@@ -1,0 +1,960 @@
+---
+name: ripple-ts
+description: .tsrx syntax and documentation
+disable-model-invocation: true
+---
+
+# Ripple - AI/LLM Documentation
+
+## Overview
+
+Ripple is a TypeScript-first UI framework and runtime for `.tsrx` files. TSRX is
+the shared source language; Ripple is the target that provides fine-grained
+reactivity, DOM rendering, server modules, hydration, context, portals, and
+reactive collections.
+
+When answering Ripple questions:
+
+- Prefer `.tsrx` component examples.
+- Return direct JSX for single-root components: `function Component(props) { return <div />; }`.
+- Use JSX statement containers (`@{...}`) when TypeScript setup belongs next to the rendered output.
+- Use JSX text for static text and `{expr}` for dynamic values.
+- When a statement container mixes TypeScript setup with rendered output, put
+  setup first and finish it with one JSX element, JSX fragment, or JSX
+  control-flow expression. It cannot finish with a bare expression container,
+  and script statements cannot appear after the final output.
+- Use `@if`, `@for`, `@switch`, and `@try` for rendered control flow. Their bodies
+  are implicit statement containers and must use `{...}` blocks.
+- Keep runtime API guidance Ripple-specific, but keep syntax guidance aligned
+  with TSRX.
+
+For target-neutral TSRX syntax, see https://tsrx.dev/llms.txt.
+
+## Install
+
+```bash
+npm install ripple @ripple-ts/vite-plugin
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { ripple } from '@ripple-ts/vite-plugin';
+
+export default defineConfig({
+	plugins: [ripple()],
+});
+```
+
+Mount client apps with `mount()`.
+
+```ts
+import { mount } from 'ripple';
+import { App } from './App.tsrx';
+
+mount(App, {
+	target: document.getElementById('root'),
+	props: { title: 'Hello world' },
+});
+```
+
+`mount()` renders the app under a default `try`/`pending`/`catch` boundary.
+Pass `rootBoundary: { pending?, catch? }` to give it components, or
+`rootBoundary: false` to render without one: `trackAsync()` must then sit inside
+a user `@try` block, and errors that escape a `@try` propagate out of the flush.
+
+Use `hydrate()` for server-rendered HTML that should become interactive.
+
+```ts
+import { hydrate } from 'ripple';
+import { App } from './App.tsrx';
+
+hydrate(App, {
+	target: document.getElementById('root'),
+});
+```
+
+## Components
+
+Components are TypeScript functions. Return a JSX element directly when there is
+one root, use a fragment for real multiple-child output, and use a JSX statement
+container (`@{...}`) when setup statements belong next to the UI.
+
+```tsrx
+export function Button({ text, onClick }: { text: string; onClick: () => void }) {
+	return <button class="button" {onClick}>{text}</button>;
+}
+
+export function App() {
+	return <Button text="Save" onClick={() => console.log('saved')} />;
+}
+```
+
+When setup code and rendered output share the same scope, use `@{...}`. Setup
+comes first and the statement container finishes with one output node: a JSX
+element, JSX fragment, or JSX control-flow expression.
+
+```tsrx
+import { track } from 'ripple';
+
+export function Counter() @{
+	const count = track(0);
+
+	function increment() {
+		count.value++;
+	}
+
+	<button onClick={increment}>Count: {count.value}</button>
+}
+```
+
+If output needs multiple siblings, text, or expression containers after setup,
+wrap that output in a fragment. Plain text between tags is JSX text, not
+JavaScript.
+
+Props are plain objects. `<Child a={x} b="y" />` builds `{ a: x, b: 'y' }` once,
+when the component is called, and passes it as is: every prop expression is
+evaluated at that moment, and the object works everywhere a plain object does
+(`Object.keys`, spread, `JSON.stringify`, `structuredClone`, `.ts` helpers, a
+call like `{Format(props)}`). A prop only changes what the child shows when the
+value itself is live: pass the tracked object (`count={count}`) for state the
+child may also write, or a derived (`title={track(() => label + count.value)}`,
+a `Derived<string>`) for a computed, read-only value. The child reads `.value`
+in both cases:
+
+```tsrx
+import { track, type Derived, type Tracked } from 'ripple';
+
+function Card({ title, count }: { title: Derived<string>; count: Tracked<number> }) @{
+	<p>{title.value} ({count.value})</p>
+}
+
+export function App() @{
+	const count = track(0);
+	const label = 'Clicks';
+	<>
+		<Card title={track(() => label + ': ' + count.value)} {count} />
+		<button onClick={() => count.value++}>More</button>
+	</>
+}
+```
+
+`count={count.value}` passes the current value, a number, and the child never
+sees later changes; the types say which it is, since `number` is a value and
+`Tracked<number>` is live. Ordinary destructuring (`{ a, ...rest }`) works on
+the plain props object.
+
+```tsrx
+export function LiteralText() {
+	return <div>
+		x = 123
+	</div>;
+}
+```
+
+## Text Inference
+
+Ripple infers locally known primitive text by default, including local primitive
+annotations, numeric operators, and unshadowed `String()`, `Number()`, `Boolean()`,
+`BigInt()`, and `Date()` calls. Do not require `as string` or `String()` just to
+render a number. `Date()` returns text; `new Date()` produces an object.
+
+Project-wide TypeScript checking is opt-in:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { ripple } from '@ripple-ts/vite-plugin';
+
+export default defineConfig({
+	plugins: [ripple({ textTypes: { tsconfig: 'tsconfig.json' } })],
+});
+```
+
+- Requires TypeScript 5.9.3 or newer and `strictNullChecks` (or `strict: true`).
+  Resolve the tsconfig path from the Vite project root.
+- Proves strings, numbers, bigints, and their unions from imported types,
+  member reads, function return types, and control-flow narrowing. Unproven
+  values retain local inference; the option does not force children to text.
+- Applies only to production builds without watch mode. Development, HMR, and
+  watched builds keep local inference.
+- The plugin manages the checker and shares its type information with Ripple's
+  automatic server build. Applications do not need manual compiler calls or a
+  `createTextTypeProject()` setup. Independently run client/server builds must
+  use the same option, tsconfig, and unchanged source tree.
+- The analysis enables `noUncheckedIndexedAccess` internally without editing the
+  tsconfig, so potentially missing entries do not become non-null text proofs.
+
+## Reactivity
+
+Create reactive state with `track()`. Reading `.value` subscribes to the
+tracked object; assigning to `.value` updates it.
+
+```tsrx
+import { effect, track, type Tracked } from 'ripple';
+
+export function Counter() @{
+	const count = track(0);
+	const double = track(() => count.value * 2);
+
+	effect(() => {
+		console.log('count changed', count.value);
+	});
+
+	<>
+		<p>Count: {count.value}</p>
+		<p>Double: {double.value}</p>
+		<button onClick={() => count.value++}>Increment</button>
+		<CounterValue {count} />
+	</>
+}
+
+function CounterValue({ count }: { count: Tracked<number> }) {
+	return <p>Shared value: {count.value}</p>;
+}
+```
+
+`track(fn)` returns a `Derived`: its `value` is read-only in the types, and a
+write to it warns in development. Pass a setter, or `true` in the setter
+position, when the derived is meant to accept writes
+(`track(() => draft, undefined, true)` is a `WritableDerived`); a write then
+holds until the next recompute. A `Tracked` satisfies `Derived` where only reads
+are needed, so `trackReadOnly(count)` (equivalent to `track(() => count.value)`;
+a read-only derived is returned as it is) is the read-only way to hand tracked
+state to a child.
+
+Use `untrack(fn)` when an effect or derived value needs to read something without
+subscribing to it.
+
+Use `snapshot(value)` to take a plain, detached shallow copy of a reactive array
+or object. Values are read without subscribing, so it is safe to call inside an
+effect or derived. The copy is a plain array or object (not a proxy); nested
+values are shared by reference.
+
+```tsrx
+import { RippleObject, snapshot } from 'ripple';
+
+export function Settings() @{
+	const settings = new RippleObject({ theme: 'dark', fontSize: 14 });
+
+	<button onClick={() => console.log(snapshot(settings))}>{'Log settings'}</button>
+}
+```
+
+## Reactive Collections
+
+Use Ripple collection classes when collection operations should update rendered
+output.
+
+```tsrx
+import { RippleArray, RippleMap, RippleObject, RippleSet } from 'ripple';
+
+export function Inventory() @{
+	const products = new RippleArray(
+		{ id: 1, name: 'Jacket' },
+		{ id: 2, name: 'Boots' },
+	);
+	const prices = new RippleMap([[1, 120], [2, 95]]);
+	const selected = new RippleSet<number>();
+	const totals = new RippleObject({ added: 0 });
+
+	<>
+		<ul>
+			@for (const product of products; key product.id) {
+				<li>{product.name}: ${prices.get(product.id)}</li>
+			}
+		</ul>
+		<button onClick={() => selected.add(1)}>Select jacket</button>
+		<p>Selected: {selected.size + totals.added}</p>
+	</>
+}
+```
+
+Available collection APIs include `new RippleArray(...)`, `RippleArray.from(...)`,
+`RippleArray.of(...)`, `new RippleObject(...)`, `new RippleMap(...)`, and
+`new RippleSet(...)`.
+
+## Template Control Flow
+
+Rendered control flow uses directive expressions.
+
+```tsrx
+import { track } from 'ripple';
+
+export function StatusBadge() @{
+	const status = track<'idle' | 'loading' | 'done'>('idle');
+
+	<>
+		@switch (status.value) {
+			@case 'loading': {
+				<p>Loading...</p>
+			}
+			@case 'done': {
+				<p>Done</p>
+			}
+			@default: {
+				<p>Idle</p>
+			}
+		}
+		<button onClick={() => (status.value = 'done')}>Finish</button>
+	</>
+}
+```
+
+Use `@for (... of ...)` for rendered lists. Filter the iterable before rendering
+when some items should be skipped, and use `@empty { ... }` for the no-items
+fallback. Direct `continue`, `break`, and `return` statements are not allowed in
+`@for` template loop bodies, and are also invalid inside `@if` template branches.
+`@switch` cases use `@case` and `@default` clauses with isolated `{...}` blocks.
+They do not fall through, and do not use `break` or `return`.
+
+```tsrx
+export function UserList({ users }: { users: User[] }) @{
+	const visibleUsers = users.filter((user) => !user.hidden);
+
+	<ul>
+		@for (const user of visibleUsers; index i; key user.id) {
+			<li>{i + 1}. {user.name}</li>
+		} @empty {
+			<li>No users</li>
+		}
+	</ul>
+}
+```
+
+Use ordinary TypeScript `return` for true component exits in setup code.
+
+```tsrx
+export function Profile({ user }: { user: User | null }) @{
+	if (!user) {
+		return null;
+	}
+
+	<h1>{user.name}</h1>
+}
+```
+
+`@try` provides pending and error UI.
+
+```tsrx
+export function ProfileBoundary() @{
+	@try {
+		<UserProfile />
+	} @pending {
+		<p>Loading...</p>
+	} @catch (error, reset) {
+		<div>
+			<p>Error: {error.message}</p>
+			<button onClick={() => reset()}>Try again</button>
+		</div>
+	}
+}
+```
+
+## Events And Refs
+
+Events use JSX-style handler props. DOM refs can be callback refs, tracked refs,
+or local variables.
+
+Import `JSX` and `Ripple` with `import type { JSX, Ripple } from 'ripple'` for
+element prop and event types, such as `JSX.IntrinsicElements['input']` and
+`Ripple.EventHandler<HTMLInputElement, InputEvent>`. These are type namespaces,
+not runtime objects.
+
+```tsrx
+import { track } from 'ripple';
+
+export function SearchBox() @{
+	const query = track('');
+	let input: HTMLInputElement | undefined;
+
+	<>
+		<label>
+			Search
+			<input
+				ref={input}
+				value={query.value}
+				onInput={(event) => {
+					query.value = event.currentTarget.value;
+				}}
+			/>
+		</label>
+		<button onClick={() => input?.focus()}>Focus</button>
+	</>
+}
+```
+
+## Dynamic Components And Elements
+
+Use the dynamic tag syntax `<{expression}>` when the element tag or component
+constructor is chosen at runtime. The expression can be a string tag name, a
+component, or a tracked variable holding either. The closing tag repeats the
+same expression: `</{expression}>`. Ripple host elements use `class`, not
+React's `className`.
+
+```tsrx
+import { track, type Component } from 'ripple';
+
+type Tag = 'section' | 'article';
+
+function Summary() {
+	return <p>Summary</p>;
+}
+
+function Details() {
+	return <article>Details</article>;
+}
+
+export function DynamicPanel() @{
+	const tag = track<Tag>('section');
+	const Body = track(() => Summary, undefined, true);
+	// Or hold it in a plain Tracked: create it empty and assign the component,
+	// because track(Summary) would treat the function as a computation.
+	// const Body = track<Component>();
+	// Body.value = Summary;
+
+	<>
+		<{tag.value} class="panel">
+			<{Body.value} />
+		</{tag.value}>
+
+		<button onClick={() => {
+			tag.value = tag.value === 'section' ? 'article' : 'section';
+			Body.value = Body.value === Summary ? Details : Summary;
+		}}>
+			Swap
+		</button>
+	</>
+}
+```
+
+`track(() => Summary, undefined, true)` holds a component; the third argument
+`true` makes the derived writable so `Body.value` can be switched. A function
+passed to `track()` always creates a derived, so a plain `Tracked` holding a
+component or any other function is created empty and assigned through `.value`.
+
+The tag expression must resolve to an element name: an identifier, member
+access, static string, or a runtime expression composed of those. Calls,
+spreads, string concatenation, and string interpolation are not valid tag
+names. Do not use removed dynamic tag syntax such as `<@tag />`,
+`<@Component />`, or the imported `Dynamic` component with an `is` prop. Use
+`<{tag}>` instead.
+
+## Styles
+
+The `style` attribute accepts a CSS string or an object with camelCase or
+kebab-case keys. Ripple never adds units: write `style={{ width: '24rem',
+margin: 0, lineHeight: 1.5, '--accent': 'rebeccapurple' }}`. Nonzero lengths need
+explicit units; numbers are accepted for unitless properties and zero lengths.
+A `null` or `undefined` property value omits the declaration and removes it on
+client updates, allowing conditional styles such as `width: expanded ? '24rem' : null`.
+HTML and SVG style objects use property-specific CSS types. Import
+`CSSProperties` from `ripple` to type reusable style objects.
+CSS strings and custom property values are not validated as CSS syntax.
+
+A `<style>` block is static CSS scoped to its siblings: it styles the items
+written beside it and everything below them, never the element that contains
+it. The compiler adds a hash class to every selector in the block and to every
+element the block reaches, so rules do not leak into parents, outer siblings,
+child components, or the page. Use CSS custom properties for runtime values.
+
+```tsrx
+import { track } from 'ripple';
+
+export function Card() @{
+	const tone = track('rebeccapurple');
+
+	<>
+		<style>
+			.card {
+				border: 1px solid var(--tone);
+				padding: 1rem;
+			}
+		</style>
+		<section class="card" style={{ '--tone': tone.value }}>
+			<h2>Card</h2>
+		</section>
+	</>
+}
+```
+
+- A block lives in the children list of an element or fragment, beside the
+  output it styles. A `@{ ... }` body or an `@if`/`@for`/`@switch`/`@try` branch
+  renders one output node and a block counts as one, so wrap the block and its
+  markup in a fragment: `<><style>...</style><div /></>`.
+- Raw CSS in `<style>` is TSRX syntax: it needs a `@{ ... }` body or a branch
+  around it. In a plain function that returns JSX, write `<style>{css}</style>`,
+  an ordinary element the compiler leaves alone.
+- Blocks among the same children share one hash class and one stylesheet. A
+  nested element or fragment whose children hold a block is a nested scope with
+  its own hash; elements carry the hash of every scope around them, outer first.
+  Outer rules reach nested scopes; inner rules never reach out.
+- A block inside an `@if`/`@for` branch styles only the elements that branch
+  renders, but its CSS always ships, because CSS is static.
+- A selector that matches nothing the block can reach, including a selector
+  that only matches the containing element, is removed as unused and left as a
+  `/* (unused) ... */` comment.
+- A scoped block accepts only the `ref` and `apply` attributes.
+- Use `:global(...)` to reach outside the scope: `:global(.x)` is page-wide,
+  `.card :global(.x)` reaches only below your scoped `.card`, `:global(.dark)
+  .card` reacts to an ancestor's class, `.card:global(.is-open)` matches a class
+  another library toggles. `:global { ... }` does the same for every rule inside
+  it. `:global` may only start or end a selector. Prefer passing a class from a
+  theme to a child you own; keep `:global` for children you cannot change, with
+  a scoped selector in front:
+
+  | I want to ...                                              | Use ...                                                                                  |
+  | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+  | Style my own elements                                      | A `<style>` block beside them; nothing global                                            |
+  | Share a look across my own components                      | A theme and `<style apply={theme} />` in each                                            |
+  | Let a child component pick up my styles                    | Pass `theme.$class` or `theme.card` as a prop                                            |
+  | Style a child I cannot change (third-party, rendered HTML) | `.wrapper :global(.their-class)`, or `.wrapper { :global { ... } }`; scoped prefix first |
+  | React to page-level state                                  | `:global(.theme-dark) .card` or `:global([data-theme='dark']) .card`                     |
+  | Style my element with a class another library toggles     | `.card:global(.is-open)`                                                                 |
+  | Page-wide rules (`body`, resets, fonts)                    | A `.css` file the page links, not a bare `:global`                                       |
+- CSS comes out in source order, outer scope first: a scope's blocks stay one
+  group, nested scopes follow their parent, sibling scopes follow source order,
+  an assigned block sits at its declaration, and an applied theme comes before
+  the block that applies it. At equal specificity the later rule wins.
+
+Assigning a `<style>` block to a variable produces a **class map** instead of a
+scoped block: `$class` is the block's hash class (after the classes of any theme
+it applies) and every standalone class selector becomes a key whose value is
+the hash class plus the class name. The declaration can sit at module scope or
+inside a component body. Pass these strings to child components as props.
+
+```tsrx
+export const theme = <style>
+	div {
+		color: green;
+	}
+	.dark {
+		color: purple;
+	}
+</style>;
+// theme.$class -> 'tsrx-1a2b3c4d'
+// theme.dark -> 'tsrx-1a2b3c4d dark'
+
+export function Badge() {
+	return <span class={theme.dark}>New</span>;
+}
+```
+
+- A block that is exported, applied, or whose `$class` is read is a **theme**
+  and keeps every selector, element and descendant selectors included. A block
+  only read through its class keys keeps only its standalone class selectors.
+- `$class` is reserved; a standalone `<style>` at module scope is an error.
+
+`<style apply={theme} />` adds the theme's `$class` to every element of the
+scope it sits in, so the theme's element and descendant rules reach them as if
+the theme had been written there. `<style apply={theme}>...</style>` applies the
+theme and declares the scope's own block in one tag.
+
+```tsrx
+import { theme } from './theme.tsrx';
+
+export function Panel() @{
+	<>
+		<style apply={theme}>
+			div {
+				color: black;
+			}
+		</style>
+		<span class={theme.dark}>Purple</span>
+		<div>Black: the local rule beats the theme's green</div>
+	</>
+}
+```
+
+- `apply={[a, b]}` applies several themes; `const accent = <style apply={base}>`
+  composes at the definition, and `accent.$class` lists `base`'s classes first;
+  `export const bundle = <style apply={[a, b]} />;` bundles themes with no CSS
+  of its own.
+- The target must be an identifier, member expression, or array of those,
+  naming a block declared earlier in the module or imported. A same-module theme
+  becomes a string literal in the class attribute; an imported theme is read at
+  runtime through `theme.$class`.
+- To opt single elements in instead of a whole scope, give them
+  `class={theme.$class}`; a child component can receive `theme.$class` through a
+  prop and put it on its own elements.
+- An element's class list is: its own classes, the hash classes of the scopes
+  around it outer to inner, then the applied themes' classes.
+- On the client the Vite plugin emits one virtual CSS module per `.tsrx` file,
+  imported after the module's own imports. On the server, `render` returns the
+  hashes of the scopes it rendered as `css` (an applied theme before the scope
+  that applies it); a class map registers its sheet when one of its entries is
+  read. Style errors are compile errors with `tsrx-style-*` codes.
+
+## Context
+
+Use `new Context(defaultValue?)`, `set(value)`, and `get()` to share state through
+the component tree. Store tracked values directly or as properties of an object
+so consumers see updates. Use derived values (`track(() => store.theme.value)`)
+when consumers should only read them.
+
+Export one context instance from a shared module and import it in providers and
+consumers. Each `new Context()` creates a separate context, even if the type or
+default value matches. A shared module avoids circular imports between components.
+
+```ts
+// theme-context.ts
+import { Context, type Tracked } from 'ripple';
+
+export type ThemeStore = {
+	theme: Tracked<string>;
+};
+
+export const ThemeContext = new Context<ThemeStore>();
+```
+
+```tsrx
+// App.tsrx
+import { track } from 'ripple';
+import { ThemeContext } from './theme-context';
+import { Button } from './Button.tsrx';
+
+export function App() @{
+	const store = { theme: track('light') };
+	ThemeContext.set(store);
+
+	<>
+		<p>Theme in App: {store.theme.value}</p>
+		<Button />
+	</>
+}
+```
+
+```tsrx
+// Button.tsrx
+import { ThemeContext } from './theme-context';
+
+export function Button() @{
+	const store = ThemeContext.get();
+
+	<button onClick={() => {
+		store.theme.value = store.theme.value === 'light' ? 'dark' : 'light';
+	}}>
+		Toggle theme: {store.theme.value}
+	</button>
+}
+```
+
+Both components share the store object: the button updates `store.theme.value`,
+and both displays update. The store itself is a plain object; its `theme`
+property holds the tracked value. Call `.set()` and `.get()` during component
+initialization, not at module scope or inside event handlers.
+
+A child's `.set(newValue)` overrides the context's provided value for itself and
+its descendants; ancestors and sibling branches retain their existing value.
+This restriction applies to replacing the provided value with `.set()`, not to
+updating reactive properties of a shared object. For shared updates, call
+`.set(store)` once in a common ancestor and have consumers mutate its reactive
+properties, such as `store.theme.value = 'dark'`, instead of calling `.set()`
+again. All reactive consumers of that property, including ancestors, see the
+update. Use a child's `.set()` for an intentional subtree override.
+
+Reactive reads of `.value` subscribe to updates; importing or passing the context
+alone does not subscribe a component. Assigning to an ordinary property of a
+plain object does not trigger an update; use tracked properties or a reactive
+object for values the UI should follow.
+
+Alternatively, keep the provider setup in `App` and pass the same instance with
+`<Button context={ThemeContext} />`. The component in `Button.tsrx` can then use:
+
+```tsrx
+import type { Context } from 'ripple';
+import type { ThemeStore } from './theme-context';
+
+export function Button({ context }: { context: Context<ThemeStore> }) @{
+	const store = context.get();
+
+	<button onClick={() => {
+		store.theme.value = store.theme.value === 'light' ? 'dark' : 'light';
+	}}>
+		Toggle theme: {store.theme.value}
+	</button>
+}
+```
+
+Context lookup follows component ancestry, including when the instance is passed
+as a prop. File boundaries do not change which provider a component reads.
+
+## Portals
+
+Use `Portal` to render content outside the normal DOM position.
+
+```tsrx
+import { Portal, track } from 'ripple';
+
+export function ModalDemo() @{
+	const open = track(false);
+
+	<>
+		<button onClick={() => (open.value = true)}>Open</button>
+		@if (open.value) {
+			<Portal target={document.body}>
+				<div class="modal">
+					<p>Modal content</p>
+					<button onClick={() => (open.value = false)}>Close</button>
+				</div>
+			</Portal>
+		}
+	</>
+}
+```
+
+## Server Modules
+
+`module server { ... }` declares server-only exports in a `.tsrx` module. Import
+from `server` in the same file to call those exports from client code through the
+Ripple server integration.
+
+```tsrx
+module server {
+	export async function saveName(name: string) {
+		return { ok: true, name };
+	}
+}
+
+import { saveName } from server;
+import { track } from 'ripple';
+
+export function Form() @{
+	const name = track('');
+	const saved = track('');
+	const submit = async () => {
+		const result = await saveName(name.value);
+		saved.value = result.name;
+	};
+
+	<>
+		<input value={name.value} onInput={(event) => (name.value = event.currentTarget.value)} />
+		<button onClick={submit}>Save</button>
+		<p>Saved: {saved.value}</p>
+	</>
+}
+```
+
+## Server-Side Rendering
+
+`ripple/server` renders components to HTML on the server; the client makes the
+result interactive with `hydrate()`.
+
+- `render(component, options?)` — renders to completion and resolves
+  `{ head, body, css, topLevelError }`. `head` and `body` are HTML strings for
+  the document's head and body insertion points; `css` is a `Set` of scoped
+  style hashes.
+- `createStream()` — returns `{ stream, sink }`: a web `ReadableStream`
+  for the HTTP response and the sink that `render` writes into.
+- `getCss(css)` — returns the CSS text for a set of hashes; emit it
+  in a `<style data-ripple-ssr>` tag so hydration can replace it with client
+  styles.
+
+`render` options:
+
+- `rootBoundary` — `{ pending?, catch? }` components wrapped around the app
+  root; used when no user `@try` boundary handles a suspension or error.
+- `stream` — a sink from `createStream()`; switches to streaming SSR and
+  resolves `{ stream, topLevelError }` instead of HTML strings.
+- `streamTemplate` — `{ before, between, after }` document scaffold for
+  streaming: `before` + SSR head content + `between` + shell body go out in the
+  first push, `after` is pushed when the stream closes.
+- `closeStream` — set `false` to keep the sink open for further writes;
+  defaults to `true` when `stream` is set.
+
+Buffered rendering:
+
+```ts
+import { render, getCss } from 'ripple/server';
+
+const { head, body, css } = await render(App);
+const html = template
+	.replace('<!--ssr-head-->', `${head}<style data-ripple-ssr>${getCss(css)}</style>`)
+	.replace('<!--ssr-body-->', body);
+```
+
+### Streaming SSR
+
+With `stream` set, `render` flushes a shell immediately: all synchronous
+content, each suspended `@try` boundary showing its `@pending` fallback, and
+all CSS registered so far. As each boundary's async work settles, its HTML
+streams as a self-contained chunk — carrying its own CSS, serialized
+`trackAsync` results, and `<head>` content — and an inline runtime swaps it
+into place. Chunks arrive out of order, parents always before children.
+Catch-only boundaries stream an empty slot that later resolves to the body or
+the server-rendered `@catch` HTML. `hydrate()` handles both arrival orders:
+content swapped before hydration hydrates normally, and later chunks activate
+their boundary in place without re-rendering.
+
+```ts
+import { render, createStream } from 'ripple/server';
+
+const { stream, sink } = createStream();
+render(App, {
+	stream: sink,
+	rootBoundary: { pending: Loading },
+	streamTemplate: {
+		before: '<!doctype html><html><head>',
+		between: '</head><body><div id="app">',
+		after: '</div></body></html>',
+	},
+});
+return new Response(stream, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+```
+
+Apps built on `@ripple-ts/vite-plugin` enable streaming for render routes in
+`ripple.config.ts` instead of calling `render` directly. A root boundary there
+names its components by module, like a route `entry` (path, or
+`[exportName, path]`), so the browser never imports the config:
+
+```ts
+export default {
+	rootBoundary: { pending: '/src/Loading.tsrx' },
+	ssr: {
+		streaming: true,
+	},
+};
+```
+
+`index.html` must keep the `<!--ssr-head-->` and `<!--ssr-body-->` markers;
+the plugin falls back to buffered SSR with a warning when they are missing.
+
+### Static Generation
+
+`prerender(component, options?)` is the static-generation counterpart of
+`render`: buffered, every `@try` boundary and `trackAsync` settled before it
+resolves, and the scoped CSS returned as text.
+
+```ts
+import { prerender } from 'ripple/server';
+
+const { head, body, css } = await prerender(App);
+const html = template
+	.replace('<!--ssr-head-->', `${head}<style data-ripple-ssr>${css}</style>`)
+	.replace('<!--ssr-body-->', body);
+```
+
+Apps built on `@ripple-ts/vite-plugin` mark render routes instead. The build
+renders each marked route through the production server entry and writes
+`<outDir>/client<path>/index.html`, which the adapter's static file handler
+serves before the server renders anything; the page still hydrates. Only a
+static path (no `:param` or `*` segment) can be prerendered.
+
+```ts
+import { defineConfig, RenderRoute } from '@ripple-ts/vite-plugin';
+
+export default defineConfig({
+	router: {
+		routes: [
+			new RenderRoute({ path: '/', entry: './src/Home.tsrx', prerender: true }),
+			new RenderRoute({ path: '/dashboard', entry: './src/Dashboard.tsrx' }),
+		],
+	},
+});
+```
+
+### Client-Only Builds
+
+An app that never hydrates server-rendered HTML tells the Vite plugin so:
+
+```ts
+export default defineConfig({
+	plugins: [ripple({ ssr: false })],
+});
+```
+
+Components then compile to bare DOM reads instead of the hydration cursor,
+`track()` calls carry no serialization hashes, and the runtime's hydration
+paths stay out of the bundle. `hydrate()` throws in such a build, and the
+option is rejected when `ripple.config.ts` declares render routes.
+
+An app that renders without the default root boundary (`mount(App, { target,
+rootBoundary: false })`) can leave the boundary runtime out of its bundle with
+`ripple({ rootBoundary: false })`; a `rootBoundary` option on `mount()` or
+`hydrate()` then throws, and `trackAsync()` must sit inside a user `@try`.
+
+### Custom Serialization
+
+Set `transport` in `ripple.config.ts` to serialize custom types in `trackAsync`
+hydration results and RPC arguments/results in both directions. The handlers
+live in their own module, which the config names by path (default export) or
+`[exportName, path]` tuple; the browser imports that module, never
+`ripple.config.ts`:
+
+```ts
+// src/transport.ts
+import type { Transport } from 'ripple';
+import { Money } from './money';
+
+export const transport: Transport = {
+	Money: {
+		encode: (value) => value instanceof Money && [value.amount, value.currency],
+		decode: ([amount, currency]) => new Money(amount, currency),
+	},
+};
+
+// ripple.config.ts
+export default defineConfig({ transport: ['transport', '/src/transport.ts'] });
+```
+
+Handlers are synchronous and browser compatible. `encode` returns truthy
+serializable data for recognized values, or `false`/`undefined` to skip them;
+wrap falsy data in an array or object. `decode` rebuilds the value. Encoders can
+claim plain objects too. With no transport or an empty one, plain hydration data
+uses raw JSON and other values use devalue's built-in types. A nonempty transport
+uses devalue for all hydration results. RPC always uses devalue.
+
+The Vite plugin registers the handlers at startup. For a custom integration,
+call `setTransport(transport)` from `ripple/server` before rendering or serving
+RPC, and from `ripple` in the browser before `hydrate`, `mount`, or RPC calls.
+Registration is application-wide; use the same definitions on both sides.
+`setTransport()` or `setTransport({})` restores built-in serialization.
+
+## Raw HTML
+
+Use `innerHTML={trustedHtml}` for trusted markup. Do not pass untrusted strings to
+raw HTML props.
+
+```tsrx
+export function Article({ markup }: { markup: string }) {
+	return <article innerHTML={markup} />;
+}
+```
+
+## Do And Do Not
+
+Do:
+
+- Use `.tsrx` for component files.
+- Return single-root components directly in examples.
+- Use `@{...}` when setup appears next to rendered output, and finish the
+  statement container with one JSX element, JSX fragment, or JSX control-flow expression.
+- Use JSX text for literal children.
+- Use `@for` for rendered lists and `@if` for conditional rendering.
+- Use Ripple collections for reactive collection state.
+- Pass a tracked or a derived as a prop when the child must follow a change; a
+  prop expression is evaluated once, when the component is called.
+- Put a `<style>` block beside the elements it styles, inside a fragment or
+  element; assign a block to a variable to share it as a theme (`apply`,
+  `$class`) or class map.
+
+Do not:
+
+- Use quoted-string text children as examples.
+- Use raw `if`, `for`, `switch`, or `try` as rendered control flow.
+- Treat plain text inside a template as JavaScript; it is JSX text.
+- Put JavaScript expressions inside `<style>` blocks.
+- Expect a `<style>` block to style the element that contains it, or write raw
+  CSS in a `<style>` inside a plain function that returns JSX.
+- Invent imports or runtime APIs outside the `ripple` package or the active
+  bundler integration.
+
+## Resources
+
+- Ripple website: https://www.ripple-ts.com
+- Ripple docs: https://www.ripple-ts.com/docs
+- Ripple playground: https://www.ripple-ts.com/playground
+- TSRX language docs: https://tsrx.dev/llms.txt
+- Source: https://github.com/Ripple-TS/ripple
+
+This document is optimized for AI/LLM understanding of current Ripple authoring.

@@ -1,0 +1,28 @@
+{
+  "languages": {
+    "TSRX": {
+      "format_on_save": "on",
+      "formatter": "language_server"
+    }
+  },
+  "lsp": {
+    "tsrx-language-server": {
+      "settings": {
+        "tsrx": {
+          "validate": {
+            "enable": true
+          }
+        }
+      }
+    },
+    "vtsls": {
+      "settings": {
+        "typescript": {
+          "tsserver": {
+            "pluginPaths": ["."]
+          }
+        }
+      }
+    }
+  }
+}

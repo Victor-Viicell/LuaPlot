@@ -1,0 +1,32 @@
+{
+  "tsrx": {
+    "compiler": "@tsrx/ripple",
+    "platform": "web"
+  },
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "jsx": "preserve",
+    "jsxImportSource": "ripple",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* TSRX language service support for .tsrx files */
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
+  },
+  "include": ["src"]
+}
