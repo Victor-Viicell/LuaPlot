@@ -8,7 +8,9 @@ export function MainContainer() @{
             <div class="portrait">
               <div class="portrait-inner"></div>
             </div>
-            <div class="left-options"></div>
+            <div class="left-options">
+              <div class="left-options"></div>
+            </div>
           </div>
           <div class="stats-and-right-options">
             <div class="stats"></div>
@@ -78,6 +80,9 @@ export function MainContainer() @{
         );
         flex-shrink: 0;
         gap: var(--section-gap);
+      }
+
+      .option-buttom {
       }
 
       .portrait {
