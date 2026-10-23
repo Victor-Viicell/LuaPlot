@@ -4,18 +4,12 @@ export function MainContainer() @{
       <div class="main-panel">
         <div class="main-stage"></div>
         <div class="player-gui">
-          <div class="portrait-and-left-options">
-            <div class="portrait">
-              <div class="portrait-inner"></div>
-            </div>
-            <div class="left-options">
-              <div class="left-options"></div>
-            </div>
+          <div class="options"></div>
+          <div class="portrait">
+            <div class="portrait-inner"></div>
           </div>
-          <div class="stats-and-right-options">
-            <div class="stats"></div>
-            <div class="right-options"></div>
-          </div>
+          <div class="stats"></div>
+          <div class="options"></div>
         </div>
       </div>
     </div>
@@ -54,7 +48,7 @@ export function MainContainer() @{
       }
 
       .player-gui {
-        --player-gui-height: 400px;
+        --player-gui-height: 300px;
         --player-gui-padding: 10px;
         --section-gap: 10px;
         --option-button-size: 56px;
@@ -70,26 +64,13 @@ export function MainContainer() @{
         background-color: var(--color-bg-elevated);
       }
 
-      .portrait-and-left-options {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        width: calc(
-          var(--player-gui-height) - (2 * var(--player-gui-padding)) -
-            var(--option-button-size) - var(--section-gap)
-        );
-        flex-shrink: 0;
-        gap: var(--section-gap);
-      }
-
       .option-buttom {
       }
 
       .portrait {
-        position: relative;
         display: flex;
-        flex: 1;
-        min-height: 0;
+        height: 100%;
+        aspect-ratio: 1;
         align-items: center;
         justify-content: center;
         border: 1px solid var(--color-border);
@@ -127,14 +108,6 @@ export function MainContainer() @{
         text-align: center;
       }
 
-      .left-options {
-        display: flex;
-        flex: 0 0 var(--option-button-size);
-        width: 100%;
-        flex-direction: row;
-        justify-content: space-between;
-      }
-
       .stats-and-right-options {
         display: flex;
         flex-direction: row;
@@ -157,7 +130,7 @@ export function MainContainer() @{
         background-color: var(--color-surface);
       }
 
-      .right-options {
+      .options {
         display: flex;
         flex-direction: column;
         flex: 0 0 var(--option-button-size);
