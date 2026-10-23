@@ -2,6 +2,11 @@ export function MainContainer() @{
   <>
     <div class="main-container">
       <div class="main-panel">
+        <div class="main-header">
+          <div class="portrait">
+            <div class="portrait-inner"></div>
+          </div>
+        </div>
         <div class="main-stage"></div>
         <div class="player-gui">
           <div class="options">
@@ -26,28 +31,7 @@ export function MainContainer() @{
               <div class="option-label">Inventory</div>
             </div>
           </div>
-          <div class="portrait">
-            <div class="portrait-inner"></div>
-          </div>
           <div class="stats"></div>
-          <div class="options">
-            <div class="option-buttom">
-              <div class="option-label"></div>
-              <div class="option-arrow"></div>
-            </div>
-            <div class="option-buttom">
-              <div class="option-label"></div>
-              <div class="option-arrow"></div>
-            </div>
-            <div class="option-buttom">
-              <div class="option-label"></div>
-              <div class="option-arrow"></div>
-            </div>
-            <div class="option-buttom">
-              <div class="option-label"></div>
-              <div class="option-arrow"></div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -59,8 +43,7 @@ export function MainContainer() @{
         height: 100%;
         width: 100%;
         margin: 0;
-        padding-top: 10px;
-        padding-bottom: 10px;
+        padding: 10px;
         background-color: var(--color-bg);
       }
 
@@ -70,6 +53,17 @@ export function MainContainer() @{
         height: 100%;
         width: 100%;
         gap: 10px;
+      }
+
+      .main-header {
+        display: flex;
+        flex-direction: row;
+        height: 100px;
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--color-border);
+        border-radius: 9px;
+        background-color: var(--color-bg-elevated);
       }
 
       .main-stage {
@@ -167,7 +161,7 @@ export function MainContainer() @{
 
       .options {
         display: flex;
-        width: 150px;
+        width: 100%;
         flex-direction: column;
         height: 100%;
         gap: 10px;

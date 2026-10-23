@@ -1,13 +1,9 @@
-import { LeftSidebar } from "./components/LeftSidebar.tsrx";
 import { MainContainer } from "./components/MainContainer.tsrx";
-import { RightSidebar } from "./components/RightSidebar.tsrx";
 
 export function App() @{
   <>
     <main class="app">
-      <LeftSidebar />
       <MainContainer />
-      <RightSidebar />
     </main>
 
     <style>
