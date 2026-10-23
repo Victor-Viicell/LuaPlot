@@ -4,12 +4,50 @@ export function MainContainer() @{
       <div class="main-panel">
         <div class="main-stage"></div>
         <div class="player-gui">
-          <div class="options"></div>
+          <div class="options">
+            <div class="option-buttom">
+              <div class="option-arrow">«</div>
+              <div class="option-label">Inventory</div>
+            </div>
+            <div class="option-buttom">
+              <div class="option-arrow">«</div>
+              <div class="option-label">Inventory</div>
+            </div>
+            <div class="option-buttom">
+              <div class="option-arrow">«</div>
+              <div class="option-label">Inventory</div>
+            </div>
+            <div class="option-buttom">
+              <div class="option-arrow">«</div>
+              <div class="option-label">Inventory</div>
+            </div>
+            <div class="option-buttom">
+              <div class="option-arrow">«</div>
+              <div class="option-label">Inventory</div>
+            </div>
+          </div>
           <div class="portrait">
             <div class="portrait-inner"></div>
           </div>
           <div class="stats"></div>
-          <div class="options"></div>
+          <div class="options">
+            <div class="option-buttom">
+              <div class="option-label"></div>
+              <div class="option-arrow"></div>
+            </div>
+            <div class="option-buttom">
+              <div class="option-label"></div>
+              <div class="option-arrow"></div>
+            </div>
+            <div class="option-buttom">
+              <div class="option-label"></div>
+              <div class="option-arrow"></div>
+            </div>
+            <div class="option-buttom">
+              <div class="option-label"></div>
+              <div class="option-arrow"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -62,9 +100,6 @@ export function MainContainer() @{
         border: 1px solid var(--color-border);
         border-radius: 9px;
         background-color: var(--color-bg-elevated);
-      }
-
-      .option-buttom {
       }
 
       .portrait {
@@ -132,10 +167,30 @@ export function MainContainer() @{
 
       .options {
         display: flex;
+        width: 150px;
         flex-direction: column;
-        flex: 0 0 var(--option-button-size);
         height: 100%;
+        gap: 10px;
+      }
+
+      .option-buttom {
+        display: flex;
+        flex-direction: row;
         justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+        background-color: var(--color-surface);
+        gap: 10px;
+        padding: 10px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        border: 1px solid var(--color-border);
+        border-radius: 7px;
+      }
+      .option-buttom:hover {
+        background-color: var(--color-surface-hover);
+        cursor: pointer;
       }
     </style>
   </>
