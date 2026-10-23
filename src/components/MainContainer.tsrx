@@ -1,90 +1,18 @@
-import { ClockBar } from "./ClockBar.tsrx";
-import { InterfacePanel } from "./InterfacePanel.tsrx";
-import { LocationView } from "./LocationView.tsrx";
-import { LogDialog } from "./LogDialog.tsrx";
-import { MapView } from "./MapView.tsrx";
-import { OptionButton } from "./OptionButton.tsrx";
-import { StatBar } from "./StatBar.tsrx";
-import { LEFT_CATEGORIES, RIGHT_CATEGORIES, STAT_KEYS } from "../game/data";
-import { formatCredits, initials } from "../game/format";
-import { GameContext } from "../game/store";
-
 export function MainContainer() @{
-  const game = GameContext.get();
-
   <>
     <div class="main-container">
-      <div class="inner-panel">
-        <ClockBar />
-
-        <div class="main-stage">
-          @if (game.enteredLocation.value) {
-            <LocationView />
-          } @else {
-            <MapView />
-          }
-
-          @if (game.activeInterface.value) {
-            <>
-              <div
-                class="dialog-backdrop"
-                onClick={() => game.setInterface(null)}
-              ></div>
-              <div
-                class={
-                  "dialog-frame " +
-                  (game.activeInterface.value === "inventory" ? "compact" : "")
-                }
-              >
-                <InterfacePanel />
-              </div>
-            </>
-          }
-
-          @if (game.logOpen.value) {
-            <LogDialog />
-          }
-        </div>
-
+      <div class="main-panel">
+        <div class="main-stage"></div>
         <div class="player-gui">
           <div class="portrait-and-left-options">
             <div class="portrait">
-              <div class="portrait-inner">
-                <span class="portrait-glyph">{initials(game.player.name)}</span>
-                <span class="portrait-name">{game.player.name}</span>
-                <span class="portrait-meta">{game.player.occupation}</span>
-                <span class="portrait-tag">
-                  {game.player.district + " // STREET LEVEL"}
-                </span>
-              </div>
+              <div class="portrait-inner"></div>
             </div>
-            <div class="left-options">
-              @for (const category of LEFT_CATEGORIES; key category.id) {
-                <OptionButton {category} />
-              }
-            </div>
+            <div class="left-options"></div>
           </div>
-
           <div class="stats-and-right-options">
-            <div class="stats">
-              <div class="stats-header">
-                <span class="stats-title">CORE</span>
-                <span class="stats-credits">
-                  ¥{formatCredits(game.player.credits)}
-                </span>
-              </div>
-              <div class="stats-list">
-                @for (const stat of STAT_KEYS; key stat) {
-                  <StatBar {stat} />
-                }
-              </div>
-            </div>
-
-            <div class="right-options">
-              @for (const category of RIGHT_CATEGORIES; key category.id) {
-                <OptionButton {category} />
-              }
-            </div>
+            <div class="stats"></div>
+            <div class="right-options"></div>
           </div>
         </div>
       </div>
@@ -92,25 +20,22 @@ export function MainContainer() @{
 
     <style>
       .main-container {
-        flex: 1;
         display: flex;
-        align-items: center;
-        justify-content: center;
+        flex-direction: column;
         height: 100%;
-        min-width: 0;
+        width: 100%;
         margin: 0;
-        padding: 10px;
+        padding-top: 10px;
+        padding-bottom: 10px;
         background-color: var(--color-bg);
       }
 
-      .main-container .inner-panel {
+      .main-panel {
         display: flex;
         flex-direction: column;
+        height: 100%;
+        width: 100%;
         gap: 10px;
-        align-items: stretch;
-        justify-content: stretch;
-        background-color: var(--color-bg);
-        overflow: hidden;
       }
 
       .main-stage {
@@ -118,38 +43,12 @@ export function MainContainer() @{
         display: flex;
         flex: 1;
         min-height: 0;
+        height: 100%;
         width: 100%;
         border: 1px solid var(--color-border);
         border-radius: 9px;
         background-color: var(--color-bg-sunken);
         overflow: hidden;
-      }
-
-      .dialog-backdrop {
-        position: absolute;
-        inset: 0;
-        z-index: 30;
-        background-color: rgba(17, 17, 27, 0.58);
-        backdrop-filter: blur(2px);
-      }
-
-      .dialog-frame {
-        position: absolute;
-        inset: 18px;
-        z-index: 31;
-        display: flex;
-        min-height: 0;
-        border-radius: 10px;
-        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
-      }
-
-      .dialog-frame > * {
-        flex: 1;
-        min-width: 0;
-      }
-
-      .dialog-frame.compact {
-        inset: 48px 9%;
       }
 
       .player-gui {
@@ -223,30 +122,6 @@ export function MainContainer() @{
         text-align: center;
       }
 
-      .portrait-glyph {
-        font-size: 42px;
-        letter-spacing: 0.08em;
-        color: var(--color-accent);
-        text-shadow: 0 0 28px rgba(203, 166, 247, 0.35);
-      }
-
-      .portrait-name {
-        font-size: 13px;
-        color: var(--color-text);
-      }
-
-      .portrait-meta {
-        font-size: 10px;
-        color: var(--ctp-peach);
-      }
-
-      .portrait-tag {
-        margin-top: 6px;
-        font-size: 8px;
-        letter-spacing: 0.14em;
-        color: var(--color-text-subtle);
-      }
-
       .left-options {
         display: flex;
         flex: 0 0 var(--option-button-size);
@@ -275,36 +150,6 @@ export function MainContainer() @{
         border: 1px solid var(--color-border);
         border-radius: 7px;
         background-color: var(--color-surface);
-      }
-
-      .stats-header {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 8px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid var(--color-border);
-      }
-
-      .stats-title {
-        font-size: 9px;
-        letter-spacing: 0.18em;
-        color: var(--color-text-subtle);
-      }
-
-      .stats-credits {
-        font-size: 11px;
-        color: var(--ctp-teal);
-        font-variant-numeric: tabular-nums;
-      }
-
-      .stats-list {
-        display: flex;
-        flex: 1;
-        min-height: 0;
-        flex-direction: column;
-        justify-content: center;
-        gap: 7px;
       }
 
       .right-options {

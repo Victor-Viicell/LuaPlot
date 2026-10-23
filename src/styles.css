@@ -222,14 +222,6 @@
     box-sizing: border-box;
 }
 
-.inner-panel {
-    flex: 1;
-    height: 100%;
-    width: 100%;
-    margin: 0;
-    background-color: var(--color-bg-elevated);
-}
-
 html {
     height: 100%;
     background-color: var(--color-bg);
