@@ -12,7 +12,7 @@ export function MainContainer() @{
           <div class="options">
             <div class="option-buttom">
               <div class="option-arrow">«</div>
-              <div class="option-label">Inventory</div>
+              <div class="option-label">Map</div>
             </div>
             <div class="option-buttom">
               <div class="option-arrow">«</div>
@@ -20,7 +20,7 @@ export function MainContainer() @{
             </div>
             <div class="option-buttom">
               <div class="option-arrow">«</div>
-              <div class="option-label">Inventory</div>
+              <div class="option-label">Body</div>
             </div>
             <div class="option-buttom">
               <div class="option-arrow">«</div>
@@ -28,7 +28,7 @@ export function MainContainer() @{
             </div>
             <div class="option-buttom">
               <div class="option-arrow">«</div>
-              <div class="option-label">Inventory</div>
+              <div class="option-label">Settings</div>
             </div>
           </div>
           <div class="stats"></div>
@@ -87,7 +87,6 @@ export function MainContainer() @{
         display: flex;
         gap: var(--section-gap);
         flex-direction: row;
-        flex-shrink: 0;
         width: 100%;
         padding: var(--player-gui-padding);
         height: var(--player-gui-height);
@@ -137,20 +136,11 @@ export function MainContainer() @{
         text-align: center;
       }
 
-      .stats-and-right-options {
-        display: flex;
-        flex-direction: row;
-        flex: 1;
-        min-width: 0;
-        height: 100%;
-        gap: var(--section-gap);
-      }
-
       .stats {
         display: flex;
         flex: 1;
-        min-width: 0;
         height: 100%;
+        width: 100%;
         flex-direction: column;
         gap: 10px;
         padding: 12px;
@@ -161,7 +151,7 @@ export function MainContainer() @{
 
       .options {
         display: flex;
-        width: 100%;
+        flex-shrink: 1;
         flex-direction: column;
         height: 100%;
         gap: 10px;
