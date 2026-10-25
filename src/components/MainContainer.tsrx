@@ -1,3 +1,11 @@
+import {
+  BodyIcon,
+  InventoryIcon,
+  MapIcon,
+  SettingsIcon,
+} from "./OptionIcons.tsrx";
+import { OptionButton } from "./OptionButton.tsrx";
+
 export function MainContainer() @{
   <>
     <div class="main-container">
@@ -10,26 +18,21 @@ export function MainContainer() @{
         <div class="main-stage"></div>
         <div class="player-gui">
           <div class="options">
-            <div class="option-buttom">
-              <div class="option-arrow">«</div>
-              <div class="option-label">Map</div>
-            </div>
-            <div class="option-buttom">
-              <div class="option-arrow">«</div>
-              <div class="option-label">Inventory</div>
-            </div>
-            <div class="option-buttom">
-              <div class="option-arrow">«</div>
-              <div class="option-label">Body</div>
-            </div>
-            <div class="option-buttom">
-              <div class="option-arrow">«</div>
-              <div class="option-label">Inventory</div>
-            </div>
-            <div class="option-buttom">
-              <div class="option-arrow">«</div>
-              <div class="option-label">Settings</div>
-            </div>
+            <OptionButton label="Map">
+              <MapIcon />
+            </OptionButton>
+            <OptionButton label="Inventory">
+              <InventoryIcon />
+            </OptionButton>
+            <OptionButton label="Body">
+              <BodyIcon />
+            </OptionButton>
+            <OptionButton label="Inventory">
+              <InventoryIcon />
+            </OptionButton>
+            <OptionButton label="Settings">
+              <SettingsIcon />
+            </OptionButton>
           </div>
           <div class="stats"></div>
         </div>
@@ -43,7 +46,7 @@ export function MainContainer() @{
         height: 100%;
         width: 100%;
         margin: 0;
-        padding: 10px;
+        padding: 5px;
         background-color: var(--color-bg);
       }
 
@@ -52,7 +55,7 @@ export function MainContainer() @{
         flex-direction: column;
         height: 100%;
         width: 100%;
-        gap: 10px;
+        gap: 5px;
       }
 
       .main-header {
@@ -60,7 +63,7 @@ export function MainContainer() @{
         flex-direction: row;
         height: 100px;
         width: 100%;
-        padding: 10px;
+        padding: 5px;
         border: 1px solid var(--color-border);
         border-radius: 9px;
         background-color: var(--color-bg-elevated);
@@ -81,9 +84,9 @@ export function MainContainer() @{
 
       .player-gui {
         --player-gui-height: 300px;
-        --player-gui-padding: 10px;
-        --section-gap: 10px;
-        --option-button-size: 56px;
+        --player-gui-padding: 5px;
+        --section-gap: 5px;
+        --option-button-size: 48px;
         display: flex;
         gap: var(--section-gap);
         flex-direction: row;
@@ -142,7 +145,7 @@ export function MainContainer() @{
         height: 100%;
         width: 100%;
         flex-direction: column;
-        gap: 10px;
+        gap: 5px;
         padding: 12px;
         border: 1px solid var(--color-border);
         border-radius: 7px;
@@ -151,30 +154,11 @@ export function MainContainer() @{
 
       .options {
         display: flex;
-        flex-shrink: 1;
+        flex-shrink: 0;
         flex-direction: column;
-        height: 100%;
-        gap: 10px;
-      }
-
-      .option-buttom {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
         align-items: center;
-        width: 100%;
         height: 100%;
-        background-color: var(--color-surface);
-        gap: 10px;
-        padding: 10px;
-        padding-top: 5px;
-        padding-bottom: 5px;
-        border: 1px solid var(--color-border);
-        border-radius: 7px;
-      }
-      .option-buttom:hover {
-        background-color: var(--color-surface-hover);
-        cursor: pointer;
+        gap: 5px;
       }
     </style>
   </>
