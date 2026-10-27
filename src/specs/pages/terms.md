@@ -20,7 +20,7 @@ Stylized or drawn depictions, including loli and shota, are not treated as liter
 
 They are enforced against visual assets — avatars, images, and GIFs — and against text. Text on posts and comments is judged for all three rules; text on a character, lorebook, or preset is judged for the NSFW flag and for copying, and for nothing else. A character, lorebook, or preset avatar can still break any of the three. Copy claims about an image are always checked by a person, because a model cannot compare pictures precisely enough.
 
-The flag is what makes the viewer's own [NSFW preference](../systems/nsfw.md) possible: Show hides flagged content, Blur covers it. An accurate flag is therefore part of the rule, not a courtesy.
+The flag is what makes the viewer's own [NSFW preference](../systems/nsfw.md) possible: with Show off flagged content stays out of listings, and with Blur on it is listed but covered. An accurate flag is therefore part of the rule, not a courtesy.
 
 ### How enforcement works
 

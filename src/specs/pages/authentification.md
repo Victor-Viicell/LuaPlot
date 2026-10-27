@@ -12,7 +12,9 @@ _To be specified._
 
 ## Data
 
-- **Providers** — Google, GitHub, Discord, handled by Supabase.
+- **Providers** — Google, GitHub, Discord, handled by Supabase. The list is fixed and rendered as those three buttons: there is no enabled/disabled provider config and no provider management anywhere in the app.
+- **One account per provider** — signing in with a different provider creates a separate account. Identities are never linked, merged, or unlinked, so a returning user gets back the account belonging to the provider they chose.
+- **Provider payload** — the provider supplies identity only. Name and email are optional and none is required: the handle and display name are both settled at [`/onboarding`](onboarding.md). A provider that returns no usable name or no email is not an error.
 
 ## Actions
 
@@ -26,9 +28,3 @@ _To be specified._
 - **Provider cancelled**
 - **Callback failed**
 - **Onboarding incomplete** → [`/onboarding`](onboarding.md)
-
-## Open questions
-
-- Can one account link several providers, or is each provider a separate identity? Supabase supports identity linking; the choice affects what returning users see.
-- What if a provider returns no usable name or email?
-- Is the provider list fixed, or should this screen only render whichever providers are enabled?

@@ -136,6 +136,7 @@ Every route has its own spec under [`pages/`](pages). This file is the route ind
 - Page specs share one skeleton (Purpose, Layout, Data, Actions, States, Open questions); shared rules are stated here rather than repeated per page.
 - Not-found is reported per type: each detail route names the content that is missing ("This character doesn't exist.", "This lorebook doesn't exist.", and so on) instead of falling back to one generic message. Unknown usernames and unowned personas use the same rule.
 - Authentication is delegated to Supabase with Google, GitHub, and Discord. The app never collects or stores passwords, so there is no password field, reset flow, or credential handling in the client.
+- The three providers are the whole list and each provider is its own account: signing in with a second provider creates a new account rather than linking identities, so there is no linking, merging, or unlinking anywhere. Provider-supplied name and email are optional; the handle is claimed at onboarding.
 
 ## Not yet specified
 
