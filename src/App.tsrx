@@ -1,10 +1,6 @@
-import { MainContainer } from "./components/MainContainer.tsrx";
-
 export function App() @{
   <>
-    <main class="app">
-      <MainContainer />
-    </main>
+    <main class="app"></main>
 
     <style>
       .app {
