@@ -24,7 +24,7 @@ Engagement shown on the page:
 - **Bookmark / unbookmark**
 - **Report** → [report](../../components/report.md)
 - **Comment** (signed in only) → [comment thread](../../components/comment-thread.md)
-- **Delete** (author only)
+- **Delete** (author only) — deletes the post and, in cascade, its entire comment thread
 - **Open attached content** → character detail or session context
 - **Open author** → [profile](../user/profile.md)
 

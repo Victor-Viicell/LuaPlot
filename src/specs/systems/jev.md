@@ -53,6 +53,8 @@ What JEV actually judges:
 - The owner sees the report, the reasons, and the measures taken on the content page itself.
 - Once every reason has been patched, the owner may request public again. The content is flagged for re-verification, and JEV checks it before it becomes public.
 - Posts and comments cannot be made private. Their only enforcement is removal, which happens as soon as JEV is certain; an unsure verdict leaves them visible.
+- A removed comment is not erased from its thread: the body, likes, and attachments go, a single line reading "This comment was removed by moderation." takes their place, and every reply beneath stays visible at every depth. Only a comment with no replies disappears outright. The [comment thread](../components/comment-thread.md) holds the rule.
+- Removing a post, or a creator deleting a post, character, lorebook, or preset, takes the whole comment thread with it in cascade — the comments are deleted with their item, never left orphaned.
 
 ## Verification
 
@@ -81,7 +83,7 @@ Many reporters, one case, one scan.
 - A verified item is exempt from the queue until it changes. Reports filed meanwhile are held, not discarded.
 - Reports are cumulative per item: many reporters share one case and one scan, so a pile-on cannot multiply JEV calls.
 - A new report adds weight to the item's place in the moderation queue.
-- JEV removes a post or comment as soon as the violation is clear. There is no hidden intermediate state: an unsure verdict leaves it public and sends it to a moderator.
+- JEV removes a post or comment as soon as the violation is clear. There is no hidden intermediate state: an unsure verdict leaves it public and sends it to a moderator. A removed comment keeps a placeholder and its replies; a removed post takes its thread with it.
 - JEV acts as soon as it detects a violation; the report queue is not its only input.
 - Only visual assets and text are classified. Text on a character, lorebook, or preset is judged for its NSFW flag and for copying, not for illegal content.
 - An unflagged NSFW avatar is a violation even when the surrounding text is fine. The flag is what stops the image from reaching users who filtered NSFW out.
@@ -112,7 +114,6 @@ Many reporters, one case, one scan.
 - Can comments be edited at all? If they cannot, a verified comment never becomes eligible for the queue again.
 - Is the verified flag exposed to authors, or is it internal only?
 - Is the reporter ever told the outcome?
-- What happens to the replies under a removed comment, or the comments under a removed post?
 - Do JEV's immediate actions get an entry in the moderation queue for audit, or are they invisible to moderators?
 - Does JEV scan content on publish, or only on report and on republication requests?
 - How long does an open case block new scans — only until it concludes, or for a cool-down afterwards?

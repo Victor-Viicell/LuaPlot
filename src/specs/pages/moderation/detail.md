@@ -19,7 +19,7 @@ Review and conclude a single case JEV could not decide: uncertain content, or a 
 
 ## Actions
 
-- **Conclude** — close the case with a visibility outcome: set the content back to public, or leave it private. A confirmed violation on a post or comment removes it.
+- **Conclude** — close the case with a visibility outcome: set the content back to public, or leave it private. A confirmed violation on a post or comment removes it; a removed comment becomes a placeholder that keeps its replies (see [comment thread](../../components/comment-thread.md)).
 - **Remove avatar** — not a standalone action. It is an option taken at conclusion, when the avatar carries the serious violation while the text is valid; removal is then combined with either visibility outcome. This is the one content edit a moderator can make, and JEV never makes it.
 - **Set reason** — record or correct the reason behind the decision.
 - **Comment** — internal note on the case, never shown publicly.

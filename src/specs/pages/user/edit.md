@@ -17,7 +17,7 @@ Fields to be specified. Known so far:
 - **Display name**
 - **Avatar**
 - **Bio**
-- **NSFW preference** — **Show NSFW content** and **Blur NSFW content** ([details](../systems/nsfw.md))
+- **NSFW preference** — **Show NSFW content** and **Blur NSFW content** ([details](../../systems/nsfw.md))
 - **Username** — changing it changes the profile URL.
 
 ## Actions

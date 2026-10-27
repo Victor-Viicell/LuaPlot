@@ -35,7 +35,7 @@ Fields to be specified. Known so far:
 
 ## Open questions
 
-- Can posts be edited or deleted after publishing?
+- Can posts be edited after publishing? Deleting is settled: the author can delete a post from its detail page, and the post's whole comment thread is deleted with it in cascade.
 - Are the remaining post kinds (character share, idea, session cut) needed as explicit types, or is every post just a body plus an optional attachment?
 - Can a post attach something that is not its own, or only the author's content?
 - Can a lorebook or preset be attached, or only characters and session cuts?
