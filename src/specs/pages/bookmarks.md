@@ -14,6 +14,7 @@ _To be specified._
 
 - The bookmarked items across all four shared types, each with enough to recognize it and link back.
 - When it was saved, and what type it is.
+- NSFW items follow the viewer's [NSFW preference](../systems/nsfw.md): Show hides them, Blur covers their cards.
 
 ## Actions
 

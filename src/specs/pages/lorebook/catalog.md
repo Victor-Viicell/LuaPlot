@@ -18,6 +18,7 @@ _To be specified._
 
 - **Search**
 - **Filter** — only `All` for now
+- **NSFW preference** — the Show and Blur toggles from [NSFW preference](../../systems/nsfw.md); they edit the account, not this view
 - **Sort**
 - **Open item** → [detail](detail.md)
 - **Create** → [create](create.md)
@@ -31,10 +32,10 @@ _To be specified._
 
 ## URL
 
-Same URL-driven filter and sort state as [`/character/catalog`](../character/catalog.md), including the `All`-only filter.
+Same URL-driven filter and sort state as [`/character/catalog`](../character/catalog.md), including the `All`-only filter. The [NSFW preference](../../systems/nsfw.md) is not part of that state: it belongs to the account.
 
 ## Open questions
 
-- Which fields appear on a lorebook card — entry count, keywords, author?
+- Does the lorebook card add an entry count or its keywords to the shared card structure?
 - Are entry and keyword counts cheap enough to show without loading the whole book?
 - Pagination style, matching the character catalog.

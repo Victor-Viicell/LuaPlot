@@ -18,6 +18,7 @@ _To be specified._
 
 - **Search**
 - **Filter** — only `All` for now
+- **NSFW preference** — the Show and Blur toggles from [NSFW preference](../../systems/nsfw.md); they edit the account, not this view
 - **Sort**
 - **Open item** → [detail](detail.md)
 - **Create** → [create](create.md)
@@ -31,10 +32,10 @@ _To be specified._
 
 ## URL
 
-Same URL-driven filter and sort state as the other catalogs, including the `All`-only filter.
+Same URL-driven filter and sort state as the other catalogs, including the `All`-only filter. The [NSFW preference](../../systems/nsfw.md) is not part of that state: it belongs to the account.
 
 ## Open questions
 
-- Which settings are worth previewing on a card?
+- Does the preset card preview any settings beyond the shared card structure?
 - Is a preset tied to a specific model or provider, and does that become a filter later?
 - Pagination style, matching the other catalogs.

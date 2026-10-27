@@ -18,6 +18,7 @@ _To be specified._
 
 - **Search**
 - **Filter** — only `All` for now
+- **NSFW preference** — the Show and Blur toggles from [NSFW preference](../../systems/nsfw.md); they edit the account, not this view
 - **Sort**
 - **Open item** → [detail](detail.md)
 - **Create** → [create](create.md)
@@ -31,10 +32,10 @@ _To be specified._
 
 ## URL
 
-Filter and sort state lives in the query string so a narrowed view can be shared, bookmarked, and restored by back/forward. The only filter option for now is `All`, since tag categories are undecided; the parameter is reserved but exposes nothing else.
+Filter and sort state lives in the query string so a narrowed view can be shared, bookmarked, and restored by back/forward. The only filter option for now is `All`, since tag categories are undecided; the parameter is reserved but exposes nothing else. The [NSFW preference](../../systems/nsfw.md) is not part of this state: it belongs to the account, not to the view.
 
 ## Open questions
 
-- Which fields appear on a catalog card?
+- The card shows tags, but the tag taxonomy is undecided — what fills that row until it exists?
 - Page size and pagination style: page numbers, infinite scroll, or load more?
-- Does the catalog show each item's author, and link to their profile?
+- Does the author in the card footer link to their profile?

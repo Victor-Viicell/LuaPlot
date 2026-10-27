@@ -11,6 +11,8 @@ The discussion attached to any shared item. Every piece of shared content has on
 - **Nesting** — comments can have comments. The model allows unbounded depth; how deep the UI renders before collapsing a branch is a display decision.
 - **Engagement per comment** — likes, dislikes, and a reply count. No bookmark: bookmarks exist so content can be found again later, and a comment is already reachable from its parent.
 - **Attachments** — comments may include images and GIFs, the same as posts.
+- **No private state** — a comment is either visible or gone. Its author, or JEV, can delete it outright.
+- **Removed, not hidden** — a comment under a report stays visible until JEV is certain, then disappears. An unsure verdict goes to a moderator without hiding the comment.
 - **Counts** — an item's comment count reflects its whole thread, not just top-level comments.
 - **Ordering** — _to be specified._
 
@@ -23,6 +25,7 @@ _To be specified._
 - **Comment** on the item
 - **Reply** to a comment
 - **Like / dislike** a comment — one vote per viewer, switching replaces the previous vote
+- **Delete** a comment — author only, with JEV also able to remove it
 - **Report** a comment → [report](report.md)
 
 ## States
@@ -33,6 +36,7 @@ _To be specified._
 - **Signed out** — read only
 - **Loading**
 - **Deleted comment**
+- **Removed by JEV**
 - **Reported**
 
 ## Open questions

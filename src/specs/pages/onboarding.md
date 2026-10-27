@@ -12,7 +12,14 @@ _To be specified._
 
 ## Data
 
-_To be specified._
+Known so far:
+
+- **Username** — claimed here, since an OAuth provider supplies no handle.
+- **Display name**
+- **Show NSFW content** — boolean
+- **Blur NSFW content** — boolean
+
+The two toggles are the first write of the [NSFW preference](../systems/nsfw.md).
 
 ## Actions
 

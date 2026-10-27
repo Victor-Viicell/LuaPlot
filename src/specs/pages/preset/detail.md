@@ -17,12 +17,14 @@ Engagement shown on the page:
 - **Likes / dislikes** and the ratio between them.
 - **Comment count**, with the [comment thread](../../components/comment-thread.md) beneath the settings.
 - **Bookmark state** for the signed-in viewer.
+- **Moderation notice** (owner only, while private): the report, the reasons, and the measures taken.
 
 ## Actions
 
 - **Like / dislike** — one vote per viewer; switching replaces the previous vote
 - **Bookmark / unbookmark**
 - **Report** → [report](../../components/report.md)
+- **Request public again** (owner, while private) — flags the content for JEV re-verification
 - **Comment** on this preset → [comment thread](../../components/comment-thread.md)
 - **Fork / copy** into the viewer's account
 - **Edit** (owner only) → [edit](edit.md)
@@ -36,6 +38,8 @@ Engagement shown on the page:
 - **Signed out** — can read, cannot vote, comment, or bookmark
 - **Voted or bookmarked**
 - **Reported**
+- **Privated by moderation** — the owner sees the report, reasons, and measures; everyone else sees it as unavailable
+- **Awaiting re-verification**
 
 ## Open questions
 

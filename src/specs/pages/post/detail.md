@@ -24,6 +24,7 @@ Engagement shown on the page:
 - **Bookmark / unbookmark**
 - **Report** → [report](../../components/report.md)
 - **Comment** (signed in only) → [comment thread](../../components/comment-thread.md)
+- **Delete** (author only)
 - **Open attached content** → character detail or session context
 - **Open author** → [profile](../user/profile.md)
 
@@ -33,7 +34,8 @@ Engagement shown on the page:
 - **Signed out** — read only
 - **No comments yet**
 - **Not found** — "This post doesn't exist."
-- **Deleted post** — "This post was deleted by its author."
+- **Deleted post** — "This post doesn't exist anymore."
+- **Removed by JEV** — same message, since a removed post cannot be privatized
 - **Voted or bookmarked**
 - **Reported**
 

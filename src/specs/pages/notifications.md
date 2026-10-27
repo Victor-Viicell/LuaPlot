@@ -13,7 +13,7 @@ Events worth notifying about:
 - New public content from a user they follow (post, character, lorebook, preset).
 - A comment on one of their own posts.
 - A new follower.
-- A moderation decision on their own content: a comment or post removed, or a creation made private by JEV.
+- A moderation decision on their own content: made private, an avatar removed, or a post or comment removed. Any action by JEV or a moderator reaches the creator.
 
 Rules that keep the volume down:
 

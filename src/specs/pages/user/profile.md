@@ -12,7 +12,9 @@ _To be specified._
 
 ## Data
 
-_To be specified._
+Known so far:
+
+- Both content tabs honour the viewer's [NSFW preference](../../systems/nsfw.md): NSFW items are hidden or covered for that viewer, not removed from the profile.
 
 ## Actions
 
