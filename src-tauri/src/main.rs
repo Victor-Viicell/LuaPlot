@@ -4,7 +4,7 @@
 fn main() {
     disable_broken_dmabuf_renderer();
 
-    neonlife_lib::run()
+    luaplot_lib::run()
 }
 
 /// WebKitGTK's DMA-BUF renderer tears down the Wayland connection on NVIDIA

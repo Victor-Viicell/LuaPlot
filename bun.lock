@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "neonlife",
+      "name": "luaplot",
       "dependencies": {
         "@fontsource-variable/jetbrains-mono": "^5.3.0",
         "@tauri-apps/api": "^2",

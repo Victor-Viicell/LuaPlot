@@ -1,1 +1,0 @@
-# Neonlife docs

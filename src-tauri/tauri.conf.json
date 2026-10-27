@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "neonlife",
+  "productName": "LuaPlot",
   "version": "0.1.0",
-  "identifier": "com.viicell.neonlife",
+  "identifier": "com.viicell.luaplot",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "neonlife",
+        "title": "LuaPlot",
         "width": 800,
         "height": 600,
         "backgroundColor": "#1e1e2e"

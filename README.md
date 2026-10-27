@@ -1,4 +1,4 @@
-# Tauri + Ripple
+# LuaPlot
 
 This template gets you started with Tauri in TypeScript using Ripple (`.tsrx`)
 components and Vite.
