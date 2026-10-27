@@ -12,6 +12,11 @@ _To be specified._
 
 ## Data
 
+Shown on the page:
+
+- **Identity** — the name, the avatar, and the description and personality. The in-session name is shown beside the name when it is set and differs, since it is what the character is called inside a [session](../session/detail.md).
+- **Attached lorebooks** — the full list, each a link to `/lorebook/[lorebook.id]`; they are referenced, never embedded here. Any number may be attached, including public lorebooks by other authors. An attachment that no longer resolves stays in the list as unavailable rather than disappearing.
+
 Engagement shown on the page:
 
 - **Likes / dislikes** and the ratio between them.
@@ -46,8 +51,7 @@ Engagement shown on the page:
 ## Open questions
 
 - Does "start a session" require a persona, fall back to the default, or prompt to create one?
-- Does a fork copy the definition only, or also the attached lorebook?
+- Does a fork copy the definition only, or also the attached lorebooks?
 - Should this page show usage counts, or the author's other work?
-- Is the attached lorebook embedded here, or only linked?
 - Can an author vote on their own character?
 - Is the ratio shown as a percentage, a like/total fraction, or both raw counts?

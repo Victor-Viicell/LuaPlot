@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Active chat session. Loads the participants (character, lorebook, preset, and persona) for that session and renders the conversation with message input, so the user can continue or review an existing session. The persona is the user's own side of the conversation: the session is pinned to one, with the user's default persona used at creation, and it can be swapped mid-session without losing the transcript. A stretch of the conversation can be published as a cut, which becomes a public post while the session itself stays private. When publishing, the author chooses whether their own messages are attributed to the persona or shown as a generic `User`.
+Active chat session. Loads the participants — the character, every lorebook attached to that character, the preset, and the persona — for that session and renders the conversation with message input, so the user can continue or review an existing session. The character is addressed by its in-session name, falling back to its public name when none is set, so the transcript carries the short form. The persona is the user's own side of the conversation: the session is pinned to one, with the user's default persona used at creation, and it can be swapped mid-session without losing the transcript. A stretch of the conversation can be published as a cut, which becomes a public post while the session itself stays private. When publishing, the author chooses whether their own messages are attributed to the persona or shown as a generic `User`.
 
 Sessions are private and unmoderated: JEV never reads one, and no other user can report one. Enforcement stops at the distribution of public content — inside a session, what the user does is under their own control.
 

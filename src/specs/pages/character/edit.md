@@ -12,10 +12,13 @@ _To be specified._
 
 ## Data
 
-Same fields as [create](create.md), preloaded.
+Same fields as [create](create.md), preloaded — including the full list of attached lorebooks, which can be extended and trimmed here the same way it is built there: by ID, or picked from the author's own lorebooks and the lorebooks they bookmarked from other authors. Removing an attachment removes the reference only; the lorebook itself is untouched and may still hang off other characters.
 
 ## Actions
 
+- **Add lorebook by ID**
+- **Pick lorebook** — from own lorebooks and bookmarked lorebooks from other authors
+- **Remove lorebook**
 - **Save** → [detail](detail.md)
 - **Delete** with confirmation
 - **Cancel** → [detail](detail.md)
@@ -25,6 +28,7 @@ Same fields as [create](create.md), preloaded.
 - **Owner**
 - **Not the owner** → forbidden, not a silent redirect
 - **Not found** — "This character doesn't exist."
+- **Lorebook unavailable** — an attachment that no longer resolves stays listed as unavailable
 - **Delete confirmation**
 - **Submitting**
 
