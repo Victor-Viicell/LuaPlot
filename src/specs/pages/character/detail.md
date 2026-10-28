@@ -33,7 +33,7 @@ Nothing else is counted here: no session or usage count, and no strip of the aut
 - **Report** → [report](../../components/report.md)
 - **Request public again** (owner, while private) — flags the content for JEV re-verification
 - **Comment** on this character → [comment thread](../../components/comment-thread.md)
-- **Start a session** → [session](../session/detail.md) — pinned to the viewer's default [persona](../persona/collection.md), per [the session spec](../session/detail.md). An account with no persona is not prompted and not blocked: the session starts unattributed, the user's side reads `User`, and **Switch persona** attaches one later.
+- **Start a session** → [session](../session/detail.md) — pins the viewer's default [persona](../persona/collection.md), then copies this character, its lorebooks, and the chosen preset into the session, per [the session spec](../session/detail.md). An account with no persona is not prompted and not blocked: the session starts unattributed, the user's side reads `User`, and **Switch persona** attaches one later.
 - **Fork / copy** into the viewer's account — copies the definition as [create](create.md) holds it, the in-session name included, with the lorebook attachments carried as references. The lorebooks themselves are never copied, so the fork reads the same lorebooks the original does; an attachment the forker cannot see is dropped from the copy instead of arriving broken. Lands on the new character's [detail](detail.md) page.
 - **Edit** (owner only) → [edit](edit.md)
 - **Open author** → [profile](../user/profile.md)

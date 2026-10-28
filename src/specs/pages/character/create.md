@@ -26,7 +26,7 @@ Fields:
 - **Attached lorebooks** — any number, from zero up, each stored by ID. The character may reference the author's own lorebooks and any public lorebook authored by someone else. Two ways to add one:
   - **By ID** — type or paste a lorebook ID into the input and confirm.
   - **From a picker** — a list of the author's own lorebooks plus the lorebooks they have bookmarked that are not their own, per [bookmarks](../bookmarks.md).
-- Attachments are references, not copies: the same lorebook can hang off any number of characters, and editing it changes what every one of them reads.
+- Attachments are references, not copies: the same lorebook can hang off any number of characters, and editing it changes what every one of them reads. A session is the one exception — it snapshots the lorebooks it starts with, per [the session spec](../session/detail.md).
 
 ## Actions
 

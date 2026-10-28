@@ -23,7 +23,7 @@ Renaming is a display change and reaches nothing else: URLs carry the ID, sessio
 - **Remove lorebook**
 - **Save** → [detail](detail.md)
 - **Delete** with confirmation — immediate and final: no undo window, no trash, no grace period. The character row and its comment thread go in cascade, per the [conventions](../../luaplot-pages.md#conventions), and its lorebook attachments are references, so they go with it while the lorebooks themselves are untouched.
-  Nothing blocks the delete and nothing is soft-hidden behind it. Other users' references degrade instead: a session that used this character opens as review-only with the character unavailable, a bookmark on it stays and reads "This character doesn't exist." per [bookmarks](../bookmarks.md), and a published cut is unaffected because it recorded its own text.
+  Nothing blocks the delete and nothing is soft-hidden behind it. Other users' references degrade instead: a session that used this character keeps the copy it started from and only loses the link — it stays fully playable, though it can no longer pull the author's changes or restore from the original — a bookmark on it stays and reads "This character doesn't exist." per [bookmarks](../bookmarks.md), and a published cut is unaffected because it recorded its own text.
 - **Cancel** → [detail](detail.md)
 
 ## States
