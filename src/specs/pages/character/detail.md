@@ -8,7 +8,8 @@ Public read-only detail page for one character. Shows the full definition, credi
 
 ## Layout
 
-_To be specified._
+- A **settings button** sits in the top right of the header, the same control the [session](../session/detail.md) carries. Its menu holds, in order: **New Session**, **Bookmark / Remove bookmark**, **Report**, and **Edit** for the owner. The page's main controls stay on the page; the menu is for what does not need a permanent button.
+- The rest of the layout is still to be specified.
 
 ## Data
 
@@ -34,7 +35,8 @@ Nothing else is counted here: no session or usage count, and no strip of the aut
 - **Request public again** (owner, while private) — flags the content for JEV re-verification
 - **Comment** on this character → [comment thread](../../components/comment-thread.md)
 - **Start a session** (while the viewer has no session with this character) → [session](../session/detail.md) — pins the viewer's default [persona](../persona/collection.md), then copies this character, its lorebooks, and the chosen preset into the session, per [the session spec](../session/detail.md). An account with no persona is not prompted and not blocked: the session starts unattributed, the user's side reads `User`, and **Switch persona** attaches one later.
-- **Continue** (once a session with this character exists) — the same control, relabelled, opening that conversation where it was left rather than starting another. It opens the most recent session with this character; the character page never creates a second one, because a new session is started from the [settings menu inside a session](../session/detail.md).
+- **Continue** (once a session with this character exists) — the same control, relabelled, opening that conversation where it was left rather than starting another. It opens the most recent session with this character; a second one is started deliberately, from the settings menu.
+- **New Session** — first option of the settings menu: starts a fresh session from this character, with new copies of it, its lorebooks, and the preset, leaving any existing session and its copies untouched.
 - **Fork / copy** into the viewer's account — copies the definition as [create](create.md) holds it, the in-session name included, with the lorebook attachments carried as references. The lorebooks themselves are never copied, so the fork reads the same lorebooks the original does; an attachment the forker cannot see is dropped from the copy instead of arriving broken. Lands on the new character's [detail](detail.md) page.
 - **Edit** (owner only) → [edit](edit.md)
 - **Open author** → [profile](../user/profile.md)

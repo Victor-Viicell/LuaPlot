@@ -14,7 +14,7 @@ Sessions are private and unmoderated: JEV never reads one, and no other user can
 
 ## Layout
 
-- The top right of the session header carries a **settings button**. Its first option is **New Session**, which starts a fresh session from the same participants — new copies of the character, its lorebooks, and the preset, with the current persona — while this session and its copies stay exactly as they are. A second session is only ever reached this way; nothing on a character's page starts one.
+- The top right of the session header carries a **settings button**. Its first option is **New Session**, which starts a fresh session from the same participants — new copies of the character, its lorebooks, and the preset, with the current persona — while this session and its copies stay exactly as they are. The same menu appears on the [character's page](../character/detail.md); the primary Start/Continue control never opens a second session.
 - The rest of the layout is still to be specified.
 
 ## Data
