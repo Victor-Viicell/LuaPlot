@@ -11,10 +11,10 @@ Review and conclude a single case JEV could not decide: uncertain content, or a 
 - The reported item: type, content, its avatar, and current visibility.
 - The reports: cumulative, each with its own reason and details, plus the total count, the spread of reasons, and when the last one arrived.
 - Which part carries the violation: the avatar or image, or the text. Avatar removal exists only for the case where the avatar is serious and the text itself is valid.
-- For a copy claim: the named source, and whether it is internal (with JEV's comparison) or external (needing manual verification).
+- For a copy claim: the named source, and whether it is internal (with JEV's comparison) or external (needing manual verification). An external claim is judged by opening the source the claim named; what was compared is recorded as the case reason plus an internal comment, and nothing is uploaded — the claim carries a link, not a file.
 - The terms checklist, and which ones the moderator has confirmed for a dismissal.
 - JEV's classification and confidence, plus what it already did — made private or escalated without acting.
-- Case history: prior actions, internal comments, and who made them.
+- Case history: prior actions, internal comments, and who made them. Comments are a flat chronological list, never a thread — no replies — and every admin sees the whole history. Every moderator action lands there with the admin's identity and its time, which is the case's audit trail; JEV's own action appears only as what it already did, with no admin attached.
 - Status: open or concluded.
 
 ## Actions
@@ -23,7 +23,7 @@ Review and conclude a single case JEV could not decide: uncertain content, or a 
 - **Remove avatar** — not a standalone action. It is an option taken at conclusion, when the avatar carries the serious violation while the text is valid; removal is then combined with either visibility outcome. This is the one content edit a moderator can make, and JEV never makes it.
 - **Set reason** — record or correct the reason behind the decision.
 - **Comment** — internal note on the case, never shown publicly.
-- **Dismiss** — no violation. The moderator must inspect the content and tick a checkbox for each term; every box must be ticked before the case can be dismissed. Escalated content was never hidden, so nothing returns to view.
+- **Dismiss** — no violation. The moderator must inspect the content and tick a checkbox for each term; every box must be ticked before the case can be dismissed. It changes no visibility: escalated content was never hidden, so nothing returns to view. A private item found clean is concluded with the public outcome instead — dismissal says the report was wrong, while conclusion is the action that sets visibility.
 
 ## States
 
@@ -37,12 +37,8 @@ Review and conclude a single case JEV could not decide: uncertain content, or a 
 - **Not found** — "This report doesn't exist."
 - **Concluding**
 
-## Open questions
+## Rules
 
-- When a moderator dismisses, does a JEV-private item return to public automatically, or must the owner still request republication?
-- After a moderator removes an avatar, is the content re-verified before it goes public, or does it return as-is?
-- For an external copy claim, what evidence is the moderator expected to record — a link, a screenshot, a note?
-- Does concluding notify the creator as well as the reporter, or does JEV already notify them?
-- Do internal comments form a thread, and are they visible to every admin?
-- Can a concluded case be reopened, and by whom?
-- Is every action logged with the admin identity as an audit trail?
+- Concluding notifies the creator, because it is their content whose visibility changed; [notifications](../notifications.md) is where moderation decisions on own content arrive, from JEV or from a moderator. The reporter is never told the outcome, per [report](../../components/report.md).
+- Removing the avatar is an edit and clears the verified flag like any other change, but it delays nothing: the case concludes and the content goes public in the same operation, since the moderator has already judged the remaining text valid. The cleared flag only makes the item eligible for a scan on its next report.
+- A concluded case is final. No reopen control exists, for any admin: a fresh report on the same item after conclusion opens a new case, which is the only route back under review.
