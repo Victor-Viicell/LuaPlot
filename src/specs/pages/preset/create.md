@@ -6,30 +6,31 @@
 
 Authoring view for a new preset: generation and model settings grouped into reusable configurations.
 
+Save publishes, like every other authored item: there is no draft state, so the preset is public the moment it saves.
+
 ## Layout
 
-_To be specified._
+- One form, one column: the avatar and the SFW/NSFW toggle at the top, then the generation settings, then **Save** and **Cancel** at the end.
+- The settings are a flat list of fields, not grouped into sections, and the list is whatever the generation layer exposes.
 
 ## Data
 
-Fields to be specified. The full settings list is undecided; a preset groups whatever the generation layer exposes, so this section should be written once that surface is settled. Known so far:
+Fields. The full settings list follows the generation layer and is added here as that surface settles; a preset is exactly that set, nothing more. Known so far:
 
 - **Avatar** — the preset's image.
 - **NSFW** — boolean toggle, SFW by default.
+- **Model** — the model the preset generates with, chosen by its author from the ones the app offers. The provider behind it belongs to the app: it is never a field and is not shown.
+
+Every generation setting belongs to the preset, and the session carries none of its own. A session copies the preset when it starts and adjusts it only by rewriting that copy, per [the session spec](../session/detail.md) — there is no per-session settings surface.
 
 ## Actions
 
 - **Save** → [detail](detail.md)
 - **Cancel** → [catalog](catalog.md)
+- **Duplicate** — not offered here: this page always starts blank, and a copy of another preset is made from its [detail](detail.md) page's **Fork / copy**, which puts it in the author's account and opens it in [edit](edit.md).
 
 ## States
 
 - **Validation error**
 - **Submitting**
 - **Save failed**
-
-## Open questions
-
-- Which settings belong in a preset versus in the session itself?
-- Are model and provider chosen by the user, or fixed by the app?
-- Can a preset be duplicated from another as a starting point?
