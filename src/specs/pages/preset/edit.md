@@ -14,6 +14,10 @@ _To be specified._
 
 Same fields as [create](create.md), preloaded.
 
+- **Save overwrites the preset in place** — no version history, no revision kept, no draft: what was saved is what the detail page shows from then on, and an earlier state is not recoverable.
+- **A running session keeps its own copy** — the preset was snapshotted when that session started, so an edit here never reaches it on its own; the session takes the new values only through **Update from original** in [the session](../session/detail.md).
+- Any edit clears the preset's verified flag, so it is scanned again on the next report, per the [conventions](../../luaplot-pages.md#conventions).
+
 ## Actions
 
 - **Save** → [detail](detail.md)
@@ -28,7 +32,3 @@ Same fields as [create](create.md), preloaded.
 - **Delete confirmation**
 - **Submitting**
 
-## Open questions
-
-- Do sessions already running on this preset keep the old values, or pick up edits on the next turn?
-- Is there version history, or is a preset simply overwritten?
