@@ -6,6 +6,8 @@
 
 Edit the signed-in user's own account. Reachable from the extra option that only appears on the viewer's own [profile](profile.md); anyone else has no entry point and is rejected by the route itself.
 
+The page edits only what LuaPlot owns. Sign-in identity stays with Supabase, so no email address and no provider is shown, chosen, or switched here, and nothing links, merges, or unlinks an identity. Account deletion is not part of it either: there is no delete control on this page and no route that removes an account.
+
 ## Layout
 
 _To be specified._
@@ -14,11 +16,11 @@ _To be specified._
 
 Fields to be specified. Known so far:
 
-- **Display name**
+- **Display name** — required, free text, duplicates allowed.
 - **Avatar**
 - **Bio**
 - **NSFW preference** — **Show NSFW content** and **Blur NSFW content** ([details](../../systems/nsfw.md))
-- **Username** — changing it changes the profile URL.
+- **Username** — the handle `/user/[user.username]` is built from, under the rules [onboarding](../onboarding.md) already enforces: unique across accounts case-insensitively, 3–24 characters of lowercase letters, digits, and underscores. Changing it moves the profile URL and no alias is kept, so a link to the previous handle reports not-found rather than redirecting; the account keeps its content, follows, and bookmarks, since none of them are addressed by username.
 
 ## Actions
 
@@ -33,9 +35,4 @@ Fields to be specified. Known so far:
 - **Validation error**
 - **Saving**
 - **Save failed**
-
-## Open questions
-
-- Changing the username changes `/user/[user.username]`, so every existing profile link breaks. Accept that, or keep the old handle as a redirect?
-- Are email and linked providers displayed here, or is identity entirely Supabase's concern?
-- Is account deletion part of this page, or out of scope for now?
+- **Handle changed** — the profile loads at the new URL; the previous one is not-found, and no redirect is offered
