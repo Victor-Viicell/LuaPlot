@@ -21,21 +21,23 @@ Sessions are private and unmoderated: JEV never reads one, and no other user can
 
 - **The copies** — the character definition with its in-session name, each attached lorebook, and the preset, each copied at session start. Every session takes its own copies, so two sessions of one character can diverge without touching each other or the original.
 - **The link** — each copied participant stores the ID of the item it came from. The link is what makes the two recreation actions possible, and a deleted original, or one made private to this user, drops the link and nothing more: no participant is marked unavailable and the session stays fully usable.
+- **The link follows the item, not its ancestry** — a session started from a forked character links to the fork, since the fork is the character it was started from: **Update from original** pulls the fork's own current version, never the version of the character the fork was copied from.
 - **Nothing flows backwards** — edits inside a session never reach the original, and edits the author makes never reach a session that already started. The only path between them is the link, and it is pulled on purpose.
 - **Editing a copy is free** — the session owner may rewrite the character, any of its lorebooks, and the preset for this session only. No moderation, no verification, no effect outside it.
 - **Each copy's state** — untouched since it was copied, edited in the session, or refreshed from the original, so **Restore** is never offered where there is nothing to restore.
-- **The persona in use** — live rather than copied, attached at start and swappable mid-session.
-- **The transcript** — turns under the character's in-session name, the message input, and the publish-a-cut control.
+- **The persona in use** — live rather than copied, attached at start and swappable mid-session. A switch leaves no mark: the transcript keeps no boundary and the turns carry no persona record, so a cut takes the attribution chosen when it is published, not the persona that was in use at each turn.
+- **The transcript** — turns under the character's in-session name, the message input, and the publish-a-cut control. It is append-only: a message is never edited or deleted once sent, and a cut already published is a snapshot no later change in the session touches. A session has no name and no archive, and there is no session list anywhere: it is reached from the character's **Continue**, or by its own URL.
 
 ## Actions
 
 - **Send message**
 - **New Session** — first option of the settings menu: a fresh session from the same participants and fresh copies, leaving this one untouched
+- **Delete session** — the settings menu's only other option, with confirmation: it removes the transcript and the session's copies, while a cut already published stays as it was. The menu holds those two and nothing more.
 - **Switch persona**
 - **Edit session copy** — the character, any of its lorebooks, or the preset, in a session-scoped editor that writes only to the copy
 - **Update from original** — per participant, while the link resolves: replaces that copy with the item's current version, which is how an author's later edits get in. It overwrites the session's own edits to that copy, so it confirms first.
 - **Restore** — per participant: puts the copy back to the version it was taken from and discards the session's edits. It brings in nothing the author changed since; that is what **Update from original** is for.
-- **Publish a cut** → [post create](../post/create.md) with attribution choice
+- **Publish a cut** → [post create](../post/create.md) with attribution choice. The cut is a range of messages, named by its first and its last turn, and it carries no NSFW flag of its own: the post's own toggle in that form decides, so the character's flag is never inherited.
 - **Open participant** — opens the session's copy, with the original reachable beside it while the link holds
 
 ## States
@@ -50,13 +52,4 @@ Sessions are private and unmoderated: JEV never reads one, and no other user can
 - **Unlinked** — the original is gone or out of reach; the copy runs anyway, without the link actions
 - **Edited copy** — changed inside the session, with **Restore** available
 - **Updated from original** — refreshed to the item's current version
-
-## Open questions
-
-- Does switching persona mark a boundary in the transcript, or is it seamless?
-- How is the cut boundary chosen — drag-select, message range, or from a message onward?
-- Can a session be renamed, archived, or deleted, and is there a list view of sessions anywhere?
-- Are messages editable or deletable, and does that reach into already-published cuts?
-- Does a published cut inherit the character's NSFW flag, or is the author asked again? A cut is public, so the flag matters even though the session does not.
-- Does a session started from a forked character link to the fork, or to the character the fork was copied from?
-- What else does the settings menu hold, after **New Session**? Its remaining options are not specified.
+- **Delete confirmation**

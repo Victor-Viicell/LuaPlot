@@ -14,7 +14,7 @@ The terms of use: the rules content has to follow. Deliberately short — three 
 
 ### Where the line sits
 
-Stylized or drawn depictions, including loli and shota, are not treated as literal CSAM under these terms. They are still NSFW and must be flagged as such. Realism is the dividing line: a photorealistic or convincingly realistic AI-generated sexual depiction of a minor is illegal content, and it escalates immediately instead of waiting in the ordinary review queue.
+Stylized or drawn depictions, including loli and shota, are not treated as literal CSAM under these terms. They are still NSFW and must be flagged as such. Realism is the dividing line: a photorealistic or convincingly realistic AI-generated sexual depiction of a minor is illegal content, and it escalates immediately instead of waiting in the ordinary review queue. There is no written test for it: JEV judges the asset, and a moderator makes the call when the case escalates.
 
 ### What the rules apply to
 
@@ -22,23 +22,24 @@ They are enforced against visual assets — avatars, images, and GIFs — and ag
 
 The flag is what makes the viewer's own [NSFW preference](../systems/nsfw.md) possible: with Show off flagged content stays out of listings, and with Blur on it is listed but covered. An accurate flag is therefore part of the rule, not a courtesy.
 
+### What the flag covers
+
+One flag per item, covering everything the item shows. A character, lorebook, or preset whose avatar is NSFW carries the flag even when its text is safe, and every image inside a post falls under that post's own flag. There is no per-image and no per-avatar flag, so one unflagged image makes the item an unflagged NSFW item rather than a partially flagged one.
+
+### Accepting the terms
+
+Finishing [`/onboarding`](onboarding.md) is the acceptance: that page states, beside **Finish**, that continuing accepts these terms, and links here. No separate acceptance record is kept and there is no version to accept, so a change to the rules is never re-asked — the text as it stands is what applies to everything published from then on.
+
 ### How enforcement works
 
-Only you can delete the content you authored. When a rule is broken, the practical consequence is visibility: JEV can make characters, lorebooks, and presets private, and a moderator can remove an avatar when concluding a case in which the avatar itself is the serious violation. Posts and comments cannot be made private: they are removed as soon as JEV is certain a rule is broken, while a case it is unsure about stays public until a moderator decides. When content is made private you can still open it and see the report, the reasons, and the measures taken. Once every reason is fixed, you may request publication again, and JEV reviews the content before it goes public. These rules govern public content; what happens inside a private session is the user's own business.
+Only you can delete the content you authored. When a rule is broken, the practical consequence is visibility: JEV can make characters, lorebooks, and presets private, and a moderator can remove an avatar when concluding a case in which the avatar itself is the serious violation. Posts and comments cannot be made private: they are removed as soon as JEV is certain a rule is broken, while a case it is unsure about stays public until a moderator decides. When content is made private you can still open it and see the report, the reasons, and the measures taken. Once every reason is fixed, you may request publication again, and JEV reviews the content before it goes public. The request is made on the content's own page, where the reasons are listed; this page states only that fixing every reason opens it, and leaves the steps there. These rules govern public content; what happens inside a private session is the user's own business.
 
 ## Layout
 
-_To be specified._
+- One column of prose: the title, the three prohibitions as a numbered list, then the notes on where the line sits, what the flag covers, accepting the terms, what the rules apply to, and how enforcement works.
+- Read-only, no controls beyond links, and no version number or last-updated date: the rules are not versioned.
+- Reached from [onboarding](onboarding.md), where **Finish** carries the acceptance.
 
 ## States
 
 - **Static** — no interactive content beyond navigation.
-
-## Open questions
-
-- Is acceptance recorded — at onboarding, at first sign-in — and is re-acceptance required when the rules change?
-- Where is this page linked from: onboarding, the auth screen, the report dialog, a footer?
-- Does the page need to define NSFW precisely — what counts as NSFW in an avatar versus an image inside a post?
-- Is "realism" defined by the judgement of the model, or is there a written test for it?
-- Is a version or last-updated date shown?
-- Should this page explain the republication request in detail, or leave that to the content page where the reasons are shown?
