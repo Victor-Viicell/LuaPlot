@@ -8,25 +8,33 @@ Public read-only detail page for one lorebook, listing its entries and offering 
 
 ## Layout
 
-_To be specified._
+- A header holding the avatar, the name, and the link to the author, with the engagement controls and the owner's **Edit** beside it.
+- Beneath it the entry list: every entry expanded, in the order its author arranged them, each showing its keywords and its content. The list is not collapsible, not filtered by keyword, and not paged — a long list scrolls with the page.
+- The [comment thread](../../components/comment-thread.md) sits at the foot of the page, after the entry list.
 
 ## Data
 
+Shown on the page:
+
+- **Identity** — the avatar and the name.
+- **Entries** — every entry with its keywords and its content, in the author's order. The keywords are visible rather than hidden: they are what the author wrote and what decides when an entry is injected.
+- **Author** — a link to [their profile](../user/profile.md).
+
 Engagement shown on the page:
 
-- **Likes / dislikes** and the ratio between them.
+- **Likes / dislikes** — both raw counts, beside the ratio between them as a percentage, the same reading as the [character](../character/detail.md) detail page.
 - **Comment count**, with the [comment thread](../../components/comment-thread.md) beneath the entry list.
 - **Bookmark state** for the signed-in viewer.
 - **Moderation notice** (owner only, while private): the report, the reasons, and the measures taken.
 
 ## Actions
 
-- **Like / dislike** — one vote per viewer; switching replaces the previous vote
+- **Like / dislike** — one vote per viewer; switching replaces the previous vote. The author votes like any other viewer: no self-vote exemption, and their vote counts toward the ratio
 - **Bookmark / unbookmark**
 - **Report** → [report](../../components/report.md)
 - **Request public again** (owner, while private) — flags the content for JEV re-verification
 - **Comment** on this lorebook → [comment thread](../../components/comment-thread.md)
-- **Fork / copy** into the viewer's account
+- **Fork / copy** into the viewer's account — copies the metadata and every entry as they stand, keywords included. There is no separate preview step: the entry list on this page already shows exactly what will be copied, and nothing about matching is promised in advance.
 - **Edit** (owner only) → [edit](edit.md)
 - **Open author** → [profile](../user/profile.md)
 
@@ -35,17 +43,9 @@ Engagement shown on the page:
 - **Another user's lorebook**
 - **Own lorebook**
 - **Not found** — "This lorebook doesn't exist."
-- **Long entry list**
+- **Long entry list** — the whole list renders and scrolls with the page; no collapse, no paging
 - **Signed out** — can read, cannot vote, comment, or bookmark
 - **Voted or bookmarked**
 - **Reported**
 - **Privated by moderation** — the owner sees the report, reasons, and measures; everyone else sees it as unavailable
 - **Awaiting re-verification**
-
-## Open questions
-
-- Are entries listed expanded, collapsed, or filtered by keyword?
-- Do keywords need to be visible, or are they implementation detail?
-- Should entry count and matching preview appear before forking?
-- Can an author vote on their own lorebook?
-- Is the ratio shown as a percentage, a like/total fraction, or both raw counts?
