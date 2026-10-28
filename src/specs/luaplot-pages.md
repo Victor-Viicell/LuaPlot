@@ -128,6 +128,7 @@ Every route has its own spec under [`pages/`](pages). This file is the route ind
 - Every item a user authors carries an image: characters, lorebooks, presets, and personas have an avatar, while posts and comments can embed images and GIFs.
 - One character starts one session per user: the detail page's primary control reads **Start a session** until a session with that character exists and **Continue** afterwards, reopening the most recent one. A second session is started only on purpose, from a settings menu — the character's own, or the session's — whose first option is **New Session**, so chatting again never silently spawns another copy of the character.
 - Reports feed [JEV](systems/jev.md). For characters, lorebooks, and presets, enforcement changes visibility; only their creator can delete them. Posts and comments have no private state: they are removed as soon as JEV is certain, and a case it is unsure about leaves them public while it escalates to a moderator.
+- JEV's immediate actions leave no case behind. A removal or an item made private happens without a moderator and never enters [`/moderation`](pages/moderation/queue.md), whose cases exist only for what JEV could not decide; the creator's notification and the reasons on the content page are the record, and the audit trail of a moderator's own decision is the case history.
 - Moderation watches visual assets — avatars, images, and GIFs — plus text. Post and comment text is judged for all three rules; character, lorebook, and preset text only for the NSFW flag and copying. Copy claims name their source; copied text from inside LuaPlot is compared automatically, while copied text from outside and every copied image go to a moderator.
 - Privatized content stays visible to its owner, who sees the report, the reasons, and the measures taken. Once every reason is fixed the owner can request publication again; that request flags the content so JEV verifies it before it becomes public.
 - Verification is cached. Content that passes a scan is flagged as verified and kept out of the report queue until its creator edits it; any edit clears the flag. Reports filed in that window are held rather than archived, and a fresh report after a change is what starts a scan.
@@ -147,6 +148,5 @@ Every route has its own spec under [`pages/`](pages). This file is the route ind
 
 - Appeals: a creator cannot contest a decision; the only path is to patch the reasons and request publication again, which JEV re-verifies.
 - Admin role: [`/moderation`](pages/moderation/queue.md) assumes one exists, but nothing defines how a user is granted it.
-- Audit: whether JEV's immediate actions leave a record in [`/moderation`](pages/moderation/queue.md), or are invisible to moderators.
 
 

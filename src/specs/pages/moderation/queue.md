@@ -12,13 +12,14 @@ The admin queue of cases [JEV](../../systems/jev.md) could not decide: content i
 - Why the case is here: JEV unsure, copied image, external copied text, or a combination.
 - Case status: open or concluded.
 - Counts: open cases versus concluded.
+- No preview: the row carries metadata only. The reported item, its avatar, and the reports are inspected on the case itself.
 
 ## Actions
 
 - **Open case** → [detail](detail.md)
 - **Filter** — open, concluded, or all
 
-Ordering is not a control: most reports first.
+Ordering is not a control: most reports first. Nothing is claimed or assigned either: a case belongs to no moderator, and the case history is where one says they are working it.
 
 ## States
 
@@ -27,11 +28,9 @@ Ordering is not a control: most reports first.
 - **Not an admin** → forbidden
 - **Loading**
 
-## Open questions
+## Rules
 
-- Are concluded cases kept indefinitely, or archived after a while?
-- Do JEV's immediate actions appear here as concluded cases for audit, or stay out of the queue entirely?
-- Do reports held against verified content appear here, so a moderator can see what was skipped?
-- Can an admin claim a case, so two reviewers do not work the same one?
-- Does the queue show a preview of the content, or only metadata?
-- Does a case that keeps receiving reports climb indefinitely, or is weight capped or decayed so old items cannot starve new ones?
+- Cases exist only for what JEV could not decide. Its immediate actions — a post or comment removed, an item made private — open no case and never enter the queue: the creator is notified, the reasons sit on the content page, and a case that follows shows that earlier action only as what JEV already did.
+- Reports held against verified content open no case and stay out of the queue. They remain attached to the item, and count toward its weight once it is reported again after a change.
+- Concluded cases are kept indefinitely. There is no archive step: the concluded filter is how one is found again, and its history is the record of what was decided.
+- Weight never decays and is never capped. Every report adds one, and cases of equal weight are ordered by their last report, newest first.
