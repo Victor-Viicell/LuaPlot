@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Public read-only detail page for one character. Shows the full definition, credits the owner, and offers the actions available on it: start a session, fork or copy, and edit when owned.
+Public read-only detail page for one character. Shows the full definition, credits the owner, and offers the actions available on it: start or continue a session, fork or copy, and edit when owned.
 
 ## Layout
 
@@ -33,7 +33,8 @@ Nothing else is counted here: no session or usage count, and no strip of the aut
 - **Report** → [report](../../components/report.md)
 - **Request public again** (owner, while private) — flags the content for JEV re-verification
 - **Comment** on this character → [comment thread](../../components/comment-thread.md)
-- **Start a session** → [session](../session/detail.md) — pins the viewer's default [persona](../persona/collection.md), then copies this character, its lorebooks, and the chosen preset into the session, per [the session spec](../session/detail.md). An account with no persona is not prompted and not blocked: the session starts unattributed, the user's side reads `User`, and **Switch persona** attaches one later.
+- **Start a session** (while the viewer has no session with this character) → [session](../session/detail.md) — pins the viewer's default [persona](../persona/collection.md), then copies this character, its lorebooks, and the chosen preset into the session, per [the session spec](../session/detail.md). An account with no persona is not prompted and not blocked: the session starts unattributed, the user's side reads `User`, and **Switch persona** attaches one later.
+- **Continue** (once a session with this character exists) — the same control, relabelled, opening that conversation where it was left rather than starting another. It opens the most recent session with this character; the character page never creates a second one, because a new session is started from the [settings menu inside a session](../session/detail.md).
 - **Fork / copy** into the viewer's account — copies the definition as [create](create.md) holds it, the in-session name included, with the lorebook attachments carried as references. The lorebooks themselves are never copied, so the fork reads the same lorebooks the original does; an attachment the forker cannot see is dropped from the copy instead of arriving broken. Lands on the new character's [detail](detail.md) page.
 - **Edit** (owner only) → [edit](edit.md)
 - **Open author** → [profile](../user/profile.md)
@@ -47,6 +48,8 @@ Nothing else is counted here: no session or usage count, and no strip of the aut
 - **Signed out** — can read, cannot vote, comment, or bookmark
 - **Voted or bookmarked**
 - **Reported**
+- **No session with this character** — the control reads **Start a session**
+- **Session in progress** — the same control reads **Continue**, opening the most recent conversation with this character
 - **Privated by moderation** — the owner sees the report, reasons, and measures; everyone else sees it as unavailable
 - **Awaiting re-verification**
 

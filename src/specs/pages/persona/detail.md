@@ -19,7 +19,7 @@ _To be specified._
 - **Set as default**
 - **Edit** → [edit](edit.md)
 - **Delete** with confirmation
-- **Start a session** with this persona
+- **Start a session** with this persona — asks for a character first, which brings that character's lorebooks and preset; if the user already has a session with that character, this opens it (Continue) rather than starting a second one, and the persona is then in use for the user's side
 
 ## States
 
@@ -32,4 +32,3 @@ _To be specified._
 
 - Is there a "not found" versus "not yours" distinction, or both collapse to 404?
 - Should the page list sessions currently using this persona?
-- What does starting a session from here require: a character, or a character plus preset?

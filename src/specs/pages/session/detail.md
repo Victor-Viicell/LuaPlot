@@ -14,7 +14,8 @@ Sessions are private and unmoderated: JEV never reads one, and no other user can
 
 ## Layout
 
-_To be specified._
+- The top right of the session header carries a **settings button**. Its first option is **New Session**, which starts a fresh session from the same participants — new copies of the character, its lorebooks, and the preset, with the current persona — while this session and its copies stay exactly as they are. A second session is only ever reached this way; nothing on a character's page starts one.
+- The rest of the layout is still to be specified.
 
 ## Data
 
@@ -29,6 +30,7 @@ _To be specified._
 ## Actions
 
 - **Send message**
+- **New Session** — first option of the settings menu: a fresh session from the same participants and fresh copies, leaving this one untouched
 - **Switch persona**
 - **Edit session copy** — the character, any of its lorebooks, or the preset, in a session-scoped editor that writes only to the copy
 - **Update from original** — per participant, while the link resolves: replaces that copy with the item's current version, which is how an author's later edits get in. It overwrites the session's own edits to that copy, so it confirms first.
@@ -57,3 +59,4 @@ _To be specified._
 - Are messages editable or deletable, and does that reach into already-published cuts?
 - Does a published cut inherit the character's NSFW flag, or is the author asked again? A cut is public, so the flag matters even though the session does not.
 - Does a session started from a forked character link to the fork, or to the character the fork was copied from?
+- What else does the settings menu hold, after **New Session**? Its remaining options are not specified.
