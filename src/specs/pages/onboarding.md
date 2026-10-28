@@ -12,26 +12,25 @@ _To be specified._
 
 ## Data
 
-Known so far:
+- **Username** — claimed here, since an OAuth provider supplies no handle. Required, and the only handle the account has: `/user/[user.username]` is built from it.
+  - Unique across accounts, compared case-insensitively; a handle already taken blocks **Finish** with **Username taken** and names no alternative.
+  - Lowercase letters, digits, and underscores, 3–24 characters, lowercased on save. The format is a constraint, not a suggestion: a handle that does not match is rejected inline.
+  - No reserved-word list. Every top-level segment stays a fixed word and handles live under `/user/`, so no handle competes with a route, per the [conventions](../luaplot-pages.md#conventions).
+- **Display name** — required, free text, duplicates allowed; it is a label and never part of a URL. Prefilled from the provider's name when the provider returned one, empty otherwise.
+- **Show NSFW content** — boolean, optional here, off for a new account.
+- **Blur NSFW content** — boolean, optional here, off for a new account.
 
-- **Username** — claimed here, since an OAuth provider supplies no handle.
-- **Display name**
-- **Show NSFW content** — boolean
-- **Blur NSFW content** — boolean
+The two toggles are the first write of the [NSFW preference](../systems/nsfw.md): they are the account's values, not a per-page filter, and [account settings](user/edit.md) changes them later.
 
-The two toggles are the first write of the [NSFW preference](../systems/nsfw.md).
+Only **Username** and **Display name** block **Finish**. The toggles may be left as they are; skipping them costs nothing, because off is the default a new account already holds.
 
 ## Actions
 
-- **Finish** → entry content
+- **Finish** → entry content. Enabled once the two required fields are valid; the whole form is written in one save, so an abandoned first run keeps what was typed.
 
 ## States
 
 - **First visit**
-- **Resumed after abandonment**
-
-## Open questions
-
-- Given that signing up happens through an OAuth provider, the username cannot come from the provider and is claimed here. How are collisions and reserved words handled?
-- What happens if the user abandons onboarding midway: locked out of the app, or let in with defaults?
-- Which preferences are required, and which can be skipped?
+- **Resumed after abandonment** — an account that never finished is incomplete, and every other route returns here: the entered values are restored, so the run continues rather than restarts.
+- **Username taken** — inline on the field, **Finish** stays disabled
+- **Invalid username** — inline on the field, **Finish** stays disabled
