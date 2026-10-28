@@ -4,40 +4,38 @@
 
 ## Purpose
 
-Composer for a new public post. The author picks the post type, writes the body, and may attach one of their characters or a cut taken from one of their own sessions before publishing. When attaching a cut, the author also chooses how their own side is attributed: by the persona's name, or as a generic `User`. The same composer is reachable inline from the thread and from a session.
+Composer for a new public post: a body, an SFW/NSFW flag, and at most one optional attachment — one of the author's characters, or a cut taken from one of their own sessions. The kind of post is chosen and stored nowhere: a body with no attachment is a plain text post, a body with a character is a character share, a body with a cut renders that cut.
+
+When the attachment is a cut, the author also chooses how their own side is attributed: by the persona's name, or as a generic `User`.
+
+A post is written once. There is no edit route and no draft, so correcting a post means deleting it and publishing again — the same rule as a comment, and it keeps a post that passed a scan from changing underneath its verification. Publishing makes the post public immediately; only moderation can take it out of public view.
 
 ## Layout
 
-_To be specified._
+- One form, one column: the body editor with inline image and GIF insertion, then the attachment with its picker, then the SFW/NSFW toggle, then **Publish** and **Cancel**.
+- **Sender attribution** appears only once a cut is attached: a body alone or with a character has no user side to attribute.
+- Opened from the [thread](thread.md) or from a [session](../session/detail.md), the same form renders in a panel over that page instead of at its own route, and publishing from the panel returns to the page it was opened on. The session instance arrives with the cut already attached.
 
 ## Data
 
-Fields to be specified. Known so far:
-
-- **Post type** — character share, idea, or session cut. A plain text post is the default; comments are a separate entity, not a post kind.
-- **Body** — text plus inline images and GIFs.
+- **Body** — text with images and GIFs inserted inline, as part of the body rather than a second attachment list. Same media rules as a comment: PNG, JPEG, WebP, and GIF, up to 10 MB each and four per post.
 - **NSFW** — boolean toggle, SFW by default.
-- **Attachment** — a character, or a cut from one of the author's sessions.
-- **Sender attribution** — persona name or `User`, when a cut is attached.
+- **Attachment** — at most one, and only the author's own content: one of their characters, or a cut from one of their own sessions. A lorebook or a preset cannot be attached, and neither can an item authored by somebody else; a lorebook or preset reaches a post only through a character that carries it.
+- **Sender attribution** — the persona's name or `User`, chosen when a cut is attached. The post records that attribution as text at publish time, so it does not follow later changes to the persona.
 
 ## Actions
 
+- **Insert image or GIF** into the body
+- **Pick a character** — from the author's own characters
+- **Attach a cut** — from one of the author's own sessions, the same cut the session's publish control produces, per [the session spec](../session/detail.md)
+- **Remove attachment**
 - **Publish** → [detail](detail.md)
 - **Cancel** → previous context
 
 ## States
 
-- **No attachment**
-- **Attachment selected**
-- **Validation error**
+- **No attachment** — body only, a plain text post
+- **Attachment selected** — a character, or a cut with the attribution choice
+- **Validation error** — an empty body, a fifth image, or a file over the size limit
 - **Publishing**
-- **Publish failed**
-
-## Open questions
-
-- Can posts be edited after publishing? Deleting is settled: the author can delete a post from its detail page, and the post's whole comment thread is deleted with it in cascade.
-- Are the remaining post kinds (character share, idea, session cut) needed as explicit types, or is every post just a body plus an optional attachment?
-- Can a post attach something that is not its own, or only the author's content?
-- Can a lorebook or preset be attached, or only characters and session cuts?
-- Is the composer a route, an inline panel, or both?
-- Are image and GIF attachments part of the body, or a separate attachment list with their own limits?
+- **Publish failed** — the draft stays in the composer for another attempt

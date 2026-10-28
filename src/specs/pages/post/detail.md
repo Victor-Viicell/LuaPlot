@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Permalink for one post. Renders the body plus whatever it attaches — a character, an idea, or a cut from a session — with the comment thread beneath it. Comments are public like the post itself; composing one requires being signed in.
+Permalink for one post. Renders the body plus its one optional attachment — a character or a cut from a session — or the body alone, with the comment thread beneath it. Comments are public like the post itself; composing one requires being signed in.
 
 ## Layout
 
