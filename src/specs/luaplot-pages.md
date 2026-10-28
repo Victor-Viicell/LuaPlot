@@ -148,10 +148,5 @@ Every route has its own spec under [`pages/`](pages). This file is the route ind
 - Not-found is reported per type: each detail route names the content that is missing ("This character doesn't exist.", "This lorebook doesn't exist.", and so on) instead of falling back to one generic message. Unknown usernames and unowned personas use the same rule.
 - Authentication is delegated to Supabase with Google, GitHub, and Discord. The app never collects or stores passwords, so there is no password field, reset flow, or credential handling in the client.
 - The three providers are the whole list and each provider is its own account: signing in with a second provider creates a new account rather than linking identities, so there is no linking, merging, or unlinking anywhere. Provider-supplied name and email are optional; the handle is claimed at onboarding.
-
-## Not yet specified
-
-- Appeals: a creator cannot contest a decision; the only path is to patch the reasons and request publication again, which JEV re-verifies.
-- Admin role: [`/moderation`](pages/moderation/queue.md) assumes one exists, but nothing defines how a user is granted it.
-
-
+- There is no appeal. A creator cannot contest JEV's action or a moderator's conclusion, and a concluded case never reopens: the only route back is fixing the reasons the decision names and requesting publication again, which JEV re-verifies, while a fresh report on the item opens a new case. The reporter is told neither outcome.
+- Admin is not granted inside the app: the operator marks an account as admin, and the app only checks that mark at [`/moderation`](pages/moderation/queue.md). No page, invite, request, or self-service control hands the role out, and there is one admin role with no hierarchy — every admin sees every case and its whole history.
