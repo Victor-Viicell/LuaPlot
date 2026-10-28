@@ -19,20 +19,22 @@ Shown on the page:
 
 Engagement shown on the page:
 
-- **Likes / dislikes** and the ratio between them.
+- **Likes / dislikes** — both raw counts, beside the ratio between them as a percentage: the detail page is where the counts live, while a card shows only the ratio.
 - **Comment count**, with the [comment thread](../../components/comment-thread.md) beneath the definition.
 - **Bookmark state** for the signed-in viewer.
 - **Moderation notice** (owner only, while private): the report, the reasons, and the measures taken.
 
+Nothing else is counted here: no session or usage count, and no strip of the author's other work. The author link goes to [their profile](../user/profile.md), which already lists what they made.
+
 ## Actions
 
-- **Like / dislike** — one vote per viewer; switching replaces the previous vote
+- **Like / dislike** — one vote per viewer; switching replaces the previous vote. The author votes like any other viewer: no self-vote exemption, and their vote counts toward the ratio
 - **Bookmark / unbookmark**
 - **Report** → [report](../../components/report.md)
 - **Request public again** (owner, while private) — flags the content for JEV re-verification
 - **Comment** on this character → [comment thread](../../components/comment-thread.md)
-- **Start a session** → [session](../session/detail.md)
-- **Fork / copy** into the viewer's account
+- **Start a session** → [session](../session/detail.md) — pinned to the viewer's default [persona](../persona/collection.md), per [the session spec](../session/detail.md). An account with no persona is not prompted and not blocked: the session starts unattributed, the user's side reads `User`, and **Switch persona** attaches one later.
+- **Fork / copy** into the viewer's account — copies the definition as [create](create.md) holds it, the in-session name included, with the lorebook attachments carried as references. The lorebooks themselves are never copied, so the fork reads the same lorebooks the original does; an attachment the forker cannot see is dropped from the copy instead of arriving broken. Lands on the new character's [detail](detail.md) page.
 - **Edit** (owner only) → [edit](edit.md)
 - **Open author** → [profile](../user/profile.md)
 
@@ -48,10 +50,3 @@ Engagement shown on the page:
 - **Privated by moderation** — the owner sees the report, reasons, and measures; everyone else sees it as unavailable
 - **Awaiting re-verification**
 
-## Open questions
-
-- Does "start a session" require a persona, fall back to the default, or prompt to create one?
-- Does a fork copy the definition only, or also the attached lorebooks?
-- Should this page show usage counts, or the author's other work?
-- Can an author vote on their own character?
-- Is the ratio shown as a percentage, a like/total fraction, or both raw counts?

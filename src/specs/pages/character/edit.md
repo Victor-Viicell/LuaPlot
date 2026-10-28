@@ -14,13 +14,16 @@ _To be specified._
 
 Same fields as [create](create.md), preloaded — including the full list of attached lorebooks, which can be extended and trimmed here the same way it is built there: by ID, or picked from the author's own lorebooks and the lorebooks they bookmarked from other authors. Removing an attachment removes the reference only; the lorebook itself is untouched and may still hang off other characters.
 
+Renaming is a display change and reaches nothing else: URLs carry the ID, sessions address the character by the in-session name stored on the row, bookmarks and lorebook attachments store the ID, and a published cut keeps the text it recorded. No name is a key anywhere.
+
 ## Actions
 
 - **Add lorebook by ID**
 - **Pick lorebook** — from own lorebooks and bookmarked lorebooks from other authors
 - **Remove lorebook**
 - **Save** → [detail](detail.md)
-- **Delete** with confirmation
+- **Delete** with confirmation — immediate and final: no undo window, no trash, no grace period. The character row and its comment thread go in cascade, per the [conventions](../../luaplot-pages.md#conventions), and its lorebook attachments are references, so they go with it while the lorebooks themselves are untouched.
+  Nothing blocks the delete and nothing is soft-hidden behind it. Other users' references degrade instead: a session that used this character opens as review-only with the character unavailable, a bookmark on it stays and reads "This character doesn't exist." per [bookmarks](../bookmarks.md), and a published cut is unaffected because it recorded its own text.
 - **Cancel** → [detail](detail.md)
 
 ## States
@@ -32,8 +35,3 @@ Same fields as [create](create.md), preloaded — including the full list of att
 - **Delete confirmation**
 - **Submitting**
 
-## Open questions
-
-- What happens to sessions and published posts referencing this character on delete: blocked, soft-deleted, or left with a missing reference?
-- Renaming is safe for URLs now that they are ID-based — confirm nothing else keys off the name.
-- Is there an undo window after delete, or is it immediate?
