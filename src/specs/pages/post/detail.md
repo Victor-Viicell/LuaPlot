@@ -12,20 +12,25 @@ _To be specified._
 
 ## Data
 
+The attachment:
+
+- **Rendered in full here** — the body plus, when present, one attachment: a character rendered as its card with a link to its [detail](../character/detail.md) page while it resolves, or a cut rendered as the conversation it recorded, its messages under the attribution chosen when it was published.
+- **A cut carries no link back** — it records text, not a pointer: no route to the session, its ID, its other messages, or the session's copy of the character. A session is private, so a post built from one exposes only what the author chose to publish, and a later rewrite inside that session changes nothing on the post.
+
 Engagement shown on the page:
 
-- **Likes / dislikes** and the ratio between them.
+- **Likes / dislikes** as the ratio percentage the cards carry, with the raw like and dislike counts beside it — not a like/total fraction.
 - **Comment count**, with the [comment thread](../../components/comment-thread.md) beneath the body.
 - **Bookmark state** for the signed-in viewer.
 
 ## Actions
 
-- **Like / dislike** — one vote per viewer; switching replaces the previous vote
+- **Like / dislike** — one vote per viewer; switching replaces the previous vote, and the author votes on their own post like any other viewer
 - **Bookmark / unbookmark**
 - **Report** → [report](../../components/report.md)
 - **Comment** (signed in only) → [comment thread](../../components/comment-thread.md)
 - **Delete** (author only) — deletes the post and, in cascade, its entire comment thread
-- **Open attached content** → character detail or session context
+- **Open attached content** — a character attachment only, to its [detail](../character/detail.md) page; a cut is text and has no destination of its own
 - **Open author** → [profile](../user/profile.md)
 
 ## States
@@ -39,8 +44,3 @@ Engagement shown on the page:
 - **Voted or bookmarked**
 - **Reported**
 
-## Open questions
-
-- Does a published cut link back to the session, and if so, does that expose anything the author did not choose to share?
-- Can an author vote on their own post?
-- Is the ratio shown as a percentage, a like/total fraction, or both raw counts?
