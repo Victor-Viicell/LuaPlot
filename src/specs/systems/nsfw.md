@@ -15,6 +15,7 @@ Decides how NSFW-flagged public content reaches a viewer. The creator's NSFW boo
 
 - The two switches are independent. A contradictory pair — Show off, Blur on — is allowed; blur simply has nothing to act on.
 - Blur only matters while Show is on.
+- A new account starts with both off, and [onboarding](../pages/onboarding.md) may leave them untouched: neither toggle blocks **Finish**, and skipping them writes nothing, since off is what the account already holds.
 - Personas are outside both settings: they are personal and never listed publicly.
 
 ## Where it lives
@@ -32,9 +33,12 @@ The same two settings are editable in three places, all editing the account, not
 - Show off removes the item from the listing. Blur on leaves it there, covered.
 - **Blur is structural.** The unit keeps its chrome. On a catalog card the top header is the title and the bottom footer is a single row holding the author beside the ratio as a percentage; the bottom line carries no comment count. The blurred area is exactly what sits between them — the avatar, the tagline, and the tags. On a post or a comment, the header carries the poster's profile and the time of posting, the footer carries likes, dislikes, and the comment count, and the body between them is what gets blurred. **The numbers are never hidden** — only the body is covered.
 - **Every blurred item carries its own reveal button.** Revealing one item never reveals the rest, and every blurred item must offer the control.
+- **A reveal lasts one view.** It uncovers that one item until the page is reloaded or the listing is fetched again, and nothing about it is written to the account: Blur on stays the account's answer, and a reveal is a single look, not a change of preference.
 - Neither setting exempts the viewer's own content: their own NSFW items are hidden or covered like anyone else's.
 - Every listing honours the settings — the catalogs, the [post thread](../pages/post/thread.md), [profile](../pages/user/profile.md) tabs, [bookmarks](../pages/bookmarks.md), and search results.
-- **Signed out**, NSFW is off by default: nothing NSFW is shown, but the control is still visible, and activating it leads to [`/authentification`](../pages/authentification.md).
+- **With Show off, a detail route still resolves.** The item draws with its chrome intact and the body withheld behind the same reveal control a blurred item carries; there is no separate notice page and no empty render. The preference hides listings, never a route.
+- **Signed out**, NSFW is off by default: nothing NSFW is shown, but the control is still visible, and activating it leads to [`/authentification`](../pages/authentification.md). There it is a single **Show NSFW content** action rather than the pair, since there is no account to hold a Blur setting.
+- Signing in from that control follows the ordinary outcome of [`/authentification`](../pages/authentification.md) — a new account continues to [onboarding](../pages/onboarding.md), a returning one to its content. No return-to-page parameter is carried, so the visitor does not come back to the listing they left.
 - The preference belongs to the account, so it follows the user rather than a single page.
 
 ## States
@@ -42,12 +46,5 @@ The same two settings are editable in three places, all editing the account, not
 - **Show on / Blur off** — plain listing
 - **Show on / Blur on** — catalog cards keep the title and the footer row (author and ratio); the avatar, tagline, and tags are covered. Posts and comments keep their header and footer; the body is covered. Each has its own reveal button.
 - **Show off** — NSFW items absent, whatever Blur says
-- **Signed out** — nothing NSFW shown; the control is visible and leads to sign-in
-
-## Open questions
-
-- What are the defaults for a new account, and can onboarding skip the two toggles?
-- Does a revealed item stay revealed after a reload, or return to blurred?
-- With Show off, what does a detail route render: the item with its content hidden, a notice explaining the preference, or nothing?
-- While signed out, is the control a single "Show NSFW" action or the full pair of toggles?
-- After signing in from that control, does the visitor return to the page they were on?
+- **Revealed** — one item uncovered for this view only; it returns to covered on reload
+- **Signed out** — nothing NSFW shown; a single **Show NSFW content** control is visible and leads to sign-in

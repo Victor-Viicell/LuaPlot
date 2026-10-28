@@ -16,7 +16,7 @@ What JEV actually judges:
 - A copy claim must name its source.
   - Copied **text**: an internal source is fetched and compared; an external source goes to a moderator.
   - Copied **images** always go to a moderator, because visual comparison is not precise enough to automate.
-- Personas are personal, so nobody else can report one; whether JEV still scans a persona avatar on its own is undecided.
+- Personas are outside JEV. They are personal, carry no NSFW flag to be missing, and nobody but their owner can see one, so a persona avatar is never scanned and never judged.
 
 ## Pipeline
 
@@ -52,6 +52,8 @@ What JEV actually judges:
 - Private is a visibility change, not a deletion. The content still exists and its owner can still open it.
 - The owner sees the report, the reasons, and the measures taken on the content page itself.
 - Once every reason has been patched, the owner may request public again. The content is flagged for re-verification, and JEV checks it before it becomes public.
+- There is no human check before an immediate action, and none after it: a clear violation is applied at once and opens no case. The recovery is the owner's republication request, which JEV verifies, and a removed post or comment has no recovery at all — removal is final, and its author can only publish again.
+- A reason is patched by editing the content itself: the owner edits and saves, and the republication request then covers the item as a whole. Reasons are not acknowledged one by one, and no per-reason record is kept.
 - Posts and comments cannot be made private. Their only enforcement is removal, which happens as soon as JEV is certain; an unsure verdict leaves them visible.
 - A removed comment is not erased from its thread: the body, likes, and attachments go, a single line reading "This comment was removed by moderation." takes their place, and every reply beneath stays visible at every depth. Only a comment with no replies disappears outright. The [comment thread](../components/comment-thread.md) holds the rule.
 - Removing a post, or a creator deleting a post, character, lorebook, or preset, takes the whole comment thread with it in cascade — the comments are deleted with their item, never left orphaned.
@@ -66,6 +68,10 @@ Verification exists to keep JEV's API calls bounded: content is scanned once per
 - Any edit by the creator clears the flag and makes the new version eligible again, but an edit starts no scan of its own: a **fresh report after the change** is what queues it.
 - A republication request runs the same check: when it passes, the flag is set and the content returns to public.
 - Verification is cached per content version, so the flag is only as good as the last edit. A replacement avatar therefore waits for a fresh report like any other edit.
+- Nothing is scanned on a timer, and nothing is scanned at publish: a new item goes public unverified but unqueued, and a scan starts only from a report, from JEV's own detection, or from a republication request. There is no scan period to wait out.
+- A republication request starts its check at once rather than waiting behind other work. The item stays private until that check returns, which is what the owner's **Awaiting re-verification** state covers.
+- The verified flag is internal: no badge, no field, nothing on the owner's page. Its only effects are that a scan is skipped and a report is recorded and held, and the held report's confirmation is what surfaces the second one.
+- A comment is never edited, per the [comment thread](../components/comment-thread.md), so a verified comment cannot drift from what was scanned and stays verified for as long as it exists.
 
 ## Cumulative reports
 
@@ -76,6 +82,8 @@ Many reporters, one case, one scan.
 - Each report keeps its own reason and details, so the moderator sees the total count and the spread of reasons when deciding.
 - Every new report adds weight, and the queue is ordered by weight: the most-reported item is reviewed first.
 - The same guard covers spam: a burst of reports on one item costs one scan, not one scan per report.
+- The guard ends when the case concludes: there is no cool-down afterwards, and a fresh report on a concluded item opens a new case and scans it, per [the case page](../pages/moderation/detail.md).
+- Reporters are told nothing beyond the submission: not that their report joined an existing case, not the verdict, and not the measure taken. The confirmation reads the same whether the report opened the case or joined it, per [report](../components/report.md).
 
 ## Rules
 
@@ -84,11 +92,12 @@ Many reporters, one case, one scan.
 - Reports are cumulative per item: many reporters share one case and one scan, so a pile-on cannot multiply JEV calls.
 - A new report adds weight to the item's place in the moderation queue.
 - JEV removes a post or comment as soon as the violation is clear. There is no hidden intermediate state: an unsure verdict leaves it public and sends it to a moderator. A removed comment keeps a placeholder and its replies; a removed post takes its thread with it.
+- An immediate action opens no case and never enters [`/moderation`](../pages/moderation/queue.md): nothing is queued for audit, and the creator's notification alongside the reasons on the content page is the record.
 - JEV acts as soon as it detects a violation; the report queue is not its only input.
 - Only visual assets and text are classified. Text on a character, lorebook, or preset is judged for its NSFW flag and for copying, not for illegal content.
 - An unflagged NSFW avatar is a violation even when the surrounding text is fine. The flag is what stops the image from reaching users who filtered NSFW out.
 - A copy claim must name its source: copied text from inside LuaPlot is compared automatically, copied text from outside needs a moderator, and every copied image needs a moderator.
-- Realistic sexual depictions of minors are never classed as unsure. They escalate immediately, ahead of the periodic queue.
+- Realistic sexual depictions of minors are never classed as unsure. They escalate immediately, ahead of every case already queued.
 - Stylized loli and shota content is not treated as literal CSAM. It is judged as ordinary NSFW content: a violation only when the flag is missing.
 - Human review covers whatever JEV cannot classify confidently, every copied image, and copied text from an outside source. The moderator concludes by choosing visibility, and may remove the avatar when the avatar is the violation while the text is valid.
 
@@ -104,18 +113,3 @@ Many reporters, one case, one scan.
 - **Flagged for re-verification**
 - **Verified** — passed a scan, exempt from the queue until the next edit
 - **Verified and public again**
-
-## Open questions
-
-- An immediate removal or privatisation is irreversible from the moderator side. Is there any human check on JEV's confirmed verdict, or is the creator's re-verification the only recovery?
-- Are persona avatars scanned at all? They are never shared, so no one can report them, but they are still images.
-- How does an owner "patch" a reason: by editing the content, or by acknowledging each reason individually?
-- Does re-verification run immediately on request, or wait for the periodic queue?
-- Can comments be edited at all? If they cannot, a verified comment never becomes eligible for the queue again.
-- Is the verified flag exposed to authors, or is it internal only?
-- Is the reporter ever told the outcome?
-- Do JEV's immediate actions get an entry in the moderation queue for audit, or are they invisible to moderators?
-- Does JEV scan content on publish, or only on report and on republication requests?
-- How long does an open case block new scans — only until it concludes, or for a cool-down afterwards?
-- Are reporters told that their report joined an existing case?
-- How long is the queue period?
