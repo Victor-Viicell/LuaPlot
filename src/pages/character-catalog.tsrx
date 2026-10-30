@@ -262,7 +262,12 @@ export function CharacterCatalog() @{
         gap: 12px;
       }
 
-      .toolbar .field {
+      /* Page-owned wrappers, never `.toolbar .field`: a scoped block cannot reach into a child
+         component's elements, so a selector that names a primitive's class silently does nothing
+         and the field falls into the narrow `auto` column. */
+      .search,
+      .prefs,
+      .pager-action {
         grid-column: 1 / -1;
       }
 
@@ -296,14 +301,6 @@ export function CharacterCatalog() @{
         justify-self: end;
       }
 
-      .filter-note {
-        display: none;
-        margin: 0;
-        color: var(--color-text-subtle);
-        font-size: 12px;
-        line-height: 1.5;
-      }
-
       /* Sort — a two-option segmented control. A <select> would be a second control language for
          one row; the segmented pair keeps the app's "one of these" gesture at 44px. */
       .seg {
@@ -321,6 +318,7 @@ export function CharacterCatalog() @{
         color: var(--color-text-muted);
         font: inherit;
         font-size: 13px;
+        white-space: nowrap;
         cursor: pointer;
         transition:
           background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -411,17 +409,12 @@ export function CharacterCatalog() @{
           gap: 12px 16px;
         }
 
-        .toolbar .field {
+        .search {
           grid-column: 1;
         }
 
         .controls-filter {
           grid-column: 2;
-        }
-
-        /* Scoped, so it cannot lose to the base rule on order. */
-        .controls-filter .filter-note {
-          display: block;
         }
 
         .controls-sort {
@@ -435,15 +428,11 @@ export function CharacterCatalog() @{
           grid-column: 1 / -1;
         }
 
-        .prefs .toggle {
-          width: auto;
-        }
-
         .pager {
           align-items: center;
         }
 
-        .pager .btn {
+        .pager-action {
           min-width: 200px;
         }
       }
@@ -488,18 +477,19 @@ export function CharacterCatalog() @{
       </header>
 
       <div class="toolbar">
-        <Field
-          label="Search"
-          type="search"
-          name="q"
-          value={draft}
-          placeholder="Name, tagline, description"
-          onInput={onSearchInput}
-        />
+        <div class="search">
+          <Field
+            label="Search"
+            type="search"
+            name="q"
+            value={draft}
+            placeholder="Name, tagline, description"
+            onInput={onSearchInput}
+          />
+        </div>
 
         <div class="controls controls-filter">
           <span class="chip">{`All`}</span>
-          <p class="filter-note">Tags are undecided, so All is the only filter.</p>
         </div>
 
         <div class="controls controls-sort">
@@ -579,9 +569,11 @@ export function CharacterCatalog() @{
                 <Button variant="secondary" onClick={loadMore}>Retry</Button>
               </div>
             } @else if (hasMore.value) {
-              <Button variant="secondary" block disabled={appending} onClick={loadMore}>
-                {appending.value ? "Loading…" : "Load more"}
-              </Button>
+              <div class="pager-action">
+                <Button variant="secondary" block disabled={appending} onClick={loadMore}>
+                  {appending.value ? "Loading…" : "Load more"}
+                </Button>
+              </div>
             } @else if (items.value.length >= PAGE_SIZE) {
               <p class="pager-note">End of the list.</p>
             }

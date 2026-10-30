@@ -3,6 +3,21 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-09 follow-up — the phone screenshot (2026-10-30)
+
+- **Changed:** two defects a 390px screenshot caught, one cause. A page's scoped `<style>` cannot
+  match a **primitive's** elements, so `.toolbar .field`, `.prefs .toggle` and `.pager .btn` did
+  nothing: the search box fell into the grid's narrow `auto` column (338 → 26px at 640) and the
+  segmented control squeezed `Top rated` onto two lines. The page now wraps each primitive in a
+  page-owned element — `.search`, `.prefs`, `.pager-action` — and places that; `.seg-btn` got
+  `white-space: nowrap`. The `filter-note` sentence was removed: at ≥640 it sized the `auto` column to
+  331px and starved the search field, and a caption explaining an inert control is not worth a row.
+- **Verified:** dev build at 390/360/640/900/1280: search field equals the card width at 360/390
+  (308/338), is 327/411/695 at 640/900/1280, the seg is a single 44px line everywhere, the placeholder
+  no longer clips, the pager button is 200px from `sm`, columns still 1/2/3/4, no horizontal scroll.
+  Functional re-check unchanged: 20 → 23 after `Load more`, Show on 27, Blur on 4 covered.
+- **Not verified:** no Tauri/Android build; the fix is CSS only, so the layout matrix is the proof.
+
 ## T-09 — `/character/catalog` (2026-10-30)
 
 - **Changed:** `src/pages/character-catalog.tsrx` is the real page — toolbar (search settled at

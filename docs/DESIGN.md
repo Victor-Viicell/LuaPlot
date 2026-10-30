@@ -320,10 +320,12 @@ so these are the decisions they inherit.
   would be a third control at 360 for no gain. A two-option **segmented control**, not a `<select>`:
   a native select is a second control language for one row, and the segmented pair keeps the 44px
   target and the app's "one of these" gesture.
-- **The filter is `All`, present as a pressed chip that says why.** The tag taxonomy is undecided, so
-  there is nothing else to filter by; the reserved `filter=all` is still written into the URL so a
-  shared link keeps meaning what it meant. The chip is inert on purpose — a disabled-looking control
-  reads as broken, and a one-option `<select>` reads as unfinished.
+- **The filter is `All`, present as a pressed chip.** The tag taxonomy is undecided, so there is
+  nothing else to filter by; the reserved `filter=all` is still written into the URL so a shared link
+  keeps meaning what it meant. The chip is inert on purpose and carries no explanation beside it — a
+  disabled-looking control reads as broken, and a sentence explaining a control nobody can use spent
+  331px of a 592px toolbar row on a phone screenshot. The reservation lives here and in the page's
+  header comment instead.
 - **The listing writes its own URL.** `writeQuery()` uses `replaceState` for the search settle and
   `pushState` for a sort, and never `navigate()`: `App.tsrx` reloads the page module whenever
   `path + search` changes, so a debounced keystroke would remount the page and drop the accumulated
@@ -344,12 +346,17 @@ so these are the decisions they inherit.
   (the item's own flag) *and* `blur` (the listing's live preference) and ANDs them itself — a
   per-item derived created inside the grid's keyed loop rendered nothing at all in ripple 0.4.7. The
   card still never imports `lib/state/prefs.ts`: it is handed a flag, not an opinion.
+- **A page's scoped `<style>` cannot touch a primitive's elements.** `.toolbar .field`,
+  `.prefs .toggle` and `.pager .btn` silently matched nothing — the search box collapsed into the
+  narrow `auto` grid column and "Top rated" wrapped onto two lines on a real phone. Wrap the
+  primitive in a **page-owned element** (`.search`, `.prefs`, `.pager-action`) and place or size that
+  instead; primitives' own look stays in `styles.css` where it always was.
 - **Chrome budget at 360.** The page opens on the controls: the lede is hidden below `sm` (kicker
   plus the search placeholder carry the meaning), and filter and sort share one line. Measured at
   360×740 the grid starts at 435 and the first card ends at 580, against a tab bar top of 680. From
-  `sm` the toolbar is one row — search, filter, sort — with the two switches beneath it. The toolbar
-  is **not sticky**: a 56px shell bar plus a sticky toolbar would leave a third of a phone for
-  content.
+  `sm` the toolbar is one row — search (1fr), filter, sort — with the two switches beneath it, and
+  the pager button is a 200px `pager-action` box rather than a full-width bar. The toolbar is **not
+  sticky**: a 56px shell bar plus a sticky toolbar would leave a third of a phone for content.
 
 ## Do not
 

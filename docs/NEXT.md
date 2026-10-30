@@ -85,9 +85,12 @@ T-12 (report dialog) both mount on this page, so it has to exist first.
 - **A `const` (or `track()`) in a component body ahead of `@if`/`@for` rendered nothing** under
   ripple 0.4.7 — the whole branch vanished, no error. `CardGrid` works only because its props are
   read inline. Found in T-09.
-- **A media-query rule of equal specificity did not override the base rule in a scoped `<style>`**
-  (`.lede` worked, `.filter-note` did not, same block). Scope the override with a descendant
-  selector. Found in T-09.
+- **A page's scoped `<style>` cannot touch a primitive's elements.** `.toolbar .field`,
+  `.prefs .toggle` and `.pager .btn` matched nothing — a real phone rendered a 26px search box and a
+  two-line `Top rated`. Wrap the primitive in a page-owned element and place that. Found in T-09,
+  fixed the same day.
+- **An `auto` grid column sized by a long caption starves its neighbour.** The "only filter" sentence
+  took 331px of a 592px row and left the search field 26px; the caption is gone.
 - **A prop holding an array or a flag is frozen at the call.** `CardGrid.items`, `CardGrid.blurNsfw`
   and `Card.blur` accept `Derived<…>` for exactly that reason; `Toggle.disabled` is still a plain
   boolean.
