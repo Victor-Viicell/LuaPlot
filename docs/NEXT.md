@@ -35,6 +35,8 @@ page ticket would invent its own navigation.
 ## Open decisions
 
 - None blocking. Tag taxonomy still undecided (no tags row yet), Stripe surface still undefined.
+- JEV's route is settled: `typesafe/jev-1.14` on the OpenRouter decisions endpoint, question set in
+  `docs/JEV.md`. T-27 implements it; do not re-open the model choice.
 
 ## Found while working
 

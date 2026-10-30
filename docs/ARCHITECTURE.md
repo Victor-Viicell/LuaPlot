@@ -12,7 +12,7 @@ in the same commit.
 | Shell | Tauri 2 (`src-tauri/`) | Desktop + Android/iOS wrapper. |
 | Auth & data | Supabase (Postgres + RLS + Storage + Edge Functions) | Client SDK only in `lib/data/supabase.ts`. |
 | LLM (chat turns) | DeepSeek `chat/completions` via Edge Function `chat` | Key server-side only. |
-| LLM (JEV) | OpenRouter chat model via Edge Function `jev` | Key server-side only; returns strict JSON. |
+| LLM (JEV) | TypeSafe **Jev** `typesafe/jev-1.14` on `POST /api/alpha/decisions` | Calibrated judgments, not prose. Keys live in the `jev` Edge Function. Question set + thresholds: `docs/JEV.md`. |
 | Hosting (preview) | GitHub Pages, `gh-pages` branch | `https://victor-viicell.github.io/LuaPlot/` |
 | Billing | Stripe (later phase) | No spec exists yet — see open decisions. |
 

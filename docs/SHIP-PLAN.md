@@ -77,9 +77,12 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       state exposes the sign-in control; blur survives navigation per the one-view rule.
 - [ ] **T-26 `/moderation` queue + `/moderation/[id]`.** Weight-ordered, cumulative report list,
       conclude action (visibility/removal), case history, admin gate.
-- [ ] **T-27 JEV adapter.** `lib/llm/jev.ts` posting strict JSON; decision table from
-      `systems/jev.md`; clear→act, unsure→escalate, copy claims→moderator; cached verification flag
-      cleared on edit.
+- [ ] **T-27 JEV adapter.** `lib/llm/jev.ts` posting `{model,state,questions}` to
+      `POST https://openrouter.ai/api/alpha/decisions` with `typesafe/jev-1.14` (docs/JEV.md has the
+      exact question set and state shape); `lib/llm/jevPolicy.ts` holding the thresholds and the
+      action table from `systems/jev.md`; clear→act, unsure→escalate, copy claims→moderator; cached
+      verification flag cleared on edit. Accept: a real verdict returns for a sample item, the
+      policy maps it to the spec's action, and a model failure falls through to "unsure".
 - [ ] **T-28 Moderation surfaces on detail pages.** Owner notice (report, reasons, measures),
       Awaiting re-verification, Request public again.
 
