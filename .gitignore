@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Secrets — server-side keys never ship. See docs/ARCHITECTURE.md.
+.env
+.env.*
+!.env.example
+
+# Rotation state
+.agent-lock/
+.vercel/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

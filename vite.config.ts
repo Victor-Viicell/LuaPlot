@@ -5,6 +5,9 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
+  // GitHub Pages serves the preview from /LuaPlot/; Tauri serves from the root.
+  base: process.env.LUAPLOT_BASE ?? "/",
+
   // Client-only app: the Tauri webview never hydrates server-rendered HTML.
   plugins: [ripple({ ssr: false })],
 
