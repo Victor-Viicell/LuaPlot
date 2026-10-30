@@ -166,6 +166,50 @@ layout only. Class names: `.btn`, `.field`, `.toggle`, `.card`, `.avatar`, `.she
 - Copy is spec-grounded and names only what exists: characters, lorebooks, sessions, cuts. No
   marketing sentence, no counts, no "trusted by".
 
+## Auth (decided in T-06, do not re-invent)
+
+`authentification.md` leaves Layout `_To be specified_`; these are the decisions, so `/onboarding` and
+`/terms` extend the same entry sequence instead of inventing a second one.
+
+- **The same title page as `/`.** Kicker (`a writing room for fiction`) → wordmark → one 44ch
+  paragraph → hairline → controls. Same type sizes, same chrome arithmetic (228 / 240 / 132 / 144),
+  same `justify-content: center`. Only the paragraph and what sits under the rule change: the two
+  entry screens are one sequence, not two designs. `space-between` is still banned here.
+- **Three equal `secondary` buttons, stacked.** No `primary` — three providers are three equal
+  choices and the accent belongs to the one action per screen. `block` at 360 for thumb reach; from
+  `sm` the group is capped at **420px** so 640 never renders a 592px-wide button. The rules above and
+  below keep spanning the whole column (a rule wider than the measure is home's look). Never a row
+  of three: `Continue with Google` at 14px mono does not fit three-up in a 560 column.
+- **Provider names are text.** No brand marks exist and there is one 20px stroke icon set, so the
+  labels are `Continue with Google` / `GitHub` / `Discord` — the product name never appears in them.
+- **One status row, height reserved.** `.status` is a 20px flex row when idle (empty, transparent
+  text) and grows to the retry button's 44 when there is one. Reserving it means a state change does
+  not re-centre the page; a two-line error wraps *inside* the 44 band instead of pushing the page
+  into a scroll at 360×740.
+- **One `track<AuthStatus>`**, a union of `idle | redirecting | cancelled | failed`; `busy`,
+  `message`, `tone`, `retryProvider`, `retryLabel` are derived from it. No scattered booleans.
+- **Redirecting**: all three buttons disabled (one attempt at a time), the pressed one keeps its
+  label, and the line below reads `Redirecting to Google…` at 12px. No spinner — nothing spins.
+- **Cancelled** is `--color-text-muted` (`Google sign-in was cancelled.`). **Failed** is
+  `--color-danger` with `Try again` in the same row, `flex: none`, `aria-label="Try again with
+  GitHub"`, retrying the provider that failed rather than asking again.
+- **Onboarding is a footer line, not a state.** `New account? Continue to onboarding` at 12px,
+  `--color-text-muted`, underlined, 44px tap box. Only T-30's matrix knows who is incomplete, so the
+  page links the route instead of pretending to gate it.
+- **Preview line** under the controls: `Preview — no provider is contacted.` 12px
+  `--color-text-subtle`, full stop included. Not the T-16 `Preview mode` chip.
+- **A signed-in visitor is not redirected away**, though the spec's Access line says so: that matrix
+  is T-30 and `session.ts` ships seeded signed in, so an eager redirect would make the page
+  unreachable in the preview.
+- **Seam:** `src/lib/auth.ts` — `signInWithProvider(provider): Promise<AuthOutcome>`,
+  `AuthOutcome = { redirecting } | { cancelled } | { failed; reason }`. No `ok` (success is a browser
+  redirect, not a value) and no `session.signIn()` call. The stub's outcome is switched by
+  `?auth=cancelled|failed|redirecting` — **preview only, deleted with the stub**.
+- **Live `disabled` takes the derived, not the value.** `Button` accepts `boolean |
+  Derived<boolean>` and reads it inside its own render; `disabled={busy.value}` froze the buttons
+  enabled because a prop expression is evaluated once at the call. `Field.disabled` and
+  `Toggle.disabled` still take a plain boolean — same trap, unfixed on purpose.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

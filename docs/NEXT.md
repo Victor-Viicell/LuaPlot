@@ -1,89 +1,108 @@
 # Baton — what the next session does
 
-**Ticket: T-06 — `/authentification`.**
+**Ticket: T-07 — `/onboarding`.**
 
-Why next: `/` now hands every signed-out visitor to this route (T-05), so it is the only dead end
-left in the entry flow: tap **Sign in** on the live preview and you land on a placeholder. It is also
-the first page that needs an **auth seam**, which does not exist yet (`src/lib` has no `auth.ts` and
-`lib/data/supabase.ts` was never written) — better to define that seam against one real page than to
-invent it later inside T-30's redirect matrix.
+Why next: it is the last dead end in the entry flow — `/authentification` now links straight to it
+(T-06), and a new account's first screen is otherwise a placeholder. It is also the first page that
+**writes an account**, and the data contract has no write for one: `repo.ts` can read preferences and
+mutate content, but there is no `saveProfile`, no `isHandleTaken`, and `session.ts` has no way to
+change a display name. Define those three against one real form now, or T-30's redirect matrix will
+invent them from scratch. The handle rules are also the first mechanically checkable validation in
+the repo (`3–24`, `[a-z0-9_]`, case-insensitive uniqueness), which makes the ticket easy to prove.
 
 ## Do
 
-1. Read `src/specs/pages/authentification.md` (30 lines) and `src/specs/pages/onboarding.md` §Purpose.
-   The spec is short and strict: **three provider buttons** (Google, GitHub, Discord), no password
-   field, no reset flow, no provider management, no email/name fields.
-2. Create `src/lib/auth.ts` — the seam. Shape it so T-30 can swap the body and keep the signature:
-   `signInWithProvider(provider: Provider): Promise<AuthOutcome>` where
-   `Provider = "google" | "github" | "discord"` and
-   `AuthOutcome = { status: "redirecting" } | { status: "cancelled" } | { status: "failed"; reason: string }`
-   (an `ok` status only means something once Supabase exists — leave it out rather than fake a
-   signed-in session; `session.signIn()` must not be called by this page).
-   Preview body: no network, resolve `cancelled` after ~600ms, and never touch `session.ts`.
-3. Build the page in `src/pages/authentification.tsrx` as the **same title page as home** (kicker →
-   wordmark → one paragraph → hairline → the controls), so the two entry screens read as one
-   sequence. Three `Button` primitives with `block` on mobile, the product name nowhere in the button
-   labels: `Continue with Google` / `Continue with GitHub` / `Continue with Discord`.
-4. States, all reachable and all honest:
-   - **Redirecting to provider** — the pressed button goes `disabled`, all three disable (one attempt
-     at a time), the label stays put and a 12px line reads `Redirecting to Google…`. No spinner.
-   - **Provider cancelled** — inline line in `--color-text-muted` + the buttons re-enabled.
-   - **Callback failed** — inline error in `--color-danger` (one of the three sanctioned uses) with a
-     `Try again` action.
-   - **Onboarding incomplete** — a plain link to `/onboarding` is enough; do not build the gate.
-   Put the state in one `track<AuthStatus>` and derive the copy; do not scatter booleans.
-5. Record the layout choice in `docs/DESIGN.md` under a new "Auth (decided in T-06)" section **in the
-   same commit** — `authentification.md` says `_To be specified_`, and CONTRACT.md requires the
-   decision to live there so the next page does not re-invent it.
-6. `docs/SHIP-PLAN.md` tick + `docs/PROGRESS.md` entry, as always.
+1. Read `src/specs/pages/onboarding.md` (36 lines) — it is the shortest and strictest page spec in
+   the repo — plus `src/specs/luaplot-pages.md` §Conventions for why there is no reserved-word list.
+2. Extend the **data contract** before the page, in the same commit as `memory.ts`:
+   `isHandleTaken(handle): Promise<boolean>` (case-insensitive across accounts, never across the
+   viewer's own current handle) and `saveProfile(patch: { handle, displayName }): Promise<User>`.
+   Every method stays `async`, there is still no error envelope (`ARCHITECTURE.md`), and both go in
+   the memory adapter with a fixture-safe answer. Document the pair in `ARCHITECTURE.md` → data, and
+   say in the type comments that `supabase.ts` (T-30) must implement them.
+3. Decide how the saved account reaches `session.ts` and **record it in `DESIGN.md`**: `signIn()`
+   fabricates `MOCK_USER.displayName`, so a saved display name silently disappears unless the store
+   grows a mutator (e.g. `setAccount({ handle, displayName })` that emits like `signIn` does).
+   T-30 replaces the body; the signature is what matters.
+4. Build `src/pages/onboarding.tsrx`. This is the **first form page**, not a title page: the shell's
+   top bar already says *Onboarding*, so the page opens with a 12px kicker, a 26px `/ 34px` title,
+   one line of copy, a hairline, then the form — same rule + spacing language as `/` and
+   `/authentification`. Two `Field`s (username, display name), two `Toggle`s (Show / Blur NSFW,
+   through `lib/state/prefs.ts`, never page-local booleans), then `Finish`.
+5. Validation is **one pure function** (`lib/validate.ts` or a local `readHandle()`), used by both
+   the inline error and the Finish gate, so the two can never disagree. Rules: lowercase letters,
+   digits, underscores, 3–24, lowercased on save; empty display name is invalid. Copy: the spec's
+   `Username taken` verbatim (and it names no alternative), and one format line of your own that the
+   spec does not dictate — keep it factual, e.g. `Lowercase letters, digits and underscores, 3–24
+   characters.`
+6. States: first visit (empty, Finish disabled), resumed after abandonment (values restored from the
+   adapter), username taken (inline on the field, Finish stays disabled), invalid username (same
+   place). Finish writes the whole form and then lands the visitor on entry content — recommended
+   target `/user/<handle>`, the same screen T-05's control opens once signed in.
+7. `docs/DESIGN.md` gains an "Onboarding (decided in T-07)" section in the same commit: the page is
+   a form page, the label/error/toggle order, where `Finish` sits relative to the tab bar, and the
+   draft-persistence decision you take in step 8. `docs/SHIP-PLAN.md` tick + `docs/PROGRESS.md`.
 
 ## Traps
 
-- **`access` says "signed-in visitors redirected away" — do not implement it.** The redirect matrix
-  is T-30 (`ARCHITECTURE.md` → Session), and `session.ts` is seeded signed in, so an eager redirect
-  would make the page unreachable in the preview. Render the page for everyone; note the gap.
-- **Do not call `signIn()` on success.** A preview stub that signs the mock user in turns the page
-  into a fake callback and hides the states the spec asks you to show.
-- **`track()` at module scope throws** (no owning block). Inside the component only.
-- **A `.tsrx` statement container crashes on `try`/`catch`** around `@{` blocks: use
-  `.then(onOk, onFail)` on the seam's promise.
-- A `<style>` block must be a child of an element or fragment; a `.tsrx` file needs
-  `export default Authentification;` for the router's `PageModule` typecheck.
-- **`min-height: calc(100dvh - …)`**: reuse home's numbers (228 / 240 / 132 / 144) — they include the
-  scroller's own 60px tab-bar clearance, which is easy to forget, and they are what makes
-  "no scroll at 360×740" true. Verify with `scrollHeight == clientHeight`, not by eye.
-- Headless Chromium screenshots **freeze CSS entrance animations at opacity 0**, so a capture can
-  look like "content failed to load" while the DOM is perfect. Verify states by reading the DOM, or
-  capture with animations disabled.
-- The `Preview mode` chip convention (T-16, `ARCHITECTURE.md`) is not built yet. One `12px
-  --color-text-subtle` line saying the preview contacts no provider is enough; do not invent a chip.
+- **`repo.ts` has no profile write and no handle lookup.** Adding them is this ticket's real work;
+  the page is the easy half. Do not fake the uniqueness check in the page by scanning
+  `listPersonas` or a fixture array — the adapter owns that rule, exactly like one-vote-per-viewer.
+- **`Field.disabled` and `Toggle.disabled` still take plain booleans.** T-06 gave `Button`
+  `disabled: boolean | Derived<boolean>` (read through `read()` inside its own render); the other
+  two primitives were left alone on purpose. A `Finish` that disables on live validity must be a
+  `Button` — if a field needs a live `disabled`, fix that primitive first and record it.
+- **The "abandoned first run keeps what was typed" line is load-bearing.** "The whole form is
+  written in one save" and "the entered values are restored" cannot both be true of a Finish-only
+  write. Recommended: one draft write (`saveProfile` + preferences) on a 250ms debounce or on blur,
+  and `Finish` = the same write plus whatever marks the account onboarded. Whichever you pick, write
+  it down — the next form page will copy it.
+- **The session store loses the display name.** See step 3; a page that only calls
+  `session.signIn(handle)` will show `You` everywhere afterwards.
+- **The NSFW pair is per account and already has a store** (`lib/state/prefs.ts`,
+  `setShowNsfw` / `setBlurNsfw`). Page-local booleans would pass a DOM check and still leave
+  `/dev/state` and every listing wrong.
+- **This page is allowed to scroll.** Five rows, help lines and inline errors do not fit 360×740 —
+  the zero-scroll rule belongs to `/` and `/authentification`. What matters is that `Finish` is
+  reachable and never hidden under the 60px tab bar + safe area, and that no field is pushed under
+  the keyboard (a phone webview crops ~40% of the viewport).
+- `track()` at module scope throws (no owning block). Inside the component only.
+- A `.tsrx` statement container crashes on `try`/`catch` around `@{` blocks: use `.then(onOk, onFail)`.
+- A `<style>` block must be a child of an element or fragment, and the file needs
+  `export default Onboarding;` for the router's `PageModule` typecheck.
+- Headless Chromium screenshots freeze entrance animations at opacity 0 — verify by reading the DOM.
+- **A hidden tab clamps timers**: a 600ms resolve measured ~1.4s in the CDP-driven browser (T-06).
+  Never conclude "the state never arrives" from a 700ms wait.
 
 ## Open decisions
 
-- **How the three states are reached in the preview.** Recommended: make the stub deterministic and
-  its outcome switchable through one query value on the page (`?provider=cancelled|failed`), used
-  only while the provider is a stub — that keeps the product surface at exactly three buttons while
-  letting a reviewer see every state. Whatever you choose, it must be visible from `/` in two taps.
-- Whether the signed-out copy mentions the terms out loud. `luaplot-pages.md` links Terms from the
-  overflow menu; keep the page to the spec's three actions and no legal line.
-- Whether the three buttons carry brand marks. There is one 20px stroke icon set and no brand assets;
-  **text-only labels** keep it consistent until someone draws real logos.
-- Preferences still reset on reload (memory adapter, no Supabase ref). Do not fake persistence.
+- **Where `Finish` lands.** Recommended `/user/<handle>` (entry content, and the handle is the one
+  URL the account has). The redirect matrix is T-30 and out of scope here.
+- **Whether the page keeps the title-page shape** (wordmark + paragraph, like `/` and
+  `/authentification`) or becomes a plain form page. Recommended: form page — a form under a 34px
+  wordmark reads as a marketing screen, and the shell already supplies the title.
+- **Draft persistence granularity** (blur vs debounce vs Finish + localStorage). Recommended:
+  debounce through the adapter, so "resumed" is honest and nothing is written twice.
+- **Whether the handle is checked on blur as well as on submit.** Recommended: both — one check per
+  blur is not per-keystroke, so the 250ms debounce rule is satisfied.
+- Preferences still reset on reload only where nothing writes them; the adapter keeps them per
+  handle, so a finished onboarding should survive a reload. Do not fake Supabase persistence.
 - Tag taxonomy still undecided (keep `tags` empty); Stripe surface still undefined.
 
 ## Found while working
 
-- **The shell's scroller carries 60px of tab-bar clearance as its own padding** (`.content`), on top
-  of the 60px tab bar and the outlet padding. Any page that wants "one screen, no scroll" has to
-  subtract all of it; both of my first two attempts scrolled by exactly 60px because of it.
-- **`document.title` for `/` is `LuaPlot`** and the shell already owns it — the page must not set a
-  title (T-05 trap held true).
-- **`space-between` on a short first screen reads as a hole, not as a composition.** The title page
-  went to `justify-content: center` after looking at a 360×740 capture; a control pinned to the very
-  bottom reads as an account footer. Worth remembering for `/onboarding` and `/terms`.
-- **Copy fixes the silhouette.** A 4-line paragraph ended in a 15%-wide runt line; measuring wrapped
-  line widths in the browser and rephrasing to a 3-line 82% shape fixed it without touching CSS. Do
-  that again rather than fiddling with `max-width`.
+- **A live `disabled` needs the derived, not the value.** `disabled={busy.value}` at a call site is
+  frozen at mount — props are evaluated once. T-06 fixed `Button`; `Field`/`Toggle` still have the
+  trap, and any page that gates a submit on validity will meet it.
+- **`Continue with {name}` renders `Continue withGoogle`.** JSX text before an expression loses its
+  trailing space; use one template literal. Check the rendered `textContent`, not the source.
+- **The failed state is the height test, not the idle state.** A 20px status line that grows to the
+  retry button's 44 fits; the same line stacked above the button adds ~56 and scrolls at 360×740.
+- **Measured, not guessed:** at 360 the outlet is 328px and 14px mono is ~8.4px/char, so a 44ch
+  paragraph is 3 lines and ~39 chars wrap per line. That arithmetic is what decides whether a block
+  fits a 512px content area — do it before writing CSS.
+- **Rules wider than the measure** is the house look (home's hairline spans 560 while the paragraph
+  holds 44ch), so capping `.providers` at 420 and leaving `.gate` full width is correct, not sloppy.
 - `session.ts` still seeds `you` signed in and the overflow menu still carries the *Preview only*
   switch; `/dev/state` shows the pair and the emit counters. Neither is a product control (T-30
   deletes both).

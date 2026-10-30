@@ -3,6 +3,36 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-06 — `/authentification` (2026-10-30)
+
+- **Changed:** `src/lib/auth.ts` (new seam: `Provider`, `PROVIDERS`, `PROVIDER_NAMES`,
+  `AuthOutcome` = redirecting / cancelled / failed, `signInWithProvider` resolving `cancelled` after
+  600ms, `?auth=cancelled|failed|redirecting` preview switch, no network, no `session.signIn()`);
+  `src/pages/authentification.tsrx` rewritten as home's title page with three equal `secondary`
+  providers, one `track<AuthStatus>` + five derived readings, a status row that reserves 20px
+  (grows to 44 for the inline `Try again`), the preview line and the onboarding footer link;
+  `src/components/Button.tsrx` now accepts `disabled: boolean | Derived<boolean>` and reads it
+  through `read()` inside its own render. Docs: `DESIGN.md` gains an Auth section, `SHIP-PLAN.md`
+  ticks T-06, `NEXT.md` rewritten for T-07.
+- **Verified:** `scripts/check.sh` GREEN (build ok, 30/30 routes). Chromium at 360×740, 640×900,
+  900×1000, 1280×900: `.screen` scrollHeight == clientHeight at every width (zero scroll in idle,
+  redirecting, cancelled **and** failed), `scrollWidth ≤ innerWidth` everywhere, buttons 328×44 at
+  360 and 420×44 from `sm`, gate 328/592/656/560 wide, wordmark 34→44 and lede 14→15 at `lg`, rail
+  71px at 900 and the tab bar gone. States driven by real clicks and read back from the DOM:
+  idle (`session ·` line empty, three enabled) → Google → all three `disabled` + `Redirecting to
+  Google…` at 12px in `--color-text-muted` → `Google sign-in was cancelled.` with the buttons
+  re-enabled; `?auth=failed` → `No callback arrived from GitHub.` in `--color-danger` (Latte
+  `#d20f39`, Mocha `#f38ba8`) with a 111×44 `Try again` (`aria-label="Try again with GitHub"`)
+  that returns to the redirecting state; `?auth=redirecting` holds the hand-off with all three
+  disabled. `/`, `/dev/primitives` and `/dev/state` re-checked after the `Button` change (plain
+  `disabled={true}` still disables).
+- **Not verified:** no Supabase call exists to verify — the seam answers from a stub, so the real
+  provider round-trip, the callback and the `redirected away` matrix are T-30. The 600ms resolve is
+  throttled to ~1.4s in a background tab (a hidden Chromium clamps timers), so the state was read
+  after a longer wait rather than at exactly 600ms. No screenshot-level check of the four Catppuccin
+  flavours on this page (tokens only). The signed-out→auth redirect and the onboarding gate are
+  absent by design and recorded in `DESIGN.md`.
+
 ## T-05 — `/` home (2026-10-30)
 
 - **Changed:** `src/pages/home.tsrx` — `PagePlaceholder` replaced with the real title page

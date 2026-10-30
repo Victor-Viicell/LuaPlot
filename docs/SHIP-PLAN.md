@@ -32,8 +32,13 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       — `src/pages/home.tsrx` is a title page, not a landing page: kicker, wordmark, 44ch paragraph,
       hairline, `session ·` reading, one control. Zero scroll at 360×740; the control follows the
       session live (`/authentification` / `/user/you`) and a signed-in visitor is never redirected.
-- [ ] **T-06 `/authentification`.** Three provider buttons, redirecting/cancelled/failed states.
+- [x] **T-06 `/authentification`.** Three provider buttons, redirecting/cancelled/failed states.
       Accept: buttons call the auth seam; mobile layout has no scroll at 360×740.
+      — `src/lib/auth.ts` is the seam (`signInWithProvider` → redirecting / cancelled / failed, no
+      `ok`, no session write, `?auth=` preview switch); `src/pages/authentification.tsrx` is home's
+      title page with three equal secondary providers in a 420 measure, one `track<AuthStatus>`, and
+      a status row that reserves 20px so no state re-centres the page. Zero scroll in all four states.
+      `Button.disabled` now takes `Derived<boolean>` — a live disable needs the derived, not the value.
 - [ ] **T-07 `/onboarding`.** Username (3–24, `[a-z0-9_]`, case-insensitive uniqueness), display
       name, NSFW toggles; inline errors; Finish gated. Accept: invalid handle and taken handle both
       block Finish with the spec's copy; valid submit lands on profile.

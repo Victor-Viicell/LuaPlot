@@ -1,4 +1,5 @@
-import type { Children } from "ripple";
+import type { Children, Derived } from "ripple";
+import { read } from "../lib/reactive.ts";
 
 /**
  * Button. Four variants, one height (44), radius 2, 14px label.
@@ -9,6 +10,10 @@ import type { Children } from "ripple";
  * secondary default: 1px outline
  * ghost     in-row actions, no border
  * danger    destructive only
+ *
+ * `disabled` takes a `Derived<boolean>` as well as a plain boolean: a prop expression is evaluated
+ * once, when the component is called, so a page that disables on live state (T-06's "one attempt at
+ * a time") must hand over the derived itself and let this component read it.
  */
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -24,7 +29,7 @@ export function Button({
 }: {
   variant?: ButtonVariant;
   type?: "button" | "submit" | "reset";
-  disabled?: boolean;
+  disabled?: boolean | Derived<boolean>;
   /** Full-width, for a form's submit on mobile. */
   block?: boolean;
   /** Accessible name when the visible label is an icon or is missing. */
@@ -39,7 +44,7 @@ export function Button({
     <button
       class={classes.join(" ")}
       type={type}
-      disabled={disabled}
+      disabled={read(disabled)}
       aria-label={label}
       onClick={onClick}
     >
