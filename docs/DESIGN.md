@@ -128,6 +128,11 @@ layout only. Class names: `.btn`, `.field`, `.toggle`, `.card`, `.avatar`, `.she
   switch that writes `data-theme` on `<html>`. It is not a product route: absent from
   `src/specs/luaplot-pages.md`, absent from the tab bar, and `scripts/spec-routes.mjs` drops
   `/dev/*` before comparing. The sheet's dialog form follows the real viewport, not the stage width.
+- **Data page.** `/dev/data` (T-03) is the second dev-only route: counts per entity, the fixture
+  names per kind, and the `resolveRepo()` badge. It uses the real `Card`, `Skeleton` and
+  `EmptyState` — it is the primitives' second proof, so it must never grow its own card look. The
+  counts strip is a 1px-gap grid on `--color-border` (2-up at 360, 4-up at `sm`), and the mutation
+  strip is the only control on any dev page that writes to the adapter.
 
 ## Do not
 

@@ -3,6 +3,32 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-03 — data contract + memory adapter (2026-10-30)
+
+- **Changed:** `src/lib/data/types.ts` (every entity derived from the specs; `ratioOf()` derives the
+  ratio from the vote counts, and personas carry no engagement and no NSFW flag), `repo.ts` (the
+  seam: one list method per kind returning `{ items, hasMore }` at 24/page, lookups returning
+  `null`, mutations returning the updated entity, `resolveRepo()`), `memory.ts` (deep-copied
+  fixtures, derived `commentCount`/`replyCount`, one vote per viewer with a switch replacing the
+  earlier vote, listings hiding what is not public and not the viewer's, `findSessionForCharacter`
+  for Start/Continue), `src/lib/fixtures/{ids,characters,lorebooks,presets,personas,posts,social,sessions,index}.ts`
+  (8 characters, 6 lorebooks, 5 presets, 3 personas, 12 posts, 18 comments, 6 alerts, 4 cases,
+  2 sessions with transcripts; ids are real 36-char UUIDs or every detail link would 404), and
+  `src/pages/dev-data.tsrx` (`/dev/data`, added to `ROUTES` only — not to the spec, not to the tab
+  bar). `docs/ARCHITECTURE.md` records the seam shapes; `docs/DESIGN.md` notes the second dev page.
+- **Verified:** `scripts/check.sh` GREEN (build ok, 30/30 routes match the spec with `/dev/*`
+  excluded); live `index-BUfrGS6u.js` on `https://victor-viicell.github.io/LuaPlot/` (200, bundle
+  hash matched by `publish.sh`). Chromium at 360×740: `scrollWidth` 360 = `innerWidth`, no
+  horizontal scroll, counts grid 2-up. At 1280×900: 3 card columns, 4 count columns, `scrollWidth`
+  1270 < 1280. Counts read 8/5/5/3/12/18/6/4 (5 lorebooks because one fixture is private, which is
+  the point of the private one). "Vote like" logged `39/14 → 40/14` and the card ratio recomputed
+  from the counts; the busiest thread reads 4 comments through `listComments` while the item's
+  derived `commentCount` says 4 too.
+- **Not verified:** no Supabase adapter, so the error envelope is still undesigned (recorded as an
+  open decision). Nothing consumes `vote`/`isBookmarked`/`toggleBookmark` from a product page yet —
+  they are proven only on `/dev/data`. No test runner exists; the derivations are checked by eye on
+  the dev page, not by an assertion.
+
 ## T-02 — design primitives (2026-10-30)
 
 - **Changed:** the eleven primitives `src/components/{Button,Field,Toggle,Card,Sheet,Toast,Tabs,

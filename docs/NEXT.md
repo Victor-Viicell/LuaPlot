@@ -1,87 +1,86 @@
 # Baton — what the next session does
 
-**Ticket: T-03 — Data contract + memory adapter.**
-Why next: T-05 onward are pages, and every one of them reads items, comments, notifications or
-reports through `src/lib/data/repo.ts`. That file does not exist yet — there is no `src/lib/data/`
-at all. Building a page before the seam exists would either invent a second source of truth or
-hard-code fixtures inside a component. The primitives are done (T-02), so the first page can land
-the moment this seam is real.
+**Ticket: T-04 — Session + NSFW preference state.**
+Why next: every page from T-05 on asks "who is this, and may they see this" before it asks
+anything else. `App.tsrx` still hard-codes `SELF_HANDLE = "you"` for the profile tab, the adapter
+answers for a module constant `VIEWER = "you"` (`src/lib/data/memory.ts`), and every route declares
+an `access` value that nothing reads. Build the two stores now, or ten pages will each invent their
+own idea of "signed in".
 
 ## Do
 
-1. `src/lib/data/types.ts` — the entity shapes, derived from the specs, not from imagination:
-   - shared item: `id` (fixed UUID string), `kind`, `title`/`name`, `author` handle, `nsfw: boolean`,
-     `createdAt`/`updatedAt` (ISO strings), `likes`, `dislikes`, `bookmarks`, `commentCount`,
-     `tags: string[]` (kept empty — the taxonomy is undecided), avatar reference.
-   - `Character` adds `inSessionName?`, `tagline`, `description`, `lorebookIds: string[]` (references,
-     never copies), `isPublic`.
-   - `Lorebook` adds `description`, `entries`; `Preset` adds `description`, `settings`; `Persona`
-     adds `description`, `isDefault` and **no** engagement and no NSFW flag (personal, never shared).
-   - `Post` = body + at most one attachment (`characterId` or a cut from a session), no kind field,
-     no edit route; `Comment` = own entity with `parentId`, `likes/dislikes`, `replyCount`, **no
-     bookmark**; `Notification` = aggregated rows (`kind`, `target`, `count`, `read`);
-     `Report` = `reasons`, `weight` (cumulative), `status` (`open|concluded`), `jev` verdict;
-     `Session` = participant copies with `sourceId`, `version`, `edited`, `unlinked`, transcript.
-   - `ratio` is **derived** (`likes / (likes + dislikes)`, 0 when there are no votes) — never stored.
-   Read `src/specs/luaplot-pages.md` (conventions), `components/comment-thread.md`,
-   `pages/session/detail.md`, `systems/jev.md`, `pages/moderation/queue.md` before typing a field.
-2. `src/lib/data/repo.ts` — the seam. `resolveRepo()` returns the memory adapter until a Supabase
-   project ref exists; every method async (`await` even in memory, so the swap is not a rewrite).
-   Listing methods take `{ query?, sort?, page }` and return `{ items, hasMore }` with a page size
-   of 24. Mutations return the updated entity. No `fetch` in this file.
-3. `src/lib/data/memory.ts` + `src/lib/fixtures/*.ts` — ≥8 characters, 6 lorebooks, 5 presets,
-   3 personas, 12 posts with comments, notifications, reports, 2 sessions with transcripts.
-   Fixture ids must be real 36-char UUIDs: the router's param matcher rejects anything else.
-   Make one character NSFW and one lorebook unreachable-from-a-session so T-08/T-15 can prove both
-   states. Names may repeat across types on purpose (spec: names never carry identity).
-4. `/dev/data` — a dev page listing counts per entity, the fixture names per kind, and a
-   `resolveRepo()` badge. Same rules as `/dev/primitives`: absent from `src/specs/luaplot-pages.md`,
-   absent from the tab bar, and `scripts/spec-routes.mjs` already drops `/dev/*` before comparing,
-   so adding the route to `ROUTES` is enough. Use `Skeleton`, `EmptyState` and the `Card` where they
-   fit — it is the second proof of the primitives against real data.
+1. `src/lib/state/session.ts` — a plain subscribe/notify store, modelled on `src/lib/toast.ts` and
+   `src/lib/router.ts`, **never** a module-scope `track()`:
+   - `currentUser(): User | null` (handle + display name + `isAdmin`, all mock: `you`, admin false),
+   - `isSignedIn()`, `signIn()`, `signOut()`, `onSession(listener)`.
+   - Seed signed in: every fixture is owned by `you`, and the preview is worth opening signed in.
+     `signOut()` forces the signed-out states pages must render; the switch has to live somewhere
+     reachable in the shell (overflow menu) so a reviewer can flip it in two taps, and it must be
+     labelled as a dev affordance, not a product control.
+   - `access` enforcement is **not** this ticket (T-30 owns the redirect matrix). Do not add
+     redirects to `router.ts` here; just make the state readable.
+2. `src/lib/state/prefs.ts` — Show NSFW / Blur NSFW, per account, **persisted in the adapter**:
+   - `nsfwPreference(): { show: boolean; blur: boolean }`, `setShowNsfw(bool)`, `setBlurNsfw(bool)`,
+     `onPrefs(listener)`. Same store shape. Blur is only meaningful while Show is on (the spec's
+     two controls are independent toggles, so keep them independent and let the page decide).
+   - Add the persistence to the seam, not to `localStorage`: `resume/save` go through
+     `repo.getPreferences(handle)` / `repo.savePreferences(handle, patch)` in `repo.ts` +
+     `memory.ts` (a map keyed by handle). `docs/ARCHITECTURE.md` gets the two new methods in the
+     same commit.
+   - Signed out: both off, and `prefs.ts` must return `{ show: false, blur: false }` without a
+     signed-in user. The signed-out control that leads to sign-in is a page concern (T-25).
+3. Wire the shell: the profile tab's handle comes from `currentUser()` (falling back to `/` when
+   signed out instead of `/user/you`), and `nsfwPreference()` gains a visible readout only where it
+   already exists — do **not** build a settings page (T-23).
+4. `src/pages/dev-state.tsrx` — `/dev/state`, third dev route: current user, the two prefs, the
+   store's notification count, and buttons that flip sign-in and both prefs. Add the route to
+   `ROUTES` only. Use `Toggle` for the two flags and `Button` for the session switch; no new look.
 
 ## Traps
 
-- **Do not store `ratio`.** The card takes `ratio` as a 0–1 number; compute it in the adapter (or a
-  small helper) from the vote counts. A stored percentage drifts the moment a vote is added.
-- **Personas**: no engagement, no NSFW, no public catalog, no follows. If the type carries a
-  `likes` field you have invented a feature the spec refuses.
-- **Session copies** keep the id of their original in `sourceId`; a published cut copies message
-  text and attribution. Never make a page read a live item once a session started.
-- Ripple: `track()` only inside a component. Model the repo like `src/lib/router.ts` and
-  `src/lib/toast.ts` — a plain store that notifies — and mirror it into a component `track()`.
-  A module-scope `track()` throws on first write.
-- A prop is evaluated once: pass `Tracked`/`Derived` for anything that changes and read it with
-  `read()` from `src/lib/reactive.ts`. Static strings are fine as plain values.
-- **Primitive styling lives in `src/styles.css`** (`docs/DESIGN.md` → "Primitives"). A page's own
-  `<style>` block is layout only. Do not add a second look for `.btn` or `.card`.
-- `/dev/primitives` leaves `data-theme` on `<html>` when you switch flavours — a manual dev action
-  cannot survive unmounting. Press **System** before you judge the page you are building.
-- The automation browser throttles CSS animations: a painted `transition` value can read as its
-  start value even though the tokens are right. Verify tokens (`getPropertyValue('--color-accent')`)
-  or the class/markup, not the animated paint.
-- Deep links on Pages answer **HTTP 404** with `404.html` (a copy of `index.html`) and the app boots
-  anyway. Only the root URL is a 200; do not "fix" the 404.
-- `scripts/check.sh` is the gate: typecheck + build + `spec-routes.mjs`. It must print GREEN.
+- **`track()` at module scope throws** the first time anything writes to it. This is why `toast.ts`
+  and `router.ts` are subscribe/notify stores and why `App.tsrx` mirrors one into its own tracked
+  value. Both new stores must follow that shape exactly.
+- **Do not import `track` in `session.ts`/`prefs.ts`** and do not make the module state reactive
+  "just this once".
+- **Preferences are per account**, so `prefs.ts` re-reads them on sign-in/sign-out; a stale Show
+  flag surviving an account switch is a bug the specs call out (per-account, not per-device).
+- **`repo.ts` is the only place with data access.** `prefs.ts` calls the adapter; it does not touch
+  `localStorage` or a fixture.
+- **A `.tsrx` statement container crashes on `try`/`catch`.** `tsrx-tsc` reports a bogus
+  `'{' or ';' expected` at the `@{` line and a `No source map entry` warning; the real cause is a
+  `try` block in the setup. Use `.then(onOk, onFail)` (App's load path does this) or a helper that
+  already returns a promise. Costs an hour if you do not know it.
+- **A `@if`/`@else` branch renders exactly one node**, and a `<style>` block must be a child of an
+  element or fragment: wrap both in `<>…</>`. The error ("A code block renders a single node") only
+  appears once the transform stops choking on the `try`.
+- Component files need `export default Component;` or the router's lazy import fails to typecheck
+  (`PageModule` requires a default export).
+- `/dev/*` is already filtered out of `scripts/spec-routes.mjs`; adding a route to `ROUTES` is
+  enough, and the spec index must stay untouched.
 
 ## Open decisions
 
-- Repo method shape: `listCharacters({ query, sort, page })` per kind versus one `list(kind, opts)`.
-  Default: one method per kind — the pages need type-narrow returns and the extra lines are cheap.
-- Ownership of the "one vote per viewer" rule: the adapter enforces it (a vote map keyed by viewer +
-  item), the page only calls `vote(id, "like" | "dislike")`.
-- Pagination: `page` is a 1-based number in component state, never in the URL (spec: paging is not
-  part of the URL). `hasMore` is what hides **Load more**.
-- Tag taxonomy still undecided (keep `tags` empty), Stripe surface still undefined, Supabase still
-  unprovisioned (memory adapter remains the truth).
+- Whether "signed in" should start true in the preview. Default here: yes, because every fixture is
+  owned by `you`; flip it if the catalog starts looking empty.
+- Where the sign-in/sign-out dev switch lives: overflow menu vs `/dev/state` only. Default: both,
+  with `/dev/state` as the honest one.
+- Supabase adapter still unprovisioned, so preferences persist in memory only — a reload resets
+  them. Do not fake persistence with `localStorage` "just for the preview"; that would make the
+  pages depend on something the real client will not provide.
+- Tag taxonomy still undecided (keep `tags` empty), Stripe surface still undefined.
 
 ## Found while working
 
-- A scoped `<style>` block cannot style a child component's elements, so every primitive's look went
-  into `src/styles.css` instead. Recorded in `docs/DESIGN.md`; do not re-open it per page.
-- `ref` runs before the portal inserts the node: `element.focus()` there silently does nothing. The
-  sheet retries until `isConnected`. Any future focus-on-mount needs the same wait.
-- Interactions that are pure CSS (toast timer, sheet motion) are not observable in the automation
-  tab; assert on state and markup instead of paint.
-- `publish.sh` compares the live `index.html` bundle hash — a Pages 200 alone can still be the
-  previous deploy, and it stays stale for minutes.
+- **The vote/comment counts in a fixture must never be authored.** `memory.ts` recomputes
+  `commentCount` and every `replyCount` from the thread on load, so a fixture that says
+  `commentCount: 3` while three comments carry a different `itemId` cannot drift. Keep that.
+- **`ratioOf()` is a function, not a field.** `/dev/data` proves it: vote once and the card's
+  percentage moves without any stored value changing.
+- **A memory-adapter mutation mutates the row in place**, so a snapshot you already hold shows the
+  post-mutation numbers. Read counts into locals *before* `await repo.vote(...)` if you are going to
+  print "before → after".
+- **One fixture lorebook is deliberately private** (`Unfiled Notes on the Ninth`, `isPublic: false`),
+  which is why the catalog shows 5 of 6 and why session 2's copy of it is `unlinked`. Both are the
+  states T-08 and T-15 have to prove; do not "fix" them.
+- `publish.sh` compares the live bundle hash; a Pages 200 alone can still be the previous deploy.

@@ -15,7 +15,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Skeleton, Avatar, Icons` on the Catppuccin tokens, keyboard + `:focus-visible` states,
       44px targets. Accept: a `/dev/primitives` route renders every variant in both themes at
       360px and 1280px with no overflow.
-- [ ] **T-03 Data contract + memory adapter.** `lib/data/types.ts`, `repo.ts`, `memory.ts`,
+- [x] **T-03 Data contract + memory adapter.** `lib/data/types.ts`, `repo.ts`, `memory.ts`,
       `lib/fixtures/*` (≥8 characters, 6 lorebooks, 5 presets, 3 personas, 12 posts with comments,
       notifications, reports, 2 sessions with transcripts). Accept: a `/dev/data` route lists
       counts per entity from `resolveRepo()`.

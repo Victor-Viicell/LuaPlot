@@ -70,8 +70,26 @@ import. `src/components/PagePlaceholder.tsrx` is the scaffold every route render
 - `supabase.ts` — real client, RLS enforced, swapped in by `resolveRepo()` when
   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` exist.
 
-Every method returns typed results and never throws raw errors; failures come back as
-`{ ok: false, error }` so pages can render the Error state.
+Shapes, decided in T-03 (change them here before changing them in the code):
+
+- **Listings** take `{ query?, sort?, page }` and return `{ items, hasMore }` with a page size of
+  24. `page` is 1-based and lives in component state; `query`/`sort` live in the query string.
+- **Lookups** return the entity or `null`. A missing item is a *not-found state* the page renders,
+  not an error — `getSession` returns `null` for "not a participant" too, because the spec gives
+  that the same message.
+- **Mutations** return the updated entity (`vote`, `toggleBookmark`), so a page never re-reads to
+  show the new counts. One vote per viewer per item is the adapter's rule, not a page's.
+- **No error envelope yet.** Every method is `async` from the first day, but nothing can fail in
+  memory. The `{ ok: false, error }` shape arrives with `supabase.ts`, which is the first adapter
+  that can actually fail — inventing it now would make every page pay for a transport it does not
+  have. Whoever writes `supabase.ts` changes this line in the same commit.
+- **Counts are derived** in the adapter, never authored in a fixture: `commentCount` and
+  `replyCount` are recomputed from the thread on load, and `ratio` is a function (`ratioOf`), never
+  a stored field.
+- **Visibility** is the adapter's stand-in for RLS: a listing drops anything that is not public and
+  not the viewer's own. A detail lookup still answers by id, because the owner and a moderator open
+  exactly that page.
+
 
 ## LLM boundary
 

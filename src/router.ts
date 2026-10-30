@@ -220,13 +220,19 @@ export const ROUTES: RouteDef[] = [
   // Legal
   { path: "/terms", title: "Terms of use", access: "public", page: () => import("./pages/terms.tsrx") },
 
-  // Development only. Not a product route: it is absent from the spec index, absent from the
-  // tab bar, and `scripts/spec-routes.mjs` drops `/dev/*` from this table before comparing.
+  // Development only. Not a product route: absent from the spec index, absent from the tab bar,
+  // and `scripts/spec-routes.mjs` drops `/dev/*` from this table before comparing.
   {
     path: "/dev/primitives",
     title: "Primitives",
     access: "public",
     page: () => import("./pages/dev-primitives.tsrx"),
+  },
+  {
+    path: "/dev/data",
+    title: "Data",
+    access: "public",
+    page: () => import("./pages/dev-data.tsrx"),
   },
 ];
 
