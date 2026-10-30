@@ -27,8 +27,11 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 
 ## P1 — The pages that define the product
 
-- [ ] **T-05 `/` home.** One screen: name, one paragraph, entry control (sign-in or profile).
+- [x] **T-05 `/` home.** One screen: name, one paragraph, entry control (sign-in or profile).
       Accept: renders signed-out and signed-in; matches spec states exactly.
+      — `src/pages/home.tsrx` is a title page, not a landing page: kicker, wordmark, 44ch paragraph,
+      hairline, `session ·` reading, one control. Zero scroll at 360×740; the control follows the
+      session live (`/authentification` / `/user/you`) and a signed-in visitor is never redirected.
 - [ ] **T-06 `/authentification`.** Three provider buttons, redirecting/cancelled/failed states.
       Accept: buttons call the auth seam; mobile layout has no scroll at 360×740.
 - [ ] **T-07 `/onboarding`.** Username (3–24, `[a-z0-9_]`, case-insensitive uniqueness), display

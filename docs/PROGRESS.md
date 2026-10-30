@@ -3,6 +3,36 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-05 — `/` home (2026-10-30)
+
+- **Changed:** `src/pages/home.tsrx` — `PagePlaceholder` replaced with the real title page
+  (kicker, 34px wordmark / 44 at `lg`, one spec-grounded paragraph, hairline, a `session ·` reading,
+  and the single entry control). Session mirrored into a page-local `track()` via `onSession`, with
+  three derived readings (`reading`, `target`, `label`) so `User | null` narrows in one place. The
+  control is a real `<a class="btn btn-primary">` (a button cannot carry `href`) targeting
+  `/authentification` signed out and `/user/<handle>` signed in; no redirect for signed-in visitors,
+  `router.ts` untouched. Docs: `DESIGN.md` gains a Home section (composition, measure, the
+  `min-height` arithmetic), `SHIP-PLAN.md` ticks T-05, `NEXT.md` rewritten for T-06.
+- **Verified:** `scripts/check.sh` GREEN (build ok, 30/30 routes); live
+  `assets/index-*.js` matched by `publish.sh` on `https://victor-viicell.github.io/LuaPlot/` (200).
+  Chromium at 360×740, 640×900, 900×800, 1280×900: `.content` scrollHeight == clientHeight at every
+  width (**zero scroll on the 360×740 first screen**, which is what the `min-height` numbers are
+  for), `scrollWidth` ≤ `innerWidth` everywhere, button 44px tall (328×44 full-width at 360, 136×44
+  from `sm`), column 328/592/656/560 wide with the block optically centred in each frame. States,
+  by driving the real store: signed in → `session · signed in as You` + `Open profile` →
+  `/user/you`; sign out via the overflow menu → `session · signed out` + `Sign in` →
+  `/authentification`, and the click lands on `/authentification` (title `Sign in — LuaPlot`); sign
+  out on another route, then SPA-navigate home with the tab bar → the page renders the signed-out
+  control (the mirror works, no stale snapshot after a reload-free navigation). Primary button
+  paints `--color-accent` (`#8839ef` in Latte), no hard-coded colours.
+- **Not verified:** no screenshot-level proof of the Mocha/Frappé/Macchiato flavours on this page
+  (tokens only; T-02 verified them). No test runner exists, so the states above were asserted by
+  reading the live DOM, not by an assertion in CI. The spec's "signed-in visitors redirected away"
+  line lives on `/authentification`, not here; the redirect matrix is still T-30. Nothing persists
+  across reload (memory adapter) and nothing pretends to.
+- **Decision recorded:** the greeting names the display name, not the handle (`docs/NEXT.md` open
+  decision); the handle appears only as the link target.
+
 ## T-04 — session + NSFW preference state (2026-10-30)
 
 - **Changed:** `src/lib/state/session.ts` (new: `currentUser/isSignedIn/signIn/signOut/onSession`

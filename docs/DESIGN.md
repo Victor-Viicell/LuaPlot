@@ -144,6 +144,28 @@ layout only. Class names: `.btn`, `.field`, `.toggle`, `.card`, `.avatar`, `.she
   and a link to `/dev/state`. 12px `--color-text-subtle`, no accent; it exists so a reviewer can
   flip the signed-out states in two taps, and it disappears the moment T-30 brings real auth.
 
+## Home (decided in T-05, do not re-invent)
+
+- `/` is a **title page, not a landing page**: kicker (12px, `.12em`, `--color-text-subtle`) →
+  wordmark 34px/600 (`-0.035em`, 44px at `lg`) → one paragraph → hairline → a `session ·` reading →
+  one control. Nothing else. No hero, no feature rows, no second link (the overflow menu owns Terms).
+- **The block is vertically centred** in the content area, not split into a top block and a control
+  pinned to the bottom: `space-between` at 360×740 leaves a 240px hole in the middle that reads as a
+  failed load. Optical centring (the block lands a few px high) is deliberate.
+- **Measure:** the paragraph is 44ch and left-aligned; the whole column is 560px at `lg`, centred in
+  the 1120 outlet. At 900–1199 the column is the full 720 outlet — the paragraph still holds 44ch,
+  so the ragged edge does not stretch.
+- **Entry row:** full-width `btn btn-primary` at 360 (thumb-reach), a left reading + right control
+  from `sm`. The control is an `<a class="btn btn-primary">`, never a `Button` — a `<button>` cannot
+  carry `href`, and the spec's entry control navigates.
+- **Zero scroll on the first screen** is bought with
+  `min-height: calc(100dvh - <chrome>)`: 228 (56 top bar + 60 tab bar + 60 scroller clearance + 52
+  outlet padding) / 240 at `sm` (64 outlet padding) / 132 at `md` (no tab bar) / 144 at `lg`. That
+  arithmetic mirrors `App.tsrx` and breaks silently if the bars change — re-measure
+  `scrollHeight == clientHeight` at 360×740 whenever the shell moves.
+- Copy is spec-grounded and names only what exists: characters, lorebooks, sessions, cuts. No
+  marketing sentence, no counts, no "trusted by".
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.
