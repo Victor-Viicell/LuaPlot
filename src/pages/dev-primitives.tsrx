@@ -2,6 +2,7 @@ import { track, type Component } from "ripple";
 import { Avatar } from "../components/Avatar.tsrx";
 import { Button } from "../components/Button.tsrx";
 import { Card } from "../components/Card.tsrx";
+import { CardGrid } from "../components/CardGrid.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Field } from "../components/Field.tsrx";
 import {
@@ -24,6 +25,8 @@ import { Sheet } from "../components/Sheet.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
 import { Tabs, type TabItem } from "../components/Tabs.tsrx";
 import { Toggle } from "../components/Toggle.tsrx";
+import { CHARACTERS } from "../lib/fixtures/characters.ts";
+import type { Character } from "../lib/data/types.ts";
 import { toast } from "../lib/toast.ts";
 
 /**
@@ -50,6 +53,25 @@ const THEMES: { id: Theme; label: string }[] = [
 ];
 
 const WIDTHS = [360, 640, 900, 1280];
+
+/* Gallery data is the real fixture set (`lib/fixtures`), never a synthetic shape: a card that
+   only works on made-up rows proves nothing. The two long variants are spreads of a real character
+   with one string replaced, so they still satisfy `Character` exactly. */
+const SFW: Character = CHARACTERS.find((row) => !row.nsfw) ?? CHARACTERS[0];
+const FLAGGED: Character = CHARACTERS.find((row) => row.nsfw) ?? CHARACTERS[0];
+
+const LONG: Character = {
+  ...SFW,
+  name: "The Cartographer of the Drowned Archive, Second Keeper of the Western Stacks",
+};
+
+const LONG_TAGLINE: Character = {
+  ...SFW,
+  tagline:
+    "Keeps a map of a city that has been underwater for sixty years, and answers every question about it with another question about the tide, the year, and who is asking.",
+};
+
+const GRID_ITEMS = CHARACTERS.slice(0, 4);
 
 const TABS: TabItem[] = [
   { value: "creations", label: "Creations" },
@@ -400,25 +422,22 @@ export function DevPrimitives() @{
           <section class="g-sec">
             <div class="g-sec-head">
               <h2 class="g-sec-title">Card</h2>
-              <p class="g-sec-note">Header / middle / footer — the blur covers the middle only</p>
+              <p class="g-sec-note">Real fixtures · header and footer crisp, middle covered until Reveal</p>
             </div>
             <div class="g-grid">
-              <Card
-                title="Aurelia of the Tides"
-                href="#primitives"
-                author="viicell"
-                ratio={0.87}
-                tagline="A tide-reader who trades in debts older than the harbour."
-                initials="AU"
-              />
-              <Card
-                title="The Last Librarian"
-                author="inkwell"
-                ratio={0.5}
-                tagline="No tags row until the taxonomy exists — the row is absent, not empty."
-                initials="LL"
-              />
+              <Card item={SFW} />
+              <Card item={FLAGGED} nsfw />
+              <Card item={LONG} />
+              <Card item={LONG_TAGLINE} />
             </div>
+            <p class="g-sec-note">
+              The second card is the fixture flagged NSFW, covered pre-reveal: the avatar and tagline
+              blur behind the scrim while the title, author and <code>ratio</code> stay at full
+              contrast. Press <strong>Reveal</strong> on it — that is the third state, and the same
+              component one click later, because reveal state is created inside the card and lasts
+              exactly this mount. The third and fourth cards hold the longest title and the longest
+              tagline in the set: the title ellipses on one line, the tagline clamps at two.
+            </p>
           </section>
 
           <section class="g-sec">
@@ -507,6 +526,18 @@ export function DevPrimitives() @{
           </section>
         </div>
       </div>
+
+      <section class="g-sec">
+        <div class="g-sec-head">
+          <h2 class="g-sec-title">Card grid</h2>
+          <p class="g-sec-note">
+            Outside the stage on purpose: its columns follow the viewport (1-up at 360, 2-up sm,
+            3-up md, 4-up lg), so a 360px stage would only ever prove the phone case. Blur preference
+            on — the one flagged fixture in the first four is covered until its own Reveal.
+          </p>
+        </div>
+        <CardGrid items={GRID_ITEMS} blurNsfw label="Characters" />
+      </section>
     </div>
 
     @if (sheetOpen.value) {

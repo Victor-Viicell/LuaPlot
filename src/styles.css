@@ -552,6 +552,8 @@ textarea.field-input {
 /* Card — title header, avatar/tagline/tags middle, author + ratio footer.
    The three parts stay separate elements: the NSFW blur (T-08) covers .card-middle only. */
 .card {
+    --card-blur: 6px;
+    --card-scrim: color-mix(in srgb, var(--color-bg) 55%, transparent);
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -586,10 +588,46 @@ a.card-title:hover {
 }
 
 .card-middle {
+    position: relative;
     display: flex;
     gap: 12px;
     align-items: flex-start;
     min-width: 0;
+}
+
+/* The covered middle (T-08): the veil is what blurs, the cover is a sibling layer holding the
+   scrim + Reveal, so the control is never inside the filter and stays clickable and 44px.
+   Both custom properties live on `.card`, so a later post/comment card reuses them by name. */
+.card.is-covered .card-middle {
+    overflow: hidden;
+}
+
+.card-veil {
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    align-items: flex-start;
+    min-width: 0;
+    transition: filter 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card.is-covered .card-veil {
+    filter: blur(var(--card-blur));
+    pointer-events: none;
+    user-select: none;
+}
+
+.card-cover {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    background-color: var(--card-scrim);
+}
+
+.card-cover .btn {
+    padding: 0 12px;
 }
 
 .card-body {
@@ -656,6 +694,51 @@ a.card-author:hover {
     flex: none;
     color: var(--color-text-muted);
     font-variant-numeric: tabular-nums;
+}
+
+/* Card grid (T-08) — gutter grid, cards keep their own 1px border and 6px radius:
+   1-up at 360, 2-up at sm (640), 3-up at md (900), 4-up at lg (1200). */
+.card-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.card-cell {
+    display: flex;
+    min-width: 0;
+}
+
+.card-cell > .card {
+    flex: 1;
+    min-width: 0;
+}
+
+.card-cell-empty {
+    grid-column: 1 / -1;
+}
+
+@media (min-width: 640px) {
+    .card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+}
+
+@media (min-width: 900px) {
+    .card-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .card-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 20px;
+    }
 }
 
 /* Avatar — square, 2px radius, 1px border, initials fallback. */

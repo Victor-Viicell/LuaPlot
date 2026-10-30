@@ -18,6 +18,7 @@
 import type { z } from "zod";
 import type {
   accountPreferencesSchema,
+  authoredItemSchema,
   avatarSchema,
   characterSchema,
   commentSchema,
@@ -69,6 +70,9 @@ export type VoteDirection = z.infer<typeof voteDirectionSchema>;
 
 /** What a shared item is counted on. On a card only the ratio is shown; counts live on detail. */
 export type Engagement = z.infer<typeof engagementSchema>;
+
+/** The union a listing or a detail lookup can answer with; `kind` is the discriminator. */
+export type AuthoredItem = z.infer<typeof authoredItemSchema>;
 
 export type Character = z.infer<typeof characterSchema>;
 export type LorebookEntry = z.infer<typeof lorebookEntrySchema>;

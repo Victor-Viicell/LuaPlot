@@ -259,6 +259,52 @@ instead of inventing a second answer.
   T-30, and an eager redirect would make the page unreachable from `/authentification`'s footer
   link in the preview.
 
+## Card and grid (decided in T-08, do not re-invent)
+
+`Card` now takes **the entity** (`Character | Lorebook | Preset`, the `AuthoredItem` union) plus one
+flag, and draws the three parts it always had. Five later tickets are this component in another
+list, so the decisions below are the ones they inherit.
+
+- **The prop is the item, not eight fields.** `name`, `tagline`, `tags`, `avatar.initials`,
+  `author` and the counts all come from the schema, so the card renders `ratioOf(item)` and can never
+  be handed a stored percentage. Title link is `href('/<kind>/<id>')` (via `href()`), author link is
+  `/user/<handle>`, both real anchors — no clickable `<div>`. `post` is **not** in the union yet: its
+  body and missing `name`/`tagline` need their own header, and T-13 owns that.
+- **`nsfw` means "draw the cover", not "the item is flagged".** The listing computes the effective
+  flag (`item.nsfw && prefs.blur`) and hands it over; the card never imports
+  `lib/state/prefs.ts`. Show-off is the listing's job too — the card is never rendered for it.
+- **Blur is structural**: the veil (avatar + tagline + tags) gets `filter: blur(6px)`; the scrim is a
+  **sibling** layer `.card-cover` over `.card-middle` at
+  `color-mix(in srgb, var(--color-bg) 55%, transparent)`, and the `Reveal` `ghost` button sits in it
+  at bottom-left, 44px tall. That is why the control stays clickable and unblurred: it is outside the
+  filtered node. Both values are local custom properties on `.card` (`--card-blur`, `--card-scrim`,
+  not global tokens) so a post/comment card can reuse them by name without a second value.
+- **The header and footer never move.** `.card-foot` carries author + ratio at full contrast — no
+  `opacity`, no filter, no scrim over it (spec: *the numbers are never hidden*). Verify it as
+  `getComputedStyle(foot).filter === 'none'` on a covered card.
+- **Reveal is the glance, the preference is the account.** `revealed = track(false)` is created
+  *inside* the card (a prop expression is evaluated once, so it cannot be passed in), the cover is
+  `@if (covered)` so revealing removes the button rather than dimming it, and the state dies with
+  the mount — a re-sort remounts keyed `@for` rows and re-blurs. That is *a reveal lasts one view*,
+  not a bug.
+- **Focus order on a covered card is title → `Reveal` → author.** Document order follows the parts,
+  and the title is safe to reach first because the header is crisp and legible; nothing inside the
+  blurred veil is focusable (the veil carries `aria-hidden` while covered). A covered card is one
+  extra Tab from its title, and the Reveal is never inside the blur.
+- **Grid: a gutter grid, not the 1px-gap count strip.** `CardGrid` is a `<ul class="card-grid">` of
+  `li.card-cell`, cards keep their own 1px border and 6px radius: gap 12px at 360, 16px from `sm`,
+  20px at `lg`; columns 1 / 2 / 3 / 4 at 360 / 640 / 900 / 1200. The count-strip gesture needs square
+  corners and the design law keeps cards at 6px, so it was rejected. Cells stretch to equal height
+  (`li` flex, `.card` flex: 1) so a two-line tagline does not leave a ragged grid.
+- **The grid owns the pref, the card owns the drawing.** `CardGrid` takes `blurNsfw` (the account's
+  Blur preference, read by the page from the store) and ANDs it with each item's own flag. With Blur
+  off a flagged item draws crisp; with it on, each flagged card keeps its own Reveal.
+- **Proved on `/dev/primitives`**, against real fixtures: a SFW card, the flagged fixture covered
+  pre-reveal, the same card one click later, the longest title and the longest tagline (spreads of a
+  real character, so they still satisfy `Character`). The grid section sits **outside** the
+  fixed-width stage, because its columns follow the viewport and a 360px stage would only ever prove
+  the phone case. `/dev/data` renders the same card through the same component.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

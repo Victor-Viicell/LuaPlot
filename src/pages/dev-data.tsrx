@@ -5,6 +5,7 @@ import { Skeleton } from "../components/Skeleton.tsrx";
 import { href } from "../router.ts";
 import { PAGE_SIZE, resolveRepo } from "../lib/data/repo.ts";
 import { ratioOf, type Character } from "../lib/data/types.ts";
+import { percent } from "../lib/format.ts";
 
 /**
  * `/dev/data` — the data seam against the real fixtures. Development only.
@@ -47,8 +48,6 @@ type Snap = {
 };
 
 const repo = resolveRepo();
-
-const pct = (value: number): string => `${Math.round(value * 100)}%`;
 
 const clip = (text: string, limit: number): string =>
   text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text;
@@ -112,7 +111,7 @@ async function readAll(): Promise<Snap> {
       rows: posts.items.map((post) => ({
         id: post.id,
         label: clip(post.body, 68),
-        note: `${post.attachment ? post.attachment.kind : "text"} · ${post.commentCount} comments · ${pct(ratioOf(post))}`,
+        note: `${post.attachment ? post.attachment.kind : "text"} · ${post.commentCount} comments · ${percent(ratioOf(post))}`,
         path: `/post/${post.id}`,
         flag: post.nsfw ? "NSFW" : undefined,
       })),
@@ -123,7 +122,7 @@ async function readAll(): Promise<Snap> {
       rows: [...open.items, ...done.items].map((report) => ({
         id: report.id,
         label: report.target.label,
-        note: `${report.weight} reports · jev ${report.jev.verdict} ${pct(report.jev.confidence)}`,
+        note: `${report.weight} reports · jev ${report.jev.verdict} ${percent(report.jev.confidence)}`,
         path: `/moderation/${report.id}`,
         flag: report.status,
       })),
@@ -183,7 +182,7 @@ export function DevData() @{
     const updated = await repo.vote("character", first.id, direction);
     if (updated && updated.kind === "character") {
       // The adapter returns the updated entity, so the counts cannot lag the vote.
-      log.value = `vote ${direction} on ${updated.name}: ${before} became ${updated.likes}/${updated.dislikes}, ratio ${pct(ratioOf(updated))}. A switch replaces the earlier vote.`;
+      log.value = `vote ${direction} on ${updated.name}: ${before} became ${updated.likes}/${updated.dislikes}, ratio ${percent(ratioOf(updated))}. A switch replaces the earlier vote.`;
       await load();
     }
   }
@@ -448,22 +447,14 @@ export function DevData() @{
           <h2 class="sec-title">Characters</h2>
           <p class="sec-note">
             Rendered with the real Card: title, avatar/tagline middle, author beside the derived
-            ratio. Nothing here stores a percentage. One character is flagged NSFW and stays
-            uncovered until T-08 brings the blur.
+            ratio. Nothing here stores a percentage. One character is flagged NSFW and draws
+            covered here, because this page hands the card the flag itself (a listing would AND it
+            with the account's Blur preference — T-09).
           </p>
         </div>
         <div class="cards">
           @for (const character of snap.value.characters; key character.id) {
-            <Card
-              title={character.name}
-              href={href(`/character/${character.id}`)}
-              author={character.author}
-              authorHref={href(`/user/${character.author}`)}
-              ratio={ratioOf(character)}
-              tagline={character.tagline}
-              tags={character.tags}
-              initials={character.avatar.initials}
-            />
+            <Card item={character} nsfw={character.nsfw} />
           }
         </div>
       </section>

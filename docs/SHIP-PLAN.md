@@ -63,9 +63,9 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       the gate (`bun run schema:check`) proves 64 rows parse, three negative cases fail, and the
       `z.lazy` reply tree is not `any`. It also caught a real bug: fixture ids were decimal strings
       (37–38 chars, not UUIDs), so **every seeded detail link was a 404** — `ids.ts` now emits hex.
-- [ ] **T-08 Catalog card + grid.** Shared card (title header; avatar/tagline/tags middle;
-      author + ratio footer), NSFW blur with per-item Reveal. Accept: blur covers only the middle;
-      ratio visible while blurred; card opens detail. Brief: `docs/tickets/T-08-card.md`.
+- [x] **T-08 Catalog card + grid.** `Card` takes the `AuthoredItem` entity + the effective cover
+      flag; veil blurred 6px, scrim sibling layer, per-item `Reveal` (44px, outside the filter), footer
+      crisp. `CardGrid` 1/2/3/4-up, gutter grid. Accept: verified in the DOM at 360/640/900/1200.
 - [ ] **T-09 `/character/catalog`.** Toolbar (search debounced 250ms, `All` filter, sort, NSFW
       toggles), grid, `Load more` (+24, hidden at end), query-string state, all six states.
       Accept: filter+sort survive reload; empty/no-results/end-of-list each render.

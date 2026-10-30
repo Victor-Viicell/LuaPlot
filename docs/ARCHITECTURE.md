@@ -31,10 +31,10 @@ src/
     fixtures/           seed data shared by memory adapter and tests
     llm/                chat.ts, jev.ts, mock.ts
     native.ts           Tauri plugin bridge + browser fallback
-    format.ts           relative time, ratio %, handles
+    format.ts           percent() today; relativeTime when a card shows "2h"
     state/              session.ts, prefs.ts (NSFW) — plain subscribe/notify stores
     toast.ts            the toast queue, same store shape
-  components/           Button.tsrx, Field.tsrx, Card.tsrx, Sheet.tsrx, Toast.tsrx,
+  components/           Button.tsrx, Field.tsrx, Card.tsrx, CardGrid.tsrx, Sheet.tsrx,
                         Tabs.tsrx, EmptyState.tsrx, Skeleton.tsrx, Avatar.tsrx,
                         CommentThread.tsrx, ReportDialog.tsrx, NsfwToggle.tsrx, Icons.tsrx
   pages/                one file per route in src/specs/luaplot-pages.md

@@ -3,6 +3,24 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-08 — catalog card + grid (2026-10-30)
+
+- **Changed:** `Card` takes the entity (`AuthoredItem` = `z.infer` of `authoredItemSchema`, added to
+  `lib/data/types.ts`) plus an `nsfw` **effective cover flag**; it renders `ratioOf(item)` and
+  `percent()` from the new `lib/format.ts`. Blur is `.card-veil` (`filter: blur(6px)`) with a
+  sibling `.card-cover` scrim (`color-mix … 55%`) holding the 44px `ghost` `Reveal`; `revealed =
+  track(false)` lives inside the card. New `components/CardGrid.tsrx` + `.card-grid` CSS: gutter
+  grid, 1/2/3/4-up at 360/640/900/1200, `blurNsfw` ANDed with `item.nsfw`. `/dev/primitives` gained
+  the real-fixture card set (covered, revealed, long title, long tagline) and a grid section outside
+  the fixed stage; `/dev/data` now passes `item` and uses `percent()`. `DESIGN.md` → *Card and grid*.
+- **Verified:** gate GREEN (build, routes 30, schema); in Chromium at 360/640/900/1200 the grid
+  rendered 1/2/3/4 columns with no horizontal scroll, a covered card's veil read `blur(6px)`, its
+  footer `filter: none` with the ratio `70%` readable, `Reveal` measured 77×44 and clickable, and
+  clicking it uncovered **only that card** (covered 2 → 1, the survivor being the grid's own card).
+  `/dev/data` cards still resolve real detail links (`/character/<uuid>`) after the signature change.
+- **Unverified:** nothing on a physical device; the dev stage width chip does not move the grid's
+  breakpoints (they are viewport media queries) — the gallery says so instead of faking it.
+
 ## T-07B — Zod at every boundary (2026-10-30)
 
 - **Changed:** `bun add zod` (4.6.7, the only new dependency; the ticket named it). New
