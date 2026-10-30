@@ -133,6 +133,16 @@ layout only. Class names: `.btn`, `.field`, `.toggle`, `.card`, `.avatar`, `.she
   `EmptyState` — it is the primitives' second proof, so it must never grow its own card look. The
   counts strip is a 1px-gap grid on `--color-border` (2-up at 360, 4-up at `sm`), and the mutation
   strip is the only control on any dev page that writes to the adapter.
+- **State page.** `/dev/state` (T-04) is the third dev-only route: who is signed in, the NSFW pair
+  as two real `Toggle`s, and a count of how many times each store has notified (a silent store and
+  a wired one look identical otherwise). Same chrome as `/dev/data` — kicker, 26px title, lede,
+  badge row, 1px-gap count strip — because a dev page that invents its own look stops being
+  evidence.
+- **Dev block in the overflow menu.** The menu keeps its three product destinations, then a hairline
+  and a **Preview only · not a product control** block: the sign-in/sign-out switch, one line of
+  NSFW state read as a sentence (*listed, blurred* / *hidden from listings* / *off (signed out)*),
+  and a link to `/dev/state`. 12px `--color-text-subtle`, no accent; it exists so a reviewer can
+  flip the signed-out states in two taps, and it disappears the moment T-30 brings real auth.
 
 ## Do not
 

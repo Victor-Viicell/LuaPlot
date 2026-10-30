@@ -19,9 +19,11 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       `lib/fixtures/*` (≥8 characters, 6 lorebooks, 5 presets, 3 personas, 12 posts with comments,
       notifications, reports, 2 sessions with transcripts). Accept: a `/dev/data` route lists
       counts per entity from `resolveRepo()`.
-- [ ] **T-04 Session + NSFW preference state.** `state/session.ts` (mock signed-in user, switchable
-      signed-out), `state/prefs.ts` (Show/Blur, persisted per account in the adapter).
+- [x] **T-04 Session + NSFW preference state.** `lib/state/session.ts` (mock signed-in user,
+      switchable signed-out), `lib/state/prefs.ts` (Show/Blur, persisted per account in the adapter).
       Accept: toggling Blur in one place is reflected on a catalog after navigation.
+      — `/dev/state` flips both stores; the adapter keeps the pair keyed by handle, so sign-out →
+      sign-in restores it. A listing reading `nsfwPreference()` follows without a page-local copy.
 
 ## P1 — The pages that define the product
 

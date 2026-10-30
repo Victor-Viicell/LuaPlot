@@ -3,6 +3,40 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-04 — session + NSFW preference state (2026-10-30)
+
+- **Changed:** `src/lib/state/session.ts` (new: `currentUser/isSignedIn/signIn/signOut/onSession`
+  over a plain subscribe/notify store, mock `you` seeded signed in, `sessionNotifications()`),
+  `src/lib/state/prefs.ts` (new: `nsfwPreference/setShowNsfw/setBlurNsfw/onPrefs/reloadPreferences`,
+  clearing to off before every read, re-reading on `onSession`, refusing writes while signed out),
+  `src/lib/data/types.ts` (`User`, `AccountPreferences`), `repo.ts` + `memory.ts`
+  (`getPreferences(handle)` / `savePreferences(handle, patch)`, a map keyed by handle — not by
+  device — with both off for an unknown handle), `src/App.tsrx` (profile tab points at
+  `currentUser().handle` and falls back to `/` when signed out; overflow menu gains a *Preview only*
+  block with the dev sign-in/out switch, a one-line NSFW readout and a `/dev/state` link),
+  `src/pages/dev-state.tsrx` (new `/dev/state`, added to `ROUTES` only), `src/router.ts` (the route
+  entry). Docs: `ARCHITECTURE.md` gains a Session section, the two preference methods and a
+  corrected `lib/state/` layout line; `DESIGN.md` gains the state page and the dev menu block.
+- **Verified:** `scripts/check.sh` GREEN (build ok, 30/30 routes match the spec with `/dev/*`
+  excluded); live `assets/index-Dn8vd7UF.js` on `https://victor-viicell.github.io/LuaPlot/` (200,
+  hash matched by `publish.sh`; the published `/dev/state` renders `State`, badges
+  `session signed in / handle @you / admin no`). Chromium, local build and live: toggling Show moved
+  Prefs-emits 0→1 and the count strip to `on`; toggling Blur made it `on · blur`; `Sign out` flipped
+  the page to `handle —`, both toggles `aria-pressed=false` **and disabled**, and the note to
+  *Signed out: nothing NSFW is shown…*; `Sign in as @you` restored `on · blur` from the adapter —
+  that is the per-account proof, since the store had cleared to off. Shell: menu readout read
+  `nsfw · listed, blurred`, the Profile tab was `/user/you` signed in and `/` signed out, and no tab
+  read as active on `/dev/state`. Widths 360/640/900/1200: `scrollWidth` ≤ `innerWidth` at every
+  one, no sub-12px text, rail appears at 900 and tab bar disappears there. `/dev/data`,
+  `/dev/primitives` and `/character/catalog` still render after the change.
+- **Not verified:** the ticket's acceptance — "toggling Blur in one place is reflected on a catalog
+  after navigation" — has no catalog to land on until T-09; what is proven is the store plus the
+  shell's readout plus the adapter round-trip. Preferences reset on reload (memory adapter, no
+  Supabase project ref) and that is deliberate, not faked with `localStorage`. The memory adapter's
+  `VIEWER` is still a constant, so signing out hides nothing in a listing — that is T-30, recorded
+  in the baton so it is not "fixed" by importing the session into `memory.ts` (module cycle). No
+  test runner exists; the stores are asserted by reading `/dev/state`, not by an assertion.
+
 ## T-03 — data contract + memory adapter (2026-10-30)
 
 - **Changed:** `src/lib/data/types.ts` (every entity derived from the specs; `ratioOf()` derives the

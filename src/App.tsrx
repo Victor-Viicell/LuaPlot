@@ -10,6 +10,9 @@ import {
   IconUser,
 } from "./components/Icons.tsrx";
 import { ToastHost } from "./components/Toast.tsrx";
+import { currentUser, onSession, signIn, signOut } from "./lib/state/session.ts";
+import { nsfwPreference, onPrefs } from "./lib/state/prefs.ts";
+import type { AccountPreferences, User } from "./lib/data/types.ts";
 
 /**
  * The shell: mobile top bar + bottom tab bar, a rail from `md`, a fixed sidebar from `lg`.
@@ -20,22 +23,38 @@ type Status = "loading" | "ready" | "missing" | "error";
 
 type Destination = { to: string; label: string; icon: Component; prefix: string };
 
-/** Placeholder until T-04 brings session state: the profile tab needs a handle to point at. */
-const SELF_HANDLE = "you";
-
-const TABS: Destination[] = [
-  { to: "/", label: "Home", icon: IconHome, prefix: "/" },
-  { to: "/post/thread", label: "Thread", icon: IconThread, prefix: "/post" },
-  { to: "/character/catalog", label: "Catalog", icon: IconCatalog, prefix: "/character" },
-  { to: "/notifications", label: "Alerts", icon: IconBell, prefix: "/notifications" },
-  { to: `/user/${SELF_HANDLE}`, label: "Profile", icon: IconUser, prefix: "/user" },
-];
+/**
+ * The five destinations. Profile is the only one that depends on who is signed in: it points at
+ * the handle the session reports (T-04), and falls back to `/` when signed out — the redirect
+ * matrix that would send a guest to `/authentification` is T-30's, not the shell's.
+ */
+function tabsFor(user: User | null): Destination[] {
+  return [
+    { to: "/", label: "Home", icon: IconHome, prefix: "/" },
+    { to: "/post/thread", label: "Thread", icon: IconThread, prefix: "/post" },
+    { to: "/character/catalog", label: "Catalog", icon: IconCatalog, prefix: "/character" },
+    { to: "/notifications", label: "Alerts", icon: IconBell, prefix: "/notifications" },
+    {
+      to: user ? `/user/${user.handle}` : "/",
+      label: "Profile",
+      icon: IconUser,
+      prefix: "/user",
+    },
+  ];
+}
 
 const MENU: { to: string; label: string }[] = [
   { to: "/bookmarks", label: "Bookmarks" },
   { to: "/moderation", label: "Moderation" },
   { to: "/terms", label: "Terms of use" },
 ];
+
+/** One honest sentence for the dev readout: what the listings would do right now. */
+function prefsLine(user: User | null, prefs: AccountPreferences): string {
+  if (!user) return "nsfw · off (signed out)";
+  if (!prefs.show) return "nsfw · hidden from listings";
+  return prefs.blur ? "nsfw · listed, blurred" : "nsfw · listed, uncovered";
+}
 
 function isActive(path: string, prefix: string): boolean {
   if (prefix === "/") return path === "/";
@@ -53,6 +72,23 @@ export function App() @{
   const status = track<Status>("loading");
   const menuOpen = track(false);
   const attempt = track(0);
+
+  /**
+   * Session and NSFW are plain subscribe/notify stores (`lib/state/*`); these tracked values are
+   * the signals the render reads, exactly as `route` mirrors the router above.
+   */
+  const self = track<User | null>(currentUser());
+  onSession((next) => {
+    self.value = next;
+  });
+
+  const prefs = track<AccountPreferences>(nsfwPreference());
+  onPrefs((next) => {
+    prefs.value = next;
+  });
+
+  /** Profile points at the signed-in handle; every other tab is fixed. */
+  const tabs = track(() => tabsFor(self.value));
 
   let seq = 0;
   let lastKey = "";
@@ -111,6 +147,17 @@ export function App() @{
   function goBack() {
     if (window.history.length > 1) window.history.back();
     else navigate("/");
+  }
+
+  /**
+   * The dev session switch. Labelled as an affordance, in the overflow menu so a reviewer can
+   * flip it in two taps: `signOut()` exists to make the signed-out states pages must render
+   * reachable, and it is not a product control (`docs/NEXT.md` → T-04, T-30 owns the real one).
+   */
+  function toggleSession() {
+    if (self.value) signOut();
+    else signIn();
+    menuOpen.value = false;
   }
 
   <>
@@ -299,6 +346,55 @@ export function App() @{
 
       .menu-item:hover {
         background-color: var(--color-surface);
+      }
+
+      .menu-sep {
+        height: 1px;
+        margin: 6px 4px 4px;
+        background-color: var(--color-border);
+      }
+
+      .menu-label {
+        margin: 0;
+        padding: 4px 12px 2px;
+        color: var(--color-text-subtle);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        line-height: 1.4;
+        text-transform: uppercase;
+      }
+
+      .menu-btn {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        font-family: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .menu-note {
+        margin: 0;
+        padding: 0 12px 2px;
+        color: var(--color-text-subtle);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.6;
+      }
+
+      .menu-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        margin-left: 12px;
+        color: var(--color-text-muted);
+        font-size: 12px;
+        text-decoration: none;
+      }
+
+      .menu-link:hover {
+        color: var(--color-text);
+        text-decoration: underline;
       }
 
       .skel {
@@ -516,7 +612,7 @@ export function App() @{
       <aside class="rail">
         <a class="mark" href={href("/")} onClick={follow("/")}>LuaPlot</a>
         <nav class="rail-nav" aria-label="Sections">
-          @for (const tab of TABS; key tab.to) {
+          @for (const tab of tabs.value; key tab.label) {
             <a
               class={isActive(route.value.path, tab.prefix) ? "rail-item is-active" : "rail-item"}
               href={href(tab.to)}
@@ -559,6 +655,15 @@ export function App() @{
                   {item.label}
                 </a>
               }
+              <div class="menu-sep" role="separator"></div>
+              <p class="menu-label">Preview only · not a product control</p>
+              <button class="menu-item menu-btn" type="button" role="menuitem" onClick={toggleSession}>
+                {self.value ? "Sign out" : "Sign in as @you"}
+              </button>
+              <p class="menu-note">{prefsLine(self.value, prefs.value)}</p>
+              <a class="menu-link" href={href("/dev/state")} onClick={follow("/dev/state")}>
+                /dev/state
+              </a>
             </div>
           </>
         }
@@ -599,7 +704,7 @@ export function App() @{
         </main>
 
         <nav class="tabbar" aria-label="Primary">
-          @for (const tab of TABS; key tab.to) {
+          @for (const tab of tabs.value; key tab.label) {
             <a
               class={isActive(route.value.path, tab.prefix) ? "tab is-active" : "tab"}
               href={href(tab.to)}

@@ -13,6 +13,7 @@
  * would make every page pay for a transport it does not have.
  */
 import type {
+  AccountPreferences,
   Character,
   Comment,
   EntityOf,
@@ -105,6 +106,23 @@ export type Repo = {
    * and Continue reopens the most recent one. `null` means the control reads Start.
    */
   findSessionForCharacter(characterId: string, owner: Handle): Promise<Session | null>;
+
+  /**
+   * The account's NSFW pair (`src/specs/systems/nsfw.md`). Per account, never per device: the
+   * store in `lib/state/prefs.ts` re-reads it on every sign-in, so one account's Show flag cannot
+   * survive into another's. An unknown handle answers the new-account defaults, both off — the
+   * spec's "skipping onboarding writes nothing, since off is what the account already holds".
+   */
+  getPreferences(handle: Handle): Promise<AccountPreferences>;
+
+  /**
+   * Writes one or both flags and returns the account's whole pair, so the caller never merges a
+   * partial into its own idea of the state.
+   */
+  savePreferences(
+    handle: Handle,
+    patch: Partial<AccountPreferences>,
+  ): Promise<AccountPreferences>;
 };
 
 /**

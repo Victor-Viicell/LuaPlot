@@ -234,6 +234,12 @@ export const ROUTES: RouteDef[] = [
     access: "public",
     page: () => import("./pages/dev-data.tsrx"),
   },
+  {
+    path: "/dev/state",
+    title: "State",
+    access: "public",
+    page: () => import("./pages/dev-state.tsrx"),
+  },
 ];
 
 type Segment = { literal: string } | { param: string; test: RegExp };

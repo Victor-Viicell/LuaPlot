@@ -30,11 +30,12 @@ src/
     llm/                chat.ts, jev.ts, mock.ts
     native.ts           Tauri plugin bridge + browser fallback
     format.ts           relative time, ratio %, handles
+    state/              session.ts, prefs.ts (NSFW) — plain subscribe/notify stores
+    toast.ts            the toast queue, same store shape
   components/           Button.tsrx, Field.tsrx, Card.tsrx, Sheet.tsrx, Toast.tsrx,
                         Tabs.tsrx, EmptyState.tsrx, Skeleton.tsrx, Avatar.tsrx,
                         CommentThread.tsrx, ReportDialog.tsrx, NsfwToggle.tsrx, Icons.tsrx
   pages/                one file per route in src/specs/luaplot-pages.md
-  state/                session.ts, prefs.ts (NSFW), toasts.ts
 supabase/
   migrations/           SQL, ordered, idempotent
   functions/chat/       DeepSeek turn generation
@@ -89,6 +90,27 @@ Shapes, decided in T-03 (change them here before changing them in the code):
 - **Visibility** is the adapter's stand-in for RLS: a listing drops anything that is not public and
   not the viewer's own. A detail lookup still answers by id, because the owner and a moderator open
   exactly that page.
+- **Preferences are per account, so they live here** (T-04): `getPreferences(handle)` and
+  `savePreferences(handle, patch)` answer the NSFW pair, keyed by handle — never by device, which is
+  what would let one account's Show flag follow another onto the same machine. An unknown handle
+  answers both off (a new account's defaults). `savePreferences` returns the whole pair, so the
+  caller never merges a partial into its own idea of the state. `lib/state/prefs.ts` is the only
+  caller: it clears to off before reading, so a switch never renders the previous account's flags
+  even for the microtask the adapter takes.
+
+## Session
+
+`lib/state/session.ts` is a plain subscribe/notify store holding `{ handle, displayName, isAdmin }`
+— the client's whole idea of an account, deliberately without email, provider, or token, since
+authentication is Supabase's and this shape never duplicates it. It is seeded **signed in** as
+`you` (every fixture's owner, so the preview is worth opening) until T-30 wires real auth;
+`signOut()` exists so the signed-out states pages must render are reachable, and it is exposed only
+as a dev affordance (overflow menu, `/dev/state`). `access` on a route stays declarative: the
+redirect matrix is T-30, and neither store redirects.
+
+The memory adapter's `VIEWER` is still a constant. Wiring it to the session would make
+`repo → memory → session → prefs → repo` a module cycle, and RLS-less memory data has no viewer to
+protect — T-30 swaps both together.
 
 
 ## LLM boundary

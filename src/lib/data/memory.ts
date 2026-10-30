@@ -20,6 +20,7 @@ import { PAGE_SIZE } from "./repo.ts";
 import type { Listing, ListOptions, ReportFilter, Repo, SortOrder } from "./repo.ts";
 import {
   ratioOf,
+  type AccountPreferences,
   type Character,
   type Comment,
   type EntityOf,
@@ -37,8 +38,12 @@ import {
 } from "./types.ts";
 
 /**
- * The signed-in account, until T-04 brings real session state. It matches `App.tsrx`'s profile
- * tab handle, so a profile link and a fixture owner are the same person from the first page.
+ * The adapter's account, and deliberately still a constant. T-04 made the session readable from a
+ * page (`lib/state/session.ts`), but importing it here would make
+ * `repo → memory → session → prefs → repo` a module cycle, and RLS-less memory data has no viewer
+ * to protect anyway. It matches `MOCK_USER.handle` and every fixture owner, so a profile link and a
+ * fixture owner are the same person. Wiring the adapter to the session is T-30's job; until then
+ * signing out hides nothing in a listing.
  */
 export const VIEWER: Handle = "you";
 
@@ -85,6 +90,13 @@ const store = load();
 const votes = new Map<string, VoteDirection>();
 /** `kind:id:viewer` → saved. A persona has no bookmark, so only shared content is ever a key. */
 const bookmarks = new Set<string>();
+
+/**
+ * Preferences are per **account**, so this is keyed by handle and not by device — the bug the
+ * specs call out. An unknown handle answers the new-account defaults: both off.
+ */
+const preferences = new Map<Handle, AccountPreferences>();
+const DEFAULT_PREFERENCES: AccountPreferences = { show: false, blur: false };
 
 function voteKey(kind: string, id: string): string {
   return `${kind}:${id}:${VIEWER}`;
@@ -304,5 +316,16 @@ export const memoryRepo: Repo = {
       .filter((row) => row.owner === owner && row.character.sourceId === characterId)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return rows[0] ?? null;
+  },
+
+  async getPreferences(handle) {
+    // A copy, so a caller cannot mutate the stored row by holding on to the answer.
+    return { ...(preferences.get(handle) ?? DEFAULT_PREFERENCES) };
+  },
+
+  async savePreferences(handle, patch) {
+    const next: AccountPreferences = { ...(preferences.get(handle) ?? DEFAULT_PREFERENCES), ...patch };
+    preferences.set(handle, next);
+    return { ...next };
   },
 };

@@ -307,6 +307,30 @@ export type Session = {
 /** The five things a viewer can vote on. A persona is not one of them. */
 export type VotableKind = "character" | "lorebook" | "preset" | "post" | "comment";
 
+/**
+ * The signed-in account, as **this client** needs it: a handle to address, a display name to
+ * print, and the admin mark `/moderation` checks. Deliberately not the auth record: no email, no
+ * provider, no token — authentication is Supabase's (T-30), which this shape never duplicates.
+ */
+export type User = {
+  /** The onboarding handle: 3–24 of `[A-Za-z0-9_]`, unique per account. */
+  handle: Handle;
+  /** Provider-supplied or chosen at onboarding. Optional there, so never identity. */
+  displayName: string;
+  /** Granted by the operator by hand, never in-app (`luaplot-pages.md`). */
+  isAdmin: boolean;
+};
+
+/**
+ * The viewer's own side of NSFW (`src/specs/systems/nsfw.md`): a per-account setting, not a
+ * property of any item. Both start off on a new account, and the pair is independent — Show off
+ * with Blur on is allowed, blur simply has nothing to act on.
+ */
+export type AccountPreferences = {
+  show: boolean;
+  blur: boolean;
+};
+
 export type EntityOf<V extends VotableKind> = {
   character: Character;
   lorebook: Lorebook;
