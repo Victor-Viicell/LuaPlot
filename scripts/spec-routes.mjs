@@ -14,8 +14,13 @@ for (const line of spec.split("\n")) {
 }
 
 // Router entries look like: { path: "/character/[id]", ... }
+// `/dev/*` is a development gallery, not a product route: it must never appear in the
+// spec index (`src/specs/luaplot-pages.md` is product law), so drop it before comparing.
 const routerRoutes = new Set();
-for (const m of router.matchAll(/path:\s*"([^"]+)"/g)) routerRoutes.add(m[1]);
+for (const m of router.matchAll(/path:\s*"([^"]+)"/g)) {
+  if (m[1].startsWith("/dev/")) continue;
+  routerRoutes.add(m[1]);
+}
 
 const norm = (r) =>
   r

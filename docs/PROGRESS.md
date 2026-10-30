@@ -3,6 +3,32 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-02 — design primitives (2026-10-30)
+
+- **Changed:** the eleven primitives `src/components/{Button,Field,Toggle,Card,Sheet,Toast,Tabs,
+  EmptyState,Skeleton,Avatar,Icons}.tsrx` plus `src/lib/reactive.ts` (`read()` for live props) and
+  `src/lib/toast.ts` (subscribe/notify queue, no module-scope `track()`); the whole look added to
+  `src/styles.css` under "Primitives (T-02)" — one stylesheet, semantic tokens only, because a
+  scoped `<style>` block can never reach into a child component; `src/pages/dev-primitives.tsrx`
+  (`/dev/primitives`, 10 sections, theme switch on `data-theme`, stage width 360/640/900/1280);
+  `/dev/*` filtered out of `scripts/spec-routes.mjs`; `<ToastHost />` mounted in `App.tsrx`.
+  `docs/DESIGN.md` records the decisions (stylesheet location, toast placement, z ladder 8/9 ·
+  40 · 41 · 60, Tabs does not own the query).
+- **Verified:** `scripts/check.sh` GREEN (build ok, 30/30 routes match the spec with `/dev/*`
+  excluded); live bundle `index-CCEwLjsa.js` on `https://victor-viicell.github.io/LuaPlot/`, 200.
+  Chromium pass at 360×740 and 1280×900: zero page-level horizontal overflow at both, shell swaps
+  tab bar → rail at 900 and keeps 5 tabs, every tap target ≥ 44px, sheet is a bottom sheet at 360
+  (`bottom: 0`, 6px top radius) and a 520px centred dialog at 1280, focus lands on the panel and Tab
+  wraps last→first, Escape closes, toast renders in the polite live region with its message, tabs
+  flip `aria-selected`, a field accepts typing. All four flavours read their own tokens
+  (`--color-accent` #cba6f7 / #8839ef / #ca9ee6 / #c6a0f6; page bg #1e1e2e / #eff1f5 / #303446 /
+  #24273a). `/dev/primitives` deep-links on Pages through `404.html` (HTTP 404, app boots — the
+  usual Pages SPA behaviour; the root URL is the 200).
+- **Not verified:** no Tauri/Android build (T-33/T-35); the toast's auto-dismiss timer and the
+  sheet's 180ms motion were not timed by hand (the automation tab throttles animations, so painted
+  `transition` values read as their start value — tokens, not paint, were used for the theme check).
+  No test runner: the gallery is a manual proof, exactly like the shell in T-01.
+
 ## T-01 — router + shell skeleton (2026-10-30)
 
 - **Changed:** `src/router.ts` (30-route table mirroring the spec index, specificity-ordered

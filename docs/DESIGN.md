@@ -87,6 +87,48 @@ blur = middle covered, footer numbers visible, per-item Reveal.
 - Icons: 20px, 1.5 stroke, `currentColor`, `stroke-linecap: round`, declared once as `.ico` in
   `src/styles.css` and inlined in `src/components/Icons.tsrx`.
 
+## Primitives (decided in T-02, do not re-invent)
+
+Eleven primitives exist: `Button, Field, Toggle, Card, Sheet, Toast, Tabs, EmptyState, Skeleton,
+Avatar, Icons` in `src/components/`. **Their look lives in `src/styles.css`, not in scoped
+`<style>` blocks.** Reason: a scoped block cannot reach into a child component, so a page could
+never style a primitive it does not own (`.empty .btn`, `.card .avatar`, spacing the action inside
+an `EmptyState`). One stylesheet keeps the set in sync; a page's own `<style>` block is for page
+layout only. Class names: `.btn`, `.field`, `.toggle`, `.card`, `.avatar`, `.sheet`, `.toast`,
+`.tabs`, `.empty`, `.skeleton`.
+
+- **Live props.** A Ripple prop is evaluated once when the component is called, so anything a page
+  will change (a field value, a toggle's state, a tab) is passed as a `Tracked<T>`/`Derived<T>` and
+  read through `read()` in `src/lib/reactive.ts`. Plain strings are for static copy.
+- **Button.** `primary` accent fill with `--color-accent-contrast` text, `secondary` 1px
+  `--color-border-strong` outline, `ghost` for in-row actions, `danger` for destructive only.
+  44px minimum, radius 2, 14px label. No loading spinner state: a busy button belongs to its page.
+- **Field.** Label 12px uppercase `.08em` above the control, help line below, error line in
+  `--color-danger` with `aria-invalid` + `aria-describedby`. Inputs/textarea 44px minimum, radius 2.
+- **Toggle.** A 44px row, label left, 40×22 switch right, state in `aria-pressed` (a toggle button,
+  not `role="switch"`). Used for Show NSFW / Blur NSFW only.
+- **Card.** Structure only, and the three parts are separate elements because T-08's blur covers
+  the middle: `.card-head` (title), `.card-middle` (avatar, tagline, tags), `.card-foot`
+  (author + ratio). The tags row is absent — not empty — while the taxonomy is undecided.
+- **Sheet.** Bottom sheet on mobile, centred dialog from `md` (900). Mounted inside `@if`, so there
+  is no `open` prop. `Portal` to `document.body`, 6px radius, the one sanctioned shadow, 180ms
+  `cubic-bezier(.2,.8,.2,1)`, scrim `rgb(0 0 0 / .35)`, Escape closes, Tab is trapped, focus lands
+  on the panel. Focus is deferred until the portal has inserted the panel — a ref runs before
+  insertion and `focus()` on a detached node does nothing.
+- **Toast.** `toast(message)` from `src/lib/toast.ts` (a plain subscribe/notify store, because a
+  module-scope `track()` has no owning block); `<ToastHost />` is mounted once in `App.tsrx`.
+  **Placement: bottom, above the tab bar** (72px + safe area on mobile, 24px from `md`), 120ms, no
+  bounce, polite live region, three at most, 3.4s each. No shadow — a toast is not a sheet.
+- **Tabs.** Renders and calls back; it does **not** write the query string. The page owns the
+  query (spec: tab state lives in the query string), so back/forward stays the page's business.
+- **Skeleton.** `lines` / `block`, matching the shape of what it stands in for. No spinner anywhere.
+- **Z-index ladder.** Overflow menu scrim 8 / menu 9 · sheet scrim 40 · sheet panel 41 · toast 60.
+  Anything new that floats must pick a rung on this ladder rather than invent a number.
+- **Dev gallery.** `/dev/primitives` renders every primitive at 360/640/900/1280 with a theme
+  switch that writes `data-theme` on `<html>`. It is not a product route: absent from
+  `src/specs/luaplot-pages.md`, absent from the tab bar, and `scripts/spec-routes.mjs` drops
+  `/dev/*` before comparing. The sheet's dialog form follows the real viewport, not the stage width.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

@@ -9,6 +9,7 @@ import {
   IconThread,
   IconUser,
 } from "./components/Icons.tsrx";
+import { ToastHost } from "./components/Toast.tsrx";
 
 /**
  * The shell: mobile top bar + bottom tab bar, a rail from `md`, a fixed sidebar from `lg`.
@@ -612,5 +613,7 @@ export function App() @{
         </nav>
       </div>
     </div>
+
+    <ToastHost />
   </>
 }

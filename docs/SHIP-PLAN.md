@@ -11,7 +11,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       `src/specs/luaplot-pages.md`, `App.tsrx` rendering `<RouterOutlet>`, mobile top bar + bottom
       tab bar + desktop sidebar, base-path aware. Accept: every route renders a titled placeholder;
       deep link `/character/catalog` works after reload on the Pages URL.
-- [ ] **T-02 Design primitives.** `Button, Field, Toggle, Card, Sheet, Toast, Tabs, EmptyState,
+- [x] **T-02 Design primitives.** `Button, Field, Toggle, Card, Sheet, Toast, Tabs, EmptyState,
       Skeleton, Avatar, Icons` on the Catppuccin tokens, keyboard + `:focus-visible` states,
       44px targets. Accept: a `/dev/primitives` route renders every variant in both themes at
       360px and 1280px with no overflow.

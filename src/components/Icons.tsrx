@@ -70,3 +70,65 @@ export function IconMore() {
     </svg>
   );
 }
+
+/* ---- Added in T-02: what the shells and forms need next. Same 20px / 1.5 set. ---- */
+
+export function IconSearch() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="6" />
+      <path d="M15.5 15.5 20 20" />
+    </svg>
+  );
+}
+
+export function IconClose() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 6.5 17.5 17.5" />
+      <path d="M17.5 6.5 6.5 17.5" />
+    </svg>
+  );
+}
+
+export function IconCheck() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 12.5 10 17.5 19 6.5" />
+    </svg>
+  );
+}
+
+export function IconPlus() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function IconBookmark() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 4h11v16L12 16.5 6.5 20z" />
+    </svg>
+  );
+}
+
+export function IconChevronDown() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 9.5 12 15l5.5-5.5" />
+    </svg>
+  );
+}
+
+export function IconFlag() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 4v16" />
+      <path d="M6 5h11l-2 3.5 2 3.5H6z" />
+    </svg>
+  );
+}
