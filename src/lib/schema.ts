@@ -493,6 +493,11 @@ export const turnSchema = z.strictObject({
  * `luaplot-pages.md` → *Sessions are private and unmoderated*; *the persona is not copied: it is a
  * live reference, swappable mid-session, and a switch leaves no mark on the transcript.* Hence
  * `personaId` and no persona copy on the session.
+ *
+ * `personaId` is **optional** because `character/detail.md` allows the unattributed start: *an
+ * account with no persona is not prompted and not blocked: the session starts unattributed, the
+ * user's side reads `User`, and **Switch persona** attaches one later.* A required id would make a
+ * persona-less account unable to start the session the spec says it can.
  */
 export const sessionSchema = z.strictObject({
   id: z.uuid(),
@@ -500,7 +505,7 @@ export const sessionSchema = z.strictObject({
   character: characterCopySchema,
   lorebooks: z.array(lorebookCopySchema),
   preset: presetCopySchema,
-  personaId: z.uuid(),
+  personaId: z.uuid().optional(),
   turns: z.array(turnSchema),
   createdAt: isoSchema,
   updatedAt: isoSchema,

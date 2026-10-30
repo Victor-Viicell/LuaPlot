@@ -77,9 +77,12 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       fixture shows the notice to its owner and *unavailable* to everyone else. Landed with
       `useParams()`, `repo.myVote`, listings filtered to `isPublic` only, and `CHARACTER(28)` +
       `REPORT(5)` as the private case.
-- [ ] **T-10B Fork + Start/Continue.** `repo.forkCharacter` and `repo.createSession` (copies, one
-      session per character per user); the detail page's primary control reads Start or Continue and
-      a second session comes only from **New Session**. Brief: `docs/tickets/T-10B-fork-and-session-control.md`.
+- [x] **T-10B Fork + Start/Continue.** `repo.forkCharacter` and `repo.createSession` (copies with
+      `sourceId` links, a live persona reference, `personaId` optional for the unattributed start);
+      the detail page's one `btn-primary` reads Start or Continue from `findSessionForCharacter` and
+      a second session comes only from **New Session**. Landed with **Fork** in the settings menu
+      (absent while private; the adapter refuses a private source) and DESIGN's *Start / Continue
+      and Fork*. Brief: `docs/tickets/T-10B-fork-and-session-control.md`.
 - [ ] **T-11 Comment thread component.** Depth-limited nesting, reply, vote, delete → placeholder,
       removed → placeholder, no bookmark on comments. Accept: deleting a parent keeps its replies.
 - [ ] **T-12 Report dialog.** Reasons from `components/report.md`, one-tap submit, identical

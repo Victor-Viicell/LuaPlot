@@ -414,6 +414,37 @@ decisions, and T-10 recorded them here rather than in a comment nobody reads.
   is evaluated once, and ripple 0.4.7 loses a `null` check across a branch, so a nullable entity in
   the template is a page that renders nothing the day the branch moves.
 
+### Start / Continue and Fork (decided in T-10B)
+
+- **One primary action, on its own row at 360.** The action row already carried Like / Dislike /
+  Bookmark at 44px; a fourth control in that row squeezed all four under the target, so **Start a
+  session / Continue** takes a full-width row first and joins the row from `sm`, where 162 + 3×132
+  plus the gaps fills the 582px row exactly. It is the only `btn-primary` on the screen — the
+  accent has one user. The wrapper `.start` is a grid because a page cannot style the primitive's
+  `.btn` (T-09's trap): the wrapper is placed, the button stretches inside it.
+- **Its label is the adapter's answer.** `repo.findSessionForCharacter(characterId, viewer)` →
+  `null` reads *Start a session*, a row reads *Continue*. The page holds one `track()` for the
+  session id and derives the label from it, so the word follows the write; Continue opens the
+  session the adapter returned, never a guess about which one is newest.
+- **A second session is deliberate.** **New session** in the settings menu calls the same
+  `createSession`, which always appends fresh copies; the primary control is what refuses to start
+  one by accident. That split is the spec's own (`character/detail.md`: *a second one is started
+  deliberately, from the settings menu*), so the "one session per character per user" rule lives in
+  the control rather than in a write that would make the menu entry a lie.
+- **The preset has no picker yet** (`character/detail.md` says *the chosen preset*): the copy takes
+  the viewer's own most recently updated preset, falling back to the newest public one. The persona
+  is their default, else the first of theirs, else **absent** — an unattributed session, which
+  `sessionSchema.personaId` allows because the spec says an account with no persona *is not
+  prompted and not blocked*.
+- **Fork lives in the settings menu and is absent while the row is private.** Save publishes
+  (`character/create.md` — no draft state), so forking a privated row would republish exactly what
+  moderation removed; `repo.forkCharacter` refuses it too, because `getCharacter` answers any id.
+  The fork lands on its own detail route with the definition and the in-session name carried,
+  `lorebookIds` still references (filtered to what the forker can see), engagement zeroed and
+  `verified` cleared.
+- **Continue and New session land on `/session/[id]`, still T-15's placeholder.** The write and the
+  label are real; the transcript screen is not built, and this note is the honest half.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

@@ -3,6 +3,35 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-10B — fork + Start/Continue on the character page (2026-10-30)
+
+- **Changed:** `repo.createSession(characterId)` and `repo.forkCharacter(id)` exist in memory, both
+  parsing what they store (`sessionSchema` / `characterSchema`) — a session is **copies** (the
+  character, each attached lorebook the viewer can see, the preset), each copy keeping `sourceId`
+  as the link, `version` 1, `edited`/`unlinked` false, the persona a live reference and *absent*
+  when the account has none (`sessionSchema.personaId` is now optional — the spec's unattributed
+  start); a fork is a new item: new id, `author` = viewer, `lorebookIds` still **references**
+  filtered to what the forker can see, engagement zeroed, `verified` false, published
+  (`character/create.md` has no draft). A fork of a private row is refused in the adapter. The
+  detail page's action row gains its one `btn-primary`, **Start a session / Continue**, labelled
+  from `findSessionForCharacter` and live (one `track()` for the session id); the settings menu's
+  **New session** is wired (the disabled twin is gone) and **Fork** joins the menu, absent while
+  the row is private. `docs/DESIGN.md` gained *Start / Continue and Fork*.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30/30 routes, fixtures + schema). Driven in
+  Chromium at 360×740 / 640 / 900 / 1200 against the dev build: CHARACTER(2) reads *Start a
+  session* → click → landed on `/session/<new uuid>` → `history.back()` → reads *Continue* →
+  Continue opened that same session, with no reload and no tree scan. **New session** produced a
+  *different* uuid and left the first session alone. **Fork** on CHARACTER(2) landed on a new
+  `/character/<uuid>` reading `Sonic the Hedgehog / Called "Sonic" inside a session.`, counts
+  `0 | 0 | 0% | 0`, its lorebook carried as a reference, byline `@you`. CHARACTER(28) (private,
+  owned by `you`) shows the notice, `Edit`, no **Fork**, and `scrollWidth == clientWidth` at 360.
+  At 360 the primary control is 328×44 on its own row with Like/Dislike/Bookmark at 44px beneath;
+  from `sm` it joins them (162 + 3×132 + gaps = the row's 582px).
+- **Not verified:** Continue and New session land on `/session/[id]`, which is still T-15's
+  placeholder — the row is written and reachable, the transcript screen does not exist yet. The
+  memory store resets on a hard reload (no persistence until Supabase), so Start/Continue across a
+  reload cannot be shown in the preview. No Tauri/Android build.
+
 ## T-10 — `/character/[id]`, the read/vote surface (2026-10-30)
 
 - **Changed:** the detail page exists: identity (avatar, name, the in-session line only when it

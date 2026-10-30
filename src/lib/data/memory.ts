@@ -19,10 +19,12 @@ import { seed } from "../fixtures/index.ts";
 import {
   accountPreferencesSchema,
   accountPreferencesPatchSchema,
+  characterSchema,
   handleSchema,
   normaliseHandle,
   profileWriteSchema,
   seedSchemas,
+  sessionSchema,
   userSchema,
   type SeedCollection,
 } from "../schema.ts";
@@ -152,6 +154,41 @@ const CLAIMED_HANDLES = new Set(
 
 function voteKey(kind: string, id: string): string {
   return `${kind}:${id}:${VIEWER}`;
+}
+
+/** A row a session creates. `crypto.randomUUID()` is a v4 UUID, which `z.uuid()` accepts. */
+function freshId(): string {
+  return crypto.randomUUID();
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+/**
+ * What the viewer may attach or start a session from: their own rows and public ones. Another
+ * author's private row is neither, and `getCharacter` answers it anyway, so this is a rule the
+ * adapter owns rather than one each page re-derives.
+ */
+function reachable(row: { isPublic: boolean; author: Handle }): boolean {
+  return row.isPublic || row.author === VIEWER;
+}
+
+/**
+ * The preset a session starts with. `character/detail.md` says *the chosen preset*, but no picker
+ * exists yet, so the default is the viewer's own most recently updated preset, falling back to the
+ * newest public one — the choice a picker will replace, recorded in `docs/DESIGN.md`.
+ */
+function pickPreset(): Preset | null {
+  const mine = store.presets.filter((row) => row.author === VIEWER);
+  const pool = mine.length > 0 ? mine : store.presets.filter((row) => row.isPublic);
+  return [...pool].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+}
+
+/** The viewer's default persona, with the first of their own as the fallback; `null` = unattributed. */
+function pickPersona(): Persona | null {
+  const mine = store.personas.filter((row) => row.owner === VIEWER);
+  return mine.find((row) => row.isDefault) ?? mine[0] ?? null;
 }
 
 /**
@@ -408,6 +445,111 @@ export const memoryRepo: Repo = {
       .filter((row) => row.owner === owner && row.character.sourceId === characterId)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return rows[0] ?? null;
+  },
+
+  /**
+   * Start a session: **copies**, never live items (`session/detail.md`). The character, each
+   * attached lorebook the viewer can see, and the preset are snapshotted with `sourceId` kept as
+   * the link; `version` starts at 1 and `edited`/`unlinked` at false, so **Restore** is not offered
+   * where there is nothing to restore. The persona is a **live reference** and may be absent.
+   *
+   * It appends rather than replaces, because **New session** starts a fresh one *leaving this
+   * session and its copies untouched*; the page's primary control is what keeps a second session
+   * from starting by accident, and it asks `findSessionForCharacter` for that.
+   */
+  async createSession(characterId) {
+    const character = store.characters.find((row) => row.id === characterId) ?? null;
+    const preset = pickPreset();
+    // Another author's private row is not startable: `getCharacter` answers it by id, so the
+    // refusal belongs here rather than in a page's if.
+    if (!character || !reachable(character) || !preset) return null;
+
+    const persona = pickPersona();
+    const at = nowIso();
+    const session = sessionSchema.parse({
+      id: freshId(),
+      owner: VIEWER,
+      character: {
+        kind: "character",
+        sourceId: character.id,
+        version: 1,
+        edited: false,
+        unlinked: false,
+        name: character.name,
+        ...(character.inSessionName ? { inSessionName: character.inSessionName } : {}),
+        description: character.description,
+        avatar: character.avatar,
+      },
+      lorebooks: character.lorebookIds.flatMap((ref) => {
+        const book = store.lorebooks.find((row) => row.id === ref);
+        if (!book || !reachable(book)) return [];
+        return [
+          {
+            kind: "lorebook" as const,
+            sourceId: book.id,
+            version: 1,
+            edited: false,
+            unlinked: false,
+            name: book.name,
+            description: book.description,
+            entries: book.entries,
+          },
+        ];
+      }),
+      preset: {
+        kind: "preset",
+        sourceId: preset.id,
+        version: 1,
+        edited: false,
+        unlinked: false,
+        name: preset.name,
+        description: preset.description,
+        settings: preset.settings,
+      },
+      ...(persona ? { personaId: persona.id } : {}),
+      turns: [],
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    store.sessions.push(session);
+    return session;
+  },
+
+  /**
+   * Fork: a new item, so it takes none of the original's engagement, bookmarks or comments
+   * (`luaplot-pages.md`: engagement is per item) and starts unverified, since *any edit clears the
+   * cached scan*. `isPublic` is true because `character/create.md` has no draft state — save
+   * publishes. Attachments stay **references**, filtered to what the forker can see.
+   */
+  async forkCharacter(id) {
+    const source = store.characters.find((row) => row.id === id) ?? null;
+    // A copy of a privated definition would republish exactly what moderation took out of view.
+    // `getCharacter` answers any id, so a page cannot be the guard. `forkCharacter` refuses and
+    // the page hides the control for the same reason.
+    if (!source || !source.isPublic) return null;
+
+    const at = nowIso();
+    const fork = characterSchema.parse({
+      ...source,
+      id: freshId(),
+      author: VIEWER,
+      lorebookIds: source.lorebookIds.filter((ref) => {
+        const book = store.lorebooks.find((row) => row.id === ref);
+        return book !== undefined && reachable(book);
+      }),
+      isPublic: true,
+      verified: false,
+      likes: 0,
+      dislikes: 0,
+      bookmarks: 0,
+      commentCount: 0,
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    store.characters.push(fork);
+    return fork;
   },
 
   async getPreferences(handle) {

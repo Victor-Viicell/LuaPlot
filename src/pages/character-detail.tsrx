@@ -16,11 +16,11 @@ import { toast } from "../lib/toast.ts";
 /**
  * `/character/[character.id]` — the read surface (`src/specs/pages/character/detail.md`).
  *
- * Scope, decided in T-10: identity + attached lorebooks + counts and ratio + vote + bookmark + the
- * owner's moderation notice + the settings menu shell. **Fork and Start/Continue are T-10B** — they
- * need `forkCharacter` / `createSession`, which the adapter does not have and which must be written
- * against T-15's copy rule rather than guessed here, so the menu's **New session** entry is drawn
- * and disabled instead of faking a write. **Report** is T-12's dialog, disabled for the same reason.
+ * Scope, decided in T-10 and extended in T-10B: identity + attached lorebooks + counts and ratio +
+ * vote + bookmark + the owner's moderation notice + the settings menu, now holding **Fork** and a
+ * wired **New session**, and the page's one `btn-primary`: **Start a session / Continue**, driven by
+ * `repo.findSessionForCharacter`. **Report** is still T-12's dialog, drawn and disabled for the same
+ * reason it always was — never wired to a write that does not exist.
  *
  * What this page owns, and what it deliberately does not:
  * - **The visibility rule.** `memory.ts`'s `getCharacter` answers any row by id (the owner and a
@@ -84,6 +84,13 @@ export function CharacterDetail() @{
   const busy = track(false);
   const revealed = track(false);
 
+  /** The session behind the primary control: `""` means none, and the control reads Start. */
+  const sessionId = track("");
+  /** One live label for the primary control — a prop expression is evaluated once. */
+  const primaryLabel = track(() => (sessionId.value ? "Continue" : "Start a session"));
+  /** Fork is absent while a row is private: a copy would republish what moderation removed. */
+  const canFork = track(() => phase.value === "ready" && !missing.value && isPublic.value);
+
   /** Session and the NSFW pair are plain stores; these are the signals this render reads. */
   const viewer = track<User | null>(currentUser());
   const show = track(nsfwPreference().show);
@@ -113,6 +120,7 @@ export function CharacterDetail() @{
     hasNotice.value = false;
     attachments.value = [];
     revealed.value = false;
+    sessionId.value = "";
 
     Promise.all([
       repo.getCharacter(id),
@@ -147,6 +155,7 @@ export function CharacterDetail() @{
         phase.value = "ready";
 
         loadAttachments(item.lorebookIds);
+        loadSession(item.id);
         // The owner's notice is this page's rule, not the adapter's: only a private row gets one.
         if (!item.isPublic) loadNotice(item.id);
       },
@@ -182,6 +191,28 @@ export function CharacterDetail() @{
           name: "",
           tagline: "",
         }));
+      },
+    );
+  }
+
+  /**
+   * **Start a session / Continue.** Only the adapter knows whether one exists, so the page asks
+   * `findSessionForCharacter` with the viewer's handle rather than scanning anything of its own —
+   * and a signed-out visitor has nothing to continue.
+   */
+  function loadSession(characterId: string): void {
+    const handle = currentUser()?.handle ?? "";
+    if (!handle) {
+      sessionId.value = "";
+      return;
+    }
+
+    repo.findSessionForCharacter(characterId, handle).then(
+      (session) => {
+        sessionId.value = session?.id ?? "";
+      },
+      () => {
+        sessionId.value = "";
       },
     );
   }
@@ -275,6 +306,78 @@ export function CharacterDetail() @{
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
     event.preventDefault();
     navigate(path);
+  }
+
+  /**
+   * The primary control. With a session it opens that conversation — the most recent one, which is
+   * what `findSessionForCharacter` answered; without one it starts a session and lands in it.
+   * It never starts a second session: that is the settings menu's **New session**.
+   */
+  async function startOrContinue(): Promise<void> {
+    if (!currentUser()) {
+      navigate("/authentification");
+      return;
+    }
+
+    if (sessionId.value) {
+      navigate(`/session/${sessionId.value}`);
+      return;
+    }
+
+    if (busy.value) return;
+    busy.value = true;
+    const session = await repo.createSession(id).catch(() => null);
+    busy.value = false;
+
+    if (!session) {
+      toast("That session couldn't start.");
+      return;
+    }
+    sessionId.value = session.id;
+    navigate(`/session/${session.id}`);
+  }
+
+  /** **New session** (`character/detail.md`): a fresh session, leaving the existing one untouched. */
+  async function newSession(): Promise<void> {
+    menuOpen.value = false;
+
+    if (!currentUser()) {
+      navigate("/authentification");
+      return;
+    }
+    if (busy.value) return;
+
+    busy.value = true;
+    const session = await repo.createSession(id).catch(() => null);
+    busy.value = false;
+
+    if (!session) {
+      toast("That session couldn't start.");
+      return;
+    }
+    sessionId.value = session.id;
+    navigate(`/session/${session.id}`);
+  }
+
+  /** **Fork**: a new character owned by the viewer, landed on its own detail page. */
+  async function fork(): Promise<void> {
+    menuOpen.value = false;
+
+    if (!currentUser()) {
+      navigate("/authentification");
+      return;
+    }
+    if (busy.value) return;
+
+    busy.value = true;
+    const copy = await repo.forkCharacter(id).catch(() => null);
+    busy.value = false;
+
+    if (!copy) {
+      toast("That copy didn't save.");
+      return;
+    }
+    navigate(`/character/${copy.id}`);
   }
 
   load();
@@ -425,6 +528,14 @@ export function CharacterDetail() @{
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
+      }
+
+      /* Four controls at 360 would squeeze every one of them under 44px, so the primary action
+         takes its own row first and joins the row from `sm`. A grid wrapper stretches the
+         primitive without the page reaching into it. */
+      .start {
+        display: grid;
+        flex: 1 1 100%;
       }
 
       .vote,
@@ -689,6 +800,10 @@ export function CharacterDetail() @{
           flex: 0 0 auto;
           min-width: 132px;
         }
+
+        .start {
+          flex: 0 0 auto;
+        }
       }
 
       /* `lg`: two columns — the definition beside a 320px aside of counts and actions. */
@@ -866,6 +981,14 @@ export function CharacterDetail() @{
               </ul>
 
               <div class="actions">
+                {/* The one primary action: `.start` is a grid wrapper so the Button stretches at
+                    360 and shrinks to its label from `sm` — a page cannot style a primitive's
+                    element (T-09), so the wrapper is what gets placed. */}
+                <div class="start">
+                  <Button variant="primary" disabled={busy} onClick={startOrContinue}>
+                    {primaryLabel.value}
+                  </Button>
+                </div>
                 <button
                   class="vote"
                   type="button"
@@ -902,14 +1025,13 @@ export function CharacterDetail() @{
     @if (menuOpen.value) {
       <Sheet title="Character" onClose={() => (menuOpen.value = false)}>
         <div class="menu">
-          {/*
-            New session is T-10B (`createSession`, written to T-15's copy rule) and Report is T-12's
-            dialog, so both are drawn and disabled rather than wired to a write that does not exist.
-          */}
-          <button class="menu-item" type="button" disabled>New session</button>
+          <button class="menu-item" type="button" onClick={newSession}>New session</button>
           <button class="menu-item" type="button" onClick={toggleBookmark}>
             {bookmarked.value ? "Remove bookmark" : "Bookmark"}
           </button>
+          @if (canFork.value) {
+            <button class="menu-item" type="button" onClick={fork}>Fork</button>
+          }
           <button class="menu-item" type="button" disabled>Report</button>
           @if (owner.value) {
             <button class="menu-item" type="button" onClick={openEdit}>Edit</button>

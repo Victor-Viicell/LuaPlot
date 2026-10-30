@@ -130,6 +130,34 @@ export type Repo = {
   findSessionForCharacter(characterId: string, owner: Handle): Promise<Session | null>;
 
   /**
+   * Start a session from this character, per `session/detail.md`: the character, every attached
+   * lorebook the viewer can see, and the preset are **copied** at start, each copy keeping the id
+   * of its original (`sourceId`); the persona is a live reference, not a copy, and is the viewer's
+   * default one — absent when the account has none, since an unattributed session is allowed.
+   *
+   * It always appends a **new** session: the settings menu's **New session** starts a fresh one
+   * *leaving this session and its copies untouched*, so a second session may exist. What the
+   * primary control must never do is start a second one by accident — that is why it asks
+   * `findSessionForCharacter` instead of calling this blindly.
+   *
+   * `null` when the character is not startable (missing, or another author's private row) or when
+   * there is no preset to copy.
+   */
+  createSession(characterId: string): Promise<Session | null>;
+
+  /**
+   * **Fork / copy** (`character/detail.md`): a new character owned by the viewer with the same
+   * definition — in-session name included — and `lorebookIds` carried as **references**, so the
+   * fork reads the same lorebooks the original does and an attachment the forker cannot see is
+   * dropped rather than arriving broken. A fork is a new item: engagement, bookmarks and comments
+   * start at zero.
+   *
+   * `null` when the source does not exist, or is private: a copy of a privated definition would
+   * publish exactly what moderation took out of view, so the write refuses it.
+   */
+  forkCharacter(id: string): Promise<Character | null>;
+
+  /**
    * The account's NSFW pair (`src/specs/systems/nsfw.md`). Per account, never per device: the
    * store in `lib/state/prefs.ts` re-reads it on every sign-in, so one account's Show flag cannot
    * survive into another's. An unknown handle answers the new-account defaults, both off — the
