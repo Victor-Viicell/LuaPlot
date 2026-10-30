@@ -30,7 +30,8 @@ could not be verified.
 - **Not verified:** no Tauri/Android build (no SDK on this box, T-35). The catalog is 27 public
   characters over two pages (24 + 3); the private fixture is deliberately absent, which is the
   point. A vote made while signed out cannot be tested without the dev switch (session.ts seeds
-  signed in; T-30). No publish-run yet at this entry.
+  signed in; T-30). Publish verified: live 200 and serving the bundle hash this run built
+  (`assets/index-DGwguzXV.js`), and the deep link `/character/<id>` resolves on Pages.
 
 ## T-09 follow-up — the toolbar, on the owner's call (2026-10-30)
 
