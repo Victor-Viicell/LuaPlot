@@ -70,11 +70,13 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       toggles), grid, `Load more` (+24, hidden at end), query-string state, all six states.
       Accept: filter+sort survive reload; empty/no-results/end-of-list each render. Landed with the
       grid/card props made live, and fixtures grown to 27 characters so paging has a second page.
-- [ ] **T-10 `/character/[id]`.** Identity, attached lorebooks (incl. unavailable), counts + ratio,
-      bookmark, vote, report, settings menu (New Session/Bookmark/Report/Edit), Start/Continue,
-      fork, owner moderation notice. Accept: every action mutates the adapter and the UI reflects it.
-      Brief: only the read/vote surface + the menu this ticket; fork and Start/Continue are
-      `docs/tickets/T-10B-fork-and-session-control.md`.
+- [x] **T-10 `/character/[id]`.** Identity, attached lorebooks (incl. unavailable), counts + ratio,
+      bookmark, vote, settings menu shell, owner moderation notice. **Report is T-12's dialog and
+      Start/Continue + fork are T-10B** — those menu entries are drawn and disabled rather than
+      faked. Accept: vote/bookmark mutate the adapter and the UI shows its answer; the private
+      fixture shows the notice to its owner and *unavailable* to everyone else. Landed with
+      `useParams()`, `repo.myVote`, listings filtered to `isPublic` only, and `CHARACTER(28)` +
+      `REPORT(5)` as the private case.
 - [ ] **T-10B Fork + Start/Continue.** `repo.forkCharacter` and `repo.createSession` (copies, one
       session per character per user); the detail page's primary control reads Start or Continue and
       a second session comes only from **New Session**. Brief: `docs/tickets/T-10B-fork-and-session-control.md`.

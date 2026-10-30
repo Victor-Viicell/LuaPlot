@@ -110,6 +110,13 @@ export type Repo = {
     direction: VoteDirection,
   ): Promise<EntityOf<V> | null>;
 
+  /**
+   * The viewer's own vote on an item, or `null` when they have not voted. The **Voted** state has
+   * to survive a remount (`character/detail.md` → States), and only the adapter knows the vote in
+   * force, so a page never guesses it from a count that another viewer could have moved.
+   */
+  myVote<V extends VotableKind>(kind: V, id: string): Promise<VoteDirection | null>;
+
   /** Bookmark state for the signed-in viewer; a persona has none, so it is not a `VotableKind`. */
   isBookmarked(kind: ItemKind | "post", id: string): Promise<boolean>;
 

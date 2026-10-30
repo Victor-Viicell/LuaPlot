@@ -186,4 +186,36 @@ export const REPORTS: Report[] = [
     lastReportAt: at(13, 17, 0),
     concludedAt: at(15, 16, 30),
   },
+  {
+    /**
+     * T-10's private fixture, owned by `you`, so the owner's moderation notice is reachable at all:
+     * `character/detail.md` → *Privated by moderation — the owner sees the report, reasons, and
+     * measures; everyone else sees it as unavailable*. JEV applied `made-private` to the content
+     * (`isPublic: false` on `CHARACTER(28)`), the case is still open, and the catalog must not list
+     * the row back to its author.
+     */
+    id: REPORT(5),
+    target: { kind: "character", id: CHARACTER(28), label: "Iolande, Second Ledger" },
+    reasons: [
+      {
+        part: "text",
+        reason: "copied-text",
+        details: "The opening of the description matches another character line for line.",
+        source: CHARACTER(1),
+        at: at(27, 6, 30),
+      },
+      { part: "text", reason: "copied-text", source: CHARACTER(1), at: at(27, 8, 15) },
+    ],
+    weight: 2,
+    status: "open",
+    jev: {
+      verdict: "violation",
+      confidence: 0.88,
+      action: "made-private",
+      note: "The first three sentences reproduce an existing character's description; the remainder is original.",
+      at: at(27, 8, 45),
+    },
+    createdAt: at(27, 6, 30),
+    lastReportAt: at(27, 8, 15),
+  },
 ];

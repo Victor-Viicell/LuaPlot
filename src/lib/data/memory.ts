@@ -154,9 +154,19 @@ function voteKey(kind: string, id: string): string {
   return `${kind}:${id}:${VIEWER}`;
 }
 
-/** Public, or the viewer's own — the memory adapter's stand-in for an RLS policy. */
-function visible<T extends { isPublic: boolean; author: Handle }>(item: T): boolean {
-  return item.isPublic || item.author === VIEWER;
+/**
+ * **Listings see published rows only.** This is the adapter's stand-in for the RLS policy on a
+ * listing: `isPublic` is JEV's lever (*enforcement changes visibility*), so a row that was made
+ * private must be absent from a catalog even for its own author — otherwise the catalog would show
+ * a private character back to the person who was told it is private.
+ *
+ * Owner visibility is the **detail page's** rule, not a listing's: `getCharacter` deliberately
+ * returns any row by id (the owner and a moderator open it by id), and `character/detail.md` splits
+ * *owner sees the notice* from *everyone else sees it unavailable*. T-10 settled this — the earlier
+ * "public **or mine**" filter put a privated row back in the public catalog.
+ */
+function listed(item: { isPublic: boolean }): boolean {
+  return item.isPublic;
 }
 
 /** Case-insensitive substring match over the fields a listing can search. */
@@ -254,7 +264,7 @@ export const memoryRepo: Repo = {
   async listCharacters(options) {
     const rows = store.characters.filter(
       (row) =>
-        visible(row) &&
+        listed(row) &&
         matches([row.name, row.tagline, row.description], options?.query) &&
         tagged(row.tags, options?.tags),
     );
@@ -264,7 +274,7 @@ export const memoryRepo: Repo = {
   async listLorebooks(options) {
     const rows = store.lorebooks.filter(
       (row) =>
-        visible(row) &&
+        listed(row) &&
         matches([row.name, row.tagline, row.description], options?.query) &&
         tagged(row.tags, options?.tags),
     );
@@ -274,7 +284,7 @@ export const memoryRepo: Repo = {
   async listPresets(options) {
     const rows = store.presets.filter(
       (row) =>
-        visible(row) &&
+        listed(row) &&
         matches([row.name, row.tagline, row.description], options?.query) &&
         tagged(row.tags, options?.tags),
     );
@@ -298,7 +308,7 @@ export const memoryRepo: Repo = {
       kind === "character" ? store.characters : kind === "lorebook" ? store.lorebooks : store.presets;
     const seen = new Set<string>();
     for (const row of rows) {
-      if (!visible(row)) continue;
+      if (!listed(row)) continue;
       for (const tag of row.tags) seen.add(tag);
     }
     return [...seen].sort((a, b) => a.localeCompare(b));
@@ -375,6 +385,10 @@ export const memoryRepo: Repo = {
 
   async isBookmarked(kind, id) {
     return bookmarks.has(voteKey(kind, id));
+  },
+
+  async myVote(kind, id) {
+    return votes.get(voteKey(kind, id)) ?? null;
   },
 
   async toggleBookmark(kind, id) {

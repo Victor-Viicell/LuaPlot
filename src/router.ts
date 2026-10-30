@@ -355,6 +355,19 @@ export function useQuery(): URLSearchParams {
   return new URLSearchParams(state.search);
 }
 
+/**
+ * The route's params for the current page — `{ id }` on `/character/[character.id]`, `{ username }`
+ * on a profile.
+ *
+ * A snapshot at call time, exactly like `useQuery()`: `App.tsrx` reloads the page module whenever
+ * `path + search` changes, so a page that reads this at mount reads the params it was mounted for.
+ * A page must never parse `location.pathname` for its own id — the table already matched it, and a
+ * second reading would be a second route rule.
+ */
+export function useParams(): Record<string, string> {
+  return state.params;
+}
+
 /** Subscribe to navigation. Returns an unsubscribe function. */
 export function onRouteChange(listener: (next: RouteState) => void): () => void {
   listeners.add(listener);

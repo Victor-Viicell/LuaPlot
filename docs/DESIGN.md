@@ -367,6 +367,53 @@ so these are the decisions they inherit.
   the switches; from `md` the grid is `1fr 220px 1fr` so sort keeps a fixed 220px. The toolbar is
   **not sticky**: a 56px shell bar plus a sticky toolbar would leave a third of a phone for content.
 
+## Character detail (decided in T-10, do not re-invent)
+
+`/character/[character.id]` is the product's first detail page, and the lorebook/preset/post detail
+pages are this page with another entity. The spec leaves its Layout *to be specified*; these are the
+decisions, and T-10 recorded them here rather than in a comment nobody reads.
+
+- **The settings menu lives in the page's own header row.** A 44px `IconMore` button at the top right
+  of the identity block opens a `Sheet` (bottom sheet at 360, centred dialog from 900) of 44px rows:
+  **New session**, **Bookmark / Remove bookmark**, **Report**, and **Edit** for the owner. This is a
+  *second* menu on one screen — the shell's overflow already holds Bookmarks, Moderation, Terms and
+  the preview switch — and the split is deliberate: the shell menu is app-level destinations, this
+  one acts on *this* character. **An entry whose target lands later is drawn and `disabled`**, never
+  wired to a write that does not exist: New session waits for T-10B's `createSession`, Report for
+  T-12's dialog, so the menu is complete without a control that lies.
+- **Counts are one row of four at 360** — likes, dislikes, ratio, comments — in the count-strip
+  gesture (1px gap on `--color-border`, square corners). Four cells fit a 328px column at 12px
+  labels, so a two-row split would only add a break to read across. The ratio is a percentage from
+  `percent(ratioOf(item))`; the raw counts sit beside it because the detail page is where counts
+  live, while a card keeps only the percentage (`luaplot-pages.md`).
+- **Engagement comes before the definition on a phone.** `.cols` is a flex column below `lg` with the
+  aside ordered first: header → byline → counts → vote/bookmark → definition → lorebooks. A reader
+  who has to scroll a whole description to find **Like** does not find it. At `lg` the same two
+  blocks become `minmax(0,1fr) 320px`, main left, aside right, both starting at the same y.
+- **The aside carries counts and actions only; attached lorebooks stay in the main column** at every
+  width. An attachment list is part of the definition (`detail.md` → *Attached lorebooks*: the full
+  list, each a link), not metadata about it, so it does not move into a sidebar — this is the rule
+  every later detail page inherits.
+- **The veil covers the tagline and the description, nothing else.** On a Show-off route the body is
+  blurred 6px behind the same sibling scrim + 44px `Reveal` a covered card uses; the header (name,
+  kicker, in-session line, settings), the byline, the counts, the actions and the lorebook list stay
+  crisp — *the numbers are never hidden*, and a blurred link list is a list nobody can click.
+  `covered` is `nsfw && !show && !revealed`: **Blur is a listing preference** and this route is where
+  the body gets read, so Blur on does not cover it. Signed out, Show is off, so a flagged row arrives
+  covered behind its Reveal — the route still resolves (`nsfw.md`: never a 404).
+- **Two refusal states, one line each, both with a way back.** Not found: `This character doesn't
+  exist.`; private and not the viewer's: `This character isn't available.` No reason, no case number,
+  no author — the moderation story is the owner's, and the owner sees it as a notice instead.
+- **The owner's notice is a panel, not a dialog**: a 2px `--color-danger` left rule, the case
+  sentence, every reason as `part · reason — details`, then the measure in JEV's terms. It sits
+  between the byline and the engagement row so the page cannot be read as merely private-by-choice.
+  **Request public again** is absent (no adapter method); the notice's last line says editing is the
+  way, which is true of the product even while the control is unbuilt.
+- **One live value per drawn field.** The page holds a `track()` per thing it draws (`likes`,
+  `tagline`, `bookmarked`, …) instead of one nullable entity read in the template: a prop expression
+  is evaluated once, and ripple 0.4.7 loses a `null` check across a branch, so a nullable entity in
+  the template is a page that renders nothing the day the branch moves.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

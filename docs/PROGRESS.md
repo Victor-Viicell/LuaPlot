@@ -3,6 +3,35 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-10 — `/character/[id]`, the read/vote surface (2026-10-30)
+
+- **Changed:** the detail page exists: identity (avatar, name, the in-session line only when it
+  differs), byline, attached lorebooks resolved through the adapter with an *unavailable* row kept
+  in the list, the four-cell counts strip (likes / dislikes / ratio / comments), vote (one per
+  viewer, switching replaces), bookmark, the owner's moderation notice, and the page's own settings
+  sheet (New session, Bookmark, Report, Edit — the two that need T-10B/T-12 are drawn and
+  `disabled`). `router.ts` gained `useParams()`; `repo` gained `myVote(kind, id)` so the **Voted**
+  state comes from the adapter instead of a page-local guess. **The adapter's listing filter is now
+  `isPublic` only** — the old "public **or mine**" put a privated row back in the catalog (the
+  carried-forward bug from T-09); owner visibility is the detail page's rule. Fixtures: `CHARACTER(28)`
+  (Iolande, private, owned by `you`) + `REPORT(5)` (open, JEV `made-private`) so the notice is
+  reachable at all; characters 27 → 28, reports 4 → 5. `docs/DESIGN.md` gained *Character detail*.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30 routes, fixture+schema check). In the live dev
+  build: Aurelia renders 128/9/93%/4 comments; `Like` → 129/9 with `aria-pressed="true"`, then
+  `Dislike` → 128/10 and the like press clears (the switch replaces rather than stacks); bookmark
+  toggles and toasts; the settings sheet lists New session / Bookmark / Report / Edit for the owner.
+  `CHARACTER(28)` as its owner shows the notice with both reasons and JEV's measure, and signing out
+  in place switches the same route to *This character isn't available*; a random uuid renders *This
+  character doesn't exist*; a signed-out vote navigates to `/authentification`. NSFW: Hollow Saint
+  with Show off draws the chrome crisp with `filter: blur(6px)` on the veil (counts `filter: none`)
+  and Reveal removes the cover. Measured at 360/640/900/1200: `scrollWidth == clientWidth` at every
+  width, the four count cells share one `top` at 360, targets 44px, and at 1200 the aside is right of
+  main at the same y.
+- **Not verified:** no Tauri/Android build (no SDK on this box, T-35). The catalog is 27 public
+  characters over two pages (24 + 3); the private fixture is deliberately absent, which is the
+  point. A vote made while signed out cannot be tested without the dev switch (session.ts seeds
+  signed in; T-30). No publish-run yet at this entry.
+
 ## T-09 follow-up — the toolbar, on the owner's call (2026-10-30)
 
 - **Changed:** three product changes asked for after looking at the phone: the search field now spans
