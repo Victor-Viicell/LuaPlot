@@ -7,8 +7,13 @@
  * or a URL and still resolve after a reseed.
  */
 
-const group = (n: number): string => String(n).padStart(8, "0");
-const tail = (n: number): string => String(n).padStart(12, "0");
+/**
+ * Hex, not decimal: `String(0xc0a1b2c3)` is `"3231822531"`, which made every seeded id 37–38
+ * characters and put it outside both the router's `[0-9a-f-]{36}` rule and `z.uuid()` — so every
+ * detail link in the preview resolved to a 404. Caught by the schema check (T-07B).
+ */
+const group = (n: number): string => (n >>> 0).toString(16).padStart(8, "0");
+const tail = (n: number): string => (n >>> 0).toString(16).padStart(12, "0");
 
 /** `8-4-4-4-12`, hex only. `bucket` keeps the types apart, `n` keeps the rows apart. */
 export function uuid(bucket: number, n: number): string {

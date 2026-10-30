@@ -45,8 +45,9 @@ The repo is the memory: never rely on chat history.
   (form input, adapter return, JEV/LLM payload), `parse` only for an internal invariant. Trimming,
   lowercasing, collapsing and ISO-string checks happen in the schema, never in a page — and display
   formatting (`percent`, `relativeTime`) stays in `lib/format.ts`. A value that fails is fixed at the
-  source (the fixture, the caller, the schema's spec citation), never by widening the schema. See
-  `docs/ARCHITECTURE.md` → Validation.
+  source (the fixture, the caller, the schema's spec citation), never by widening the schema.
+  **Read `docs/ARCHITECTURE.md` → Validation before adding a shape, a form or an LLM call** — it is
+  the settled rule, not a proposal, and `bun run schema:check` (gate section 5) enforces it.
 - Every async surface renders Loading / Empty / Error / Success. No spinners without a skeleton.
 - No per-keystroke network calls; debounce search at 250ms.
 

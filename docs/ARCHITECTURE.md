@@ -25,7 +25,9 @@ src/
   styles.css            tokens + base (already exists)
   router.ts             route table + matcher + navigate()
   lib/
-    data/               types.ts, repo.ts (interface), memory.ts, supabase.ts
+    schema.ts           every shape + its normalisation (Zod) — see Validation
+    validate.ts         onboarding field readings over those schemas
+    data/               types.ts (z.infer only), repo.ts (interface), memory.ts, supabase.ts
     fixtures/           seed data shared by memory adapter and tests
     llm/                chat.ts, jev.ts, mock.ts
     native.ts           Tauri plugin bridge + browser fallback
@@ -108,6 +110,37 @@ Shapes, decided in T-03 (change them here before changing them in the code):
   unique index, and `isHandleTaken` is advisory in front of it (the index is the guarantee).
   Onboarding calls `saveProfile` for its **draft** too, debounced, which is what makes the spec's
   *Resumed after abandonment* honest without `localStorage`.
+
+## Validation
+
+Zod is the **one** parser and the **one** normaliser (T-07B; `zod` 4.x, no `zod/v3` path and no
+hand-rolled mini-validator anywhere). Read this before adding a shape, a form, or an LLM call.
+
+- **`lib/schema.ts` owns every shape.** One `z.strictObject` per entity (an unknown key fails
+  instead of being dropped), primitives for the rules that repeat (`isoSchema`, `handleSchema`,
+  `displayNameSchema`, `avatarSchema`, `engagementSchema`), and the collection schemas
+  (`seedSchemas`, `commentThreadSchema`) the adapter and the gate parse.
+- **Types are `z.infer`.** `lib/data/types.ts` derives every entity (`export type Character =
+  z.infer<typeof characterSchema>`), so a shape exists exactly once: never declare a hand type
+  beside a schema. `z.infer` is the **output** type — what the app holds after a parse, handle
+  already lowercased — so a value that came through `repo` is never re-normalised in a page.
+- **`safeParse` at every edge**: form input (`lib/validate.ts` reads the `ZodError` issue code to
+  say *required* or *format*), anything an adapter returns or accepts (`lib/data/memory.ts` parses
+  each fixture collection at load and every write before it stores), and **every JEV/LLM payload
+  before any code reads a field**. `parse` is only for an internal invariant — a bug, not a user.
+- **Normalisation lives in the schema**: trim, lowercase a handle, collapse display-name whitespace,
+  real ISO-8601 strings (`2026-13-01` fails, a length check would not). A saved row cannot differ
+  from a validated one, because the same schema produced it.
+- **Display formatting stays in `lib/format.ts`** (`percent`, `relativeTime`, handles) — Zod is
+  shape and input, not presentation. `ratioOf()` derives the ratio; it is never stored.
+- **Error copy comes from the schema** (`HANDLE_RULE` is the schema's message), so the inline error,
+  the submit gate and the adapter cannot disagree.
+- **A fixture that fails is fixed against the spec**, never by loosening the schema. A shape the
+  specs forbid (a stored `ratio`, engagement on a persona, `updatedAt` on a post) does not exist in
+  `schema.ts` at all.
+- **The gate proves it**: `bun run schema:check` is section 5 of `scripts/check.sh` — every fixture
+  collection parses, three negative cases (bad handle, missing `nsfw`, unknown key) must fail, and
+  the recursive `commentBranchSchema` must be a real type, not `any`.
 
 ## Session
 

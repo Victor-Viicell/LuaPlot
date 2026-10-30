@@ -3,6 +3,41 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-07B — Zod at every boundary (2026-10-30)
+
+- **Changed:** `bun add zod` (4.6.7, the only new dependency; the ticket named it). New
+  `src/lib/schema.ts` holds every shape: primitives (`isoSchema` — a real calendar check, so
+  `2026-13-01` and `2026-02-30` fail; `handleSchema` — trim → lowercase → 3–24 `[a-z0-9_]`;
+  `displayNameSchema` — trim + collapse; `avatarSchema`; `engagementSchema`), every entity as a
+  `z.strictObject` (character, lorebook, preset, persona, post, comment, notification, report,
+  session + `sessionCopySchema`, `accountPreferencesSchema`, `userSchema`), the collection schemas
+  (`seedSchemas`, `commentThreadSchema`) and `commentBranchSchema` (`z.lazy`). `src/lib/data/types.ts`
+  is now `z.infer` only — every hand-written entity type deleted, `ratioOf` kept. `lib/validate.ts`
+  keeps `readHandle`/`readDisplayName` and `HANDLE_RULE` (now the schema's own message) and derives
+  *required* vs *format* from the `ZodError` issue code. `memory.ts` parses all nine fixture
+  collections at module load (a bad row throws naming collection, index and path), parses
+  `saveProfile` (through `profileWriteSchema`) and `savePreferences` (patch + merged pair), and uses
+  the schema's `normaliseHandle` instead of its own copy. `router.ts` matches `[user.username]` with
+  the schema's `isHandle` (the `Segment.test` is a predicate now, so there is no second regex).
+  `scripts/schema-check.ts` + `bun run schema:check` + section 5 of `scripts/check.sh`.
+  `docs/ARCHITECTURE.md` → **Validation**, `docs/CONTRACT.md` → one bullet pointing at it,
+  `SHIP-PLAN.md` ticks T-07B, `NEXT.md` rewritten for T-08.
+- **Verified:** `./scripts/check.sh` GREEN with five sections (build ok, output ok, 30/30 routes,
+  repo public, schema ok — 64 rows across 9 collections, negative cases rejected, comment tree
+  18 rows / 12 roots / depth 3 / type not any). Bundle delta measured against a `git worktree` of
+  HEAD: JS raw 145.2 → 236.3 KB, gzip 56.5 → 82.8 KB (**+26.4 KB gzip**, above the ticket's ~14 KB
+  estimate — see the baton). Published and confirmed live 200 on the new asset
+  (`assets/index-SfEO0tBm.js`). Driven in Chromium against the **published** build: `/onboarding`
+  with `ab` shows the schema's copy in `.field-error` + `aria-invalid=true` + Finish disabled; `ada`
+  with a display name shows `Username taken`, Finish disabled; a free handle clears the error and
+  enables Finish. `handleSchema` probed directly: `Avis_2`/`  avis_2  `/`AVIS_2` → `avis_2`, 24 ok /
+  25 rejected, `avis-2` rejected, empty → *required*. Live `/character/c0a1b2c3-…-0001` resolves
+  through the shell and `/dev/data` renders the fixture counts, which is the adapter's load-time
+  parse succeeding in the shipped bundle.
+- **Not verified:** nothing on a real mobile device (no Android toolchain on this box); the
+  `supabase.ts` adapter does not exist, so its parse points are still unwritten. The `bun add zod`
+  network step was fine (registry reachable).
+
 ## T-07 — `/onboarding` (2026-10-30)
 
 - **Changed:** data contract + adapter gain the profile trio — `repo.currentProfile(): Promise<User |

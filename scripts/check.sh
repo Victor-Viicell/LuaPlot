@@ -49,6 +49,17 @@ else
   say "   SKIP (gh unavailable)"
 fi
 
+# 5. Schemas: every fixture parses, and the three negative cases fail (T-07B)
+say "== schema"
+if bun run schema:check >/tmp/luaplot-schema.log 2>&1; then
+  grep -E '^\s+(ok|[0-9]+ rows)' /tmp/luaplot-schema.log | tail -4 | sed 's/^/   /'
+  say "   schema ok"
+else
+  say "   SCHEMA FAILED — tail:"
+  tail -20 /tmp/luaplot-schema.log | sed 's/^/   /'
+  FAIL=1
+fi
+
 if [[ $FAIL -eq 0 ]]; then
   say "GREEN"
   exit 0

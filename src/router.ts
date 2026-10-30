@@ -1,4 +1,5 @@
 import type { Component } from "ripple";
+import { isHandle } from "./lib/schema.ts";
 
 /**
  * The route table plus the only navigation seam in the app.
@@ -242,20 +243,23 @@ export const ROUTES: RouteDef[] = [
   },
 ];
 
-type Segment = { literal: string } | { param: string; test: RegExp };
+/** A param segment carries a predicate, so the table can hand a schema rule in directly. */
+type Segment = { literal: string } | { param: string; test: (value: string) => boolean };
 
 const PARAM_SEGMENT = /^\[(.+)\]$/;
 /** Ids are constrained so a real id can never collide with a fixed word like `catalog`. */
 const ID = /^[0-9a-f-]{36}$/i;
-/** Handles follow the onboarding rule: 3–24 of `[a-z0-9_]`, case-insensitive. */
-const HANDLE = /^[A-Za-z0-9_]{3,24}$/;
+const idSegment = (value: string): boolean => ID.test(value);
 
 const segment = (part: string): Segment => {
   const param = PARAM_SEGMENT.exec(part);
   if (!param) return { literal: part };
   // `[character.id]` exposes `id`, `[user.username]` exposes `username`.
   const name = param[1].split(".").pop() ?? param[1];
-  return { param: name, test: name === "username" ? HANDLE : ID };
+  // A username is matched by the **onboarding rule itself** (`lib/schema.ts` → `isHandle`): two
+  // copies of `3–24 of [a-z0-9_]` would be two rules, and the day one tightens, the other silently
+  // routes a profile that cannot exist.
+  return { param: name, test: name === "username" ? isHandle : idSegment };
 };
 
 const split = (path: string): string[] => path.split("/").filter(Boolean);
@@ -284,7 +288,7 @@ export function matchPath(path: string): RouteMatch | null {
           ok = false;
           break;
         }
-      } else if (expected.test.test(actual)) {
+      } else if (expected.test(actual)) {
         params[expected.param] = actual;
       } else {
         ok = false;

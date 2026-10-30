@@ -16,6 +16,17 @@
  * `await` from the first day and the swap is not a rewrite.
  */
 import { seed } from "../fixtures/index.ts";
+import {
+  accountPreferencesSchema,
+  accountPreferencesPatchSchema,
+  handleSchema,
+  normaliseHandle,
+  profileWriteSchema,
+  seedSchemas,
+  userSchema,
+  type SeedCollection,
+} from "../schema.ts";
+import type { z } from "zod";
 import { PAGE_SIZE } from "./repo.ts";
 import type { Listing, ListOptions, ReportFilter, Repo, SortOrder } from "./repo.ts";
 import {
@@ -27,12 +38,9 @@ import {
   type Handle,
   type ItemKind,
   type Lorebook,
-  type Notification,
   type Persona,
   type Post,
   type Preset,
-  type Report,
-  type Session,
   type User,
   type VoteDirection,
   type VotableKind,
@@ -48,31 +56,50 @@ import {
  */
 export const VIEWER: Handle = "you";
 
-type Store = {
-  characters: Character[];
-  lorebooks: Lorebook[];
-  presets: Preset[];
-  personas: Persona[];
-  posts: Post[];
-  comments: Comment[];
-  notifications: Notification[];
-  reports: Report[];
-  sessions: Session[];
-};
+/**
+ * Every collection is derived from its fixture, so the store is exactly what `seedSchemas` says.
+ * A mapped type over the schemas — not a second hand-written shape.
+ */
+type Store = { [K in SeedCollection]: z.infer<(typeof seedSchemas)[K]> };
 
-/** Deep copy: fixtures are module constants and must survive a page voting on them. */
-function load(): Store {
-  const store: Store = structuredClone({
-    characters: seed.characters,
-    lorebooks: seed.lorebooks,
-    presets: seed.presets,
-    personas: seed.personas,
-    posts: seed.posts,
-    comments: seed.comments,
-    notifications: seed.notifications,
-    reports: seed.reports,
-    sessions: seed.sessions,
+/**
+ * Parse one fixture collection. A bad row **throws here, at module load**, naming the collection,
+ * the row index and the failing path — a broken fixture must never ship, and the next session must
+ * not have to bisect which collection it was in.
+ */
+function parseCollection<T>(name: string, schema: z.ZodType<T>, rows: unknown): T {
+  const result = schema.safeParse(rows);
+  if (result.success) return result.data;
+
+  const issues = result.error.issues.slice(0, 3).map((issue) => {
+    const [head, ...rest] = issue.path;
+    const row = typeof head === "number" ? `[${head}]` : "";
+    const path = [row, rest.join(".")].filter(Boolean).join(" ");
+    return `${path || "(row)"}: ${issue.message}`;
   });
+  throw new Error(`Fixture "${name}" failed its schema — ${issues.join("; ")}`);
+}
+
+/**
+ * Deep copy: fixtures are module constants and must survive a page voting on them. A parse is
+ * already a fresh object graph, so the clone happens by validating rather than by `structuredClone`.
+ */
+function load(): Store {
+  const store: Store = {
+    characters: parseCollection("characters", seedSchemas.characters, seed.characters),
+    lorebooks: parseCollection("lorebooks", seedSchemas.lorebooks, seed.lorebooks),
+    presets: parseCollection("presets", seedSchemas.presets, seed.presets),
+    personas: parseCollection("personas", seedSchemas.personas, seed.personas),
+    posts: parseCollection("posts", seedSchemas.posts, seed.posts),
+    comments: parseCollection("comments", seedSchemas.comments, seed.comments),
+    notifications: parseCollection(
+      "notifications",
+      seedSchemas.notifications,
+      seed.notifications,
+    ),
+    reports: parseCollection("reports", seedSchemas.reports, seed.reports),
+    sessions: parseCollection("sessions", seedSchemas.sessions, seed.sessions),
+  };
 
   // Derived counts. Placeholders count too: the branch beneath them still exists.
   for (const comment of store.comments) {
@@ -119,13 +146,8 @@ const CLAIMED_HANDLES = new Set(
     ...seed.lorebooks.map((row) => row.author),
     ...seed.presets.map((row) => row.author),
     ...seed.posts.map((row) => row.author),
-  ].map((owner) => owner.toLowerCase()),
+  ].map(normaliseHandle),
 );
-
-/** The one normalisation every handle comparison uses: the validator's rule, applied again here. */
-function normaliseHandle(handle: string): string {
-  return handle.trim().toLowerCase();
-}
 
 
 function voteKey(kind: string, id: string): string {
@@ -354,8 +376,16 @@ export const memoryRepo: Repo = {
   },
 
   async savePreferences(handle, patch) {
-    const next: AccountPreferences = { ...(preferences.get(handle) ?? DEFAULT_PREFERENCES), ...patch };
-    preferences.set(handle, next);
+    // Both edges are parsed: the handle through the one handle rule, the patch through the pair's
+    // schema, and the merged row through `accountPreferencesSchema` before it is stored — so a
+    // stored pair cannot differ from a validated one.
+    const key = handleSchema.parse(handle);
+    const write = accountPreferencesPatchSchema.parse(patch);
+    const next = accountPreferencesSchema.parse({
+      ...(preferences.get(key) ?? DEFAULT_PREFERENCES),
+      ...write,
+    });
+    preferences.set(key, next);
     return { ...next };
   },
 
@@ -378,13 +408,17 @@ export const memoryRepo: Repo = {
   },
 
   async saveProfile(patch) {
-    // The adapter normalises, so no page can store a handle that only *looks* claimed. `isAdmin`
-    // is carried over rather than written: only the operator grants it (`luaplot-pages.md`).
-    profile = {
-      handle: normaliseHandle(patch.handle),
-      displayName: patch.displayName.trim(),
+    // Both edges are parsed: the form's write through `profileWriteSchema` (which trims, lowercases
+    // the handle and collapses the display name) and the row through `userSchema` before it is
+    // stored. `isAdmin` is carried over rather than written: only the operator grants it
+    // (`luaplot-pages.md`).
+    const write = profileWriteSchema.parse(patch);
+    const next = userSchema.parse({
+      handle: write.handle,
+      displayName: write.displayName,
       isAdmin: profile?.isAdmin ?? false,
-    };
-    return { ...profile };
+    });
+    profile = next;
+    return { ...next };
   },
 };
