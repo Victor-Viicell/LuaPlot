@@ -44,11 +44,22 @@ scripts/                check.sh, publish.sh, agent-lock.sh, deploy.py (Vercel f
 
 ## Router
 
-`src/router.ts` owns one table of `{ pattern, page, access }` built from the spec route index.
-Matcher: fixed segments match before `[param]`, params are UUID-constrained, query string carries
-filter/sort state. `base` comes from `import.meta.env.BASE_URL` so `/LuaPlot/` on Pages and `/` in
-Tauri both work. No history rewriting beyond `pushState`; a `404.html` copy of `index.html` is
-published so deep links resolve on Pages.
+`src/router.ts` owns one table of `{ path, page, access }` built from the spec route index, with the
+spec's own param spelling (`[character.id]`, `[user.username]`) so a diff against the spec is
+mechanical. Matcher: fixed segments match before `[param]` (sorted by param count, then length);
+ids are `[0-9a-f-]{36}`, usernames match the onboarding handle rule (`[A-Za-z0-9_]{3,24}`);
+query string carries filter/sort state. `base` comes from `import.meta.env.BASE_URL` so `/LuaPlot/`
+on Pages and `/` in Tauri both work (`href()` prefixes every in-app link). No history rewriting
+beyond `pushState`; `publish.sh` copies `index.html` to `404.html` so deep links resolve on Pages.
+
+State is a **plain subscribe/notify store** (`currentRoute()`, `onRouteChange()`, `useQuery()`),
+not a tracked value: `track()` must be created inside a component in this Ripple version — a
+module-scope tracked has no owning block and every write to it throws. `App.tsrx` mirrors the store
+into its own `track()` and that is the signal renders read.
+
+Pages live flat in `src/pages/` as `<type>-<view>.tsrx` (`character-catalog`, `lorebook-detail`,
+`session-detail`, `moderation-queue`), each exporting a named component plus a default for the lazy
+import. `src/components/PagePlaceholder.tsrx` is the scaffold every route renders until its ticket.
 
 ## Data
 

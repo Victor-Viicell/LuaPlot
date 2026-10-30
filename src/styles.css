@@ -302,6 +302,20 @@ canvas {
     max-width: 100%;
 }
 
+/* Icon set — one 20px stroke set inlined as .tsrx components (src/components/Icons.tsrx).
+   Geometry lives in the components; presentation lives here so a scoped style block in a
+   parent never has to reach into a child component. */
+.ico {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 hr {
     height: 0;
     border: 0;

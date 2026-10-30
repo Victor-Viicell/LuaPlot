@@ -69,6 +69,24 @@ Loading = skeleton matching the final layout, never a spinner. Empty = one line 
 primary action. No-results = the query echoed back + Clear. Error = what failed + Retry. NSFW
 blur = middle covered, footer numbers visible, per-item Reveal.
 
+## Shell (decided in T-01, do not re-invent)
+
+- Top bar 56px: 44×44 back and overflow targets, title 13px/600, current path as a 12px
+  `--color-text-subtle` crumb at `lg` only. No glass, no blur, no shadow on the bar.
+- Mobile tab bar 60px + safe area: Home, Thread, Catalog, **Alerts**, Profile. The inbox page is
+  titled *Notifications*; the tab reads *Alerts* because five 12px labels must fit a 72px cell at
+  360. Never shorten the other four.
+- Active destination: `--color-accent` on icon and label, plus a 20×2px accent tick above the icon
+  (mobile / rail) or a 2px accent bar on the left edge (`lg`). The 1200+ sidebar is 240px, the rail
+  at `md` is 84px icon-over-label.
+- Overflow menu (top right) holds Bookmarks, Moderation, Terms — app-level destinations that are
+  not in the tab bar. It is a 6px sheet with the one sanctioned shadow; the scrim is invisible.
+- Content outlet: 16/24/32 gutters, capped at 720px until `lg`, then 1120px.
+- Placeholder pages (until their ticket lands): spec path as a 12px kicker, 26/34px title, the
+  spec's one-line summary, a hairline rule, then `Not built yet.` in `--color-text-subtle`.
+- Icons: 20px, 1.5 stroke, `currentColor`, `stroke-linecap: round`, declared once as `.ico` in
+  `src/styles.css` and inlined in `src/components/Icons.tsrx`.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

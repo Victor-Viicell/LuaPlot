@@ -7,7 +7,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 
 ## P0 — Foundation (nothing else is worth doing first)
 
-- [ ] **T-01 Router + shell skeleton.** `src/router.ts` with the full route table from
+- [x] **T-01 Router + shell skeleton.** `src/router.ts` with the full route table from
       `src/specs/luaplot-pages.md`, `App.tsrx` rendering `<RouterOutlet>`, mobile top bar + bottom
       tab bar + desktop sidebar, base-path aware. Accept: every route renders a titled placeholder;
       deep link `/character/catalog` works after reload on the Pages URL.

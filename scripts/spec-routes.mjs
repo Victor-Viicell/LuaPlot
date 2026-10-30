@@ -20,14 +20,15 @@ for (const m of router.matchAll(/path:\s*"([^"]+)"/g)) routerRoutes.add(m[1]);
 const norm = (r) =>
   r
     .replace(/\[[^\]]+\]/g, ":p") // [character.id] and :id are the same shape
+    .replace(/:[A-Za-z][A-Za-z0-9_]*/g, ":p") // ... and so is :username
     .replace(/\/$/, "") || "/";
 
-const specN = new Set(specRoutes);
-const routerN = new Set([...routerRoutes].map((r) => r.replace(/:[A-Za-z]+/g, ":p")));
-const missing = [...specN].map(norm).filter((r) => !routerN.has(norm(r)));
-const extra = [...routerRoutes].map(norm).filter((r) => !new Set([...specN].map(norm)).has(r));
+const specN = new Set([...specRoutes].map(norm));
+const routerN = new Set([...routerRoutes].map(norm));
+const missing = [...specN].filter((r) => !routerN.has(r));
+const extra = [...routerN].filter((r) => !specN.has(r));
 
-if (specN.size === 0) {
+if (specRoutes.size === 0) {
   console.error("spec-routes: parsed 0 spec routes — parser drift, fix the regex");
   process.exit(1);
 }

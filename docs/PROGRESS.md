@@ -3,6 +3,24 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-01 — router + shell skeleton (2026-10-30)
+
+- **Changed:** `src/router.ts` (30-route table mirroring the spec index, specificity-ordered
+  matcher, `navigate` / `currentRoute` / `onRouteChange` / `useQuery`, BASE-aware `href`),
+  `src/App.tsrx` rewritten as the shell (top bar, five-destination bottom bar, `md` rail,
+  `lg` 240px sidebar, skeleton / not-found / error outlet, overflow menu), `src/components/Icons.tsrx`
+  (7 icons, one 20px / 1.5 stroke set), `src/components/PagePlaceholder.tsrx`, 30 page placeholders,
+  `.ico` base rules in `src/styles.css`, `src/vite-env.d.ts`.
+- **Verified:** `scripts/check.sh` GREEN (build ok, 30/30 routes match the spec); real Chromium pass
+  at 360×740, 640, 900, 1280 — zero horizontal overflow at every width, tab bar swaps to the rail at
+  900, rail widens to 240 at 1200, tab target 72×59, top bar 56, labels 12px; tab clicks, overflow
+  menu, `history.back()`/`forward()` and deep links (`/character/<uuid>`, `/moderation/<uuid>`,
+  `/user/<handle>`, `/user/a` → not found, `/nope` → not found) all resolve; Latte and Mocha both
+  render from tokens (bg `#eff1f5` / `#1e1e2e`, accent `#8839ef` / `#cba6f7`).
+- **Not verified:** no Tauri/Android build (T-33/T-35). `access` is declared on every route but
+  nothing enforces it — that is T-04 (session) + T-30 (redirect matrix). No test runner exists, so
+  the route check stays in `scripts/spec-routes.mjs`.
+
 ## 2026-10-30 — setup (baseline, not a ticket)
 
 - Baseline build verified: `bun run build` → 81 modules, 156ms, dist 13.3KB JS / 11.2KB CSS.
