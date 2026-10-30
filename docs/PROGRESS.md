@@ -20,6 +20,12 @@ could not be verified.
 - **Not verified:** no Tauri/Android build (T-33/T-35). `access` is declared on every route but
   nothing enforces it — that is T-04 (session) + T-30 (redirect matrix). No test runner exists, so
   the route check stays in `scripts/spec-routes.mjs`.
+- **Publish:** the first `publish.sh` printed `LIVE` while Pages was still serving the *previous*
+  build (its CDN answered 200 for ~4 minutes with the old `index-DNvyvbRv.js`; the site only flipped
+  to the new bundle at 16:06, well after the 200). `publish.sh` now polls until the live
+  `index.html` references the bundle hash it just built, and fails if that takes past 400s. The
+  comparison path is verified (second run matched immediately); the stale-deploy wait itself was
+  observed by hand, not inside the script.
 
 ## 2026-10-30 — setup (baseline, not a ticket)
 
