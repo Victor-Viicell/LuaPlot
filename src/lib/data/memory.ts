@@ -202,6 +202,12 @@ function pageOf<T>(rows: T[], options: ListOptions | undefined): Listing<T> {
   return { items, hasMore: start + items.length < rows.length };
 }
 
+/** Any-of tag match; an empty selection is `All` (`repo.ts` → `ListOptions.tags`). */
+function tagged(tags: string[], wanted: string[] | undefined): boolean {
+  if (!wanted || wanted.length === 0) return true;
+  return tags.some((tag) => wanted.includes(tag));
+}
+
 const ENGAGED: Accessors<Character | Lorebook | Preset | Post> = {
   createdAt: (row) => row.createdAt,
   name: (row) => ("name" in row ? row.name : row.body),
@@ -247,21 +253,30 @@ export const memoryRepo: Repo = {
 
   async listCharacters(options) {
     const rows = store.characters.filter(
-      (row) => visible(row) && matches([row.name, row.tagline, row.description], options?.query),
+      (row) =>
+        visible(row) &&
+        matches([row.name, row.tagline, row.description], options?.query) &&
+        tagged(row.tags, options?.tags),
     );
     return pageOf(order(rows, options?.sort, ENGAGED), options);
   },
 
   async listLorebooks(options) {
     const rows = store.lorebooks.filter(
-      (row) => visible(row) && matches([row.name, row.tagline, row.description], options?.query),
+      (row) =>
+        visible(row) &&
+        matches([row.name, row.tagline, row.description], options?.query) &&
+        tagged(row.tags, options?.tags),
     );
     return pageOf(order(rows, options?.sort, ENGAGED), options);
   },
 
   async listPresets(options) {
     const rows = store.presets.filter(
-      (row) => visible(row) && matches([row.name, row.tagline, row.description], options?.query),
+      (row) =>
+        visible(row) &&
+        matches([row.name, row.tagline, row.description], options?.query) &&
+        tagged(row.tags, options?.tags),
     );
     return pageOf(order(rows, options?.sort, ENGAGED), options);
   },
@@ -276,6 +291,17 @@ export const memoryRepo: Repo = {
       (row) => row.owner === VIEWER && matches([row.name, row.tagline, row.description], options?.query),
     );
     return pageOf(order(rows, options?.sort, PERSONA_ACCESS), options);
+  },
+
+  async listTags(kind) {
+    const rows =
+      kind === "character" ? store.characters : kind === "lorebook" ? store.lorebooks : store.presets;
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (!visible(row)) continue;
+      for (const tag of row.tags) seen.add(tag);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
   },
 
   async getCharacter(id) {

@@ -3,7 +3,9 @@ import { Button } from "../components/Button.tsrx";
 import { CardGrid } from "../components/CardGrid.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Field } from "../components/Field.tsrx";
+import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
+import { TagPicker } from "../components/TagPicker.tsrx";
 import { Toggle } from "../components/Toggle.tsrx";
 import { href, navigate, useQuery } from "../router.ts";
 import { PAGE_SIZE, resolveRepo } from "../lib/data/repo.ts";
@@ -18,28 +20,40 @@ import { nsfwPreference, onPrefs, setBlurNsfw, setShowNsfw } from "../lib/state/
  * - **The listing policy**, not the drawing. Show off removes flagged rows; Blur on keeps them and
  *   `CardGrid` ANDs the account's Blur with each item's own flag. The card never learns the
  *   preference, and the grid never learns the query.
- * - **One fetch path**: `(1, "replace")` for a new query or sort, `(next, "append")` for **Load
- *   more**, and the same call reached from Retry. `seq` drops an answer that lands after a newer one.
+ * - **One fetch path**: `(1, "replace")` for a new query, tags or sort, `(next, "append")` for
+ *   **Load more**, and the same call reached from Retry. `seq` drops an answer that lands late.
  * - **The query string**, written straight through `history`: `docs/DESIGN.md` → *Catalog* records
  *   why `navigate()` is not used for the search settle.
  * - **Six states**, all rendered: loading (a skeleton shaped like the grid), empty, no-results,
  *   loading more (the button reports it), end of list (no control), error.
  *
- * The filter is `All` and nothing else because the tag taxonomy is undecided: it renders as a
- * pressed chip that says so, and the reserved `filter=all` parameter is kept in the URL so a shared
- * link keeps meaning what it meant.
+ * **The toolbar is four rows**: search (full width), tags (full width, a multi-select field), sort (a
+ * `Select`), then the account's two switches. There is no `All` control — an empty tag field *is*
+ * `All`, and the options come from the tags actually in use (`repo.listTags`), never from a taxonomy
+ * this page invented.
  */
 
 type Phase = "loading" | "ready" | "error";
 
 type SortChoice = "newest" | "ratio";
 
+const SORT_OPTIONS: { value: SortChoice; label: string }[] = [
+  { value: "newest", label: "Newest" },
+  { value: "ratio", label: "Top rated" },
+];
+
 /** The page's own reading of its URL, taken once at mount. */
-function readQuery(): { q: string; sort: SortChoice } {
+function readQuery(): { q: string; sort: SortChoice; tags: string[] } {
   const params = useQuery();
+  const tags = (params.get("tags") ?? "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+
   return {
     q: (params.get("q") ?? "").trim(),
     sort: params.get("sort") === "ratio" ? "ratio" : "newest",
+    tags,
   };
 }
 
@@ -51,14 +65,19 @@ function readQuery(): { q: string; sort: SortChoice } {
  * history directly keeps the URL shareable, and a back/forward still lands a remount that reads the
  * query at mount, which is exactly when this page wants to read it.
  */
-function writeQuery(q: string, sort: SortChoice, mode: "push" | "replace"): void {
+function writeQuery(
+  q: string,
+  sort: SortChoice,
+  tags: string[],
+  mode: "push" | "replace",
+): void {
   const params = new URLSearchParams();
-  // Reserved until tags exist (`luaplot-pages.md` → Conventions), but kept in the URL.
-  params.set("filter", "all");
   if (q) params.set("q", q);
+  if (tags.length > 0) params.set("tags", tags.join(","));
   if (sort !== "newest") params.set("sort", sort);
 
-  const url = `${href("/character/catalog")}?${params.toString()}`;
+  const search = params.toString();
+  const url = `${href("/character/catalog")}${search ? `?${search}` : ""}`;
   if (mode === "replace") window.history.replaceState({}, "", url);
   else window.history.pushState({}, "", url);
 }
@@ -79,6 +98,10 @@ export function CharacterCatalog() @{
   const draft = track(start.q);
   const applied = track(start.q);
   const sort = track<SortChoice>(start.sort);
+  /** The chosen tags — the page's state and the page's URL; the picker only reports them. */
+  const tags = track<string[]>(start.tags);
+  /** Every tag in use, from the adapter. Empty until the first answer, which just means no menu. */
+  const tagOptions = track<string[]>([]);
 
   /** Mirrors of the account's pair, so a toggle re-renders the grid without a refetch. */
   const show = track(nsfwPreference().show);
@@ -91,12 +114,12 @@ export function CharacterCatalog() @{
 
   /** Show off wins over Blur: a flagged row is absent, whatever Blur says (`nsfw.md` → States). */
   const visible = track(() => (show.value ? items.value : items.value.filter((row) => !row.nsfw)));
-  const searching = track(() => applied.value.length > 0);
+  const filtered = track(() => applied.value.length > 0 || tags.value.length > 0);
 
   let seq = 0;
 
   /**
-   * Pull one page. `replace` starts over (new query, new sort, Retry, first mount); `append` is
+   * Pull one page. `replace` starts over (new query, tags, sort, Retry, first mount); `append` is
    * **Load more**. An answer that arrives after a newer fetch started is dropped.
    */
   function fetchPage(page: number, mode: "replace" | "append"): void {
@@ -113,31 +136,33 @@ export function CharacterCatalog() @{
       appending.value = true;
     }
 
-    repo.listCharacters({ query: applied.value, sort: sort.value, page }).then(
-      (listing) => {
-        if (mine !== seq) return;
+    repo
+      .listCharacters({ query: applied.value, tags: tags.value, sort: sort.value, page })
+      .then(
+        (listing) => {
+          if (mine !== seq) return;
 
-        items.value = mode === "append" ? [...items.value, ...listing.items] : listing.items;
-        hasMore.value = listing.hasMore;
-        nextPage.value = page + 1;
-        appending.value = false;
-        phase.value = "ready";
+          items.value = mode === "append" ? [...items.value, ...listing.items] : listing.items;
+          hasMore.value = listing.hasMore;
+          nextPage.value = page + 1;
+          appending.value = false;
+          phase.value = "ready";
 
-        fillIfBlank();
-      },
-      () => {
-        if (mine !== seq) return;
-        appending.value = false;
+          fillIfBlank();
+        },
+        () => {
+          if (mine !== seq) return;
+          appending.value = false;
 
-        if (mode === "append") {
-          appendFailure.value = "The next page didn't load.";
-          return;
-        }
+          if (mode === "append") {
+            appendFailure.value = "The next page didn't load.";
+            return;
+          }
 
-        phase.value = "error";
-        failure.value = "The catalog could not be loaded.";
-      },
-    );
+          phase.value = "error";
+          failure.value = "The catalog could not be loaded.";
+        },
+      );
   }
 
   /**
@@ -149,6 +174,14 @@ export function CharacterCatalog() @{
     if (visible.value.length > 0) return;
 
     fetchPage(nextPage.value, "append");
+  }
+
+  /** The tag vocabulary is the adapter's answer, not this page's list. */
+  function loadTags(): void {
+    repo.listTags("character").then(
+      (next) => (tagOptions.value = next),
+      () => (tagOptions.value = []),
+    );
   }
 
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -165,21 +198,31 @@ export function CharacterCatalog() @{
     if (value === applied.value) return;
 
     applied.value = value;
-    writeQuery(value, sort.value, "replace");
+    writeQuery(value, sort.value, tags.value, "replace");
     fetchPage(1, "replace");
   }
 
-  function clearSearch(): void {
+  function clearFilters(): void {
     draft.value = "";
-    applySearch("");
+    applied.value = "";
+    tags.value = [];
+    writeQuery("", sort.value, [], "replace");
+    fetchPage(1, "replace");
   }
 
-  function chooseSort(next: SortChoice): void {
+  function chooseSort(next: string): void {
+    if (next !== "newest" && next !== "ratio") return;
     if (next === sort.value) return;
 
     sort.value = next;
     // A sort is a discrete choice, so it earns a history entry; keystrokes do not.
-    writeQuery(applied.value, next, "push");
+    writeQuery(applied.value, next, tags.value, "push");
+    fetchPage(1, "replace");
+  }
+
+  function chooseTags(next: string[]): void {
+    tags.value = next;
+    writeQuery(applied.value, sort.value, next, "push");
     fetchPage(1, "replace");
   }
 
@@ -212,6 +255,7 @@ export function CharacterCatalog() @{
     navigate(`/character/${item.id}`);
   }
 
+  loadTags();
   fetchPage(1, "replace");
 
   <>
@@ -219,7 +263,7 @@ export function CharacterCatalog() @{
       .catalog {
         display: flex;
         flex-direction: column;
-        gap: 20px;
+        gap: 16px;
       }
 
       .head {
@@ -227,8 +271,8 @@ export function CharacterCatalog() @{
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
-        padding-bottom: 16px;
+        gap: 10px;
+        padding-bottom: 12px;
         border-bottom: 1px solid var(--color-border);
       }
 
@@ -253,96 +297,27 @@ export function CharacterCatalog() @{
         text-wrap: pretty;
       }
 
-      /* Not sticky on purpose: at 360 the shell's 56px bar plus a stacked toolbar would leave the
-         grid a third of the screen. Search takes the full width; filter and sort share the line
-         beneath it; the account switches close the block. */
+      /* Four rows, all full width until `sm`: search, tags, sort, the two switches. Nothing is
+         sticky — at 360 the shell's 56px bar plus a sticky toolbar would leave a third of a phone
+         for the grid. */
       .toolbar {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 12px;
+        gap: 10px;
       }
 
       /* Page-owned wrappers, never `.toolbar .field`: a scoped block cannot reach into a child
-         component's elements, so a selector that names a primitive's class silently does nothing
-         and the field falls into the narrow `auto` column. */
+         component's elements, so a selector naming a primitive's class silently does nothing. */
       .search,
+      .tags,
       .prefs,
       .pager-action {
         grid-column: 1 / -1;
       }
 
-      .controls {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px 12px;
-      }
-
-      .chip {
-        display: inline-flex;
-        align-items: center;
-        height: 32px;
-        padding: 0 10px;
-        border: 1px solid var(--color-accent);
-        border-radius: 2px;
-        color: var(--color-accent);
-        font-size: 12px;
-        letter-spacing: 0.04em;
-        line-height: 1;
-        text-transform: uppercase;
-      }
-
-      .controls-filter {
-        grid-column: 1;
-      }
-
-      .controls-sort {
-        grid-column: 2;
-        justify-self: end;
-      }
-
-      /* Sort — a two-option segmented control. A <select> would be a second control language for
-         one row; the segmented pair keeps the app's "one of these" gesture at 44px. */
-      .seg {
-        display: inline-flex;
-        overflow: hidden;
-        border: 1px solid var(--color-border-strong);
-        border-radius: 2px;
-      }
-
-      .seg-btn {
-        min-height: 44px;
-        padding: 0 12px;
-        border: 0;
-        background: transparent;
-        color: var(--color-text-muted);
-        font: inherit;
-        font-size: 13px;
-        white-space: nowrap;
-        cursor: pointer;
-        transition:
-          background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
-          color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
-      }
-
-      .seg-btn + .seg-btn {
-        border-left: 1px solid var(--color-border-strong);
-      }
-
-      .seg-btn[aria-pressed="true"] {
-        background-color: var(--color-accent);
-        color: var(--color-accent-contrast);
-      }
-
-      .seg-btn:hover:not([aria-pressed="true"]) {
-        background-color: var(--color-surface);
-        color: var(--color-text);
-      }
-
+      /* Stacked: the two labels are long enough that a row of them wraps to three lines each. */
       .prefs {
         display: flex;
         flex-direction: column;
-        grid-column: 1 / -1;
         padding-top: 4px;
         border-top: 1px solid var(--color-border);
       }
@@ -400,32 +375,23 @@ export function CharacterCatalog() @{
           font-size: 15px;
         }
 
-        /* From `sm` the three controls sit on one line — search, filter, sort — and the two
-           account switches move beneath them. Stacking four rows at 900 leaves the grid half a
-           screen down for no gain. */
+        /* The two text fields keep the full width; sort and the switches share the row beneath. */
         .toolbar {
-          grid-template-columns: minmax(0, 1fr) auto auto;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
           align-items: end;
           gap: 12px 16px;
         }
 
-        .search {
+        .sort {
           grid-column: 1;
-        }
-
-        .controls-filter {
-          grid-column: 2;
-        }
-
-        .controls-sort {
-          grid-column: 3;
         }
 
         .prefs {
           flex-direction: row;
           align-items: center;
           gap: 32px;
-          grid-column: 1 / -1;
+          grid-column: 2;
+          border-top: 0;
         }
 
         .pager {
@@ -437,19 +403,31 @@ export function CharacterCatalog() @{
         }
       }
 
-      @media (min-width: 1200px) {
+      @media (min-width: 900px) {
         .toolbar {
-          gap: 16px;
+          grid-template-columns: minmax(0, 1fr) 220px minmax(0, 1fr);
         }
 
-        .lede {
-          max-width: 68ch;
+        .search {
+          grid-column: 1 / 3;
+        }
+
+        .tags {
+          grid-column: 1 / -1;
+        }
+
+        .sort {
+          grid-column: 2;
+        }
+
+        .prefs {
+          grid-column: 3;
         }
       }
 
-      @media (prefers-reduced-motion: reduce) {
-        .seg-btn {
-          transition: none;
+      @media (min-width: 1200px) {
+        .lede {
+          max-width: 68ch;
         }
       }
     </style>
@@ -460,7 +438,7 @@ export function CharacterCatalog() @{
           <p class="kicker">character catalog</p>
           <p class="lede">
             Everything published, newest first. Search matches a name, a tagline, or a description;
-            the two switches below decide how flagged characters reach this list.
+            the tag field narrows to what is tagged with any of the tags you pick.
           </p>
         </div>
         <a
@@ -488,29 +466,24 @@ export function CharacterCatalog() @{
           />
         </div>
 
-        <div class="controls controls-filter">
-          <span class="chip">{`All`}</span>
+        <div class="tags">
+          <TagPicker
+            label="Tags"
+            options={tagOptions}
+            selected={tags}
+            onChange={chooseTags}
+            placeholder="Any tag"
+          />
         </div>
 
-        <div class="controls controls-sort">
-          <div class="seg" role="group" aria-label="Sort">
-            <button
-              type="button"
-              class="seg-btn"
-              aria-pressed={sort.value === "newest" ? "true" : "false"}
-              onClick={() => chooseSort("newest")}
-            >
-              Newest
-            </button>
-            <button
-              type="button"
-              class="seg-btn"
-              aria-pressed={sort.value === "ratio" ? "true" : "false"}
-              onClick={() => chooseSort("ratio")}
-            >
-              Top rated
-            </button>
-          </div>
+        <div class="sort">
+          <Select
+            label="Sort"
+            name="sort"
+            value={sort.value}
+            options={SORT_OPTIONS}
+            onChange={chooseSort}
+          />
         </div>
 
         <div class="prefs">
@@ -546,11 +519,11 @@ export function CharacterCatalog() @{
           <p class="alert-text">{failure.value}</p>
           <Button variant="secondary" onClick={() => fetchPage(1, "replace")}>Retry</Button>
         </div>
-      } @else if (visible.value.length === 0 && searching.value) {
+      } @else if (visible.value.length === 0 && filtered.value) {
         <EmptyState
-          message={`Nothing matches “${applied.value}”.`}
-          actionLabel="Clear search"
-          onAction={clearSearch}
+          message="Nothing matches those filters."
+          actionLabel="Clear filters"
+          onAction={clearFilters}
         />
       } @else if (visible.value.length === 0) {
         <EmptyState

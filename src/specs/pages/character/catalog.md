@@ -8,7 +8,7 @@ Browsable, searchable list of characters. Each item links to [`/character/[chara
 
 ## Layout
 
-- A toolbar holding search, the `All` filter, sort, and the [NSFW preference](../../systems/nsfw.md) toggles, above a grid of catalog cards.
+- A toolbar of four rows: **search** across the full width, a **tag** field across the full width, a **sort** selector, then the [NSFW preference](../../systems/nsfw.md) toggles. The grid follows beneath it.
 - Each card opens its character's detail page; its author in the footer links to that author's [profile](../user/profile.md).
 - Below the grid, **Load more** appends the next page of 24 cards and is absent once the list ends.
 
@@ -16,14 +16,14 @@ Browsable, searchable list of characters. Each item links to [`/character/[chara
 
 Built from the shared card structure, per the [conventions](../../luaplot-pages.md#conventions): the title in the header, the avatar, tagline, and tags between, and the author beside the ratio as a percentage in the footer. No comment count and no like or dislike counts on the card — those live on [detail](detail.md).
 
-The **tags row** stays empty while the tag taxonomy is undecided: the row is not rendered, and no placeholder text stands in for it.
+Every card renders its **tags row** when the item carries tags; an item with none renders no row and no placeholder. The tag vocabulary is authored on the content, never invented by a listing (`luaplot-pages.md` → Conventions), so the filter's options are exactly the tags in use.
 
 ## Actions
 
-- **Search**
-- **Filter** — only `All` for now
+- **Search** — matches a name, a tagline, or a description
+- **Filter by tags** — a multi-select field: typing narrows the dropdown to the tags in use, picking one puts it inside the field as a chip, and every chip carries its own remove control. Picking two tags matches items carrying **either**; no tag selected means **All**
 - **NSFW preference** — the Show and Blur toggles from [NSFW preference](../../systems/nsfw.md); they edit the account, not this view
-- **Sort**
+- **Sort** — a selector: `Newest` (default) or `Top rated`
 - **Open item** → [detail](detail.md)
 - **Open author** → [profile](../user/profile.md)
 - **Load more** — appends the next page
@@ -40,4 +40,4 @@ The **tags row** stays empty while the tag taxonomy is undecided: the row is not
 
 ## URL
 
-Filter and sort state lives in the query string so a narrowed view can be shared, bookmarked, and restored by back/forward. The only filter option for now is `All`, since tag categories are undecided; the parameter is reserved but exposes nothing else. The [NSFW preference](../../systems/nsfw.md) is not part of this state: it belongs to the account, not to the view. Paging is not in the URL either — returning to the page shows the first page of results.
+The search, the tags, and the sort live in the query string — `?q=…&tags=blue,haunted&sort=ratio` — so a narrowed view can be shared, bookmarked, and restored by back/forward. The [NSFW preference](../../systems/nsfw.md) is not part of this state: it belongs to the account, not to the view. Paging is not in the URL either — returning to the page shows the first page of results.

@@ -132,3 +132,12 @@ export function IconFlag() {
     </svg>
   );
 }
+
+/** The caret a `<select>` cannot draw for itself. */
+export function IconChevron({ class: className }: { class?: string }) {
+  return (
+    <svg class={className ? `ico ${className}` : "ico"} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 9.5 12 15l6-5.5" />
+    </svg>
+  );
+}

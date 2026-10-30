@@ -122,6 +122,15 @@ T-12 (report dialog) both mount on this page, so it has to exist first.
   show `Load more` or the end-of-list note until they have a second page — grow them when their
   ticket needs the proof, the way T-09 grew characters.
 
+- **`Select` and `TagPicker` exist now** (`src/components/`, styled in `styles.css`): a native
+  `<select>` in the app's chrome, and the multi-select tag field the catalog uses. Any filter or
+  enumeration a later page needs should reuse them rather than grow a segmented row or a custom
+  dropdown — the catalog's segmented sort was replaced on the owner's call for exactly that reason.
+- **Tags are authored, and the 27 characters now carry ten of them** (`artisan, authority, creature,
+  debt, family, ghost, harbor, ritual, sea, shopkeep`). `repo.listTags(kind)` is the vocabulary a
+  filter offers; lorebooks and presets still have none, so their filters would open empty until their
+  fixtures are tagged.
+
 ## After this
 
 **T-10B** — fork + Start/Continue, brief in `docs/tickets/T-10B-fork-and-session-control.md`. Then

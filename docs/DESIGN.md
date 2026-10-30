@@ -89,13 +89,15 @@ blur = middle covered, footer numbers visible, per-item Reveal.
 
 ## Primitives (decided in T-02, do not re-invent)
 
-Eleven primitives exist: `Button, Field, Toggle, Card, Sheet, Toast, Tabs, EmptyState, Skeleton,
-Avatar, Icons` in `src/components/`. **Their look lives in `src/styles.css`, not in scoped
-`<style>` blocks.** Reason: a scoped block cannot reach into a child component, so a page could
+Thirteen primitives exist: `Button, Field, Select, TagPicker, Toggle, Card, Sheet, Toast, Tabs,
+EmptyState, Skeleton, Avatar, Icons` in `src/components/`. **Their look lives in `src/styles.css`,
+not in scoped `<style>` blocks.** Reason: a scoped block cannot reach into a child component, so a page could
 never style a primitive it does not own (`.empty .btn`, `.card .avatar`, spacing the action inside
 an `EmptyState`). One stylesheet keeps the set in sync; a page's own `<style>` block is for page
-layout only. Class names: `.btn`, `.field`, `.toggle`, `.card`, `.avatar`, `.sheet`, `.toast`,
-`.tabs`, `.empty`, `.skeleton`.
+layout only. Class names: `.btn`, `.field`, `.select`, `.tagpicker`, `.toggle`, `.card`, `.avatar`, `.sheet`,
+`.toast`, `.tabs`, `.empty`, `.skeleton`. The tag dropdown picks rung **10** on the z-ladder (above
+cards, below the shell's overflow menu) and its chips are 28px inside a 44px field — the one
+sanctioned sub-44 target, because a token chip is a label with a corner, not a standalone action.
 
 - **Live props.** A Ripple prop is evaluated once when the component is called, so anything a page
   will change (a field value, a toggle's state, a tab) is passed as a `Tracked<T>`/`Derived<T>` and
@@ -273,6 +275,10 @@ list, so the decisions below are the ones they inherit.
 - **`nsfw` means "draw the cover", not "the item is flagged".** The listing computes the effective
   flag (`item.nsfw && prefs.blur`) and hands it over; the card never imports
   `lib/state/prefs.ts`. Show-off is the listing's job too — the card is never rendered for it.
+- **The thumbnail is a third of the card, square** (T-09, owner's call): `Avatar` takes
+  `size="fluid"` and `.card-veil .avatar.is-fluid` gives it `width: 33%; aspect-ratio: 1/1` with a
+  22px initial (18px from `md`). It is a stylesheet rule, not a `size` prop, because the box has to
+  follow the card's own width; the tagline and the tag row share the remaining two thirds.
 - **Blur is structural**: the veil (avatar + tagline + tags) gets `filter: blur(6px)`; the scrim is a
   **sibling** layer `.card-cover` over `.card-middle` at
   `color-mix(in srgb, var(--color-bg) 55%, transparent)`, and the `Reveal` `ghost` button sits in it
@@ -315,17 +321,18 @@ so these are the decisions they inherit.
   predicates — `visible` (Show off filters the flagged rows out) and `searching` (a settled query) —
   produce all six states. A page that tracked `loading` and `hasError` separately would eventually
   render both.
-- **Sort offers `Newest` and `Top rated`.** The spec says *Sort* without naming options; these are the
-  two `repo.SortOrder` already supports meaningfully for a listing (`ratio` = like share). A third
-  would be a third control at 360 for no gain. A two-option **segmented control**, not a `<select>`:
-  a native select is a second control language for one row, and the segmented pair keeps the 44px
-  target and the app's "one of these" gesture.
-- **The filter is `All`, present as a pressed chip.** The tag taxonomy is undecided, so there is
-  nothing else to filter by; the reserved `filter=all` is still written into the URL so a shared link
-  keeps meaning what it meant. The chip is inert on purpose and carries no explanation beside it — a
-  disabled-looking control reads as broken, and a sentence explaining a control nobody can use spent
-  331px of a 592px toolbar row on a phone screenshot. The reservation lives here and in the page's
-  header comment instead.
+- **Sort offers `Newest` and `Top rated`, through a `Select`.** The spec says *Sort* without naming
+  options; these are the two `repo.SortOrder` already supports meaningfully for a listing (`ratio` =
+  like share). It is a **native `<select>`** wearing the app's chrome (T-09, revised after a phone
+  screenshot): a segmented row only ever grew sideways, and a selector is the one control every phone
+  picker already drives. `Select` is a primitive now, so the profile's type filter and every later
+  enumeration reuse it instead of inventing a third control language.
+- **The filter is a tag field, and empty means `All`.** `TagPicker` (T-09, revised): the chosen tags
+  live *inside* the field as chips with their own remove controls, typing narrows a dropdown of the
+  tags actually in use (`repo.listTags`), and picking one keeps the field focused so several can be
+  chosen in a row. Two tags match items carrying **either** — an all-of filter empties a small
+  catalog on the second click. There is no separate `All` control: it is the empty state of this
+  one, which is why the toolbar carries four rows and no chip.
 - **The listing writes its own URL.** `writeQuery()` uses `replaceState` for the search settle and
   `pushState` for a sort, and never `navigate()`: `App.tsrx` reloads the page module whenever
   `path + search` changes, so a debounced keystroke would remount the page and drop the accumulated
@@ -351,12 +358,14 @@ so these are the decisions they inherit.
   narrow `auto` grid column and "Top rated" wrapped onto two lines on a real phone. Wrap the
   primitive in a **page-owned element** (`.search`, `.prefs`, `.pager-action`) and place or size that
   instead; primitives' own look stays in `styles.css` where it always was.
-- **Chrome budget at 360.** The page opens on the controls: the lede is hidden below `sm` (kicker
-  plus the search placeholder carry the meaning), and filter and sort share one line. Measured at
-  360×740 the grid starts at 435 and the first card ends at 580, against a tab bar top of 680. From
-  `sm` the toolbar is one row — search (1fr), filter, sort — with the two switches beneath it, and
-  the pager button is a 200px `pager-action` box rather than a full-width bar. The toolbar is **not
-  sticky**: a 56px shell bar plus a sticky toolbar would leave a third of a phone for content.
+- **Chrome budget.** The toolbar is four rows, all full width on a phone: **search**, **tags**,
+  **sort**, then the two switches. The lede is hidden below `sm` (kicker plus the search placeholder
+  carry the meaning). Measured: at 390×844 the grid starts at 498 and the first card ends at 673,
+  well clear of the 784 tab bar; at 360×740 it starts at 514 and ends at 690 against a bar top of
+  680 — the card's last few pixels ride under the bar until the first scroll, which is what the
+  60px content clearance is for. From `sm` the two fields keep the full width and sort sits beside
+  the switches; from `md` the grid is `1fr 220px 1fr` so sort keeps a fixed 220px. The toolbar is
+  **not sticky**: a 56px shell bar plus a sticky toolbar would leave a third of a phone for content.
 
 ## Do not
 

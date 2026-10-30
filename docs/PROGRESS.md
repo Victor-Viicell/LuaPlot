@@ -3,6 +3,29 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-09 follow-up — the toolbar, on the owner's call (2026-10-30)
+
+- **Changed:** three product changes asked for after looking at the phone: the search field now spans
+  the full column (its own row), the sort is a **`Select`** primitive (a native `<select>` in the app's
+  chrome, not a segmented row), and tags became a real filter — a new **`TagPicker`** primitive: a
+  multi-select field whose chosen tags sit inside it as chips, whose dropdown is filtered by what the
+  reader types, and whose options come from `repo.listTags(kind)` (the tags in use), never from an
+  invented taxonomy. `ListOptions` gained `tags` (any-of), `memory.ts` gained `listTags`, the 27
+  character fixtures gained 10 tags between them, and the `All` chip is gone — an empty tag field is
+  `All`. The URL became `?q=…&tags=a,b&sort=ratio`. The card thumbnail is now a **third of the card's
+  width at 1:1** (`Avatar` gained `size="fluid"`, the box lives in `styles.css` so it scales with the
+  card), and the tag row sits under the tagline where it always did — it only looked absent because
+  the deployed build still had `tags: []` on every fixture.
+- **Verified:** at 360/390/640/900/1280 the search, the tag field and (below `sm`) the sort all measure
+  the full column width (308/338/572), no horizontal scroll, columns still 1/2/3/4. Picker: click opens
+  ten options; typing `h` narrows to authority/ghost/harbor/shopkeep; `Enter` adds a chip, clears the
+  input and refetches (`?tags=harbor`, 6 cards); a second tag makes two chips and ten cards (either-of);
+  the chip's × drops it (5 cards); `Back` restores URL, chips, sort and grid. Sort: choosing `Top rated`
+  keeps the tags (`?tags=harbor,ghost&sort=ratio`) and reorders (10 cards, best ratio first). Cards now
+  render their tag rows (37 chips across the first page).
+- **Not verified:** no Tauri/Android build; the dropdown is not tested with a real phone keyboard open
+  (the fixed overlay could sit under the IME — `mobile-webview-ui` covers the pattern if it does).
+
 ## T-09 follow-up — the phone screenshot (2026-10-30)
 
 - **Changed:** two defects a 390px screenshot caught, one cause. A page's scoped `<style>` cannot

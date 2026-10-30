@@ -42,6 +42,13 @@ export type SortOrder = "newest" | "oldest" | "ratio" | "name";
 export type ListOptions = {
   /** Matched against the title/name and the tagline, case-insensitive. Debounced by the page. */
   query?: string;
+  /**
+   * Tags the row must carry at least one of (`character/catalog.md`): the filter is a multi-select
+   * of the tags in use, and an empty list means `All`. Any-of rather than all-of, because two tags
+   * on a card are often alternatives in a reader's mind, and an all-of filter empties a small
+   * catalog on the second click.
+   */
+  tags?: string[];
   /** Defaults to `newest`. */
   sort?: SortOrder;
   /** 1-based, held in component state — never in the URL (paging is not part of the URL). */
@@ -64,6 +71,13 @@ export type Repo = {
   listPosts(options?: ListOptions): Promise<Listing<Post>>;
   /** The persona collection is personal and unpaged in the spec; it still pages at 24. */
   listPersonas(options?: ListOptions): Promise<Listing<Persona>>;
+
+  /**
+   * Every tag in use on the given kind, sorted, so a listing's tag filter offers what exists rather
+   * than an invented taxonomy (`luaplot-pages.md` → Conventions). Deduplicated across the rows the
+   * viewer may see; unpaged on purpose — a vocabulary is small and the filter must be complete.
+   */
+  listTags(kind: ItemKind): Promise<string[]>;
 
   getCharacter(id: string): Promise<Character | null>;
   getLorebook(id: string): Promise<Lorebook | null>;
