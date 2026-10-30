@@ -48,9 +48,16 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       profile methods the adapter now owns, and the debounced draft write is what makes *resumed
       after abandonment* true. `session.setAccount` is how a saved display name reaches the store.
       `Field.error` is live now (T-02 froze it at mount).
+- [ ] **T-07B Zod at every boundary.** `bun add zod`; `src/lib/schema.ts` holds one schema per entity
+      and per input; `lib/data/types.ts` becomes `z.infer` of those schemas; `lib/validate.ts` reports
+      the schema's issues instead of owning a regex; fixtures parse on load and every adapter write
+      parses its input; `scripts/schema-check.ts` + a fifth `check.sh` section make the gate the
+      guarantee; `ARCHITECTURE.md` → **Validation** and one CONTRACT bullet record it for every later
+      ticket. Accept: `check.sh` GREEN with the schema section, onboarding copy unchanged, no
+      duplicated entity shape, no `z.any()`.
 - [ ] **T-08 Catalog card + grid.** Shared card (title header; avatar/tagline/tags middle;
       author + ratio footer), NSFW blur with per-item Reveal. Accept: blur covers only the middle;
-      ratio visible while blurred; card opens detail.
+      ratio visible while blurred; card opens detail. Brief: `docs/tickets/T-08-card.md`.
 - [ ] **T-09 `/character/catalog`.** Toolbar (search debounced 250ms, `All` filter, sort, NSFW
       toggles), grid, `Load more` (+24, hidden at end), query-string state, all six states.
       Accept: filter+sort survive reload; empty/no-results/end-of-list each render.

@@ -40,6 +40,13 @@ The repo is the memory: never rely on chat history.
 - **Tauri hardware**: mobile-only capabilities go through `src/lib/native.ts` (Tauri plugin APIs, dynamically imported) with a browser fallback. Web builds must never break.
 - **Secrets never enter the client bundle.** `DEEPSEEK_API_KEY` / `OPENROUTER_API_KEY` are read only by server-side code (`supabase/functions/*`); the static build uses the mock provider.
 - Ripple (`.tsrx`) for components; no React, no JSX, no second framework.
+- **Zod is the only parser and the only normaliser.** `src/lib/schema.ts` owns every shape; entity
+  types are `z.infer` of it, so a shape is declared once. `safeParse` at every UI/transport edge
+  (form input, adapter return, JEV/LLM payload), `parse` only for an internal invariant. Trimming,
+  lowercasing, collapsing and ISO-string checks happen in the schema, never in a page — and display
+  formatting (`percent`, `relativeTime`) stays in `lib/format.ts`. A value that fails is fixed at the
+  source (the fixture, the caller, the schema's spec citation), never by widening the schema. See
+  `docs/ARCHITECTURE.md` → Validation.
 - Every async surface renders Loading / Empty / Error / Success. No spinners without a skeleton.
 - No per-keystroke network calls; debounce search at 250ms.
 
