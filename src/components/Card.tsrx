@@ -1,6 +1,7 @@
-import { track } from "ripple";
+import { track, type Derived } from "ripple";
 import { ratioOf, type AuthoredItem } from "../lib/data/types.ts";
 import { percent } from "../lib/format.ts";
+import { read } from "../lib/reactive.ts";
 import { href } from "../router.ts";
 import { Avatar } from "./Avatar.tsrx";
 import { Button } from "./Button.tsrx";
@@ -29,15 +30,23 @@ import { Button } from "./Button.tsrx";
 export function Card({
   item,
   nsfw = false,
+  blur = false,
   onOpen,
 }: {
   item: AuthoredItem;
-  /** Effective cover flag, computed by the listing — not the account preference itself. */
-  nsfw?: boolean;
+  /** The item's own NSFW flag. */
+  nsfw?: boolean | Derived<boolean>;
+  /**
+   * The listing's Blur preference, handed in live. The card combines the two itself and reads both
+   * through `read()`, because a listing that flips Blur has to repaint cards it already mounted and
+   * a prop expression is evaluated once (T-09). The card still never imports the preference store:
+   * it is given a flag, not an opinion.
+   */
+  blur?: boolean | Derived<boolean>;
   onOpen?: (event: MouseEvent) => void;
 }) @{
   const revealed = track(false);
-  const covered = track(() => nsfw && !revealed.value);
+  const covered = track(() => read(nsfw) && read(blur) && !revealed.value);
   const path = `/${item.kind}/${item.id}`;
 
   <article class={covered.value ? "card is-covered" : "card"}>

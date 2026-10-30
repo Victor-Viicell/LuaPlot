@@ -1,5 +1,6 @@
-import type { Children } from "ripple";
+import type { Children, Derived } from "ripple";
 import type { AuthoredItem } from "../lib/data/types.ts";
+import { read } from "../lib/reactive.ts";
 import { Card } from "./Card.tsrx";
 
 /**
@@ -16,6 +17,13 @@ import { Card } from "./Card.tsrx";
  * A `<ul>` because it is a list of items: the `li` carries the layout, the card carries the
  * meaning. The link on each title is the entry point (plus `onOpen` for a page that wants the
  * event); nothing here is a clickable `<div>`.
+ *
+ * **Both props are live** (decided in T-09). A prop expression is evaluated once when the component
+ * is called, so a page that appends another 24 rows or flips Blur would hand this component a frozen
+ * array or a frozen flag and the grid would never repaint — the same trap `Button.disabled` and
+ * `Field.error` already carry the fix for. `items` and `blurNsfw` accept `Derived<…>` as well as a
+ * plain value and are read through `read()` inside the render, so a static call site
+ * (`/dev/primitives`, `/dev/data`) is unchanged.
  */
 export function CardGrid({
   items,
@@ -24,24 +32,25 @@ export function CardGrid({
   label,
   children,
 }: {
-  items: AuthoredItem[];
+  items: Derived<AuthoredItem[]> | AuthoredItem[];
   /** The account's Blur NSFW preference — the card never reads the store. */
-  blurNsfw?: boolean;
+  blurNsfw?: Derived<boolean> | boolean;
   onOpen?: (event: MouseEvent, item: AuthoredItem) => void;
   /** Accessible name for the list, e.g. `Characters`. */
   label?: string;
   /** The listing's empty state, rendered inside the grid when there is nothing to draw. */
   children?: Children;
 }) @{
-  @if (items.length === 0) {
+  @if (read(items).length === 0) {
     <div class="card-grid-empty">{children}</div>
   } @else {
     <ul class="card-grid" aria-label={label}>
-      @for (const item of items; key item.id) {
+      @for (const item of read(items); key item.id) {
         <li class="card-cell">
           <Card
             {item}
-            nsfw={item.nsfw && blurNsfw}
+            nsfw={item.nsfw}
+            blur={blurNsfw}
             onOpen={onOpen ? (event) => onOpen(event, item) : undefined}
           />
         </li>

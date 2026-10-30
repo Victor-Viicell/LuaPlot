@@ -305,6 +305,52 @@ list, so the decisions below are the ones they inherit.
   fixed-width stage, because its columns follow the viewport and a 360px stage would only ever prove
   the phone case. `/dev/data` renders the same card through the same component.
 
+## Catalog (decided in T-09, do not re-invent)
+
+`/character/catalog` is the first real host of the grid and the first listing that reads the NSFW
+pair. The lorebook, preset, thread, bookmark and profile listings are this page with another entity,
+so these are the decisions they inherit.
+
+- **One phase union, not a shoal of booleans.** `phase: loading | ready | error` plus two derived
+  predicates — `visible` (Show off filters the flagged rows out) and `searching` (a settled query) —
+  produce all six states. A page that tracked `loading` and `hasError` separately would eventually
+  render both.
+- **Sort offers `Newest` and `Top rated`.** The spec says *Sort* without naming options; these are the
+  two `repo.SortOrder` already supports meaningfully for a listing (`ratio` = like share). A third
+  would be a third control at 360 for no gain. A two-option **segmented control**, not a `<select>`:
+  a native select is a second control language for one row, and the segmented pair keeps the 44px
+  target and the app's "one of these" gesture.
+- **The filter is `All`, present as a pressed chip that says why.** The tag taxonomy is undecided, so
+  there is nothing else to filter by; the reserved `filter=all` is still written into the URL so a
+  shared link keeps meaning what it meant. The chip is inert on purpose — a disabled-looking control
+  reads as broken, and a one-option `<select>` reads as unfinished.
+- **The listing writes its own URL.** `writeQuery()` uses `replaceState` for the search settle and
+  `pushState` for a sort, and never `navigate()`: `App.tsrx` reloads the page module whenever
+  `path + search` changes, so a debounced keystroke would remount the page and drop the accumulated
+  rows. Back/forward still remounts, and the page reads `useQuery()` at mount — which is exactly when
+  it wants to.
+- **`q` belongs to the shareable view**, although the spec's URL section names only filter and sort:
+  a search *is* a narrowed view, and a searchable listing whose search cannot be shared is a bug with
+  a link on it.
+- **Paging is state, 24 at a time, and any new query or sort resets it.** `Load more` is a button; the
+  `End of the list.` line appears only once a full page has been loaded, so a short list carries no
+  editorial note about nothing.
+- **Show off filters after the fetch, so a slice can be entirely hidden.** `fillIfBlank()` pulls the
+  next page while nothing is visible — that is what stops "No results" from lying about an empty
+  search.
+- **Live props, three times over.** `CardGrid.items` and `CardGrid.blurNsfw` accept `Derived<…>` and
+  are read inside the template, because a prop expression is evaluated once: a frozen array would
+  never append and a frozen flag would never cover. **This amends T-08:** `Card` now takes `nsfw`
+  (the item's own flag) *and* `blur` (the listing's live preference) and ANDs them itself — a
+  per-item derived created inside the grid's keyed loop rendered nothing at all in ripple 0.4.7. The
+  card still never imports `lib/state/prefs.ts`: it is handed a flag, not an opinion.
+- **Chrome budget at 360.** The page opens on the controls: the lede is hidden below `sm` (kicker
+  plus the search placeholder carry the meaning), and filter and sort share one line. Measured at
+  360×740 the grid starts at 435 and the first card ends at 580, against a tab bar top of 680. From
+  `sm` the toolbar is one row — search, filter, sort — with the two switches beneath it. The toolbar
+  is **not sticky**: a 56px shell bar plus a sticky toolbar would leave a third of a phone for
+  content.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

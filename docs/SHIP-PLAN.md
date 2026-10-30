@@ -66,12 +66,18 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 - [x] **T-08 Catalog card + grid.** `Card` takes the `AuthoredItem` entity + the effective cover
       flag; veil blurred 6px, scrim sibling layer, per-item `Reveal` (44px, outside the filter), footer
       crisp. `CardGrid` 1/2/3/4-up, gutter grid. Accept: verified in the DOM at 360/640/900/1200.
-- [ ] **T-09 `/character/catalog`.** Toolbar (search debounced 250ms, `All` filter, sort, NSFW
+- [x] **T-09 `/character/catalog`.** Toolbar (search debounced 250ms, `All` filter, sort, NSFW
       toggles), grid, `Load more` (+24, hidden at end), query-string state, all six states.
-      Accept: filter+sort survive reload; empty/no-results/end-of-list each render.
+      Accept: filter+sort survive reload; empty/no-results/end-of-list each render. Landed with the
+      grid/card props made live, and fixtures grown to 27 characters so paging has a second page.
 - [ ] **T-10 `/character/[id]`.** Identity, attached lorebooks (incl. unavailable), counts + ratio,
       bookmark, vote, report, settings menu (New Session/Bookmark/Report/Edit), Start/Continue,
       fork, owner moderation notice. Accept: every action mutates the adapter and the UI reflects it.
+      Brief: only the read/vote surface + the menu this ticket; fork and Start/Continue are
+      `docs/tickets/T-10B-fork-and-session-control.md`.
+- [ ] **T-10B Fork + Start/Continue.** `repo.forkCharacter` and `repo.createSession` (copies, one
+      session per character per user); the detail page's primary control reads Start or Continue and
+      a second session comes only from **New Session**. Brief: `docs/tickets/T-10B-fork-and-session-control.md`.
 - [ ] **T-11 Comment thread component.** Depth-limited nesting, reply, vote, delete → placeholder,
       removed → placeholder, no bookmark on comments. Accept: deleting a parent keeps its replies.
 - [ ] **T-12 Report dialog.** Reasons from `components/report.md`, one-tap submit, identical

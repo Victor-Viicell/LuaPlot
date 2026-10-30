@@ -3,6 +3,34 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-09 — `/character/catalog` (2026-10-30)
+
+- **Changed:** `src/pages/character-catalog.tsrx` is the real page — toolbar (search settled at
+  250ms, the `All` chip, a `Newest`/`Top rated` segmented sort, the two NSFW `Toggle`s), the grid,
+  `Load more`, and all six states. It writes its own URL through `history` (`filter=all`, `q`,
+  `sort`) and never `navigate()`, because the shell remounts on a changed query (DESIGN → *Catalog*).
+  `CardGrid` now takes `items`/`blurNsfw` as `Derived<…>` read inside the template, and `Card` gained
+  a live `blur` prop it ANDs with its own flag — an amendment to T-08, recorded in DESIGN because a
+  per-item derived inside the keyed loop rendered nothing in ripple 0.4.7. Fixtures grew 8 → 27
+  characters (4 flagged) so paging and the Show/Blur pair are exercisable at all; ids still come from
+  `ids.ts`.
+- **Verified:** gate GREEN (build 548K, routes 30, schema). In Chromium at 360×740 / 640 / 900 /
+  1280: 1/2/3/4 columns, `scrollWidth − clientWidth` = −10 at every width, grid top 435/436/384/375
+  with the first card wholly above the tab bar. Paging: 20 → 23 cards after `Load more`, the control
+  gone, `End of the list.` shown. NSFW: Show off → 20 (the 4 flagged absent), Show on → 27, Blur on →
+  exactly those 4 covered, each with a crisp footer carrying its `%` and its own `Reveal`; revealing
+  one took 4 → 3; a re-sort put the cover back. Search `salt` → 1 card and
+  `?filter=all&q=salt&sort=ratio`; `zzzz` → no-results with the query echoed and `Clear search`;
+  clearing restored the full page. Sort `Top rated` → descending ratios, first 96%,
+  `?filter=all&sort=ratio`. Loading skeleton captured by a `MutationObserver` injected through CDP
+  before navigation (`.card-grid[aria-busy="true"]` plus 6 `.skel-card`). Error state forced by
+  patching `memoryRepo.listCharacters` to reject → `role="alert"` + `Retry`, which loaded 20 rows
+  once restored; an append failure (reject only when `page > 1`) → inline `The next page didn't
+  load.` keeping the 20 rows, and its `Retry` completed to 23. Signed out (overflow → Sign out), the
+  Show toggle navigated to `/authentification` and stayed off.
+- **Not verified:** no Tauri/Android build. The other four listings still seed fewer than 24 rows, so
+  their `Load more` remains unproven until they have data. Nothing exercises a Supabase adapter.
+
 ## T-08 — catalog card + grid (2026-10-30)
 
 - **Changed:** `Card` takes the entity (`AuthoredItem` = `z.infer` of `authoredItemSchema`, added to

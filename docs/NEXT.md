@@ -1,96 +1,125 @@
 # Baton — what the next session does
 
-**Ticket: T-09 — `/character/catalog`, the first real host of the grid.**
+**Ticket: T-10 — `/character/[id]`, the read/vote surface.**
 
-Brief: none yet; this file is the brief. `src/specs/pages/character/catalog.md` and
-`src/specs/systems/nsfw.md` are the law, plus `docs/DESIGN.md` → *Card and grid* (T-08) and
-*Primitives*.
+Brief: this file. Spec: `src/specs/pages/character/detail.md` (it carries the settings menu, the
+in-session name, the lorebook list and the Start/Continue wording), `systems/nsfw.md` →
+*With Show off, a detail route still resolves*, `components/report.md` (the dialog itself is T-12).
+`docs/DESIGN.md` → *Card and grid* + *Catalog* are the settled look.
 
-Why next: T-08 built the card and the grid in isolation; nothing yet reads `nsfwPreference()` and no
-listing exists. T-09 is the first page that **hides or covers** content by the account's preference,
-and T-10/T-13/T-21/T-23 all reuse the toolbar → grid → `Load more` shape it establishes.
+**Scope, deliberately narrow.** This ticket is identity + attached lorebooks + counts and ratio +
+vote + bookmark + the owner's moderation notice + the settings menu shell (**Bookmark**, **Edit**,
+and the entries whose targets land later). **Fork and Start/Continue are T-10B** — they need adapter
+writes (`forkCharacter`, `createSession`) that do not exist yet, and `createSession` must be written
+to T-15's copy rule rather than guessed here. Do not build them in T-10.
+
+Why next: every card in the catalog links here, and this page is where the product's engagement rules
+live (one vote per viewer, counts on detail, ratio shared with the card). T-11 (comment thread) and
+T-12 (report dialog) both mount on this page, so it has to exist first.
 
 ## Approach
 
-1. Read the two specs, then `src/lib/state/prefs.ts`, `src/lib/data/repo.ts` (what the adapter already
-   offers for paging/filtering — do not invent a second query path) and `src/lib/reactive.ts`.
-2. Toolbar: search (debounced **250ms**, no per-keystroke fetch), `All` filter (only option; the
-   parameter is reserved), sort, and the two NSFW `Toggle`s wired to `setShowNsfw` / `setBlurNsfw`.
-   Filter + sort live in the **query string** (shareable, back/forward); paging does not.
-3. Listing = `@if (show)` filter (`item.nsfw` dropped when Show is off) → `CardGrid
-   items={visible} blurNsfw={blur}` → `Load more` (+24, absent at the end).
-4. Render all six states: Loading (skeleton matching the grid), Empty (one line + `Create`),
-   No-results (query echoed + `Clear`), Loading more (the button busy, not a spinner), End of list
-   (no control), Error (what failed + `Retry`).
-5. Mobile first 360×740, then 640/900/1200. No horizontal scroll at any width. Do not restyle the
-   card or the grid — they are settled.
+1. Read the spec, then `src/lib/data/memory.ts` → `getCharacter`, `vote`, `isBookmarked`,
+   `toggleBookmark`, and `src/lib/data/types.ts` → `ratioOf`, `EntityOf`.
+2. **The id.** The page needs its route param, and the router does not expose one to pages yet
+   (`useQuery()` only). Add `useParams()` to `src/router.ts` if `currentRoute().params` is not
+   enough — do not parse `location.pathname` in the page.
+3. **Reveal on a Show-off detail route:** the body is withheld behind the same per-item `Reveal` the
+   card uses, while the header (name, author, ratio) stays. Do **not** reuse `Card` — a detail page
+   is not a card; reuse the *pattern* (`revealed = track(false)`, a scrim sibling, a 44px button) and
+   keep the numbers crisp.
+4. **Vote and bookmark are adapter calls**: `repo.vote(kind, id, direction)` returns the updated
+   entity, `repo.toggleBookmark` returns `{ bookmarked }`. Render what the adapter returned rather
+   than recomputing counts in the page.
+5. **Attached lorebooks:** `item.lorebookIds` → `repo.getLorebook` each; a `null` answer stays in the
+   list as an unavailable row (the spec: *an attachment that no longer resolves stays listed as
+   unavailable rather than disappearing*).
+6. **Non-owner on a private row:** `memory.ts`'s `getCharacter` returns any row by id, so the page
+   owns the rule — if `!item.isPublic && item.author !== viewer`, render the "unavailable" state; the
+   owner sees the moderation notice instead. That split is the one visibility rule the adapter
+   deliberately leaves to the page.
+7. Mobile first at 360×740, then 640 / 900 / 1200. At `lg` a detail page becomes two columns
+   (main + 320px aside) per `docs/DESIGN.md` → *Layout law*.
 
 ## Traps
 
-- **Show off wins over Blur.** A flagged item is *absent* from the listing when Show is off, whatever
-  Blur says (`nsfw.md` → States). The pair is independent in the store, so the filter is
-  `show ? items : items.filter(i => !i.nsfw)` and then `blurNsfw={blur}`.
-- **`Card` takes the entity and the effective flag** — pass `blurNsfw` to `CardGrid` and let it AND
-  the item's own flag; do not pass `nsfw={false}` to "keep it simple".
-- **A reveal does not survive a re-fetch.** It is per mount by design; paging in keeps earlier cards
-  (keyed `@for`), but a new fetch that replaces `items` re-blurs. That is the spec's one-view rule.
-- **The prefs store is read, not copied.** Read the pair through the store (a `track(...)` over it or
-  the existing subscribe shape) so flipping a toggle re-renders the grid without a re-fetch.
-- **NSFW is not access control**: `/character/<id>` still resolves (T-10). No redirect, no 404.
-- **Signed out**, the control leads to `/authentification` (`nsfw.md`); `session.ts` still ships the
-  seeded account, so the signed-out branch is only reachable through the overflow menu's preview
-  switch.
-- Debounce the search, keep the loading skeleton's shape equal to the grid's (1/2/3/4 cells).
+- **A prop expression is evaluated once.** Anything that changes while the page is open (a vote
+  count, the bookmark state, the reveal) must be a `track(...)` read inside the template, or handed
+  to a primitive as a `Derived` — `Button.disabled`, `Field.error`, `CardGrid.items`, `Card.blur` all
+  already carry that fix. Do not invent a fourth shape for it.
+- **Nothing in a component body that can be inline.** A `const` (or a `track()`) declared ahead of an
+  `@if`/`@for` silently rendered *nothing* in `CardGrid` under ripple 0.4.7; read `read(prop)` in the
+  template instead.
+- **A same-specificity media override in a scoped `<style>` did not win.** Scope it with a
+  descendant selector, as `.controls-filter .filter-note` does in the catalog page.
+- **`@else {` with two nodes needs a fragment** `<>…</>`, or the compile fails with "A code block
+  renders a single node".
+- **No self-vote exemption**: the author votes like anyone and the vote counts in the ratio
+  (`detail.md`, settled in the spec pass).
+- **This page shows both raw counts and the percentage**; a card keeps only the percentage. Do not
+  "simplify" it back to one number.
+- **NSFW is not access control**: a Show-off visitor still gets the route, never a 404.
+- The owner's **Request public again** has no adapter method yet — if it stays unbuilt, say so in a
+  comment and leave the button out rather than faking a write.
 
 ## Open decisions
 
-- Where the six states live: one `AsyncState` union in the page (Loading / Ready / Empty / Error) or a
-  `@try` boundary. Pick one and record it in `DESIGN.md` → *States*.
-- Sort options: the spec says `Sort` without naming options — propose `Newest` / `Top rated` and
-  record the choice in `DESIGN.md` before implementing, since every later catalog inherits it.
-- Whether the toolbar is sticky above the grid at 360 (two rows of controls plus toggles is ~120px of
-  chrome). Recommended: not sticky — the shell already has a 56px top bar.
+- **Where the settings menu lives.** The spec puts a settings button in the page header (New Session,
+  Bookmark, Report, Edit) and the shell already owns a top-bar overflow (Bookmarks, Moderation, Terms,
+  the preview switch), so this is a *second* menu on one screen. Keep it inside the page's own header
+  row, not the shell, and record the placement in `DESIGN.md`.
+- **Counts layout at 360**: one row (like / dislike / ratio / comments) or two. Pick, record, keep the
+  44px targets.
+- **Whether the `lg` aside carries the lorebooks** or they stay in the main column. Choose, record,
+  and make it the rule for every detail page.
+- **No private character fixture owned by `you` exists**, so the owner's moderation notice cannot be
+  rendered at all. Add one through `ids.ts` and check the catalog does not list it — see the first
+  item under *Found while working*.
 
 ## Found while working (carried forward — keep this list growing)
 
-- **`@empty` does not parse in ripple 0.4.7** although the skill doc shows it: it fails with
-  `TS1144`/`TS1146` at the `@empty` token. `CardGrid` uses `@if (items.length === 0) … @else` instead.
-  Until a version bump is proven, write the explicit branch.
-- **A gallery stage cannot prove a viewport media query.** The `/dev/primitives` width chip resizes a
-  fixed-width stage, so `.card-grid` always reported the columns of the *real* viewport; the grid
-  section now sits outside the stage and says so. Any future breakpoint proof must resize the window.
-- **`/dev/data` renders the NSFW fixture covered now** (`nsfw={character.nsfw}`): it hands the flag
-  itself, with no Blur preference in play. A page that copies that line without the `&& blur` AND will
-  cover flagged items even when the account turned Blur off.
+- **`visible()` in `memory.ts` is "public **or mine**", so a private character owned by the viewer
+  would appear in the public catalog.** A listing should see public rows only; owner visibility is
+  the detail page's rule. Not fixed — settle it with T-10's private fixture (it changes what the
+  catalog returns, so it needs a check at the same time).
+- **A `const` (or `track()`) in a component body ahead of `@if`/`@for` rendered nothing** under
+  ripple 0.4.7 — the whole branch vanished, no error. `CardGrid` works only because its props are
+  read inline. Found in T-09.
+- **A media-query rule of equal specificity did not override the base rule in a scoped `<style>`**
+  (`.lede` worked, `.filter-note` did not, same block). Scope the override with a descendant
+  selector. Found in T-09.
+- **A prop holding an array or a flag is frozen at the call.** `CardGrid.items`, `CardGrid.blurNsfw`
+  and `Card.blur` accept `Derived<…>` for exactly that reason; `Toggle.disabled` is still a plain
+  boolean.
+- **`@empty` does not parse in ripple 0.4.7** although the skill doc shows it (`TS1144`/`TS1146` at
+  the token). Write the explicit `@if (…length === 0) … @else` branch.
+- **A gallery stage cannot prove a viewport media query.** Any breakpoint proof must resize the
+  window; CDP `Emulation.setDeviceMetricsOverride` works and is how T-09 measured 1/2/3/4 columns.
+- **`/dev/data` passes `nsfw={character.nsfw}` only**, so with T-09's split it draws crisp — it needs
+  `blur` to show a covered card.
 - **Onboarding's uniqueness check sits inside `persistDraft`, which returns early when the display
-  name is empty.** A user who types only a handle never gets the spec's `Username taken` (or any
-  answer) and `Finish` stays disabled with no explanation — found while driving `/onboarding` in the
-  DOM for T-07B. The spec wants the answer inline on the field: move `checkHandle` out of the draft
-  write (check on settle, write only when valid). Not fixed.
-- **Zod costs +26.4 KB gzip / +91 KB raw on the JS bundle**, because `router.ts` imports `isHandle`
-  from `schema.ts` and drags zod into the boot chunk. `zod/mini` (or a lazy router import) is the
-  lever if a bundle budget is ever named.
-- **`z.uuid()` is stricter than the router's `[0-9a-f-]{36}`.** They agree on every real id today; if
-  the router ever needs them to agree exactly, give the id segment a schema predicate the way
-  `[user.username]` now uses `isHandle`.
-- **A new fixture id bucket must go through `ids.ts`.** Hand-written ids are exactly the drift the
-  schema check now catches at load.
-- **`Toggle.disabled` is a plain boolean** (`Field.error` and `Button.disabled` are `Derived` now):
-  same frozen-prop trap, unfixed until a page needs a live one.
-- **`disabled={!derived}` is always false.** A prop expression is evaluated once, so the *derived*
-  must be handed over (`disabled={blocked}` where `blocked = track(() => !canFinish.value)`).
-- **`repo.saveProfile` + `session.setAccount` is the pair for any account write.** The adapter owns
-  the row, the session owns the screen; `savePreferences` is the pair's sibling for the NSFW two.
-- **`src/specs/components/` has only `comment-thread.md` and `report.md`** — the card has no spec file
-  of its own, so `luaplot-pages.md` §Conventions plus `DESIGN.md` are the law for it.
+  name is empty.** A handle-only visitor never gets `Username taken` and `Finish` stays disabled with
+  no explanation. Not fixed.
+- **Zod costs +26.4 KB gzip / +91 KB raw on the boot chunk** (router imports `isHandle`). `zod/mini`
+  or a lazy router import is the lever if a bundle budget is named.
+- **`z.uuid()` is stricter than the router's `[0-9a-f-]{36}`.** They agree on every real id today.
+- **A new fixture id bucket must go through `ids.ts`.** Hand-written ids are the drift the schema
+  check catches at load.
+- **`disabled={!derived}` is always false.** Hand over the derived (`disabled={blocked}`).
+- **`repo.saveProfile` + `session.setAccount` is the pair for any account write**; `savePreferences`
+  is its sibling for the NSFW two.
+- **`src/specs/components/` has only `comment-thread.md` and `report.md`** — the card has no spec of
+  its own, so `luaplot-pages.md` §Conventions plus `DESIGN.md` are the law for it.
 - `session.ts` still seeds `you` signed in and the overflow menu still carries the *Preview only*
-  switch; `/dev/state` shows the pair and the emit counters. Neither is a product control (T-30
-  deletes both).
+  switch; `/dev/state` shows the pair and the emit counters. T-30 deletes both.
 - `publish.sh` compares the live bundle hash; a Pages 200 alone can still be the previous deploy.
-- **`Card` has no post branch.** A post has a body and no `name`/`tagline`; keep it out of `Card` until
-  T-13 rather than bending the authored union.
+- **`Card` has no post branch.** A post has a body and no `name`/`tagline`; keep it out of `Card`
+  until T-13.
+- **Characters are 27 now; lorebooks 6, presets 5, personas 3, posts 12.** The other listings cannot
+  show `Load more` or the end-of-list note until they have a second page — grow them when their
+  ticket needs the proof, the way T-09 grew characters.
 
 ## After this
 
-T-10 `/character/[id]` — identity, attached lorebooks (including unavailable ones), counts + ratio,
-the vote/bookmark actions and the report entry.
+**T-10B** — fork + Start/Continue, brief in `docs/tickets/T-10B-fork-and-session-control.md`. Then
+T-11 mounts the comment thread on the detail page.
