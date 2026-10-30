@@ -3,6 +3,41 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-07 — `/onboarding` (2026-10-30)
+
+- **Changed:** data contract + adapter gain the profile trio — `repo.currentProfile(): Promise<User |
+  null>`, `repo.isHandleTaken(handle)` (case-insensitive across accounts, never across the viewer's
+  own handle; fixture authors `bram/ada/sable/quill/orin/mira` are claimed accounts) and
+  `repo.saveProfile({ handle, displayName })` (normalises, returns the saved user, never touches
+  `isAdmin`), implemented in `memory.ts`; `src/lib/validate.ts` is the one pure reading
+  (`readHandle` → `{handle, problem: required|format}`, `readDisplayName` + `HANDLE_RULE`);
+  `session.setAccount({handle, displayName})` emits so a saved name reaches every screen;
+  `src/pages/onboarding.tsrx` replaces the placeholder with the form page (kicker, 26/34 title, 52ch
+  lede, hairline, two `Field`s, a hairline + caption, two `Toggle`s through `lib/state/prefs.ts`, a
+  `btn-primary` Finish gated on a `Derived`), a 250ms settle that checks uniqueness *and* writes the
+  draft, Loading/failed states, and `navigate('/user/' + handle)` on submit; `Field.error` is now a
+  live `Derived` (`track(() => !!read(error))`) instead of a mount-time snapshot. Docs: `DESIGN.md`
+  gains "Onboarding (decided in T-07)", `ARCHITECTURE.md` the profile bullet + `setAccount`,
+  `SHIP-PLAN.md` ticks T-07, `NEXT.md` rewritten for T-08.
+- **Verified:** `scripts/check.sh` GREEN (build ok, 30/30 routes). Driven in Chromium against the
+  built preview: first visit renders empty with `Finish` disabled and both toggles `false`; `ab` →
+  format error after the settle, `field-input is-invalid` + `aria-invalid="true"`, help line
+  replaced; `ada` → `Username taken` inline (328px wide at 360), Finish disabled; no draft row is
+  written for a taken or incomplete handle (reloading the page kept it empty). `Ada_Lovelace` +
+  `  Ada   Lovelace ` → Finish enables, submit lands on `/user/ada_lovelace` (lowercased) and
+  `/dev/state` reads `handle @ada_lovelace`, `display name Ada Lovelace`, prefs `true,false` — the
+  pair written under the saved handle before `setAccount`, so Show survived the handle switch.
+  In-app back to `/onboarding` restores both fields and the toggle from the adapter with Finish
+  enabled (own handle is not "taken"). Geometry: 360×740 / 640×800 / 900×800 / 1200×900 all
+  `scrollWidth == innerWidth`; at 360 the scroller scrolls 277px and Finish sits at y 477–521 with
+  the tab bar at 680 (never hidden); at `lg` the 560px column is centred in the 940px outlet.
+- **Not verified:** nothing persists across a full reload — the memory adapter is rebuilt on boot, so
+  a reload legitimately returns to the first-visit state (no `localStorage` fake). No Supabase row,
+  so the real unique index is T-29/T-30. The 250ms settle measures ~1.2s in a hidden headless tab
+  (timers are clamped), so states were read after the clamp, not at exactly 250ms. `Toggle.disabled`
+  is still a mount-time boolean (unused on this page). No screenshot-level check of the four
+  flavours.
+
 ## T-06 — `/authentification` (2026-10-30)
 
 - **Changed:** `src/lib/auth.ts` (new seam: `Provider`, `PROVIDERS`, `PROVIDER_NAMES`,

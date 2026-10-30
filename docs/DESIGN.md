@@ -210,6 +210,55 @@ layout only. Class names: `.btn`, `.field`, `.toggle`, `.card`, `.avatar`, `.she
   enabled because a prop expression is evaluated once at the call. `Field.disabled` and
   `Toggle.disabled` still take a plain boolean — same trap, unfixed on purpose.
 
+## Onboarding (decided in T-07, do not re-invent)
+
+`onboarding.md` also leaves Layout `_To be specified_`, and it is the repo's first **form page**.
+These are the decisions, so every later form (`/character/create`, `/user/edit`) extends them
+instead of inventing a second answer.
+
+- **A form page, not a title page.** The shell's top bar already says *Onboarding*, so a 34px
+  wordmark underneath would read as a second marketing screen. The page opens with the 12px kicker
+  (`first run`), a 26px / 34px `lg` title, one 52ch line of copy, a hairline, then the form. Same
+  rule + spacing language as `/` and `/authentification` — the entry sequence shares one column
+  (560px at `lg`, centred in the 1120 outlet).
+- **Order inside the form:** username → display name → hairline → `nsfw content` caption → Show →
+  Blur → `Finish`. The second rule is the only thing that separates "required" from "optional";
+  there is no box, no card, no legend.
+- **`Finish` is the last element in the column, never pinned.** It is `btn-primary btn-block` at
+  360 (thumb reach, 328×44) and a left-aligned 200px minimum from `sm`, where a line of note sits
+  beside it. The page scrolls (five rows do not fit 360×740) and the shell's 60px tab-bar
+  clearance + outlet padding keeps the button clear of the bar: measured at 360×740 the scroller
+  scrolls 277px and `Finish` lands at y 477–521 against a bar top of 680. Nothing on this page is
+  fixed or sticky, so the phone keyboard cannot cover a field — it is all in flow.
+- **The rule is the help line until it is the error.** `Field.help` carries the factual format line
+  (`Lowercase letters, digits and underscores, 3–24 characters.`) and it is *removed* when the same
+  sentence becomes the inline error, because a red line repeating the grey line above it reads as a
+  rendering bug. Errors appear once a field has settled (the 250ms debounce), never on the first
+  keystroke; the taken copy is the spec's verbatim `Username taken`.
+- **Uniqueness is asked, not remembered.** A verdict carries the handle it is about, so a stale
+  answer can never disable `Finish` for a different value. `Finish` is enabled only for a settled,
+  format-valid handle the adapter has answered *free*, plus a non-empty display name.
+- **Draft persistence: one debounced `saveProfile` + `savePreferences`.** The same 250ms settle
+  that runs the uniqueness check writes the draft, and only for a form that could actually be
+  finished (a two-character handle is never written as the account's profile — otherwise a draft
+  could claim a handle by accident). `Finish` is the same write, then `setAccount`, then
+  `/user/<handle>`. Reloading the preview still empties the form, because the memory adapter is the
+  only row that exists; nothing fakes persistence with `localStorage`.
+- **The NSFW pair is the store's, not the page's.** Both toggles read `lib/state/prefs.ts` and write
+  through `setShowNsfw` / `setBlurNsfw`; the finished form writes the pair under the *saved* handle
+  before `setAccount` switches the session, so the store's re-read on session change finds the same
+  values instead of flashing off.
+- **`Field.error` is live.** T-02 froze `invalid` at mount (`const invalid = read(error)`), so a
+  dynamic error line updated while the border and `aria-invalid` stayed stale. T-07 makes it a
+  `Derived` like `Button.disabled`. `Toggle.disabled` is still a plain boolean — same trap, unfixed
+  until a page needs a live one.
+- **No prefill in the preview.** The spec prefills the display name from the provider; the mock
+  account ships the literal `You`, which is not a provider label, so only a saved draft prefills.
+  T-30 replaces that line with `currentUser()?.displayName`.
+- **Signed-out visitors are not redirected.** `access: "onboarding"` is declarative; the matrix is
+  T-30, and an eager redirect would make the page unreachable from `/authentification`'s footer
+  link in the preview.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

@@ -33,6 +33,7 @@ import {
   type Preset,
   type Report,
   type Session,
+  type User,
   type VoteDirection,
   type VotableKind,
 } from "./types.ts";
@@ -97,6 +98,35 @@ const bookmarks = new Set<string>();
  */
 const preferences = new Map<Handle, AccountPreferences>();
 const DEFAULT_PREFERENCES: AccountPreferences = { show: false, blur: false };
+
+/**
+ * The viewer's saved profile — the account's handle and display name, written by onboarding.
+ *
+ * Keyed by the adapter's **account** (`VIEWER`), not by the handle it holds, because the handle is
+ * what the account claims here; a Supabase row is keyed by `auth.uid()` for exactly the same
+ * reason. `null` means onboarding has written nothing, which is the spec's *first visit*.
+ */
+let profile: User | null = null;
+
+/**
+ * Handles owned by other accounts in the preview. Fixture authors are real people here, so their
+ * handles are claimed; without this the preview would happily hand out `ada` and then show two
+ * accounts whose URL is `/user/ada`.
+ */
+const CLAIMED_HANDLES = new Set(
+  [
+    ...seed.characters.map((row) => row.author),
+    ...seed.lorebooks.map((row) => row.author),
+    ...seed.presets.map((row) => row.author),
+    ...seed.posts.map((row) => row.author),
+  ].map((owner) => owner.toLowerCase()),
+);
+
+/** The one normalisation every handle comparison uses: the validator's rule, applied again here. */
+function normaliseHandle(handle: string): string {
+  return handle.trim().toLowerCase();
+}
+
 
 function voteKey(kind: string, id: string): string {
   return `${kind}:${id}:${VIEWER}`;
@@ -327,5 +357,34 @@ export const memoryRepo: Repo = {
     const next: AccountPreferences = { ...(preferences.get(handle) ?? DEFAULT_PREFERENCES), ...patch };
     preferences.set(handle, next);
     return { ...next };
+  },
+
+  async currentProfile() {
+    // A copy: the caller must not be able to mutate the account by holding on to the answer.
+    return profile ? { ...profile } : null;
+  },
+
+  async isHandleTaken(handle) {
+    const needle = normaliseHandle(handle);
+    if (!needle) return false;
+
+    // The viewer's own handles are never "taken" from the viewer: the rule compares accounts, and
+    // typing the handle you already hold is a no-op, not a collision. `VIEWER` is the mock
+    // account's current handle; `profile.handle` is the one onboarding has drafted or claimed.
+    if (needle === normaliseHandle(VIEWER)) return false;
+    if (profile && normaliseHandle(profile.handle) === needle) return false;
+
+    return CLAIMED_HANDLES.has(needle);
+  },
+
+  async saveProfile(patch) {
+    // The adapter normalises, so no page can store a handle that only *looks* claimed. `isAdmin`
+    // is carried over rather than written: only the operator grants it (`luaplot-pages.md`).
+    profile = {
+      handle: normaliseHandle(patch.handle),
+      displayName: patch.displayName.trim(),
+      isAdmin: profile?.isAdmin ?? false,
+    };
+    return { ...profile };
   },
 };

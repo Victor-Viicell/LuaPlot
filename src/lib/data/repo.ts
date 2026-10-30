@@ -27,6 +27,7 @@ import type {
   Report,
   ReportStatus,
   Session,
+  User,
   VoteDirection,
   VotableKind,
 } from "./types.ts";
@@ -114,6 +115,34 @@ export type Repo = {
    * spec's "skipping onboarding writes nothing, since off is what the account already holds".
    */
   getPreferences(handle: Handle): Promise<AccountPreferences>;
+
+  /**
+   * The signed-in account's saved profile, or `null` when onboarding has written nothing for it
+   * yet. This is what makes the spec's **Resumed after abandonment** state honest: the form
+   * restores what was typed from the adapter, not from a page-local draft or `localStorage`.
+   * Signed out, or with no row, it answers `null` — a missing profile is a state, not an error.
+   */
+  currentProfile(): Promise<User | null>;
+
+  /**
+   * Whether a handle is already claimed by another account. Compared case-insensitively across
+   * accounts, and **never** across the viewer's own current handle: typing the handle you already
+   * hold is not a collision. `null`/empty answers `false` — that is the validator's business
+   * (`lib/validate.ts`), not a lookup. The adapter owns this rule so no page scans fixtures for it,
+   * exactly like one vote per viewer per item.
+   */
+  isHandleTaken(handle: Handle): Promise<boolean>;
+
+  /**
+   * The whole onboarding form in one write: the claimed handle and the display name. Returns the
+   * saved account, with the handle trimmed and lowercased by the adapter. `isAdmin` is never set
+   * from here — the operator grants it by hand, so this cannot take it away either.
+   *
+   * The page calls it for the **draft** too (debounced), so an abandoned first run still has what
+   * was typed; `Finish` is the same write plus the session update. Splitting a "commit" flag out
+   * would be a second way to write the same row for no gain in the preview.
+   */
+  saveProfile(patch: { handle: Handle; displayName: string }): Promise<User>;
 
   /**
    * Writes one or both flags and returns the account's whole pair, so the caller never merges a

@@ -97,6 +97,17 @@ Shapes, decided in T-03 (change them here before changing them in the code):
   caller never merges a partial into its own idea of the state. `lib/state/prefs.ts` is the only
   caller: it clears to off before reading, so a switch never renders the previous account's flags
   even for the microtask the adapter takes.
+- **The account's profile is the third per-account surface** (T-07): `currentProfile()` answers the
+  signed-in account's saved `{ handle, displayName, isAdmin }` or `null` when onboarding has written
+  nothing (the spec's *first visit*), `isHandleTaken(handle)` answers case-insensitively across
+  accounts and **never** across the viewer's own current handle, and `saveProfile({ handle,
+  displayName })` writes the whole form in one save and returns the saved account with the handle
+  trimmed and lowercased. The adapter owns the handle rule for the same reason it owns one vote per
+  viewer: the page that scans fixtures for a free handle has invented a second truth. `supabase.ts`
+  must implement all three — the profile row is keyed by `auth.uid()`, uniqueness is a `citext`
+  unique index, and `isHandleTaken` is advisory in front of it (the index is the guarantee).
+  Onboarding calls `saveProfile` for its **draft** too, debounced, which is what makes the spec's
+  *Resumed after abandonment* honest without `localStorage`.
 
 ## Session
 
@@ -105,7 +116,10 @@ Shapes, decided in T-03 (change them here before changing them in the code):
 authentication is Supabase's and this shape never duplicates it. It is seeded **signed in** as
 `you` (every fixture's owner, so the preview is worth opening) until T-30 wires real auth;
 `signOut()` exists so the signed-out states pages must render are reachable, and it is exposed only
-as a dev affordance (overflow menu, `/dev/state`). `access` on a route stays declarative: the
+as a dev affordance (overflow menu, `/dev/state`). `setAccount({ handle, displayName })` (T-07) is
+the mutator onboarding uses: the adapter holds the saved profile, and without this the claimed
+display name would be replaced by `MOCK_USER.displayName` on every screen. It emits like `signIn`,
+which is what re-reads the NSFW pair per handle. `access` on a route stays declarative: the
 redirect matrix is T-30, and neither store redirects.
 
 The memory adapter's `VIEWER` is still a constant. Wiring it to the session would make

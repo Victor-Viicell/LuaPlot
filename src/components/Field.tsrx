@@ -1,4 +1,4 @@
-import type { Derived } from "ripple";
+import { track, type Derived } from "ripple";
 import { read } from "../lib/reactive.ts";
 
 /**
@@ -44,13 +44,19 @@ export function Field({
   const id = `field-${counter}`;
   const helpId = `${id}-help`;
   const errorId = `${id}-error`;
-  const invalid = read(error) ? true : false;
+  /**
+   * Live, not frozen. `error` may be a `Derived` (an inline validation message changes while the
+   * visitor types), and a prop expression is evaluated once at the call, so reading it here would
+   * keep the control grey at whatever the first render said while the error line itself updated —
+   * the same trap `Button.disabled` had in T-06, fixed here in T-07.
+   */
+  const invalid = track(() => !!read(error));
 
   <div class="field">
     <label class="field-label" for={id}>{label}</label>
     @if (multiline) {
       <textarea
-        class={invalid ? "field-input is-invalid" : "field-input"}
+        class={invalid.value ? "field-input is-invalid" : "field-input"}
         id={id}
         name={name}
         rows={rows}
@@ -58,13 +64,13 @@ export function Field({
         value={read(value)}
         disabled={disabled}
         maxlength={maxLength}
-        aria-invalid={invalid ? "true" : undefined}
+        aria-invalid={invalid.value ? "true" : undefined}
         aria-describedby={read(error) ? errorId : read(help) ? helpId : undefined}
         onInput={(event) => onInput(event.currentTarget.value)}
       ></textarea>
     } @else {
       <input
-        class={invalid ? "field-input is-invalid" : "field-input"}
+        class={invalid.value ? "field-input is-invalid" : "field-input"}
         id={id}
         type={type}
         name={name}
@@ -72,7 +78,7 @@ export function Field({
         value={read(value)}
         disabled={disabled}
         maxlength={maxLength}
-        aria-invalid={invalid ? "true" : undefined}
+        aria-invalid={invalid.value ? "true" : undefined}
         aria-describedby={read(error) ? errorId : read(help) ? helpId : undefined}
         onInput={(event) => onInput(event.currentTarget.value)}
       />

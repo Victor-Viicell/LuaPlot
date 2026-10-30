@@ -71,3 +71,21 @@ export function signOut(): void {
   user = null;
   emit();
 }
+
+/**
+ * Replace the signed-in account's own handle and display name — the one write onboarding needs.
+ *
+ * Without this, `signIn()` fabrics the display name (`MOCK_USER.displayName`), so a name claimed at
+ * `/onboarding` would survive in the adapter and vanish from every screen. It emits like `signIn`,
+ * so the profile tab, `/dev/state` and the NSFW store (which re-reads its pair per handle) all
+ * follow the new account rather than the old one.
+ *
+ * Signed out there is no account to rename, so it does nothing: a profile write cannot create a
+ * session. T-30 replaces both this and `signIn` with the Supabase row; the signature is the seam.
+ */
+export function setAccount(patch: { handle: Handle; displayName: string }): void {
+  if (user === null) return;
+  if (user.handle === patch.handle && user.displayName === patch.displayName) return;
+  user = { ...user, handle: patch.handle, displayName: patch.displayName };
+  emit();
+}

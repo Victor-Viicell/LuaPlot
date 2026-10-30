@@ -39,9 +39,15 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       title page with three equal secondary providers in a 420 measure, one `track<AuthStatus>`, and
       a status row that reserves 20px so no state re-centres the page. Zero scroll in all four states.
       `Button.disabled` now takes `Derived<boolean>` — a live disable needs the derived, not the value.
-- [ ] **T-07 `/onboarding`.** Username (3–24, `[a-z0-9_]`, case-insensitive uniqueness), display
+- [x] **T-07 `/onboarding`.** Username (3–24, `[a-z0-9_]`, case-insensitive uniqueness), display
       name, NSFW toggles; inline errors; Finish gated. Accept: invalid handle and taken handle both
       block Finish with the spec's copy; valid submit lands on profile.
+      — The repo's first form page: kicker, 26/34 title, hairline, two `Field`s, two `Toggle`s
+      (through `lib/state/prefs.ts`), `Finish`. `lib/validate.ts` is the one reading both the inline
+      error and the gate use; `repo.currentProfile` / `isHandleTaken` / `saveProfile` are the three
+      profile methods the adapter now owns, and the debounced draft write is what makes *resumed
+      after abandonment* true. `session.setAccount` is how a saved display name reaches the store.
+      `Field.error` is live now (T-02 froze it at mount).
 - [ ] **T-08 Catalog card + grid.** Shared card (title header; avatar/tagline/tags middle;
       author + ratio footer), NSFW blur with per-item Reveal. Accept: blur covers only the middle;
       ratio visible while blurred; card opens detail.
