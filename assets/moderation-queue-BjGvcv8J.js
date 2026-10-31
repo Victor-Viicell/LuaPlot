@@ -1,0 +1,1 @@
+import{M as e,rt as t}from"./render-BZhEF_Ro.js";import{t as n}from"./PagePlaceholder-BDOSi4Uh.js";function r(){return t((t,r)=>{e(n,t,{path:`/moderation`,title:`Moderation`,note:`Admin queue of what JEV could not decide.`})})}export{r as ModerationQueue,r as default};

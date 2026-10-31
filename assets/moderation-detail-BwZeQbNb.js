@@ -1,0 +1,1 @@
+import{M as e,rt as t}from"./render-BZhEF_Ro.js";import{t as n}from"./PagePlaceholder-BDOSi4Uh.js";function r(){return t((t,r)=>{e(n,t,{path:`/moderation/[report.id]`,title:`Case`,note:`Review and conclude one case.`})})}export{r as ModerationDetail,r as default};
