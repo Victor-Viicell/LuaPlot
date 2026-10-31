@@ -32,7 +32,9 @@ import type {
   itemKindSchema,
   jevVerdictSchema,
   lorebookEntrySchema,
+  lorebookEntryWriteSchema,
   lorebookSchema,
+  lorebookWriteSchema,
   notificationKindSchema,
   notificationSchema,
   notificationTargetSchema,
@@ -91,6 +93,13 @@ export type Character = z.infer<typeof characterSchema>;
 export type CharacterWrite = z.infer<typeof characterWriteSchema>;
 export type LorebookEntry = z.infer<typeof lorebookEntrySchema>;
 export type Lorebook = z.infer<typeof lorebookSchema>;
+/**
+ * One entry row as the editor holds it (`lorebookEntryWriteSchema`): keywords as one typed line,
+ * content as typed. The adapter turns each into a stored `LorebookEntry` and numbers its id.
+ */
+export type LorebookEntryWrite = z.infer<typeof lorebookEntryWriteSchema>;
+/** One lorebook submission — the fields the author writes; id, author, clock and counts are the adapter's. */
+export type LorebookWrite = z.infer<typeof lorebookWriteSchema>;
 export type PresetSettings = z.infer<typeof presetSettingsSchema>;
 export type Preset = z.infer<typeof presetSchema>;
 export type Persona = z.infer<typeof personaSchema>;

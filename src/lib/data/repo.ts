@@ -22,6 +22,7 @@ import type {
   Handle,
   ItemKind,
   Lorebook,
+  LorebookWrite,
   Notification,
   Persona,
   Post,
@@ -169,6 +170,47 @@ export type Repo = {
    * `false` when the row is missing or another account's.
    */
   deleteCharacter(id: string): Promise<boolean>;
+
+  /**
+   * **Save** on `/lorebook/create` (`lorebook/create.md`): the write is `lorebookWriteSchema`-shaped
+   * and parsed here, so the form's gate and the stored row are one rule. The page hands the
+   * *write*, never a row — the adapter owns `id`, `author`, `verified: false`, the clock, the empty
+   * `tagline`, no tags and zero engagement.
+   *
+   * **The adapter numbers each entry's id** (`entry-1`, `entry-2` …) in the order the author left
+   * them: the form never invents a label, so two rows cannot collide, and `entries` may be empty
+   * (*No entries yet* is a form state, not a validation error). `null` on a failed parse.
+   */
+  addLorebook(input: LorebookWrite): Promise<Lorebook | null>;
+
+  /**
+   * **Save** on `/lorebook/[id]/edit` — **author only**, `null` for anyone else. `id`, `author`,
+   * `createdAt`, `isPublic` and the engagement counts are kept; `updatedAt` moves and `verified`
+   * clears, because *any edit clears the cached scan*. The entries are replaced wholesale by the
+   * write, renumbered, in the author's order.
+   */
+  updateLorebook(id: string, input: LorebookWrite): Promise<Lorebook | null>;
+
+  /**
+   * **Delete** on `/lorebook/[id]/edit` — **author only**, immediate. The lorebook row, its entries,
+   * its comment thread and the votes/bookmarks on it go together (`edit.md` → *Delete*: *takes the
+   * entries and the comment thread with it*).
+   *
+   * **It reaches no further**: a character that attaches this lorebook keeps the id in its
+   * `lorebookIds` and shows it as *unavailable*, and a session keeps the copy it started from.
+   * Stripping the id from those rows would erase a reference no author removed.
+   */
+  deleteLorebook(id: string): Promise<boolean>;
+
+  /**
+   * **Fork / copy** (`lorebook/detail.md`): a new lorebook owned by the viewer, with the metadata
+   * and **every entry as it now stands, keywords included**. Entries are renumbered for the copy, so
+   * a fork cannot inherit a duplicate label. Engagement, bookmarks and comments start at zero.
+   *
+   * `null` when the source is missing or private: a copy of a privated lorebook would republish what
+   * moderation took out of view.
+   */
+  forkLorebook(id: string): Promise<Lorebook | null>;
 
   /**
    * The lorebooks the picker may offer (`character/create.md` → *From a picker*): **the author's own

@@ -24,6 +24,9 @@ import {
   commentSchema,
   commentWriteSchema,
   handleSchema,
+  lorebookEntrySchema,
+  lorebookSchema,
+  lorebookWriteSchema,
   normaliseHandle,
   profileWriteSchema,
   reportOutcomeSchema,
@@ -250,6 +253,20 @@ function checkedLorebookIds(ids: string[], already: readonly string[]): string[]
     if (!attachableBook(id)) return null;
   }
   return ids;
+}
+
+/**
+ * The entries a write stores, in the author's order, with the **adapter's** labels: `entry-1`,
+ * `entry-2` … (`lorebook/detail.md`: an entry id is a short label, not an entity id). The form hands
+ * `{keywords, content}` rows and never an id, so two blocks cannot collide and a fork cannot inherit
+ * a duplicate. Each row is parsed through `lorebookEntrySchema` before it is stored.
+ */
+function numberEntries(
+  rows: { keywords: string[]; content: string }[],
+): z.infer<typeof lorebookEntrySchema>[] {
+  return rows.map((row, index) =>
+    lorebookEntrySchema.parse({ id: `entry-${index + 1}`, keywords: row.keywords, content: row.content }),
+  );
 }
 
 /**
@@ -778,6 +795,137 @@ export const memoryRepo: Repo = {
 
     recount(store);
     return true;
+  },
+
+  /**
+   * **Save** on `/lorebook/create` (`lorebook/create.md`). `lorebookWriteSchema` is parsed here before
+   * anything is stored, so the form's gate and the stored row are one rule, exactly as
+   * `addCharacter` does it.
+   *
+   * The adapter owns every entry's id: `entry-1`, `entry-2` … in the order the author left them, so
+   * the form cannot invent a collision and a fork cannot inherit a duplicate label. A new lorebook
+   * is published and unscanned; `tagline` and `tags` stay empty because the create form names
+   * neither.
+   */
+  async addLorebook(input) {
+    const parsed = lorebookWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const at = nowIso();
+    const row = lorebookSchema.parse({
+      kind: "lorebook",
+      id: freshId(),
+      name: write.name,
+      author: VIEWER,
+      tagline: "",
+      description: write.description,
+      nsfw: write.nsfw,
+      avatar: write.avatar,
+      entries: numberEntries(write.entries),
+      isPublic: true,
+      verified: false,
+      tags: [],
+      likes: 0,
+      dislikes: 0,
+      bookmarks: 0,
+      commentCount: 0,
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    store.lorebooks.push(row);
+    recount(store);
+    return row;
+  },
+
+  /**
+   * **Save** on `/lorebook/[id]/edit` — author only. Everything the author does not write on the row
+   * is kept (`id`, `author`, `createdAt`, engagement, `isPublic`); the entries are replaced wholesale
+   * and renumbered, `updatedAt` moves and `verified` clears.
+   */
+  async updateLorebook(id, input) {
+    const row = store.lorebooks.find((entry) => entry.id === id) ?? null;
+    if (!row || row.author !== VIEWER) return null;
+
+    const parsed = lorebookWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const next = lorebookSchema.parse({
+      ...row,
+      name: write.name,
+      description: write.description,
+      nsfw: write.nsfw,
+      avatar: write.avatar,
+      entries: numberEntries(write.entries),
+      verified: false,
+      updatedAt: nowIso(),
+    });
+
+    store.lorebooks.splice(store.lorebooks.indexOf(row), 1, next);
+    recount(store);
+    return next;
+  },
+
+  /**
+   * **Delete** — author only, immediate, with the entries and the whole comment thread. It reaches
+   * no further: a character's `lorebookIds` keeps the id (the attachment degrades to *unavailable*
+   * on its own page) and a session keeps the copy it started from.
+   */
+  async deleteLorebook(id) {
+    const index = store.lorebooks.findIndex((row) => row.id === id);
+    if (index < 0) return false;
+    if (store.lorebooks[index].author !== VIEWER) return false;
+
+    store.lorebooks.splice(index, 1);
+
+    const kept: Comment[] = [];
+    for (const row of store.comments) {
+      if (row.itemId !== id) {
+        kept.push(row);
+        continue;
+      }
+      votes.delete(voteKey("comment", row.id));
+      bookmarks.delete(voteKey("comment", row.id));
+    }
+    store.comments = kept;
+    votes.delete(voteKey("lorebook", id));
+    bookmarks.delete(voteKey("lorebook", id));
+
+    recount(store);
+    return true;
+  },
+
+  /**
+   * Fork: a new lorebook owned by the viewer, every entry copied as it stands and renumbered. A new
+   * item takes none of the original's engagement, bookmarks or comments, and starts unverified.
+   * Private rows are refused: a copy would republish what moderation removed.
+   */
+  async forkLorebook(id) {
+    const source = store.lorebooks.find((row) => row.id === id) ?? null;
+    if (!source || !source.isPublic) return null;
+
+    const at = nowIso();
+    const fork = lorebookSchema.parse({
+      ...source,
+      id: freshId(),
+      author: VIEWER,
+      entries: numberEntries(
+        source.entries.map((entry) => ({ keywords: entry.keywords, content: entry.content })),
+      ),
+      isPublic: true,
+      verified: false,
+      likes: 0,
+      dislikes: 0,
+      bookmarks: 0,
+      commentCount: 0,
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    store.lorebooks.push(fork);
+    return fork;
   },
 
   /**

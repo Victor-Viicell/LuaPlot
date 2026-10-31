@@ -3,6 +3,35 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-18 — the four lorebook routes, and the first entries editor (2026-10-31)
+
+- **Changed:** `lorebookWriteSchema` + `lorebookEntryWriteSchema` (+ `LOREBOOK_NAME_REQUIRED`,
+  `ENTRY_KEYWORD_REQUIRED`, `ENTRY_CONTENT_REQUIRED`, `splitKeywords`) in `schema.ts`, sharing T-17's
+  `initialsInputSchema`/`withInitials` rather than re-implementing them; `LorebookWrite` /
+  `LorebookEntryWrite` in `types.ts`; `repo.addLorebook` / `updateLorebook` / `deleteLorebook` /
+  `forkLorebook` with `numberEntries` numbering `entry-1…n` in the adapter. One form,
+  `components/LorebookForm.tsrx` (`lorebook: null` is create) with the entries editor — comma-separated
+  keywords, content, per-block Up/Down/Remove, **Add entry** appending — mounted by `/lorebook/create`
+  and `/lorebook/[id]/edit`; the edit page puts Delete at the foot, set apart. `/lorebook/[id]` inherits
+  the character detail page (square cover, counts, sheet with Fork/Bookmark/Report/Edit, owner notice,
+  two refusals) and renders the entry list in author order with keywords visible, no collapse or
+  paging; `Request public again` is drawn disabled. `/lorebook/catalog` is the character catalog with
+  the lorebook listing, and a card that adds nothing.
+- **Verified:** `scripts/check.sh` → GREEN (build, 30 routes, schema). Adapter exercised under `bun`
+  (scratch probe, not committed): `addLorebook` stored `author: you`, initials filled from the name,
+  `verified: false`, `isPublic: true`, entries `entry-1`/`entry-2` with keywords split. Then the
+  **live** build in Chromium at **360×740**: the catalog listed five lorebooks, *The Salt Archive*
+  detail drew 4 entries + 12 keyword chips at `scrollWidth` 360; the create form blocked Save while
+  the name was empty, printed `An entry needs at least one keyword.` under the empty block, then saved
+  *The Glass Orchard* and landed on its detail with both entries and `['orchard','glass','harvest','bell']`;
+  edit of a fixture preloaded four keyword lines and moved entry 2 above entry 1, and Save persisted
+  that order to detail. At **1200** the detail page is a 508px + 320px grid with a 320px cover,
+  `scrollWidth` 1190.
+- **Not verified:** delete was not clicked on the live build (the adapter path is T-17's, minus the
+  character attachments); fork, the owner's moderation notice on a private lorebook and the disabled
+  `Request public again` were not exercised — no owned-private lorebook fixture exists. `sm` (640)
+  was not measured on this page.
+
 ## T-17 — the character form, and the first authored write (2026-10-31)
 
 - **Changed:** `characterWriteSchema` (+ `CHARACTER_NAME_REQUIRED`, `LOREBOOK_NOT_ATTACHABLE`,

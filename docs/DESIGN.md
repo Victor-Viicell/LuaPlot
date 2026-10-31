@@ -793,6 +793,44 @@ consumer of `Session` before P2.
   the row is `verified: false` until JEV or a moderator looks at it — the same rule a new post
   follows. A tagline is not a field, so a character authored here carries `tagline: ""` and no tags.
 
+## Lorebook create and edit (decided in T-18, do not re-invent)
+
+`lorebook/create.md` fixes the form's parts and `lorebook/edit.md` leaves its frame *to be specified*.
+Both routes mount the **same** `components/LorebookForm.tsrx` (`lorebook: null` is create, a row is
+edit), and the frame is T-17's `CharacterForm` unchanged: one column at 360 in the spec's own order
+(identity → description → image and NSFW → entries → Save/Cancel), `md` splitting the image row, `lg`
+putting identity and media in a 320px right column with the entries across the full width. The
+differences are all about the **entries editor**, which T-19's settings form does not need and T-20
+(personas) does not have.
+
+- **Keywords are one comma-separated field per entry**, not the `TagPicker` chip list. An entry's
+  keywords are the entry's own vocabulary, not the item's tags, and at 360 a chip input inside a block
+  inside a list is three nested controls deep. The split lives in `lorebookEntryWriteSchema`
+  (`splitKeywords`), never in the page, so the inline error and the stored row cannot disagree. The
+  schema accepts the typed line **or** an already-split list, because the adapter parses the write
+  again and a schema must accept its own output.
+- **Add entry appends below the list.** The list reads in the author's order, and a block inserted at
+  the top would push the first entry down on every add.
+- **Reorder is two 44px buttons (Up / Down) on each block's header row, never a drag handle**: a phone
+  drag target is 20px, and the header already carries **Remove**. The first block's Up and the last
+  block's Down are `disabled` rather than hidden, so the row does not reflow as entries move.
+- **A block never collapses in the form**, even with many entries: the form is where every field is
+  meant to be editable, and a collapsed block would hide a validation error. Detail does not collapse
+  either (`detail.md`), but that is the read page's own rule.
+- **`entry-1`, `entry-2` … are the adapter's labels**, numbered in display order by `numberEntries`
+  in `memory.ts`. The form never invents an id, so two blocks cannot collide and a fork cannot inherit
+  a duplicate.
+- **A block's validation error is a template-owned paragraph**, not a `Field.error` prop: a prop
+  expression is evaluated once, so the line would never appear while the entry list kept its keys. The
+  schema's issue path (`entries.2.keywords`) is what picks the block.
+- **Delete sits at the foot of edit, after the form**, marked by the same 2px `--color-danger` rule and
+  confirming in place: `edit.md` requires it *set apart from the save controls so the two are never
+  adjacent*. Its sentence states the consequence once — entries and thread go, characters keep the
+  attachment listed as unavailable — and no reverse lookup is run.
+- **`Request public again` is drawn disabled** (owner, while private): `detail.md` names it but no
+  write exists, so it says *Not available yet* rather than pretending to succeed.
+- **Cancel differs by host**: catalog from create, detail from edit; Save lands on detail both ways.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

@@ -136,7 +136,9 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 - [x] **T-17 `/character/create` + `/edit`.** One-column form, avatar pick, SFW/NSFW toggle,
       lorebook attachments by ID and picker, unavailable rows kept. Accept: save publishes and
       lands on detail; invalid lorebook ID blocks with the spec's error.
-- [ ] **T-18 `/lorebook/*` (catalog, create, detail, edit).** Entries list, body editor.
+- [x] **T-18 `/lorebook/*` (catalog, create, detail, edit).** Entries list, body editor. Accept: a
+      lorebook saves with its entries, edit preloads them, reorder persists, and delete removes the row
+      without touching a character's attachment.
 - [ ] **T-19 `/preset/*` (catalog, create, detail, edit).** Generation settings form.
 - [ ] **T-20 `/persona` collection + create/edit/detail.** Default persona rules, delete moves the
       mark, never shared/flagged. Accept: deleting the default reassigns in one step.

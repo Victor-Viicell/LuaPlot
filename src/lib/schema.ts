@@ -226,10 +226,24 @@ export const LOREBOOK_ALREADY_ATTACHED = "That lorebook is already attached.";
  */
 export const lorebookIdSchema = z.string().trim().pipe(z.uuid(LOREBOOK_ID_INVALID));
 
-const characterInitialsSchema = z
+/**
+ * The initials a card draws, shared by both authored forms (`characterWriteSchema`,
+ * `lorebookWriteSchema`): upper-cased on the way in, four at most. One control, one rule.
+ */
+const initialsInputSchema = z
   .string()
   .transform((raw) => raw.trim().toUpperCase())
   .pipe(z.string().max(4, "Four letters at most."));
+
+/** Empty initials are filled from the name — the transform both authored writes share (T-17). */
+function withInitials<T extends { name: string; avatar: { initials: string } }>(value: T): T {
+  return {
+    ...value,
+    avatar: {
+      initials: value.avatar.initials === "" ? initialsOf(value.name) : value.avatar.initials,
+    },
+  };
+}
 
 export const characterWriteSchema = z
   .strictObject({
@@ -246,13 +260,10 @@ export const characterWriteSchema = z
       }),
     description: z.string().transform((raw) => raw.trim()),
     nsfw: z.boolean(),
-    avatar: z.strictObject({ initials: characterInitialsSchema }),
+    avatar: z.strictObject({ initials: initialsInputSchema }),
     lorebookIds: z.array(z.uuid()).transform((ids) => [...new Set(ids)]),
   })
-  .transform((value) => ({
-    ...value,
-    avatar: { initials: value.avatar.initials === "" ? initialsOf(value.name) : value.avatar.initials },
-  }));
+  .transform(withInitials);
 
 /**
  * `lorebook/detail.md`: entries are visible because *they are what decides when an entry is
@@ -269,6 +280,68 @@ export const lorebookSchema = authored("lorebook", {
   description: z.string(),
   entries: z.array(lorebookEntrySchema),
 });
+
+/* --- The lorebook form's write (T-18) ------------------------------------------------------------ */
+
+export const LOREBOOK_NAME_REQUIRED = "A lorebook needs a name.";
+export const ENTRY_KEYWORD_REQUIRED = "An entry needs at least one keyword.";
+export const ENTRY_CONTENT_REQUIRED = "An entry needs content.";
+
+/**
+ * **Keywords are typed as one comma-separated line** and split here, never in the page
+ * (`lorebook/create.md` → *Keywords*: *the words an entry is matched on; at least one per entry*).
+ * `entry-1`, `entry-2` … are **not** the author's to invent: the adapter numbers them on write, so
+ * two entries in one form cannot collide and a fork cannot inherit a duplicate label.
+ *
+ * An entry is one row of the editor: its keywords as typed, its content as typed. The shape the row
+ * is stored in is `lorebookEntrySchema` and stays the only row shape — this is the input to it.
+ */
+export function splitKeywords(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((word) => word.trim())
+    .filter((word) => word.length > 0);
+}
+
+export const lorebookEntryWriteSchema = z.strictObject({
+  /**
+   * Accepts the typed line **or** an already-split list: the form hands strings, and the adapter
+   * parses the write again, so the schema has to accept its own output or a second parse would
+   * refuse a write the first one just normalised (T-18).
+   */
+  keywords: z
+    .union([z.string(), z.array(z.string())])
+    .transform((raw) => (Array.isArray(raw) ? raw : splitKeywords(raw)))
+    // Trimmed and deduped in typed order: a keyword twice is one keyword.
+    .transform((words) => [...new Set(words.map((word) => word.trim()).filter((word) => word.length > 0))])
+    .pipe(z.array(z.string().min(1)).min(1, ENTRY_KEYWORD_REQUIRED)),
+  content: z
+    .string()
+    .transform((raw) => raw.trim())
+    .pipe(z.string().min(1, ENTRY_CONTENT_REQUIRED)),
+});
+
+/**
+ * The lorebook form's one shape (`lorebook/create.md`, and `edit.md` is the same form), parsed by
+ * `LorebookForm` **and** again by `repo.addLorebook` / `repo.updateLorebook` — the pattern
+ * `characterWriteSchema` established in T-17.
+ *
+ * Deliberately no `tagline` (`luaplot-pages.md`: a lorebook has none, so the card's stays `""`) and
+ * no tags (the taxonomy is undecided). `entries` may be empty: *No entries yet* is a state of the
+ * form, not a validation error.
+ */
+export const lorebookWriteSchema = z
+  .strictObject({
+    name: z
+      .string()
+      .transform(normaliseDisplayName)
+      .pipe(z.string().min(1, LOREBOOK_NAME_REQUIRED)),
+    description: z.string().transform((raw) => raw.trim()),
+    nsfw: z.boolean(),
+    avatar: z.strictObject({ initials: initialsInputSchema }),
+    entries: z.array(lorebookEntryWriteSchema),
+  })
+  .transform(withInitials);
 
 /**
  * `preset/create.md`: the generation surface is not finalised, so `settings` is a flat list of
