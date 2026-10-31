@@ -23,6 +23,27 @@ semantic aliases only.** Flavours: Mocha (default dark), Latte, Frappé, Macchia
 - Surfaces: `--color-bg` page, `--color-bg-elevated` panels, `--color-surface` inputs and cards.
 - Danger is `--ctp-red` and is only for destructive actions, moderation states, and errors.
 
+### Contrast (measured in T-37, do not re-litigate by eye)
+
+Every pair below was computed from the tokens, then re-measured in the browser on the real pages.
+WCAG AA wants **4.5:1** for text under 18.66px — which is all of this app's type.
+
+- `--color-text` on any surface: 8.69–12.14:1 (Mocha). Never the problem.
+- **`--color-text-subtle` is `--color-text-muted`'s value**, not a dimmer step: overlay-1 measured
+  4.44:1 on the page and **3.40:1 on a card**, and Catppuccin's next step up (overlay-2, 4.45 on a
+  card) still misses. The label tier is 12px uppercase + `.08em`, and **size and tracking carry it
+  now, not tone** — a label may not be dimmer than the prose it sits beside.
+- `--color-text-muted` is `subtext-0`, except **Frappé and Latte** where it is `subtext-1`
+  (subtext-0 measured 4.26 / 3.20:1 on their own card surface). A flavour-specific step in the
+  theme block is legal; a hex in a page never is.
+- `--color-accent-contrast` is `--ctp-base`, not `--ctp-crust`: the primary button's label measured
+  **4.09:1 on Latte** with crust. base gives 8.07 / 4.79 / 5.60 / 6.84 across the four flavours.
+- `--color-avatar-text` (`muted`, `--ctp-text` in light flavours) exists because initials are text
+  on `--color-surface` where the muted tier measured 4.05:1 on Latte.
+- **Known gap, filed as T-37B:** Latte's active tab label (`--color-accent` on
+  `--color-bg-elevated`) is **4.45:1**, 0.05 short, and Latte has no darker mauve. Nothing else in
+  the default (Mocha) flavour fails: a full six-page walk at 360×740 finds **0** failing text pairs.
+
 ## Type
 
 - One family: JetBrains Mono Variable (`--font-body`). No second font, no serif accents.

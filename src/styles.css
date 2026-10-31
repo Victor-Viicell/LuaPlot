@@ -42,12 +42,20 @@
     --color-surface-hover: var(--ctp-surface-1);
     --color-border: var(--ctp-surface-1);
     --color-border-strong: var(--ctp-surface-2);
+    /* T-37: initials sit on --color-surface, where the muted tier measured 4.05:1 on
+       Latte. Dark flavours keep the muted value; light flavours step to --ctp-text. */
+    --color-avatar-text: var(--color-text-muted);
     --color-text: var(--ctp-text);
     --color-text-muted: var(--ctp-subtext-0);
-    --color-text-subtle: var(--ctp-overlay-1);
+    /* T-37: 12px labels sit on --color-surface too, and overlay-1 measured 3.40:1 there
+       (4.44:1 on the page). The label tier is the muted tier's value; size and the
+       .08em tracking carry the distinction now, not tone. Overridden per flavour below. */
+    --color-text-subtle: var(--color-text-muted);
     --color-accent: var(--ctp-mauve);
     --color-accent-hover: var(--ctp-lavender);
-    --color-accent-contrast: var(--ctp-crust);
+    /* T-37: crust on mauve measured 4.09:1 on Latte (the primary button's label).
+       base is the same step every flavour already draws the button on: 8.07 / 4.79 / 5.60 / 6.84. */
+    --color-accent-contrast: var(--ctp-base);
     --color-success: var(--ctp-green);
     --color-warning: var(--ctp-yellow);
     --color-danger: var(--ctp-red);
@@ -93,6 +101,12 @@
         --ctp-blue: #1e66f5;
         --ctp-lavender: #7287fd;
         color-scheme: light;
+
+        /* T-37: Latte's subtext-0 measured 4.37:1 on the page and 3.20:1 on a card, so the
+           prose tier steps down to subtext-1 (5.53 / 5.14); the card's own pair is still
+           short (4.05) — recorded in docs/PROGRESS.md, not faked with a hex. */
+        --color-text-muted: var(--ctp-subtext-1);
+        --color-avatar-text: var(--ctp-text);
     }
 }
 
@@ -124,6 +138,12 @@
     --ctp-blue: #1e66f5;
     --ctp-lavender: #7287fd;
     color-scheme: light;
+
+    /* T-37: Latte's subtext-0 measured 4.37:1 on the page and 3.20:1 on a card, so the
+       prose tier steps down to subtext-1 (5.53 / 5.14). The card's own pair is still
+       short (4.05) — recorded in docs/PROGRESS.md, not faked with a hex. */
+    --color-text-muted: var(--ctp-subtext-1);
+    --color-avatar-text: var(--ctp-text);
 }
 
 :root[data-theme="frappe"] {
@@ -154,6 +174,10 @@
     --ctp-blue: #8caaee;
     --ctp-lavender: #babbf1;
     color-scheme: dark;
+
+    /* T-37: subtext-0 measured 4.26:1 on this flavour's card surface, so the prose tier
+       takes subtext-1 (6.75 page / 5.19 card) and the label tier follows it. */
+    --color-text-muted: var(--ctp-subtext-1);
 }
 
 :root[data-theme="macchiato"] {
@@ -1386,7 +1410,7 @@ a.post-time:hover {
     border: 1px solid var(--color-border-strong);
     border-radius: 2px;
     background-color: var(--color-surface);
-    color: var(--color-text-muted);
+    color: var(--color-avatar-text);
     font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.02em;

@@ -4,6 +4,38 @@ Append-only. Newest first. Every entry: ticket, what changed, what was verified 
 could not be verified.
 
 
+## T-37 — contrast fixed at the token, and the rest measured (2026-10-31)
+
+- **Changed:** `src/styles.css` only — no component, no page, no dependency. `--color-text-subtle`
+  is now **the muted tier's value** (overlay-1 measured 4.44:1 on the page and 3.40:1 on a card;
+  a 12px label cannot take that), so the label tier is carried by size and `.08em` tracking instead
+  of a dimmer tone. `--color-text-muted` steps to `subtext-1` on **Frappé and Latte** (subtext-0
+  measured 4.26 / 3.20:1 on their card surface). `--color-accent-contrast` is now `--ctp-base`
+  (crust on mauve was 4.09:1 on Latte, the primary button's own label). One new named token,
+  `--color-avatar-text` (muted in dark, `--ctp-text` in light — initials sat at 4.05:1 on Latte's
+  surface). Every value is a Catppuccin ramp step; no hex entered app code.
+- **Verified:** `scripts/check.sh` GREEN; live 200. Measured in the browser at 360×740 over `/`
+  `/post/thread` `/post/<id>` `/character/<id>` `/bookmarks` `/moderation?admin=1`, walking every
+  element with a text node, resolving its effective background through the ancestor chain and
+  computing WCAG ratios on the computed colours: **dark (Mocha) 0 failing text pairs — was 20+
+  (subtle at 2.83–3.40:1, the primary button at 4.09:1 in light)**; light (Latte) 4, all one pair
+  (below). Also measured: **0 unnamed focusables** across the six routes at 360 and 1280 (AX tree,
+  roles button/link/textbox/combobox/tab/checkbox), **0 positive `tabindex`** anywhere and a
+  55-stop tab sequence that follows DOM order, **no page-level horizontal scroll** in 35
+  width/route pairs (320/360/400/640/900/1200/1280), and **no layout shift on fonts**: all six
+  `@font-face` rules carry `font-display: swap`, and the header measures **56px with the woff2
+  loaded and 56px with `*woff2*` blocked** (`body` 740 in both).
+- **Bundle, recorded so nobody hunts it again:** `dist` 1.1 MB; every JS chunk 728 KB raw /
+  **186,716 B gz**; CSS **23,783 B gz** (236 KB raw); the only asset over 40 KB is the JetBrains
+  Mono Latin woff2 at 40,404 B. The ticket's < 300 KB gz budget is met with ~113 KB to spare.
+- **Not verified / known fail:** Latte's **active tab label** is `--color-accent` on
+  `--color-bg-elevated` = **4.45:1**, 0.05 short, and Catppuccin Latte has no darker mauve step —
+  closing it means inventing a colour or moving the tab bar's surface, i.e. a design decision, filed
+  as **T-37B**. Frappé and Macchiato were computed token-by-token, not walked in the browser.
+  Tap targets: the project's 44px rule still fails for **card-footer author links (16–21px tall,
+  inline text so WCAG 2.2 `2.5.8` exempts them)** and **avatar links at 36×36** (AA's 24×24 floor
+  passes) — recorded, not redesigned inside a measurement ticket.
+
 ## T-28B — a post can be removed (2026-10-31)
 
 - **Changed:** `postSchema` grew `status: z.enum(["visible","removed"])` (one new `postStatusSchema`,

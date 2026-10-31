@@ -219,8 +219,12 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 
 ## P6 — Release
 
-- [ ] **T-37 Accessibility + perf pass.** Focus order, labels, contrast ≥ 4.5, bundle < 300KB gz,
+- [x] **T-37 Accessibility + perf pass.** Focus order, labels, contrast ≥ 4.5, bundle < 300KB gz,
       no layout shift on fonts.
+- [ ] **T-37B Light-flavour contrast.** Latte's active tab label is 4.45:1 (`accent` on
+      `bg-elevated`) and its `--color-surface` cannot carry the prose tier (4.05); dark flavours
+      measure clean. Needs a decision — a darker light-mode accent ramp, or a lighter surface —
+      not a hex in a page.
 - [ ] **T-38 End-to-end smoke.** Scripted walk of the 12 primary journeys against the Pages build.
 - [ ] **T-39 Release.** Signed Android APK, desktop AppImage, README with links, tag `v0.1.0`.
 
