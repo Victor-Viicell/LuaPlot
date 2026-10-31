@@ -120,9 +120,9 @@ character form's picker has only one real lorebook to offer until this exists.
 - **`repo.appendReply(id, text)` exists** — the model's write path; do not add a second one.
 - **The `Preview mode` chip lives in the session's composer meta line**, because `/session/…` hides
   the shell's top bar. Any other surface that shows a mock answer needs its own marker.
-- **The T-17 form was not seen in a browser** — no Chromium pass that tick: layout, the in-place
-  delete confirmation and the unavailable-row rendering rest on build + code alone. Confirm them
-  against the preview while T-18 is open, or the first phone review will.
+- **The T-17 form is proven at 360 only** — the live build was driven in Chromium at 360×740 (save →
+  detail, edit preload, bogus-ID error, in-place delete → catalog), but the 900/1200 layout and the
+  *unavailable* attachment row were not measured.
 - **Counts now: characters 28 (27 public), lorebooks 6, presets 5, personas 3, posts 12, reports 5,
   comments 22, sessions 2.**
 

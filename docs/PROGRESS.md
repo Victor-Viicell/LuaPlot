@@ -22,11 +22,18 @@ could not be verified.
   update → renamed, in-session name `Tess`, initials `TH`, `createdAt` kept, `verified` cleared;
   a private book by `quill` refused by both the write and `attachableLorebook`; updating/deleting
   another author's character answers `null`/`false`; delete cascades the row and leaves the lorebook.
-  Published: `LIVE=https://victor-viicell.github.io/LuaPlot/` → 200 (asset 200 too).
-- **Not verified:** the form in a real browser this tick (no Chromium pass): the 360/900/1200 layout,
-  the in-place delete confirmation and the unavailable-row rendering are proven by build + code, not
-  by a screenshot. A separate `personality` field is not stored (one description field, per the spec's
-  single bullet) — filed in `NEXT.md`.
+  Then the **live** build in a real Chromium at **360×740**: `/character/create` renders the form
+  (5 fields, picker offering *The Salt Archive*), `requestSubmit` with Name "Probe Two" saved and
+  landed on `/character/<new id>` as *Probe Two / @you / PR*, `scrollWidth` 360 (no horizontal
+  scroll); an in-app push to `/character/<id>/edit` preloaded Name, initials and definition; a bogus
+  lorebook id printed the schema's sentence (`A lorebook ID is a 36-character code…`) and attached
+  nothing; Delete swapped to the in-place sentence → *Confirm delete* → `/character/catalog` with the
+  row gone. Published: `LIVE=https://victor-viicell.github.io/LuaPlot/` → 200 (asset 200 too).
+- **Not verified:** the **900 / 1200** layout was not measured this tick (the pass was 360 only), and
+  no fixture exercises the *unavailable* attachment row in a browser — the rule is proven by the
+  adapter probe (an id already on the row survives a re-save), not by a screenshot. A separate
+  `personality` field is not stored (one description field, per the spec's single bullet) — filed in
+  `NEXT.md`.
 
 ## T-16 — the model seam answers, and says that it is a preview (2026-10-31)
 
