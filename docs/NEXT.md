@@ -1,159 +1,105 @@
 # Baton — what the next session does
 
-**Ticket: T-13 — the public timeline at `/post/thread`.**
+**Ticket: T-14 — `/post/[id]` and `/post/create`.**
 
-Spec: `src/specs/pages/post/thread.md` (the whole file — one column of post cards under a single
-control row; sort in the URL; filter `All` only; the account's Show/Blur toggles; **Create** at the end
-of the row; the card's own structure; attachment rendering with **Show more** for a cut; **Load more**
-appends 24 and stays out of the URL; Loading / Empty / Error / End of feed) plus
-`src/specs/luaplot-pages.md` → *Conventions* (the card structure posts use, paging, query-string state)
-and `src/specs/systems/nsfw.md` (Show off ⇒ **NSFW posts are absent from the feed**, which is not the
-blur). `docs/DESIGN.md` → *Card and grid*, *Catalog* and *Report dialog* are the laws already in force.
+Specs: `src/specs/pages/post/detail.md` (the whole file — Layout is *To be specified*, so its layout
+choices must be recorded in `docs/DESIGN.md` in the same commit) and
+`src/specs/pages/post/create.md` (one column: body with inline images, attachment picker, NSFW toggle,
+Publish / Cancel; sender attribution only once a cut is attached; the panel-over-the-page form too).
+`src/specs/luaplot-pages.md` → *Conventions* (a post's parts, paging, query-string state) and
+`docs/DESIGN.md` → *Thread* (T-13's post card) are the law already in force. T-14 is also the first
+surface that must decide whether a post's image is a **reportable part** (`components/report.md` →
+*What can be reported*; `reportPartSchema` has no attachment value today).
 
-Why next: `/post/thread` is on the tab bar (a live destination) and still T-01's `PagePlaceholder`;
-every other page in P1 that a reader can tap is built. It is also the first surface that needs a **post
-card**, which T-14 (`/post/[id]`) and T-30's profile reuse.
+Why next: `/post/[id]` is the permalink `PostCard` already links to (the comment count and the
+`<time>`), and it is the second caller of both `CommentThread` and `ReportDialog` — the two components
+whose reuse T-14 proves. `/post/create` is the only way to make a post, and the thread's **Create**
+control points at it today as a placeholder.
 
 ## Approach
 
-1. **`src/components/PostCard.tsrx`** — the structure the conventions fix for posts: `.card-head` (the
-   poster's `Avatar` + `@handle` + `<time>`), `.card-middle` (the body, its inline images), `.card-foot`
-   (likes, dislikes, comment count). **`Card` has no post branch and must not grow one**: a post has no
-   `name`/`tagline`, and a card whose title slot is empty is a card that reads broken. Record the split
-   in `docs/DESIGN.md` under *Card and grid* in this same commit.
-2. **The comment count opens the permalink**, not a thread: the feed never renders a comment. Wrap the
-   count in an anchor to `/post/[id]` (`href()`), 44px tap target.
-3. **The attachment renders in the card**, under the body, from `postAttachmentSchema`'s two kinds: a
-   `character` shows avatar + name + tagline; a `cut` shows its first messages with the rest folded
-   behind **Show more**, which expands **in place** (a per-card `track()`, never a route change).
-4. **Controls** — one row at 360, spread at `sm`: a `Select` for sort (`newest` / most discussed / most
-   liked), a filter reading `All` only (a `Select` with one option, or a disabled-looking chip — pick one
-   and say why in DESIGN), the two NSFW `Toggle`s (they write the **account**, `repo.savePreferences`),
-   and **Create** as the row's last control → `/post/create` (still T-14's placeholder).
-5. **Sort lives in the query string** (`?sort=…`), like the catalog's; page state stays in the component.
-   `repo.listPosts({ sort, page })` already exists — `newest` sorts on `createdAt`, and the other two
-   need a decision (see Open decisions).
-6. **Load more** appends the next 24 (`hasMore` from the listing); paging never enters the URL. The
-   bottom of the column reads **End of feed** when `hasMore` is false.
+1. **`/post/[id]` reuses `PostCard` for the body and adds only what a permalink adds**: the vote pair,
+   bookmark, Report, Delete (author only, and it takes the whole comment thread with it), and
+   `CommentThread` beneath. The cut renders **in full** here — no fold, no Show more — and a character
+   attachment renders as its card with a link. A cut has **no link back** to its session: it is text.
+2. **Engagement is the detail page's**: ratio percentage from `percent(ratioOf(post))` with the raw
+   like and dislike counts beside it, plus the comment count — never a fraction.
+3. **`/post/create` is one form**: body (a `Field`-style textarea, no image uploader until an
+   uploader exists — say so in DESIGN rather than draw a button that does nothing), attachment picker
+   over the author's own characters and cuts, NSFW toggle, Publish / Cancel. Empty body is the only
+   hard gate today (`postWriteSchema` must be added to `schema.ts`, `safeParse`d at the form edge and
+   again in `repo.addPost`).
+4. **Attaching another author's item must be impossible** — that is T-14's accept line. The picker
+   lists `repo.listCharacters()` filtered to `author === viewer`, and the *write* verifies it too
+   (the adapter refuses an id the viewer does not own), so the picker cannot be the only guard.
+5. **`postAttachmentSchema` has no image field and `reportPartSchema` has no attachment value.** Do not
+   invent either: if the post's image is to be reportable, that is a spec change in `report.md`, and
+   the honest interim is the text-only report the thread already offers.
 
 ## Traps
 
 - **`@empty` does not parse** in ripple 0.4.7 — write the explicit `@if (…length === 0) … @else`.
 - **`@for (const row of …; key row.key)`** — `@for (row of …)` without `const` is a compiler crash.
 - **`@else {` with two nodes needs a fragment** `<>…</>`, or the compile fails with *"A code block
-  renders a single node"*. The same applies to **every** branch with two children, including a `@for`
-  body's siblings — T-12 hit this five times in one file.
-- **A standalone `<style>` block must be inside a fragment** with the markup it styles: `<><style>…</style><div>…</div></>`.
-- **A `const`/`track()` below an `@if`/`@for`** rendered nothing in T-09 — declare the card's state at the
-  top of the component and keep the branch on that track.
-- **A page cannot style a primitive's `.btn`/`.field`** — the pattern for "full width at 360, inline from
-  `sm`" is a page-owned wrapper that is `display: grid` (T-09's `.start`, the composer's `.post`).
-- **`auto` grid/`flex` columns sized by a long caption starve their neighbours** (T-09's 26px search
-  box). At 360 the control row wraps; do not put the filter caption inside a `flex: 1` cell.
-- **A gallery/stage cannot prove a viewport media query.** Measure 360/640/900/1200 with CDP
-  `Emulation.setDeviceMetricsOverride`, as T-09/T-10/T-11/T-12 did.
-- **A base rule declared AFTER a `@media` block wins at every width.** Both selectors have the same
-  specificity, and cascade order beats the query — T-13's `.head`-style grids will hit this. Declare
-  base placement first, the `@media` override second, and measure at 640 before believing the split.
-- **Show off removes NSFW posts from the feed**, it does not blur them (`thread.md` → URL). Blur is a
-  *listing* preference for what stays visible. Read `nsfw.md` before wiring the pair: they are
-  independent, and Show on + Blur on is legal.
-- **The memory store resets on a hard reload** — a "the toggle sticks" claim has to be proven with in-app
-  navigation (`history.back()` or a `pushState` + `popstate`), not a reload.
-- **`repo.listPosts` pages 24 and the fixtures hold 12 posts**, so `hasMore` is false and **Load more**
-  is unreachable until the fixtures grow. Either add ≥13 posts (and update the counts line in
-  `docs/NEXT.md`'s *Found while working*) or land the control and record that its append path is
-  unverified — do not pretend.
-- **A post's `verified` flag and open cases leave no mark on a card** (`thread.md` → Data): a reported
-  post renders exactly like any other. Do not add a badge.
-- **The post body is `z.string().min(1)` and never edited** — no edit affordance on any card.
+  renders a single node"* — every branch with two children, including a `@for` body's siblings.
+- **A standalone `<style>` block must be inside a fragment** with the markup it styles.
+- **A `const`/`track()` below an `@if`/`@for`** renders nothing — declare state at the top.
+- **A prop expression is evaluated once.** T-13's card takes the whole `people` record because
+  `character={people[id]}` froze on the `null` it saw before the lookup answered. Same trap as `blur`.
+- **A discriminated union cannot be narrowed inside a template block**: T-13 flattened the attachment
+  to a plain object with a `shown` flag in a derived. Do the same for the cut's messages.
+- **A page cannot style a primitive's `.btn`/`.field`** — use a page-owned wrapper.
+- **A base rule declared AFTER a `@media` block wins at every width.** Same specificity, cascade order
+  beats the query. Declare base placement first, then measure at 640.
+- **Measure 360/640/900/1200 with CDP `Emulation.setDeviceMetricsOverride`** — a screenshot cannot
+  prove a media query.
+- **The memory store resets on a hard reload** — any "it sticks" claim needs in-app navigation.
+- **`publish.sh` compares the live bundle hash**; a Pages 200 alone can still be the previous deploy.
+- **A post's `verified` flag and open cases leave no mark** (`thread.md` → Data): do not add a badge.
+- **Delete takes the thread with it** — the adapter must drop the comments, not orphan them, and the
+  feed/detail must then answer the not-found state.
 
 ## Open decisions
 
-- **Where "most discussed" / "most liked" sort.** `SortOrder` today is `newest | oldest | ratio | name`
-  and `listPosts` maps two of them onto engagement. Either extend `SortOrder` (a repo change shared with
-  every listing) or sort the page's rows in the page (wrong past page 1). Prefer the adapter, and record
-  the new order names in `ARCHITECTURE.md` → Data in the same commit.
-- **Where the NSFW exclusion happens.** Filtering the drawn page after a 24-row read makes `Load more`
-  count the wrong things; the honest fix is a `listPosts` that reads the account's Show flag. Pick one,
-  say why in `DESIGN.md` → *Catalog* or a new *Thread* section.
-- **The filter control with one option.** A `Select` with `All` alone looks broken; a non-interactive
-  chip labelled `All` is honest. Pick one and record it — do not invent tags the taxonomy has not
-  decided (`repo.listTags("post")` answers `[]`, which is why the filter is `All` only).
-- **Cut attachments in the feed**: how many messages before the fold? The spec says *its first messages*
-  — pick 2 (one character turn, one user turn) and record it.
+- **The composer's image/GIF insertion.** There is no uploader and no storage: either draw nothing and
+  record it, or draw a disabled control. Prefer nothing, and say so in DESIGN → *Thread*.
+- **Where the create form lives.** The spec wants the same form as a panel over the thread and over a
+  session. Build the route first; a `Sheet` host is a second decision, and the session instance only
+  exists once T-15 lands.
+- **Cut attribution.** `cutMessageSchema` carries `attribution` per message, so the persona-vs-`User`
+  choice is a **text written at publish time** — record how the composer stamps it.
 
 ## Found while working (carried forward — keep this list growing)
 
-- **Nothing of T-13 exists yet**: no `src/components/PostCard.tsrx`, no `src/pages/post/`. The tick that
-  was handed T-13 found a killed session's half-landed cover edit on `/character/[id]` instead, finished
-  it (T-12 follow-up, now committed and measured) and spent its budget there. Start T-13 at step 1.
-- **A held report opens no case.** `report.md` says a report on already-verified content *starts no scan
-  until the content changes*, so `addReport` records it for the viewer and opens nothing; `/moderation`
-  therefore has **no view of held reports** yet. If a moderator needs them, that is a queue question
-  (a third listing), not a write question. T-12.
-- **A case opened at runtime carries `jev: { verdict: "unsure", confidence: 0.5, action: "none" }`** — the
-  queue must render *not scanned yet* from that, not from a missing verdict. T-12.
-- **`reportPartSchema` has no attachment value**, so a post's image can only be reported as text today:
-  the dialog offers text-only for a `post` target. Adding a part is a **spec** question (`report.md` →
-  *What can be reported*), decided in T-14 at the earliest.
-- **The comment footer does not mark a row as already reported**; the dialog's record is the state.
-  A per-row flag would cost one `myReport` read per row — do it only if a reader is actually confused.
-- **T-12's `PARTS_BY_KIND` lives in `ReportDialog.tsrx`**, not in the schema: it is a *surface* rule, not
-  a shape. If a second surface needs another part, widen the table there rather than in `schema.ts`.
-- **A same-document `hashchange` is not handled by the comment thread** (T-11): the `#comment-[id]`
-  anchor expands and scrolls only at mount. An in-app link to an anchor on the page already open does
-  nothing. No surface produces such a link yet; when one does, add a listener **and** a way to remove
-  it, or the handler outlives the page.
-- **`status: "removed"` has no fixture.** The *removed by moderation* placeholder is the same code
-  path as a deletion and is unreachable in the preview. A comment under `REPORT(5)`'s case would make
-  it real; not invented because no spec names which comment is removed.
-- **Comment attachments are not drawn** (`comment-thread.md` → *Attachments*: PNG/JPEG/WebP/GIF, four
-  per comment, 10 MB each): `commentSchema` has no attachment field until an uploader exists.
-- **`sessionSchema.personaId` is optional now** (T-10B): an account with no persona starts an
-  unattributed session and the user's side reads `User`. T-15 must render a session without one.
-- **`repo.createSession` always appends.** The one-session rule lives in the character page's primary
-  control (`findSessionForCharacter`), not in the write. Do not "fix" it into the adapter.
-- **Rows created at runtime take `crypto.randomUUID()`.** `src/lib/fixtures/ids.ts` buckets are for
-  fixtures only.
-- **The memory store resets on a hard reload.** Any "this survives" claim needs in-app navigation.
-- **Continue and New session land on `/session/[id]`, still T-15's placeholder.**
-- **`repo.forkCharacter` refuses a private source** and the page hides **Fork** for the same reason.
-- **The adapter's listing filter is `isPublic` only**; owner visibility is the detail page's rule. The
-  catalog is 27 public characters over two pages (24 + 3).
-- **`repo.myVote(kind, id)` / `repo.myReport(kind, id)`** exist — every vote and report surface uses
-  them, never a page-local flag that dies on a remount.
+- **Load more is unverified on the thread**: 12 fixtures against a 24-row page. Growing `POSTS` past
+  25 is the cheapest way to prove the append path, and it also gives T-14 a longer thread to sit in.
+- **`PostCard` folds a cut at two messages** behind Show more; the permalink must draw **all** of them,
+  so the card needs a `fold` prop (or the detail page its own drawing) — decide and record it.
+- **A held report opens no case** (T-12): `/moderation` has no view of held reports. A queue question.
+- **A case opened at runtime carries `jev: { verdict: "unsure", confidence: 0.5, action: "none" }`** —
+  the queue renders *not scanned yet* from that.
+- **`reportPartSchema` has no attachment value**, so a post's image can only be reported as text.
+- **`status: "removed"` has no fixture**; the removed-by-moderation placeholder is unreachable.
+- **Comment attachments are not drawn** — `commentSchema` has no attachment field until an uploader.
+- **`sessionSchema.personaId` is optional** (T-10B): an account with no persona starts an unattributed
+  session. T-15 must render a session without one.
+- **`repo.createSession` always appends**; the one-session rule lives in the character page.
+- **Rows created at runtime take `crypto.randomUUID()`**; fixture id buckets are fixtures only.
+- **`repo.myVote(kind, id)` / `repo.myReport(kind, id)`** exist — never a page-local flag.
 - **`router.ts` has `useParams()`.** Do not parse `location.pathname` in a page.
-- **`listReports` filters open cases by default**; the owner's notice takes its own case out of
-  `listReports({ status: "all" })`.
-- **A page's scoped `<style>` cannot touch a primitive's elements** (T-09).
-- **`Zod` costs +26.4 KB gzip on the boot chunk** (`router` imports `isHandle`). `zod/mini` or a lazy
-  router import is the lever if a bundle budget is named.
-- **`z.uuid()` is stricter than the router's `[0-9a-f-]{36}`.** They agree on every real id today.
-- **`repo.saveProfile` + `session.setAccount` is the pair for any account write**; `savePreferences`
-  is its sibling for the NSFW two.
-- **`src/specs/components/` has only `comment-thread.md` and `report.md`** — a post card has no spec of
-  its own, so `luaplot-pages.md` §Conventions plus `DESIGN.md` are the law for it (this is T-13's first
-  decision).
-- `session.ts` still seeds `you` signed in and the overflow menu still carries the *Preview only*
-  switch; `/dev/state` shows the pair. T-30 deletes both.
-- **`publish.sh` compares the live bundle hash**; a Pages 200 alone can still be the previous deploy.
+- **A page's scoped `<style>` cannot touch a primitive's elements.**
+- **Zod costs +26.4 KB gzip on the boot chunk**; `zod/mini` is the lever if a budget is named.
 - **Counts now: characters 28 (27 public), lorebooks 6, presets 5, personas 3, posts 12, reports 5,
-  comments 22, sessions 2.** `COMMENTS` carries four replies under `COMMENT(13)` on `CHARACTER(1)` and
-  `COMMENT(22)` is the NSFW body cover — keep both when a fixture moves.
-- **`commentBodySchema` has no `min(1)`**; the required-text rule lives on `commentWriteSchema`.
-- **The comment tree is not capped, only the drawing is.**
-- **`Select` and `TagPicker` exist** (`src/components/`, styled in `styles.css`): reuse them rather than
-  growing a segmented row or a custom dropdown — T-13's sort and filter should be a `Select`.
-- **Tags are authored; characters carry ten** (`artisan, authority, creature, debt, family, ghost,
-  harbor, ritual, sea, shopkeep`). Lorebooks, presets and posts have none.
-- **`schema.ts` owns the report copy** (`REPORT_WHAT_REQUIRED`, `REPORT_SOURCE_REQUIRED`, …) so the
-  dialog, the step gates and the adapter print the same sentence. Any new form's message belongs there.
+  comments 22, sessions 2.**
+- **The item cover is `Avatar size="hero"`** — full content width and 1:1 on a phone, a 320px column
+  from `sm`, monogram initials. Lorebook and preset detail pages are placeholders and inherit it.
+- **`schema.ts` owns form copy** (`REPORT_WHAT_REQUIRED`, …) so gate, inline error and adapter print
+  the same sentence. The composer's empty-body message belongs there.
 
 ## After this
 
-**T-14** mounts `/post/[id]` + `/post/create` — the second caller of both `CommentThread` and
-`ReportDialog`, and the first to decide whether a post's image is a reportable part.
+**T-15** mounts `/session/[id]`: transcript, composer, awaiting state, and the publish-a-cut flow that
+T-14's composer will be opened from.
 
 ## When blocked
 

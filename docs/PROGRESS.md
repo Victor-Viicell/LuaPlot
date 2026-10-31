@@ -3,6 +3,28 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-13 — the public timeline at `/post/thread` (2026-10-30)
+
+- **Changed:** `src/components/PostCard.tsrx` (new primitive: `.post-head` poster + `<time>`, `.post-middle`
+  body + attachment behind the card's blur, `.post-foot` likes / dislikes / comment count) and
+  `src/pages/post-thread.tsrx` (control row → sort, `All` chip, Show/Blur pair, **Create**; one column of
+  cards; Loading / Empty / Error / End of feed; Load more appended from `hasMore`). `SortOrder` gained
+  `discussed` and `liked` (`commentCount`, `likes`, `createdAt` tie-break) with a `newest` fallback for
+  every other listing; `docs/ARCHITECTURE.md` → *Data* and a new `docs/DESIGN.md` → *Thread* section
+  record the decisions, plus the *Card and grid* rule that `Card` never grows a post branch.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30/30 routes, schema). Dev server at 360/640/900/1280:
+  11 of 12 rows with Show off (the flagged post absent, nothing covered even with Blur on), 12 rows with
+  Show on + Blur on and exactly one `.is-covered` whose `.post-veil` computes `blur(6px)` while
+  `.post-foot` stays `filter: none`; sort writes `?sort=discussed` / `?sort=liked` and reorders (top card
+  4 comments / 133 likes respectively); the cut shows 2 turns and **Show more** expands to 4 in place
+  without touching the URL; the comment count is 44px tall and both attachment characters resolve
+  (Sonic the Hedgehog, Aurelia of the Tides); no horizontal overflow at any width; control row is three
+  rows at 360 and one from `sm`. Published build re-checked on the live URL at 390: 11 cards, both
+  attachments, one cut, `All` chip, End of feed.
+- **Not verified:** **Load more** — 12 fixtures against a 24-row page means `hasMore` is false, so the
+  append path is mounted but unreachable. A post's image is not drawn (`postSchema` has no image field).
+  No Tauri/Android build.
+
 ## T-12 follow-up — the item avatar is a square cover (2026-10-30)
 
 - **Changed:** on the owner's call, an item's avatar is no longer a 56px thumbnail: `Avatar` gained

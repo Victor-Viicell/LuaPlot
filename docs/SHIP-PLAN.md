@@ -100,7 +100,9 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       owns one report per viewer per item, cumulative cases (`weight + 1`, `lastReportAt`) and
       already-verified *held*. Accept met: a report opens/joins a case in the adapter with cumulative
       weight (5/3-open → 6/4-open on `/dev/data` without a reload).
-- [ ] **T-13 `/post/thread`.** Public timeline, composer entry, NSFW handling, Load more.
+- [x] **T-13 `/post/thread`.** Public timeline, composer entry, NSFW handling, Load more. Landed: post
+      card (own primitive), sort in the URL (`newest | discussed | liked`), `All` chip, Show/Blur pair,
+      Load more mounted from `hasMore`. Load more's append path is unverified — 12 fixtures, page 24.
 - [ ] **T-14 `/post/[id]` + `/post/create`.** Body + at most one attachment (own character or cut),
       image/GIF embed, no edit route. Accept: attaching another author's item is impossible.
 - [ ] **T-15 `/session/[id]`.** Transcript, composer, awaiting-response state, settings menu
