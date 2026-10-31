@@ -646,6 +646,20 @@ export const turnSchema = z.strictObject({
 });
 
 /**
+ * **Send message** (`session/detail.md` → *Actions*). The user's own side is the only thing typed:
+ * the role, the time and the id are the adapter's, so the write is one trimmed string. Trimmed
+ * here, never in the page — a saved turn cannot differ from a validated one.
+ */
+export const TURN_REQUIRED = "Write a message first.";
+export const TURN_MAX = 4000;
+export const turnWriteSchema = z.strictObject({
+  text: z
+    .string()
+    .transform((value) => value.trim())
+    .pipe(z.string().min(1, TURN_REQUIRED).max(TURN_MAX, "Keep it under 4000 characters.")),
+});
+
+/**
  * `luaplot-pages.md` → *Sessions are private and unmoderated*; *the persona is not copied: it is a
  * live reference, swappable mid-session, and a switch leaves no mark on the transcript.* Hence
  * `personaId` and no persona copy on the session.

@@ -40,6 +40,20 @@ export function shortStamp(iso: string): string {
 }
 
 /**
+ * The clock time of one turn in a transcript: `18:10`, reader's zone.
+ *
+ * A transcript is read forwards, under a date that the session header already gives, so the day is
+ * noise in every row. `shortStamp` keeps it for a thread whose rows can be days apart.
+ */
+const clockFormat = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+export function clockTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return clockFormat.format(date);
+}
+
+/**
  * The two letters a comment's `Avatar` draws from its author's handle.
  *
  * A handle has no display name or image on a comment row — the spec's *header with the author's

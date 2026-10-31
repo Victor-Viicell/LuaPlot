@@ -637,9 +637,81 @@ not its frame. These are the choices.
   session has no persona or the author picks the generic one. The choice appears only once a cut is
   attached (`create.md`: *Sender attribution appears only once a cut is attached*), and a later
   persona rename leaves the post alone.
-- **The panel-over-the-page instance is not built.** The route is; the `Sheet` host waits for T-15's
-  session page, which is the only other place the spec opens the composer from, and Cancel goes back
-  to the thread because that is where the only **Create** control lives today.
+- **The panel-over-the-page instance is built (T-15).** `/session/[id]` opens the same
+  `components/PostComposer.tsrx` in a `Sheet` with the cut locked — see *Session* below for the
+  two-step range and why one composer serves both hosts. Cancel returns to the session.
+
+## Session (decided in T-15, do not re-invent)
+
+`/session/[id]` is the only route in P1 where a conversation happens, and the spec leaves everything
+below the settings button *to be specified*. These are the choices; `/session/…` is also the last
+consumer of `Session` before P2.
+
+- **The page is the transcript, not a dashboard.** Header: the copy character's **in-session name** as
+  the title, the persona in use as `You are <persona>` beside the preset's name, and the settings
+  button (44px, `IconMore`) at the top right of the identity block. Under it the turns, then the
+  composer. No session name, no session list, no archive — the URL or the character's **Continue** is
+  the only way in.
+- **The settings `Sheet` holds exactly two rows**: **New Session** first, **Delete session** second
+  with a confirmation in place (the sheet swaps to the sentence + Cancel / Delete, not a second
+  dialog). Persona switching is its own underlined control beside the persona line, never a third
+  menu item — the menu stays the spec's two options.
+- **Delete goes to the character**, not the catalog, because that is where the next session starts;
+  the route then answers not-found for the deleted id. **New Session** calls
+  `createSession(sourceId, currentPersona)`, which is why the adapter gained an optional persona: the
+  spec says *with the current persona*, which is not necessarily the account's default.
+- **Copies are a disclosure, closed by default**, because a phone should open on prose. The header
+  row reads `Session copies · 4 copies · 1 edited`; expanded, one row per participant (character,
+  each lorebook, preset) with its kind, its name, its state as a **word** (`untouched` / `edited` /
+  `unlinked`) and one line of fact (`2 entries · version 2`). A state is not a badge — there are
+  three, and the badge language belongs to status chips.
+- **One control per state.** *Linked* rows offer **Open the original** (a real link to
+  `/<kind>/<sourceId>`) and **Update from original**, which confirms first because it overwrites the
+  session's edits; **Restore** appears only while `edited`. *Unlinked* rows offer neither and print
+  *The original is out of reach. This copy runs on.* — the copy keeps running, which is the whole
+  point of the state.
+- **Restore's honest limit.** The memory adapter has no version history, so `restoreCopy` re-reads the
+  original as it stands and keeps the copy's own `version`; `updateCopyFromOriginal` re-reads it *and*
+  moves the version forward. For every fixture the two are correct (the original is the pre-edit
+  text); the one case where they differ is an author editing the original *after* a copy was edited.
+  A stored snapshot is the fix, and it is a schema change, not a page change.
+- **One scrollbar.** The shell scrolls the page, so the composer sits **in flow** after the
+  transcript: no sticky element for a phone keyboard to cover, no second scroller, and the
+  `scrollIntoView` dance a pinned transcript would need is not there to get wrong. The reading column
+  caps at 68ch on the turn text.
+- **Two columns from `lg`, never from `md`.** At `md` the outlet is 720 wide and a 300px aside leaves
+  a 324px reading column — a transcript is prose, so it keeps the whole outlet there and the copies
+  stay the one collapsed row they are on a phone. At `lg` the aside is 300px, `position: sticky` at
+  88px, and the main column is the remaining 528 at 1200. DOM order is `aside` → `main`, which is the
+  phone order (the collapsed row above the transcript), so the wide layout is a grid placement and
+  not a second tree.
+- **The user's own turns sit in a panel** (`--color-surface`, 1px border, 6px radius); the
+  character's are plain prose under its in-session name. Time is `clockTime(at)` — `18:10`, not the
+  thread's date-bearing `shortStamp` — because a transcript is read forwards under a date the header
+  already gives. The entrance is one 160ms rise per turn, `prefers-reduced-motion` respected.
+- **`Publish a cut` opens a two-step sheet.** Step one picks the range from two `Select`s (`3 · …`),
+  defaults to the whole transcript, and **Continue** opens step two: `PostComposer` with the cut
+  locked (range line, message count, attribution choice, NSFW toggle, body). Two steps exist because
+  a prop expression is evaluated **once** — a composer mounted beside live selects would keep the
+  range it was born with — and re-mounting the composer on every range change would throw the draft
+  away silently. *Change the range* returns to step one, and that is the one path that loses a draft.
+- **One composer, two hosts.** `components/PostComposer.tsrx` is the whole form T-14 built, with a
+  `cut` prop: `null` draws the picker (`/post/create`), a value locks the attachment and stamps the
+  turns from the session. One `postWriteSchema`, one `repo.addPost` — the panel is not a second
+  composer with a private copy of the rules. The panel drops the picker's character list and the
+  `md` two-column split, since a sheet has no second column.
+- **Send is local, the reply is a seam.** `repo.appendTurn` writes the user's turn (`turnWriteSchema`
+  trims and refuses an empty message) and `lib/llm/chat.ts → replyTo()` answers `null` today, so the
+  page prints *No model is connected in the preview, so there is no reply.* and invents nothing.
+  T-16 fills that function; the page does not change. **`Awaiting model response` is not drawn** —
+  there is no pending call to draw it for.
+- **Not-found and not-a-participant are one state** (`This session doesn't exist.`), because
+  `getSession` answers `null` for both; signed out is a sign-in `EmptyState`, not a spinner, because
+  the route's `access` is `signed-in` and a page that waits forever on a signed-out viewer is a
+  broken page.
+- **`Edit session copy` is not built.** The spec's session-scoped editor needs its own form and a
+  copy write schema (`sessionCopyWriteSchema`); the copy rows show state and the link actions only,
+  and the ticket is in `docs/NEXT.md`.
 
 ## Do not
 

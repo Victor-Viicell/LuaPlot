@@ -1,117 +1,110 @@
 # Baton — what the next session does
 
-**Ticket: T-15 — `/session/[session.id]`.**
+**Ticket: T-16 — the LLM seam and mock turns.**
 
-Specs: `src/specs/pages/session/detail.md` (the whole file — *Layout* is **To be specified** beyond the
-settings button, so every layout choice must be recorded in `docs/DESIGN.md` in the same commit),
-`src/specs/components/comment-thread.md`-style conventions in `src/specs/luaplot-pages.md`, and
-`docs/DESIGN.md` → *Post detail and composer* (T-14's composer, which this page opens as a panel) plus
-*Thread* (the card the published cut becomes).
+Specs: `src/specs/pages/session/detail.md` → *States* (*Awaiting model response*, *Send failed*),
+*Actions* → **Send message**; `src/specs/systems/jev.md` for how a model is addressed server-side;
+`docs/DESIGN.md` → *Session* (T-15's page, which already calls the seam) and *Shell* (the chips
+gesture); `docs/ARCHITECTURE.md` → *Validation* (every LLM payload is `safeParse`d before any code
+reads a field).
 
-Why next: `/session/[id]` is the only route left in P1, it is where **Publish a cut** lives (T-14's
-composer is built to be opened from it), and it is the last consumer of `Session` before P2. Its
-fixtures already cover the two hard states — session 1 is fully linked, session 2 has an `edited`
-character copy and an `unlinked` lorebook copy (its original is private).
+Why next: T-15 built the page and left exactly one hole in it — `lib/llm/chat.ts → replyTo()` returns
+`null`, so *Send* appends a turn and prints *No model is connected in the preview, so there is no
+reply.* T-16 is the only ticket in P1 that closes that, and every later AI surface (JEV on posts,
+character generation) reuses the same provider/client split.
 
 ## Approach
 
-1. **The page is the transcript, not a dashboard.** Header: the character's in-session name, the
-   persona in use, and the settings button at its top right. The transcript is append-only turns under
-   the in-session name; the composer sits under it. No session list exists anywhere — the URL or the
-   character's **Continue** is the only way in (`detail.md` → *Data*).
-2. **The settings `Sheet` holds exactly two options** — **New Session** (first) and **Delete session**
-   (with confirmation). The menu holds those two and nothing more; persona switching is its own
-   control beside the persona, not a third menu item.
-3. **Copies carry a state, and each state has one control:** *linked* → **Update from original**
-   (confirms, overwrites the session's edits) and **Restore** only when `edited`; *unlinked* → no link
-   actions at all, and the copy still runs. `characterCopySchema` / `lorebookCopySchema` /
-   `presetCopySchema` already carry `version`, `edited`, `unlinked`.
-4. **`send` appends a turn locally for now.** T-16 owns the LLM seam and the awaiting state; this
-   ticket must leave a named seam (one function, `lib/llm/chat.ts` when it lands) rather than a page
-   that calls a model. Do not fake a reply.
-5. **Publish a cut opens T-14's composer in a `Sheet`** with the cut pre-attached — the range named by
-   its first and last turn (`detail.md` → *Actions*), the persona/`User` attribution choice, and the
-   post's own NSFW toggle deciding the flag (never the character's). `repo.addPost` already takes the
-   cut as text; the composer's panel mode is the one thing T-14 deferred.
-6. **Not-found and not-a-participant are one state** — "This session doesn't exist." — for the same
-   reason the post permalink collapses them: `getSession` answers `null` for both.
+1. **Two files, one signature.** `replyTo(request): Promise<ChatReply | null>` stays as it is;
+   `lib/llm/provider.ts` owns the transport (server-side key read, request shape) and
+   `lib/llm/mock.ts` owns the deterministic preview reply. The page does not change at all — that is
+   the whole point of the seam.
+2. **Preview mode is a chip, not a hidden flag.** A `Preview mode` chip in the shell (12px
+   `--color-text-subtle`, 1px border, non-focusable like the thread's filter chip) appears whenever
+   the mock provider is the one answering. `skill`-style honesty: never a reply that looks real and
+   is not.
+3. **The awaiting state is real, not a delay.** The page shows the character's row as a
+   two-line `Skeleton` under its in-session name while the call is in flight, and replaces it with
+   the reply. `awaiting` is page state derived from `sending`, so a fast mock still renders it once
+   (a microtask is enough to paint it — verify with a CDP screenshot-free DOM read, not by eye).
+4. **The reply is appended through the adapter**, not in the page: `repo.appendTurn` gains a role, or
+   a second method `appendReply(id, text)`. One write path, `turnWriteSchema` still the only
+   trimming rule, `at` still the adapter's clock.
+5. **Determinism.** The mock answers from the turn count and the in-session name only — no
+   `Math.random`, no `Date.now` in the text — so the same transcript always produces the same
+   sentence and a fixture-based check can assert it.
 
 ## Traps
 
-- **`useParams()` keys the param by its own segment**: `[session.id]` → `params.id`. T-14 lost a tick
-  to reading `params["post.id"]` and rendering the not-found state on a live URL.
-- **`@empty` does not parse** in ripple 0.4.7 — write the explicit `@if (…length === 0) … @else`.
-- **`@for (const row of …; key row.key)`** — without `const` it is a compiler crash.
-- **`@else {` with two nodes needs a fragment** `<>…</>`; every branch with two children, including a
-  `@for` body's siblings.
-- **A standalone `<style>` block must be inside a fragment** with the markup it styles.
-- **A `const`/`track()` below an `@if`/`@for`** renders nothing — declare state at the top.
-- **A prop expression is evaluated once** — hand a `track` over (not `track.value`) when a child must
-  follow it, and read it through `read()` inside the child.
-- **A discriminated union cannot be narrowed inside a template block** — flatten to plain fields in a
-  derived (T-13's attachment, T-14's `copies` will need the same).
-- **A page cannot style a primitive's `.btn`/`.field`** — use a page-owned wrapper.
-- **A base rule declared AFTER a `@media` block wins at every width.** Declare base placement first.
-- **Measure 360/640/900/1200 with CDP `Emulation.setDeviceMetricsOverride`** — a screenshot cannot
-  prove a media query, and check `scrollWidth ≤ innerWidth`.
-- **The memory store resets on a hard reload** — any "it sticks" claim needs in-app navigation.
+- **`replyTo` must never be called from a page with a model key.** `DEEPSEEK_API_KEY` /
+  `OPENROUTER_API_KEY` are server-side only (`.env.local`, gitignored); the static build calls the
+  mock, and the provider file must not be imported by a `.tsrx` that ships in the client bundle.
+- **`@if` with two children needs a fragment**; the awaiting row and the reply row are two nodes.
+- **A `@for` body's siblings need a fragment too**; the transcript already wraps each turn in a
+  single `<li>` — keep it that way rather than adding a second node in the loop body.
+- **A prop expression is evaluated once** — do not hand `PostComposer` or a chip a `track.value`.
+- **`repo.appendTurn` returns the whole session**; use `applySession(next)` (T-15's one writer) or the
+  header, copies and transcript drift.
+- **`localStorage` is not a queue**: nothing about an in-flight reply survives a reload, and the
+  memory adapter reseeds on a hard reload anyway.
+- **The memory store resets on a hard reload** — "it sticks" claims need in-app navigation.
 - **`publish.sh` compares the live bundle hash**; a Pages 200 alone can still be the previous deploy.
-- **Delete session removes the transcript and the copies; a published cut stays** (it is a post). The
-  adapter needs a `deleteSession`, and the route must then answer not-found.
-- **`schema.ts` owns form copy** (`POST_REQUIRED`, `COMMENT_REQUIRED`, …) so gate, inline error and
-  adapter print the same sentence. A session-copy edit form's copy belongs there too.
-- **Zod at every new boundary**: a session-copy edit is a write — give it a `*WriteSchema` in
-  `schema.ts` and `safeParse` it in both the form and the adapter, never a page-local `trim()`.
 
 ## Open decisions
 
-- **Where the transcript scrolls.** The shell already scrolls the page; a session wants the transcript
-  pinned to the bottom with the composer in reach. Decide one (sticky composer, or a fixed-height
-  transcript from `md`), measure it at 360 with the keyboard inset (`docs/DESIGN.md` → *Shell*), and
-  record it — do not leave two scrollbars on a phone.
-- **`Awaiting model response`** is a T-16 state. Draw the placeholder only if T-16 lands in the same
-  tick; otherwise leave the seam and say so in DESIGN.
-- **New Session** needs `repo.createSession(characterId)` (it exists) plus the current persona — check
-  whether a persona switch has to be passed through, or whether the default is right.
-- **`deleteSession` does not exist yet** on `Repo`; add it beside `deletePost` with the same
-  author-only shape.
+- **Does `Send` wait for the reply or fire and forget?** The spec lists *Awaiting model response* as
+  a state, so the composer stays disabled until the reply lands; a draft typed during the wait is
+  discarded by `draft.value = ""` only after the turn is stored, so the field is empty while waiting.
+- **Where the chip lives.** The shell's top bar is 56px and already carries back + title + overflow;
+  a third element at 360 needs measuring. An alternative is the session header's kicker line — decide
+  and record it in `docs/DESIGN.md` → *Session*.
+- **A failed reply** is the spec's *Send failed*: the turn is already stored (it is append-only), so
+  the failure line belongs under the composer as `sendError`, not as a rollback.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **`Edit session copy` is not built** (T-15): it needs `sessionCopyWriteSchema` in `schema.ts` and a
+  session-scoped editor form, and the copy rows currently draw state + link actions only.
+- **`Restore` has no version history** (T-15): `restoreCopy` re-reads the original as it stands and
+  keeps the copy's `version`; a stored snapshot is the fix and it is a schema change.
+- **`components/PostComposer.tsrx` now serves two hosts** — `/post/create` (picker) and the session's
+  Publish-a-cut sheet (`cut` locked). A third host passes `cut` or not; never a second form.
+- **`PostComposer` drops its two-column `md` split when `cut` is set** (`.compose.is-locked`): a sheet
+  has no second column to fill.
+- **The publish-a-cut sheet is two steps** because a prop expression is evaluated once; a composer
+  mounted beside live range selects keeps the range it was born with. *Change the range* is the one
+  path that loses a draft.
+- **`repo.createSession(characterId, personaId?)`** now carries the current persona through
+  **New session**; another account's persona is ignored, not attached.
+- **`repo.appendTurn` / `deleteSession` / `setSessionPersona` /
+  `updateCopyFromOriginal` / `restoreCopy` exist** — do not add a second path to any of them.
+- **A session's two-column layout is `lg`, not `md`** (T-15): at 900 the outlet is 656 and a 300px
+  aside leaves a 324px reading column.
 - **Load more is unverified on the thread**: 12 fixtures against a 24-row page. Growing `POSTS` past
   25 is the cheapest way to prove the append path.
-- **`PostCard` now takes `fold` / `foot`** (T-14): the permalink passes `fold={false}` / `foot={false}`,
-  the feed passes neither. T-30's profile reuse passes neither.
-- **`postWriteSchema` and `POST_REQUIRED` exist** — the composer's gate and `repo.addPost` share them;
-  a panel instance must reuse the same schema, not a panel-local copy of the rules.
-- **A cut with no messages is refused** (`postAttachmentSchema.messages.min(1)`): an empty session
-  cannot publish a cut, and the composer keeps the draft when the write fails.
-- **A new post is `verified: false`** — the queue's *not scanned yet* rendering applies to it.
-- **`repo.addPost` starts post engagement at zero and dates it `nowIso()`**; a post created at runtime
-  sorts to the top of `/post/thread` on `newest`.
-- **`repo.listMySessions()` exists** (newest `updatedAt` first) — T-15 should not add a second way to
-  list a session.
-- **A held report opens no case** (T-12): `/moderation` has no view of held reports. A queue question.
-- **`reportPartSchema` has no attachment value**, so a post's image could only be reported as text
-  (`post/detail.md` offers the text-only report the thread already has).
+- **`PostCard` takes `fold` / `foot`**: the permalink passes `fold={false}` / `foot={false}`.
+- **`postWriteSchema` and `POST_REQUIRED` exist** — the composer's gate and `repo.addPost` share them.
+- **A cut with no messages is refused** (`postAttachmentSchema.messages.min(1)`).
+- **A new post is `verified: false`**, engagement zero, dated `nowIso()`.
+- **`repo.listMySessions()` exists** (newest `updatedAt` first).
+- **A held report opens no case** (T-12): `/moderation` has no view of held reports.
+- **`reportPartSchema` has no attachment value**, so a post's image can only be reported as text.
 - **`status: "removed"` has no fixture**; the removed-by-moderation placeholder is unreachable.
 - **Comment attachments are not drawn** — `commentSchema` has no attachment field until an uploader.
-- **`sessionSchema.personaId` is optional** (T-10B): an account with no persona starts an unattributed
-  session, and the transcript's user side reads `User`.
-- **`repo.createSession` always appends**; the one-session rule lives in the character page.
-- **Rows created at runtime take `crypto.randomUUID()`**; fixture id buckets are fixtures only.
-- **`repo.myVote(kind, id)` / `repo.myReport(kind, id)`** exist — never a page-local flag.
-- **A page's scoped `<style>` cannot touch a primitive's elements.**
+- **`sessionSchema.personaId` is optional** — an unattributed session reads `User`.
+- **Rows created at runtime take `crypto.randomUUID()`**.
+- **`repo.myVote` / `repo.myReport` / `isBookmarked`** exist — never a page-local flag.
+- **A page's scoped `<style>` cannot touch a primitive's elements** — use a page-owned wrapper.
+- **A base rule declared AFTER a `@media` block wins at every width.**
+- **`@for` needs `const`**; `@empty` does not parse in ripple 0.4.7.
 - **Zod costs +26.4 KB gzip on the boot chunk**; `zod/mini` is the lever if a budget is named.
 - **Counts now: characters 28 (27 public), lorebooks 6, presets 5, personas 3, posts 12, reports 5,
   comments 22, sessions 2.**
-- **The item cover is `Avatar size="hero"`** — full content width and 1:1 on a phone, a 320px column
-  from `sm`. Lorebook and preset detail pages are placeholders and inherit it.
 
 ## After this
 
-**T-16** the LLM seam: `lib/llm/chat.ts` + `mock.ts` + a **Preview mode** chip, so a sent message
-produces a deterministic reply after the awaiting state.
+**T-17** `/character/create` + `/edit` — the first authoring form, and the first write that must
+answer JEV (read `.agents/skills/typesafe-ai/SKILL.md` and the live docs before designing the call).
 
 ## When blocked
 

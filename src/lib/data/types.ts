@@ -51,6 +51,7 @@ import type {
   sessionCopySchema,
   sessionSchema,
   turnSchema,
+  turnWriteSchema,
   userSchema,
   votableKindSchema,
   voteDirectionSchema,
@@ -122,6 +123,8 @@ export type CharacterCopy = Extract<SessionCopy, { kind: "character" }>;
 export type LorebookCopy = Extract<SessionCopy, { kind: "lorebook" }>;
 export type PresetCopy = Extract<SessionCopy, { kind: "preset" }>;
 export type Turn = z.infer<typeof turnSchema>;
+/** One typed message (`turnWriteSchema`) — trimmed and non-empty before it reaches the adapter. */
+export type TurnWrite = z.infer<typeof turnWriteSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type User = z.infer<typeof userSchema>;
 export type AccountPreferences = z.infer<typeof accountPreferencesSchema>;

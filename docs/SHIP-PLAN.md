@@ -110,9 +110,16 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       attribution for a cut, NSFW toggle. `repo.addPost` / `deletePost` (cascade) / `listMySessions`.
       Accept met: the adapter refuses a character the viewer does not author, and the picker only
       lists the viewer's own. Image/GIF embed deliberately not drawn — no uploader, no media field.
-- [ ] **T-15 `/session/[id]`.** Transcript, composer, awaiting-response state, settings menu
+- [x] **T-15 `/session/[id]`.** Transcript, composer, awaiting-response state, settings menu
       (New Session, Delete with confirmation), Switch persona, publish-a-cut flow, participant
-      copies with Edited/Updated/Restore/Unlinked states.
+      copies with Edited/Updated/Restore/Unlinked states. Landed: header with in-session name +
+      persona control, append-only transcript (`repo.appendTurn`), in-flow composer with a
+      `lib/llm/chat.ts` reply seam (`replyTo()` → `null`, nothing faked), settings sheet with exactly
+      New Session / Delete session (confirmation + `repo.deleteSession`), `repo.setSessionPersona`,
+      copies disclosure with `updateCopyFromOriginal` / `restoreCopy` and an unlinked state that keeps
+      the copy running, publish-a-cut via a two-step sheet around the extracted
+      `components/PostComposer.tsrx`. **Not done:** `Edit session copy` (needs a copy write schema +
+      form) and the *Awaiting model response* state (T-16's, nothing to draw it for yet).
 - [ ] **T-16 LLM seam + mock turns.** `lib/llm/chat.ts` + `mock.ts` + `Preview mode` chip; a turn
       appends to the transcript with the character's in-session name. Accept: in preview mode a
       sent message produces a deterministic reply after the awaiting state.

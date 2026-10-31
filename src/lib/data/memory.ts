@@ -33,6 +33,7 @@ import {
   reportWriteSchema,
   seedSchemas,
   sessionSchema,
+  turnWriteSchema,
   userSchema,
   type SeedCollection,
 } from "../schema.ts";
@@ -51,6 +52,8 @@ import {
   type Persona,
   type Post,
   type Preset,
+  type Session,
+  type SessionCopy,
   type ReportEntry,
   type User,
   type VoteDirection,
@@ -238,6 +241,124 @@ function pickPersona(): Persona | null {
   const mine = store.personas.filter((row) => row.owner === VIEWER);
   return mine.find((row) => row.isDefault) ?? mine[0] ?? null;
 }
+
+/**
+ * A copy rebuilt from its original **as it stands now** — the body of both **Update from original**
+ * and **Restore**. Returns `null` when the link no longer resolves (the item is gone, or it is
+ * another author's private row), which is the *unlinked* state: the copy keeps running and the row
+ * loses its actions (`session/detail.md` → *States*).
+ *
+ * `version` comes from the copy being replaced, so the caller decides whether the write moves it
+ * forward (update) or keeps it (restore), and no page computes a version number.
+ */
+function copyFromOriginal(
+  kind: SessionCopy["kind"],
+  sourceId: string,
+  session: Session,
+): SessionCopy | null {
+  const previous =
+    kind === "character"
+      ? session.character
+      : kind === "lorebook"
+        ? session.lorebooks.find((row) => row.sourceId === sourceId)
+        : session.preset;
+  if (!previous || previous.sourceId !== sourceId) return null;
+
+  const base = { sourceId, version: previous.version, edited: false, unlinked: false } as const;
+
+  if (kind === "character") {
+    const item = store.characters.find((row) => row.id === sourceId) ?? null;
+    if (!item || !reachable(item)) return null;
+    return {
+      ...base,
+      kind: "character",
+      name: item.name,
+      ...(item.inSessionName ? { inSessionName: item.inSessionName } : {}),
+      description: item.description,
+      avatar: item.avatar,
+    };
+  }
+
+  if (kind === "lorebook") {
+    const item = store.lorebooks.find((row) => row.id === sourceId) ?? null;
+    if (!item || !reachable(item)) return null;
+    return {
+      ...base,
+      kind: "lorebook",
+      name: item.name,
+      description: item.description,
+      entries: item.entries,
+    };
+  }
+
+  const item = store.presets.find((row) => row.id === sourceId) ?? null;
+  if (!item || !reachable(item)) return null;
+  return {
+    ...base,
+    kind: "preset",
+    name: item.name,
+    description: item.description,
+    settings: item.settings,
+  };
+}
+
+/**
+ * A spent link: the original is gone, or it is another author's private row, so the copy loses the
+ * link and **nothing else** (`session/detail.md` → *The link*). The copy keeps running, the row drops
+ * its link actions, and the session is still usable — that is why an action whose original vanished
+ * answers the session instead of `null`.
+ */
+function markUnlinked(
+  session: Session,
+  kind: SessionCopy["kind"],
+  sourceId: string,
+): Session | null {
+  const next = sessionSchema.parse({
+    ...session,
+    character:
+      kind === "character" && session.character.sourceId === sourceId
+        ? { ...session.character, unlinked: true }
+        : session.character,
+    lorebooks: session.lorebooks.map((row) =>
+      kind === "lorebook" && row.sourceId === sourceId ? { ...row, unlinked: true } : row,
+    ),
+    preset:
+      kind === "preset" && session.preset.sourceId === sourceId
+        ? { ...session.preset, unlinked: true }
+        : session.preset,
+    updatedAt: nowIso(),
+  });
+
+  Object.assign(session, next);
+  return next;
+}
+
+/**
+ * Replace one copy in place and re-parse the session, so the stored row is exactly what
+ * `sessionSchema` says — a copy is a write, and a write goes through its schema
+ * (`docs/ARCHITECTURE.md` → *Validation*).
+ */
+function commitCopy(
+  session: Session,
+  copy: SessionCopy,
+  patch: { edited: boolean; version: number },
+): Session {
+  const next = { ...copy, version: patch.version, edited: patch.edited };
+
+  const merged = sessionSchema.parse({
+    ...session,
+    character: copy.kind === "character" ? next : session.character,
+    lorebooks: session.lorebooks.map((row) =>
+      copy.kind === "lorebook" && row.sourceId === copy.sourceId ? { ...copy, ...patch } : row,
+    ),
+    preset: copy.kind === "preset" ? next : session.preset,
+    updatedAt: nowIso(),
+  });
+
+  Object.assign(session, merged);
+  return merged;
+}
+
 
 /**
  * **Listings see published rows only.** This is the adapter's stand-in for the RLS policy on a
@@ -529,6 +650,103 @@ export const memoryRepo: Repo = {
       .filter((row) => row.owner === VIEWER)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   },
+
+  /**
+   * Send message: one appended user turn. `turnWriteSchema` trims and refuses an empty message, so
+   * the page's gate and the stored turn are the same sentence. The role is the adapter's, the id is
+   * fresh, and the time is now — the transcript keeps no persona record, so nothing else is written
+   * (`session/detail.md` → *Data* → *The transcript*).
+   */
+  async appendTurn(id, input) {
+    const row = store.sessions.find((entry) => entry.id === id) ?? null;
+    if (!row || row.owner !== VIEWER) return null;
+
+    const parsed = turnWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const at = nowIso();
+    const next = sessionSchema.parse({
+      ...row,
+      turns: [
+        ...row.turns,
+        { id: freshId(), role: "user", text: parsed.data.text, at },
+      ],
+      updatedAt: at,
+    });
+
+    Object.assign(row, next);
+    return next;
+  },
+
+  /**
+   * Delete a session — participant only — with its transcript and copies. Published cuts survive:
+   * a cut is a post, stamped as text at publish time, so there is nothing to cascade into.
+   */
+  async deleteSession(id) {
+    const index = store.sessions.findIndex((row) => row.id === id);
+    if (index < 0) return false;
+    if (store.sessions[index].owner !== VIEWER) return false;
+    store.sessions.splice(index, 1);
+    return true;
+  },
+
+  /**
+   * Update from original, per participant. The copy is rebuilt from the item **as it stands now**,
+   * which is what makes the action overwrite the session's edits (`session/detail.md`: *It
+   * overwrites the session's own edits to that copy*), so the page confirms before calling here.
+   * `version` moves forward and `edited` clears. `null` when the link no longer resolves: the copy
+   * keeps running, so a spent link is not an error.
+   */
+  async updateCopyFromOriginal(sessionId, kind, sourceId) {
+    const session = store.sessions.find((entry) => entry.id === sessionId) ?? null;
+    if (!session || session.owner !== VIEWER) return null;
+
+    const replacement = copyFromOriginal(kind, sourceId, session);
+    if (!replacement) return markUnlinked(session, kind, sourceId);
+
+    return commitCopy(session, replacement, { edited: false, version: replacement.version + 1 });
+  },
+
+  /**
+   * Restore: the copy goes back to the version it was taken from and the session's edits are
+   * discarded. The memory adapter has no version history, so it re-reads the original as it stands
+   * and keeps the copy's own `version` — recorded in `docs/DESIGN.md` → *Session*.
+   */
+  async restoreCopy(sessionId, kind, sourceId) {
+    const session = store.sessions.find((entry) => entry.id === sessionId) ?? null;
+    if (!session || session.owner !== VIEWER) return null;
+
+    const replacement = copyFromOriginal(kind, sourceId, session);
+    if (!replacement) return markUnlinked(session, kind, sourceId);
+
+    return commitCopy(session, replacement, { edited: false, version: replacement.version });
+  },
+
+  /**
+   * Switch persona: one field, and the transcript is untouched — the turns carry no persona record,
+   * so a cut takes the attribution chosen at publish time (`session/detail.md` → *Data*). Another
+   * account's persona is refused rather than attached; `null` detaches.
+   */
+  async setSessionPersona(id, personaId) {
+    const row = store.sessions.find((entry) => entry.id === id) ?? null;
+    if (!row || row.owner !== VIEWER) return null;
+
+    if (personaId !== null) {
+      const persona = store.personas.find((entry) => entry.id === personaId) ?? null;
+      if (!persona || persona.owner !== VIEWER) return null;
+    }
+
+    const { personaId: _previous, ...rest } = row;
+    const next = sessionSchema.parse({
+      ...rest,
+      ...(personaId === null ? {} : { personaId }),
+      updatedAt: nowIso(),
+    });
+
+    Object.assign(row, next);
+    return next;
+  },
+
   async getReport(id) {
     return store.reports.find((row) => row.id === id) ?? null;
   },
@@ -759,14 +977,17 @@ export const memoryRepo: Repo = {
    * session and its copies untouched*; the page's primary control is what keeps a second session
    * from starting by accident, and it asks `findSessionForCharacter` for that.
    */
-  async createSession(characterId) {
+  async createSession(characterId, personaId) {
     const character = store.characters.find((row) => row.id === characterId) ?? null;
     const preset = pickPreset();
     // Another author's private row is not startable: `getCharacter` answers it by id, so the
     // refusal belongs here rather than in a page's if.
     if (!character || !reachable(character) || !preset) return null;
 
-    const persona = pickPersona();
+    // **New session** carries the session's current persona (`session/detail.md`). An id that is not
+    // the viewer's own is ignored rather than attached: a persona is never shared.
+    const carried = personaId ? store.personas.find((row) => row.id === personaId) : null;
+    const persona = carried && carried.owner === VIEWER ? carried : pickPersona();
     const at = nowIso();
     const session = sessionSchema.parse({
       id: freshId(),

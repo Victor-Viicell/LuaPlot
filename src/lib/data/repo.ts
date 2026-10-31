@@ -33,6 +33,8 @@ import type {
   ReportTarget,
   ReportWrite,
   Session,
+  SessionCopy,
+  TurnWrite,
   User,
   VoteDirection,
   VotableKind,
@@ -136,6 +138,61 @@ export type Repo = {
   listMySessions(): Promise<Session[]>;
 
   /**
+   * **Send message** (`session/detail.md` → *Actions*): one user turn, appended. The write is
+   * `turnWriteSchema`-shaped — trimmed and non-empty there, so the composer's gate and the stored row
+   * are one rule — and the role, id and timestamp are the adapter's, because the transcript keeps no
+   * persona record and a turn is never edited afterwards. `updatedAt` moves with it.
+   *
+   * A turn is appended **without** a reply: the model is T-16's `lib/llm/chat.ts` seam, and this
+   * write deliberately knows nothing about it (`null` when the session is gone or not the viewer's).
+   */
+  appendTurn(id: string, input: TurnWrite): Promise<Session | null>;
+
+  /**
+   * Delete a session — **participant only** — taking its transcript and its copies with it
+   * (`session/detail.md`: *it removes the transcript and the session's copies, while a cut already
+   * published stays*). A published cut is a post, so nothing cascades into `posts`: it is text that
+   * was stamped at publish time. `false` when the row is missing or another account's.
+   */
+  deleteSession(id: string): Promise<boolean>;
+
+  /**
+   * **Update from original** (`session/detail.md` → *Actions*), per participant: replaces the copy
+   * with the item's **current** version and overwrites the session's edits, which is why the page
+   * confirms first. The link follows the item, not its ancestry (`sourceId` is the fork when the
+   * session was started from a fork). `version` moves forward, `edited` clears.
+   *
+   * `null` when the session is not the viewer's or the original is out of reach — a spent link is
+   * not a page error: the copy keeps running and the row loses its actions (`unlinked`).
+   */
+  updateCopyFromOriginal(
+    sessionId: string,
+    kind: SessionCopy["kind"],
+    sourceId: string,
+  ): Promise<Session | null>;
+
+  /**
+   * **Restore** (`session/detail.md` → *Actions*): puts the copy back and discards the session's own
+   * edits, `edited` cleared. It brings in nothing the author changed since — that is
+   * **Update from original**'s job; the memory adapter has no version history, so this re-reads the
+   * original as it stands and is recorded as such in `docs/DESIGN.md`.
+   */
+  restoreCopy(
+    sessionId: string,
+    kind: SessionCopy["kind"],
+    sourceId: string,
+  ): Promise<Session | null>;
+
+  /**
+   * **Switch persona** (`session/detail.md` → *Actions*): the persona is a **live reference**, not a
+   * copy, so a switch writes one field on the session and leaves the transcript alone — *a switch
+   * leaves no mark: the transcript keeps no boundary and the turns carry no persona record*.
+   * `null` detaches the persona (the user's side reads `User`), and a persona that is not the
+   * viewer's own is refused rather than attached.
+   */
+  setSessionPersona(id: string, personaId: string | null): Promise<Session | null>;
+
+  /**
    * Append a comment or a reply (`T-11`). The write is `commentWriteSchema`-shaped, parsed by the
    * adapter before it stores — the composer's gate and the stored row are the same schema, so the
    * two cannot disagree. The row's **author is the signed-in account**, its `nsfw` flag is its own
@@ -227,8 +284,13 @@ export type Repo = {
    *
    * `null` when the character is not startable (missing, or another author's private row) or when
    * there is no preset to copy.
+   *
+   * `personaId` carries **the session's current persona** through **New session**
+   * (`session/detail.md` → *New Session*: *with the current persona*), which is not necessarily the
+   * account's default. An id that is not the viewer's own is ignored and the default is used, so a
+   * page can never attach somebody else's persona.
    */
-  createSession(characterId: string): Promise<Session | null>;
+  createSession(characterId: string, personaId?: string): Promise<Session | null>;
 
   /**
    * **Fork / copy** (`character/detail.md`): a new character owned by the viewer with the same

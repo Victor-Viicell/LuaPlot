@@ -3,6 +3,34 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-15 — `/session/[id]` (2026-10-31)
+
+- **Changed:** `src/components/PostComposer.tsrx` (new — T-14's form, extracted with a `cut` prop so
+  a session can open it locked in a `Sheet`); `src/pages/post-create.tsrx` now renders it;
+  `src/pages/session-detail.tsrx` (header with the in-session name + persona control, append-only
+  transcript, in-flow composer, settings `Sheet` with exactly New Session / Delete session and an
+  in-place confirmation, copies disclosure with `untouched` / `edited` / `unlinked` rows and one
+  control per state, two-step Publish-a-cut sheet, not-found + signed-out states); `src/lib/schema.ts`
+  gains `turnWriteSchema` + `TURN_REQUIRED`; `src/lib/data/{repo,memory}.ts` gain `appendTurn`,
+  `deleteSession`, `updateCopyFromOriginal`, `restoreCopy`, `setSessionPersona`, and
+  `createSession(characterId, personaId?)`; `src/lib/llm/chat.ts` (new seam, `replyTo()` → `null`);
+  `src/lib/format.ts` gains `clockTime`; `docs/DESIGN.md` → *Session*.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30/30 routes, schema). Dev server + CDP
+  `Emulation.setDeviceMetricsOverride`: 360/640/900/1200 with `scrollWidth ≤ innerWidth` at every
+  width, single column at 900 (656 outlet) and `528px + 300px sticky aside` at 1200; session 1 renders
+  8 turns, `4 copies`; Send appends a 9th turn and prints the no-model line; settings sheet holds
+  exactly `New Session` / `Delete session`; session 2 shows `3 copies · 1 edited`, the edited
+  character copy offering Update + Restore, the unlinked lorebook offering neither; **Update from
+  original** → version 2→3, state `untouched`; **Restore** → state `untouched`, version stays 2;
+  Publish a cut over turns 3–6 → a real post whose cut reads `AURELIA … NELL …` for four messages;
+  persona switch `Ash → The Correspondent` relabels every user turn and leaves the transcript alone;
+  **Delete session** → `/character/<sourceId>` and the deleted id then answers
+  `This session doesn't exist.` **in-app** (popstate, no reload); unknown id → the same line.
+- **Not verified:** `Edit session copy` is not built (needs `sessionCopyWriteSchema` + a form);
+  *Awaiting model response* is not drawn (T-16's state, nothing pending); the composer's own panel
+  path was only exercised through the session sheet (not from a second host); Tauri packaging and
+  the native shell were untouched this tick.
+
 ## T-14 — `/post/[id]` and `/post/create` (2026-10-30)
 
 - **Changed:** `src/pages/post-detail.tsrx` (permalink: `PostCard` with `fold={false}` /
