@@ -23,6 +23,13 @@ import type {
   bookmarkCountsSchema,
   bookmarkKindSchema,
   bookmarkRowSchema,
+  caseCommentSchema,
+  caseConcludeSchema,
+  caseDecisionSchema,
+  caseDismissSchema,
+  caseEventKindSchema,
+  caseEventSchema,
+  caseOutcomeSchema,
   characterSchema,
   characterWriteSchema,
   chatReplySchema,
@@ -167,6 +174,19 @@ export type ReportStatus = z.infer<typeof reportStatusSchema>;
 /** The queue's filter (`pages/moderation/queue.md`): one status, or both. */
 export type ReportFilter = z.infer<typeof reportFilterSchema>;
 export type Report = z.infer<typeof reportSchema>;
+/** One arrow in a case's flat audit trail — an admin's note or a state change, never a thread. */
+export type CaseEvent = z.infer<typeof caseEventSchema>;
+export type CaseEventKind = z.infer<typeof caseEventKindSchema>;
+/** What a conclusion did to the content: back public, left private, or removed. */
+export type CaseOutcome = z.infer<typeof caseOutcomeSchema>;
+/** The record a closed case carries (what / by whom / when / why). Absent while it is open. */
+export type CaseDecision = z.infer<typeof caseDecisionSchema>;
+/** One conclusion (`caseConcludeSchema`) — outcome, the optional avatar removal, and the reason. */
+export type CaseConclude = z.infer<typeof caseConcludeSchema>;
+/** One dismissal (`caseDismissSchema`) — no violation, every term ticked, and the reason. */
+export type CaseDismiss = z.infer<typeof caseDismissSchema>;
+/** One internal note on a case (`caseCommentSchema`). */
+export type CaseComment = z.infer<typeof caseCommentSchema>;
 export type SessionCopy = z.infer<typeof sessionCopySchema>;
 export type CharacterCopy = Extract<SessionCopy, { kind: "character" }>;
 export type LorebookCopy = Extract<SessionCopy, { kind: "lorebook" }>;

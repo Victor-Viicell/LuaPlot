@@ -1185,6 +1185,63 @@ reveal's expiry. These are the decisions.
   `reportSourceIsExternal()` from `schema.ts`: an internal source is *copied text*, a link is
   *copied text from outside*, and those two take different routes through `systems/jev.md`.
 
+## Moderation case (decided in T-26B)
+
+`/moderation/[report.id]` inverts the queue's one rule: **the queue carries no content, the case
+carries nothing else.** `pages/moderation/detail.md` fixes the data, four actions and nine states;
+these are the drawings.
+
+- **The item is evidence.** Type, author, avatar, visibility, NSFW flag, and the body in full — a
+  moderator cannot judge a cover or a passage they are not allowed to read. It is **read-only**: no
+  edit control, no link to the public page (an admin must not act where a visitor acts), no vote and
+  no comment box of the item's own. The type's one extra line is the `item-detail` (`3 entries`,
+  `Model luaplot-1`, a tagline, a comment's thread state). A target whose author deleted it is a
+  state, not an error: the label stays and the body reads *Its author deleted this — the case stays,
+  the content does not.*
+- **Two columns at `md`, one at 360.** `.main` is the case (JEV ledger, the item, the reports);
+  `.aside` is the decision panel and the history, 340px and sticky from 900px. At 360 the aside
+  flows under the reports — the moderator scrolls once, after reading the evidence. One column,
+  one measure; nothing is a stretched phone.
+- **JEV is a ledger row, not a banner**: a 2px `--color-border-strong` left rule on
+  `--color-bg-elevated`, `not sure · and escalated it without acting` in one line, the confidence as
+  the section's right-hand figure (`58% confident`), and the stored note under it in
+  `--color-text-subtle`. No model is called here; T-27 fills the verdict, this page only prints it.
+- **A report is a row, not a card**: `reason words · parts · age`, then the reporter's details, then
+  the source. The copy claim splits on `reportSourceIsExternal()` — an internal id prints
+  `Source: item 3f2a…`, a link prints as a real anchor (`--color-info`, new tab). The parts word is
+  there because *what* was reported is part of the claim: `NSFW flag · avatar` is a different
+  accusation from `NSFW flag · text`.
+- **The decision is one operation in the adapter, and one panel in the page.** *Conclude* offers the
+  outcomes the target can take and nothing else — authored items get **Public / Private**, a post or
+  a comment gets **Removed** (a confirmed violation removes it; there is no visibility to set) — so
+  the panel cannot submit a pair the adapter would refuse. **Remove avatar** is a checkbox inside
+  that flow, absent for a post or comment where it draws disabled with *No avatar to remove.* One
+  `Reason` field serves both conclusions: it is the moderator's own words, recorded on the case and
+  delivered to the creator, with *Help* copy saying the reporter is never told.
+- **Dismiss is gated on the terms, visibly.** The three `TERMS_RULES` titles, one native checkbox
+  each (18px, `accent-color: --color-accent`, 44px row), each linking its `/terms#anchor`, and
+  `CASE_TERMS_REQUIRED` printed under them until all three are ticked. The button's gate and
+  `caseDismissSchema` are the same rule, so a tick the schema would refuse cannot be submitted.
+  **Gates are `off` flags** (`concludeOff`, `dismissOff`) handed to `Button.disabled` as tracked
+  values — an inline `!valid || busy` expression freezes at mount (T-06's trap), and naming the flag
+  `canConclude` while feeding `disabled` inverted it (caught in the browser, not the typecheck).
+- **A concluded case is a record, not a form.** The panel is replaced by the decision block: the
+  outcome as its loudest line (`Concluded · private`, `Concluded · removed`, `Dismissed — no
+  violation`), the reason, `by @admin · 2d ago`. **No reopen control and no disabled Conclude** — a
+  concluded case is final; a fresh report opens a new case.
+- **History is flat and oldest first.** One `<ul>` of hairlines: `@admin left a note · 2h`,
+  `concluded the case`, `dismissed the case`, `removed the avatar`, with the note's text under its
+  own row. **JEV is not an event**: it has no admin, so what it did is printed once, in the ledger.
+  Empty copy: *No activity yet. Every note and every decision lands here, with its author.*
+- **States**: `loading` (header skeleton + four blocks, no spinner), `ready`, `forbidden`
+  (*Only a moderator can open a case.* — `?admin=1` is the same preview switch the queue uses, and
+  the *Queue* link re-writes it), `notfound` (*This report doesn't exist.*), `error` (+ **Retry**).
+  The route param is parsed with `reportIdSchema` before the adapter is asked, so a malformed deep
+  link is not-found, never a crash.
+- **The page never announces the reporter's outcome**: the toast after a conclusion says *Case
+  concluded. The creator has been told.* — which is who is told. A dismissal's toast says *Nothing
+  changed visibility*, because it did not.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

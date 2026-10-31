@@ -20,6 +20,10 @@ import type {
   BookmarkRow,
   Character,
   CharacterWrite,
+  CaseComment,
+  CaseConclude,
+  CaseDismiss,
+  CaseEvent,
   Comment,
   CommentWrite,
   EntityOf,
@@ -115,6 +119,12 @@ export type Repo = {
   getPost(id: string): Promise<Post | null>;
   getSession(id: string): Promise<Session | null>;
   getReport(id: string): Promise<Report | null>;
+  /**
+   * One comment by id. A report's target may be a comment (`reportTargetSchema`), and the case page
+   * is the one page where the item itself is rendered — a moderator has to read the row that was
+   * reported, and `listComments` needs an item id the case does not carry.
+   */
+  getComment(id: string): Promise<Comment | null>;
 
   /**
    * The whole thread for one item, oldest first, replies included — a thread is a conversation,
@@ -468,6 +478,38 @@ export type Repo = {
    * reporter is not shown the verdict, the queue position or who acted.
    */
   myReport(kind: ReportTarget["kind"], id: string): Promise<ReportEntry | null>;
+
+  /**
+   * Close a case with a visibility outcome (`pages/moderation/detail.md` → *Actions*, T-26B). One
+   * operation, because the spec's *Conclude* is one: the adapter writes the outcome (public /
+   * private / removed, chosen per target kind), `status: "concluded"`, `concludedAt`, the `concluded`
+   * history event, the optional `avatar-removed` event, the decision and the **creator's**
+   * notification — the creator is the only account told, because it is their content whose
+   * visibility changed. The reporter is never told.
+   *
+   * Removing the avatar clears the item's `verified` flag like any other edit and delays nothing:
+   * the case still concludes in the same step.
+   *
+   * `null` when the write does not parse, the case is gone or already concluded (**a concluded case
+   * is final**), or the outcome cannot apply to that target (an avatar on a comment, a removal of an
+   * authored item).
+   */
+  concludeReport(input: CaseConclude): Promise<Report | null>;
+
+  /**
+   * Dismiss a case as **no violation** (`detail.md` → *Actions*): every term ticked, the reason
+   * recorded, no visibility change — escalated content was never hidden, so nothing returns to view.
+   * Writes the `dismissed` decision and event, closes the case, and notifies nobody: no visibility
+   * moved and the reporter is never told an outcome.
+   */
+  dismissReport(input: CaseDismiss): Promise<Report | null>;
+
+  /**
+   * Append an internal note to a case's history — flat, chronological, never a reply. The author is
+   * the adapter's admin (memory: `VIEWER`; Supabase: `auth.uid()`), so a page cannot post as someone
+   * else. `null` when the write does not parse, the case is gone, or it is concluded (final).
+   */
+  addCaseComment(input: CaseComment): Promise<CaseEvent | null>;
 
   /**
    * One vote per viewer per item, and a switch replaces the earlier vote — the adapter owns that

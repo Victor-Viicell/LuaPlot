@@ -24,6 +24,11 @@ import {
   bookmarkKindSchema,
   bookmarkRowSchema,
   bookmarkSeedSchema,
+  caseCommentSchema,
+  caseConcludeSchema,
+  caseDecisionSchema,
+  caseDismissSchema,
+  caseEventSchema,
   characterSchema,
   characterWriteSchema,
   commentSchema,
@@ -65,18 +70,23 @@ import {
   type BookmarkKind,
   type BookmarkRow,
   type Character,
+  type CaseDecision,
+  type CaseEvent,
+  type CaseEventKind,
   type Comment,
   type EntityOf,
   type Handle,
   type ItemKind,
   type Lorebook,
   type Persona,
+  type Notification,
   type Post,
   type Preset,
   type Profile,
   type ProfileCreationType,
   type Session,
   type SessionCopy,
+  type Report,
   type ReportEntry,
   type User,
   type VoteDirection,
@@ -638,6 +648,61 @@ function rowFor(kind: VotableKind, id: string): Character | Lorebook | Preset | 
     case "comment":
       return store.comments.find((row) => row.id === id) ?? null;
   }
+}
+
+/**
+ * One arrow in a case's audit trail, built where the case lives rather than in a page. The author is
+ * always the adapter's admin (`VIEWER`), exactly as a comment's author is the signed-in account, so
+ * a page can never write history as somebody else. Parsed through `caseEventSchema` before it is
+ * stored — the same shape the page reads back.
+ */
+function historyEvent(kind: CaseEventKind, at: string, body?: string): CaseEvent {
+  return caseEventSchema.parse({
+    id: freshId(),
+    kind,
+    actor: VIEWER,
+    ...(body === undefined ? {} : { body }),
+    at,
+  });
+}
+
+/**
+ * The measure a conclusion reports to the creator, in the order the spec's own sentences read:
+ * *removed* beats everything (the content is gone), then *had its avatar removed*, then *was made
+ * private*. A conclusion that leaves the content public and removes nothing has no measure to name —
+ * `notifications.md` then reads *A moderation decision was made on your character*, which is exactly
+ * what happened.
+ */
+function measureOf(decision: CaseDecision): Notification["measure"] {
+  if (decision.outcome === "removed") return "removed";
+  if (decision.avatarRemoved) return "avatar-removed";
+  if (decision.outcome === "private") return "made-private";
+  return undefined;
+}
+
+/**
+ * The one account told about a conclusion: the **creator**, because it is their content whose
+ * visibility changed (`detail.md` → *Rules*). No `actor` — *nobody acts on your behalf but the
+ * system* (`notifications.md`) — and no reporter ever gets a row: the reporter is told nothing.
+ *
+ * A dismissal writes nothing here: it changes no visibility, so there is no measure to announce.
+ */
+function notifyCreator(report: Report, measure: Notification["measure"]): void {
+  store.notifications.push(
+    notificationSchema.parse({
+      id: freshId(),
+      kind: "moderation",
+      target: {
+        kind: report.target.kind,
+        id: report.target.id,
+        label: report.target.label,
+      },
+      count: 1,
+      ...(measure === undefined ? {} : { measure }),
+      read: false,
+      createdAt: nowIso(),
+    }),
+  );
 }
 
 /**
@@ -1612,6 +1677,135 @@ export const memoryRepo: Repo = {
 
   async myReport(kind, id) {
     return myReports.get(voteKey(kind, id)) ?? null;
+  },
+
+  async getComment(id) {
+    return store.comments.find((row) => row.id === id) ?? null;
+  },
+
+  /**
+   * Conclude one case (`pages/moderation/detail.md` → *Actions*, T-26B). Everything the spec calls
+   * one operation happens here, in one step, because the page must never re-read to show the result:
+   *
+   * - the **outcome** is applied to the row the case is about, and which outcome is legal depends on
+   *   the target, not on the write (a write carries an id): *set the content back to public, or
+   *   leave it private* for an authored item, *a confirmed violation on a post or comment removes
+   *   it* otherwise. An impossible pair (`removed` on a character, `private` on a comment) answers
+   *   `null` instead of inventing a state the specs do not describe;
+   * - **Remove avatar** drops the uploaded image and clears `verified`, exactly as any other edit
+   *   does, and delays nothing;
+   * - `status`, `concludedAt`, the `concluded` event (+ `avatar-removed` when taken) and the decision
+   *   are written, so the case's history is the audit trail and the closed case is final;
+   * - the **creator** gets one moderation notification. The reporter never hears anything.
+   */
+  async concludeReport(input) {
+    const parsed = caseConcludeSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const report = store.reports.find((row) => row.id === write.reportId) ?? null;
+    if (!report || report.status !== "open") return null;
+
+    const row = rowFor(report.target.kind, report.target.id);
+    if (!row) return null;
+
+    const authored =
+      report.target.kind === "character" ||
+      report.target.kind === "lorebook" ||
+      report.target.kind === "preset";
+    const removal = write.outcome === "removed";
+    // A post or comment has no visibility to set; an authored item is never deleted by moderation.
+    if (authored === removal) return null;
+    if (write.removeAvatar && !authored) return null;
+
+    const at = nowIso();
+
+    if (authored) {
+      (row as Character | Lorebook | Preset).isPublic = write.outcome === "public";
+      if (write.removeAvatar) {
+        const item = row as Character | Lorebook | Preset;
+        // The upload goes; the initials stay, because they are derived, not uploaded, and the
+        // avatar slot is never empty (`avatarSchema`).
+        item.avatar = { initials: item.avatar.initials };
+        item.verified = false;
+      }
+    } else if (report.target.kind === "comment") {
+      const comment = row as Comment;
+      comment.status = "removed";
+      comment.body = "";
+      comment.likes = 0;
+      comment.dislikes = 0;
+      votes.delete(voteKey("comment", comment.id));
+      recount(store);
+    }
+    // A `post` row has no status field yet, so a post removal is recorded on the case only. The gap
+    // is logged in `docs/NEXT.md`: nothing can hide a removed post until `postSchema` grows one.
+
+    const decision = caseDecisionSchema.parse({
+      kind: "concluded",
+      outcome: write.outcome,
+      avatarRemoved: write.removeAvatar,
+      reason: write.reason,
+      actor: VIEWER,
+      at,
+    });
+
+    report.status = "concluded";
+    report.concludedAt = at;
+    report.decision = decision;
+    if (write.removeAvatar) report.history.push(historyEvent("avatar-removed", at));
+    report.history.push(historyEvent("concluded", at));
+
+    notifyCreator(report, measureOf(decision));
+
+    return reportSchema.parse(report);
+  },
+
+  /**
+   * Dismiss one case as **no violation** (`detail.md` → *Actions*): every term ticked, the reason
+   * recorded, nothing else touched. Escalated content was never hidden, so there is no visibility to
+   * change — and a private item found clean is *concluded* with the public outcome instead, which is
+   * why `outcome` is absent on a dismissal rather than set to the status quo.
+   */
+  async dismissReport(input) {
+    const parsed = caseDismissSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const report = store.reports.find((row) => row.id === write.reportId) ?? null;
+    if (!report || report.status !== "open") return null;
+
+    const at = nowIso();
+    report.status = "concluded";
+    report.concludedAt = at;
+    report.decision = caseDecisionSchema.parse({
+      kind: "dismissed",
+      avatarRemoved: false,
+      reason: write.reason,
+      actor: VIEWER,
+      at,
+    });
+    report.history.push(historyEvent("dismissed", at));
+
+    return reportSchema.parse(report);
+  },
+
+  /**
+   * One internal note on the case — flat, chronological, never a reply. `null` on a concluded case:
+   * *a concluded case is final*, and the history it closed with is the record.
+   */
+  async addCaseComment(input) {
+    const parsed = caseCommentSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const report = store.reports.find((row) => row.id === write.reportId) ?? null;
+    if (!report || report.status !== "open") return null;
+
+    const at = nowIso();
+    const note = historyEvent("comment", at, write.body);
+    report.history.push(note);
+    return note;
   },
 
   async vote<V extends VotableKind>(

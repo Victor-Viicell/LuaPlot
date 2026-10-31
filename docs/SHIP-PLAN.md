@@ -162,10 +162,13 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       — `pages/moderation-queue.tsrx` draws the list on page 1 (`Select` filter in the URL, counts
       from two `listReports` calls), the `forbidden` state for the mock account, and `?admin=1` as
       the reviewer's switch. JEV's verdict is read from the row, never recomputed.
-- [ ] **T-26B `/moderation/[report.id]`.** The case itself: cumulative reports, conclude with a
+- [x] **T-26B `/moderation/[report.id]`.** The case itself: cumulative reports, conclude with a
       visibility outcome (remove avatar as part of it), dismiss after the full term checklist, set
       reason, internal comments, flat history, and the notification the conclusion writes. Needs its
       own writes (`caseCommentSchema`, conclude, dismiss) — split out of T-26 on purpose.
+      — `pages/moderation-detail.tsrx` draws the case read-only above its paperwork; `repo` gained
+      `concludeReport` / `dismissReport` / `addCaseComment` / `getComment`, `reportSchema` gained
+      `history` + `decision`, and the conclusion writes the creator's moderation row.
 - [ ] **T-27 JEV adapter.** `lib/llm/jev.ts` posting `{model,state,questions}` to
       `POST https://openrouter.ai/api/alpha/decisions` with `typesafe/jev-1.14` (docs/JEV.md has the
       exact question set and state shape); `lib/llm/jevPolicy.ts` holding the thresholds and the

@@ -29,6 +29,8 @@ export const POST = (n: number): string => uuid(0x90570000, n);
 export const COMMENT = (n: number): string => uuid(0xc0a3e07a, n);
 export const NOTIFICATION = (n: number): string => uuid(0x0f141e00, n);
 export const REPORT = (n: number): string => uuid(0x4e90047a, n);
+/** A case's history event (`caseEventSchema`) — one arrow in the audit trail. */
+export const CASE_EVENT = (n: number): string => uuid(0xca5e7000, n);
 export const SESSION = (n: number): string => uuid(0x5e551000, n);
 
 /** Fixed timestamps: a fixture that reads "3 days ago" today must still read that next week. */

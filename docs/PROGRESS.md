@@ -4,6 +4,32 @@ Append-only. Newest first. Every entry: ticket, what changed, what was verified 
 could not be verified.
 
 
+## T-26B — the case itself, and the decision it closes with (2026-10-31)
+
+- **Changed:** `pages/moderation-detail.tsrx` replaces the placeholder — the case is drawn as
+  evidence (JEV ledger with its confidence, the item read-only in full, every filing with its reason,
+  surface, details and source split by `reportSourceIsExternal`) above a decide panel that is one
+  operation (outcome the target allows, `Remove avatar` inside it, one `Reason` field) and a dismiss
+  block gated on the three `TERMS_RULES` ticks. Adapter: `concludeReport` (applies public/private to
+  authored items, `removed` to a comment, writes status + clock + `concluded`/`avatar-removed` events
+  + decision + the creator's moderation notification), `dismissReport` (no visibility change, notifies
+  nobody), `addCaseComment`, `getComment`. Schema: `caseEventSchema`, `caseDecisionSchema`,
+  `caseOutcomeSchema`, `caseConcludeSchema`, `caseDismissSchema`, `caseCommentSchema`,
+  `reportIdSchema`, `termsRuleSchema`; `reportSchema` gained `history` + `decision` and refines the
+  concluded/open pair. Fixtures: history on all five cases, decisions on the two concluded ones, and
+  `COMMENT(12)` is now the removed placeholder that case decided.
+- **Verified how:** `scripts/check.sh` GREEN (build, 30 routes, schema check); in a browser against
+  `vite preview` — conclude with avatar removal flipped the case to `CONCLUDED` with the decision
+  block, the history rows and a new `Your character had its avatar removed — Hollow Saint / now` row
+  in the inbox (3 → 4 unread, reached in-app); dismiss on case 5 closed it as `Dismissed — no
+  violation`, kept the badge at 3 and logged the note first; report dialog-free states checked:
+  post target offers only `Removed` with *No avatar to remove*, comment case read-only, `notfound`
+  and `forbidden` copies, no horizontal overflow at 360 and a two-column layout at 1000/1280.
+- **Not verified:** nothing on a real Supabase adapter (memory only), and a **post removal has
+  nowhere to land** — `postSchema` has no status, so the decision is recorded on the case and the
+  post row stays. Logged in `docs/NEXT.md` as a gap to file.
+
+
 ## T-26 — the moderation queue, weight first and metadata only (2026-10-31)
 
 - **Changed:** `pages/moderation-queue.tsrx` is no longer a `PagePlaceholder` — it draws the queue on

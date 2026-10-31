@@ -345,17 +345,22 @@ export const COMMENTS: Comment[] = [
     status: "visible",
   },
   {
+    /**
+     * The removed comment behind `REPORT(3)` (T-26B): a concluded case's decision has to be visible
+     * on the content it decided, so this row is the placeholder the spec describes — *a removed
+     * comment becomes a placeholder that keeps its replies*, with its body, likes and dislikes gone.
+     */
     id: COMMENT(12),
     itemId: POST(7),
     parentId: null,
     author: "you",
-    body: "The adult register is doing real work here — the vow of silence is more unsettling for it.",
+    body: "",
     createdAt: at(23, 11, 30),
     nsfw: true,
-    likes: 8,
+    likes: 0,
     dislikes: 0,
     replyCount: 0,
-    status: "visible",
+    status: "removed",
   },
   {
     id: COMMENT(13),

@@ -99,6 +99,15 @@ Shapes, decided in T-03 (change them here before changing them in the code):
   and **recomputes `replyCount` (the whole branch) and the item's `commentCount` after every write**;
   a delete by anyone but the author answers `null`, and a delete by the author returns the row as a
   `deleted` placeholder with its body gone and its branch intact.
+- **Case writes (T-26B)** are `concludeReport`, `dismissReport` and `addCaseComment`, all
+  `*Schema`-shaped and `safeParse`d at the adapter. A case carries a **flat `history`** of
+  `caseEventSchema` rows (never a thread) and, once closed, a `caseDecisionSchema` record; the schema
+  refines the pair, so a concluded case without its decision (or an open one with one) fails at
+  parse. `concludeReport` applies the outcome the *target* allows — authored items go
+  `public`/`private` (removal is refused: moderation never deletes authored content), a comment gets
+  `status: "removed"` with its body gone and its replies intact, and a **post has no status field
+  yet**, so its removal is recorded on the case alone — the gap is logged in `docs/NEXT.md`. It also writes the
+  creator's moderation notification in the same step; the reporter is never written a row.
 - **Counts are derived** in the adapter, never authored in a fixture: `commentCount` and
   `replyCount` are recomputed from the thread on load, and `ratio` is a function (`ratioOf`), never
   a stored field.

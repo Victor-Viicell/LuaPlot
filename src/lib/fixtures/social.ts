@@ -1,5 +1,5 @@
 import type { Notification, Report } from "../data/types.ts";
-import { at, CHARACTER, COMMENT, LOREBOOK, NOTIFICATION, POST, REPORT } from "./ids.ts";
+import { at, CASE_EVENT, CHARACTER, COMMENT, LOREBOOK, NOTIFICATION, POST, REPORT } from "./ids.ts";
 
 /**
  * Notifications are deliberately sparse: same kind on the same target folds into one row, and the
@@ -106,6 +106,15 @@ parts: ["text"],        reasons: ["copied-text"],
     },
     createdAt: at(28, 22, 40),
     lastReportAt: at(29, 9, 0),
+    history: [
+      {
+        id: CASE_EVENT(1),
+        kind: "comment",
+        actor: "you",
+        body: "Two claims in one case: the avatar and the text. Read the avatar against the flag first — the copy claim's internal source no longer resolves.",
+        at: at(29, 9, 20),
+      },
+    ],
   },
   {
     id: REPORT(2),
@@ -130,6 +139,7 @@ parts: ["avatar"],        reasons: ["copied-image"],
     },
     createdAt: at(27, 12, 30),
     lastReportAt: at(28, 9, 45),
+    history: [],
   },
   {
     id: REPORT(3),
@@ -154,6 +164,24 @@ parts: ["text"],        reasons: ["missing-nsfw"],
     createdAt: at(23, 14, 0),
     lastReportAt: at(23, 16, 20),
     concludedAt: at(24, 10, 0),
+    decision: {
+      kind: "concluded",
+      outcome: "removed",
+      avatarRemoved: false,
+      reason: "Flag missing on the comment's own row and not inherited from the post: a confirmed violation on a comment removes it, which leaves a placeholder and keeps the branch.",
+      actor: "you",
+      at: at(24, 10, 0),
+    },
+    history: [
+      {
+        id: CASE_EVENT(2),
+        kind: "comment",
+        actor: "you",
+        body: "The post it hangs under is flagged; the comment's own row is not. That is the violation, not the register.",
+        at: at(23, 18, 5),
+      },
+      { id: CASE_EVENT(3), kind: "concluded", actor: "you", at: at(24, 10, 0) },
+    ],
   },
   {
     id: REPORT(4),
@@ -181,6 +209,24 @@ parts: ["text"],        reasons: ["missing-nsfw"],
     createdAt: at(13, 9, 0),
     lastReportAt: at(13, 17, 0),
     concludedAt: at(15, 16, 30),
+    decision: {
+      kind: "concluded",
+      outcome: "private",
+      avatarRemoved: false,
+      reason: "The outside source was opened and the middle four entries are a close paraphrase. Left private: the notes stay quill's, the copies do not go back into the catalog.",
+      actor: "you",
+      at: at(15, 16, 30),
+    },
+    history: [
+      {
+        id: CASE_EVENT(4),
+        kind: "comment",
+        actor: "you",
+        body: "JEV never fetches an outside source, so https://example.org/notes was read by hand and compared entry by entry.",
+        at: at(14, 9, 30),
+      },
+      { id: CASE_EVENT(5), kind: "concluded", actor: "you", at: at(15, 16, 30) },
+    ],
   },
   {
     /**
@@ -212,5 +258,6 @@ parts: ["text"],        reasons: ["copied-text"],
     },
     createdAt: at(27, 6, 30),
     lastReportAt: at(27, 8, 15),
+    history: [],
   },
 ];

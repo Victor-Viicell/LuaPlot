@@ -760,13 +760,21 @@ export function reportSourceIsExternal(source: string): boolean {
  * mapping written three times (page, dialog, queue) drifts. The page takes its ids from here and
  * the dialog takes its "the rule this enforces" link from here, so the two cannot disagree.
  */
+export const termsRuleSchema = z.enum(["copied", "unmarked", "illegal"]);
+
+export type TermsRule = z.infer<typeof termsRuleSchema>;
+
+/**
+ * The three prohibitions, in the order `/terms` prints them — which is also the order the case
+ * page draws its dismissal checklist in, so the ticks read as the rules were stated.
+ */
+export const TERMS_RULES_ORDER: readonly TermsRule[] = ["copied", "unmarked", "illegal"];
+
 export const TERMS_RULES = {
   copied: { anchor: "copied-content", title: "No copied content" },
   unmarked: { anchor: "unmarked-nsfw", title: "No unmarked NSFW" },
   illegal: { anchor: "illegal-content", title: "No illegal content" },
-} as const;
-
-export type TermsRule = keyof typeof TERMS_RULES;
+} as const satisfies Record<TermsRule, { anchor: string; title: string }>;
 
 /** Which prohibition a reason code enforces: `copied-image` and `copied-text` are one rule. */
 export const REPORT_REASON_RULE = {
@@ -874,21 +882,169 @@ export const reportStatusSchema = z.enum(["open", "concluded"]);
 export const reportFilterSchema = z.enum(["open", "concluded", "all"]);
 
 /**
+ * The case page's route param (`pages/moderation/detail.md`) — a report id. Parsed before the
+ * adapter is asked, so a malformed deep link is *not found*, never a crash and never a lookup the
+ * adapter has to defend against. Shares `z.uuid()` with `reportTargetSchema`'s ids.
+ */
+export const reportIdSchema = z.uuid();
+
+/* --- The case's own writes (T-26B) --------------------------------------------------------------- */
+
+/**
+ * `pages/moderation/detail.md` → *Data* → *Case history*: **comments are a flat chronological list,
+ * never a thread**; **every moderator action lands there with the admin's identity and its time**.
+ * So an event is one arrow in the audit trail, and the four kinds are the four things an admin can
+ * leave behind. **JEV is not one of them**: its action is stored on `report.jev` and appears as
+ * *what it already did*, with no admin attached (`detail.md`, first paragraph of *Data*).
+ *
+ * `comment` is the only kind carrying a `body`, and the only one that is a message rather than a
+ * state change — the refinement keeps that true, so the page never has to ask.
+ */
+export const caseEventKindSchema = z.enum(["comment", "concluded", "dismissed", "avatar-removed"]);
+
+export const caseEventSchema = z
+  .strictObject({
+    id: z.uuid(),
+    kind: caseEventKindSchema,
+    /** The admin who acted. Required on every event; JEV never gets one. */
+    actor: handleSchema,
+    /** The note itself, on a `comment`; absent on every state change. */
+    body: z.string().min(1).max(2000).optional(),
+    at: isoSchema,
+  })
+  .superRefine((event, ctx) => {
+    if (event.kind === "comment" && event.body === undefined) {
+      ctx.addIssue({ code: "custom", message: CASE_COMMENT_REQUIRED, path: ["body"] });
+    }
+    if (event.kind !== "comment" && event.body !== undefined) {
+      ctx.addIssue({ code: "custom", message: "Only a note carries text.", path: ["body"] });
+    }
+  });
+
+/**
+ * What a moderation decision *did* to the content (`detail.md` → *Actions*): an authored item goes
+ * back **public** or is left **private**, and a post or comment is **removed** — the one deletion
+ * moderation has, because a post has no visibility to change. Which of the three applies is the
+ * adapter's check against the target's kind, since the write carries an id, not a row.
+ */
+export const caseOutcomeSchema = z.enum(["public", "private", "removed"]);
+
+/**
+ * The closed case's record: what was decided, by whom, when, and why. `outcome` is present exactly
+ * when the case was concluded — a **dismissal changes no visibility, ever** (`detail.md`: *it
+ * changes no visibility: escalated content was never hidden*), so it has none to record.
+ * `avatarRemoved` is the one content edit a moderator makes and it rides along with either
+ * conclusion, so it is a flag on the decision rather than a decision of its own.
+ */
+export const caseDecisionSchema = z
+  .strictObject({
+    kind: z.enum(["concluded", "dismissed"]),
+    outcome: caseOutcomeSchema.optional(),
+    avatarRemoved: z.boolean(),
+    /** The moderator's own words — *record or correct the reason behind the decision*. */
+    reason: z.string().min(1),
+    actor: handleSchema,
+    at: isoSchema,
+  })
+  .superRefine((decision, ctx) => {
+    if (decision.kind === "concluded" && decision.outcome === undefined) {
+      ctx.addIssue({ code: "custom", message: "A conclusion records its outcome.", path: ["outcome"] });
+    }
+    if (decision.kind === "dismissed" && decision.outcome !== undefined) {
+      ctx.addIssue({ code: "custom", message: "A dismissal changes no visibility.", path: ["outcome"] });
+    }
+  });
+
+export const CASE_REASON_REQUIRED = "Record the reason behind the decision.";
+export const CASE_REASON_TOO_LONG = "Keep the reason under 1000 characters.";
+export const CASE_COMMENT_REQUIRED = "Write the note first.";
+export const CASE_COMMENT_TOO_LONG = "Keep the note under 2000 characters.";
+export const CASE_TERMS_REQUIRED = "Tick every term before dismissing.";
+
+const CASE_REASON_MAX = 1000;
+
+/** Trimmed where it enters, capped where it is stored — the same rule as every other free text. */
+const caseText = (max: number, required: string, tooLong: string) =>
+  z
+    .string()
+    .transform((value) => value.trim())
+    .pipe(z.string().min(1, required).max(max, tooLong));
+
+/**
+ * **Conclude** is one operation, not a form (`docs/NEXT.md` T-26B → *Approach*): an outcome, the
+ * optional avatar removal, and the reason. The adapter writes the outcome, the status, the clock,
+ * the history event and the creator's notification in one step — the page never re-reads to show
+ * the result.
+ */
+export const caseConcludeSchema = z.strictObject({
+  reportId: reportIdSchema,
+  outcome: caseOutcomeSchema,
+  /** Only when the avatar carries the violation while the text is valid (`detail.md`). */
+  removeAvatar: z.boolean(),
+  reason: caseText(CASE_REASON_MAX, CASE_REASON_REQUIRED, CASE_REASON_TOO_LONG),
+});
+
+/**
+ * **Dismiss** says *no violation* and needs the terms checked (`detail.md` → *Actions*): every one
+ * of the three, which is why the array is refined rather than merely counted. The gate on the
+ * button and this check are the same rule, so a tick the schema would refuse cannot be submitted.
+ */
+export const caseDismissSchema = z
+  .strictObject({
+    reportId: reportIdSchema,
+    reason: caseText(CASE_REASON_MAX, CASE_REASON_REQUIRED, CASE_REASON_TOO_LONG),
+    terms: z.array(termsRuleSchema),
+  })
+  .superRefine((write, ctx) => {
+    if (TERMS_RULES_ORDER.some((rule) => !write.terms.includes(rule))) {
+      ctx.addIssue({ code: "custom", message: CASE_TERMS_REQUIRED, path: ["terms"] });
+    }
+  });
+
+/** An internal note on the case: never shown publicly, never a reply to another note. */
+export const caseCommentSchema = z.strictObject({
+  reportId: reportIdSchema,
+  body: caseText(2000, CASE_COMMENT_REQUIRED, CASE_COMMENT_TOO_LONG),
+});
+
+/**
  * `systems/jev.md` + `luaplot-pages.md`: *Reports are cumulative … each new report raises the
  * item's weight, and the moderation queue is ordered most-reported first.* One case per item, its
  * own reasons kept, `lastReportAt` as the tie-break, `concludedAt` only on a concluded case.
+ *
+ * T-26B added the two halves the case page needs and no page may keep privately: the **flat,
+ * chronological history** (every admin action with its author and time) and the **decision** a
+ * concluded case is closed with. The refinement is the invariant that makes *a concluded case is
+ * final* (`detail.md` → *Rules*) checkable: a closed case always carries its decision and its
+ * clock, an open one carries neither.
  */
-export const reportSchema = z.strictObject({
-  id: z.uuid(),
-  target: reportTargetSchema,
-  reasons: z.array(reportEntrySchema).min(1),
-  weight: z.number().int().min(1),
-  status: reportStatusSchema,
-  jev: jevVerdictSchema,
-  createdAt: isoSchema,
-  lastReportAt: isoSchema,
-  concludedAt: isoSchema.optional(),
-});
+export const reportSchema = z
+  .strictObject({
+    id: z.uuid(),
+    target: reportTargetSchema,
+    reasons: z.array(reportEntrySchema).min(1),
+    weight: z.number().int().min(1),
+    status: reportStatusSchema,
+    jev: jevVerdictSchema,
+    /** The audit trail, oldest first. JEV's own action is not an event (`caseEventSchema`). */
+    history: z.array(caseEventSchema),
+    decision: caseDecisionSchema.optional(),
+    createdAt: isoSchema,
+    lastReportAt: isoSchema,
+    concludedAt: isoSchema.optional(),
+  })
+  .superRefine((report, ctx) => {
+    const concluded = report.status === "concluded";
+    if (concluded && report.decision === undefined) {
+      ctx.addIssue({ code: "custom", message: "A concluded case carries its decision.", path: ["decision"] });
+    }
+    if (!concluded && report.decision !== undefined) {
+      ctx.addIssue({ code: "custom", message: "An open case has no decision yet.", path: ["decision"] });
+    }
+    if (concluded !== (report.concludedAt !== undefined)) {
+      ctx.addIssue({ code: "custom", message: "Only a concluded case carries its clock.", path: ["concludedAt"] });
+    }
+  });
 
 /* ------------------------------------------------------------------------------------------------
  * Sessions
