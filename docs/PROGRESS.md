@@ -3,6 +3,38 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-11 — the comment thread on `/character/[id]` (2026-10-30)
+
+- **Changed:** `src/components/CommentThread.tsrx` (new): the flat adapter rows become a drawn list
+  in code — grouped by `parentId`, oldest first at every level, anything below the third level folded
+  onto the third indent, a placeholder with no surviving branch dropped entirely — so the template
+  renders one flat `@for` and never recurses. Deleted/removed rows keep header, time and footer with
+  one sentence in place of the body and **no actions**; a reply list longer than three folds behind
+  `Show N more replies`; the one composer at the top is retargeted by any row's **Reply** (depth
+  three included); NSFW covers a comment's own body only, behind a per-comment Reveal. Writes:
+  `repo.addComment` (author = the adapter's account, counts recomputed) and `repo.deleteComment`
+  (author only, branch kept). `commentBodySchema` / `commentWriteSchema` in `schema.ts` — the body is
+  trimmed there, the required-text rule belongs to the write, and a `superRefine` keeps *a visible
+  comment has text / a placeholder has none* true of the row. `memory.ts` now counts `replyCount` as
+  the **whole branch** and recounts on every write; the character page mounts the thread under the
+  lorebooks and its `Comments` cell is live from the thread's own answer. Fixtures grew to 22
+  comments (four replies under `COMMENT(13)`, an NSFW reply at depth three) so the fold, the third
+  indent and the cover are all reachable at the preview URL.
+- **Verified:** `./scripts/check.sh` → GREEN (build, 30 routes, 22 comments in 12 roots, type not
+  `any`); live at 360 through CDP `setDeviceMetricsOverride` — depths 0/16/32px, `Show 1 more reply`
+  expands to the fourth, the deleted row draws *This comment was deleted.* with zero `.act`
+  buttons while its NSFW reply stays covered beneath it, `Delete → Confirm delete` turns the author's
+  own row into that placeholder with the count cell unchanged at 8, posting appends a ninth row and
+  moves the cell to 9 with the draft cleared, `#comment-[id]` on a fresh load expands the branch and
+  scrolls to it (shell `.content` scrolled to 1633, row at y=212, `is-target` applied). At 640/900
+  (thread 656px) and 1200 (grid `508px 320px`, thread in `.main`, indents 24px) there is no
+  horizontal scroll.
+- **Not verified:** a same-document `hashchange` (in-app navigation to an anchor on the page already
+  open) is not handled — only the fragment at mount is; and a *removed by moderation* placeholder is
+  code-identical to a deletion but unreachable in the preview, because no fixture carries
+  `status: "removed"`. Attachment images on comments have no uploader yet, so the body renders text
+  only.
+
 ## T-10B — fork + Start/Continue on the character page (2026-10-30)
 
 - **Changed:** `repo.createSession(characterId)` and `repo.forkCharacter(id)` exist in memory, both

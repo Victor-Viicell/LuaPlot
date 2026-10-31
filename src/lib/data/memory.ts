@@ -20,6 +20,8 @@ import {
   accountPreferencesSchema,
   accountPreferencesPatchSchema,
   characterSchema,
+  commentSchema,
+  commentWriteSchema,
   handleSchema,
   normaliseHandle,
   profileWriteSchema,
@@ -87,7 +89,7 @@ function parseCollection<T>(name: string, schema: z.ZodType<T>, rows: unknown): 
  * already a fresh object graph, so the clone happens by validating rather than by `structuredClone`.
  */
 function load(): Store {
-  const store: Store = {
+  const next: Store = {
     characters: parseCollection("characters", seedSchemas.characters, seed.characters),
     lorebooks: parseCollection("lorebooks", seedSchemas.lorebooks, seed.lorebooks),
     presets: parseCollection("presets", seedSchemas.presets, seed.presets),
@@ -104,14 +106,46 @@ function load(): Store {
   };
 
   // Derived counts. Placeholders count too: the branch beneath them still exists.
-  for (const comment of store.comments) {
-    comment.replyCount = store.comments.filter((row) => row.parentId === comment.id).length;
-  }
-  for (const item of [...store.characters, ...store.lorebooks, ...store.presets, ...store.posts]) {
-    item.commentCount = store.comments.filter((row) => row.itemId === item.id).length;
+  recount(next);
+
+  return next;
+}
+
+/**
+ * Recompute every derived count from the thread.
+ *
+ * `replyCount` is the **whole branch** beneath a comment at every depth (not just its direct
+ * children — the schema says so and the footer reads it as *N replies*), and an item's
+ * `commentCount` is its whole thread, placeholders included (`comment-thread.md` → *Counts*).
+ *
+ * Called at load **and after every write**: a count that only refreshes at load is a count that
+ * disagrees with the thread the moment a reply lands, and the page's count strip reads the item's
+ * number while the thread draws the rows.
+ */
+function recount(target: Store): void {
+  const children = new Map<string | null, Comment[]>();
+  for (const row of target.comments) {
+    const bucket = children.get(row.parentId) ?? [];
+    bucket.push(row);
+    children.set(row.parentId, bucket);
   }
 
-  return store;
+  const sizes = new Map<string, number>();
+  const branchSize = (id: string): number => {
+    const known = sizes.get(id);
+    if (known !== undefined) return known;
+    const kids = children.get(id) ?? [];
+    const size = kids.reduce((sum, kid) => sum + 1 + branchSize(kid.id), 0);
+    sizes.set(id, size);
+    return size;
+  };
+
+  for (const comment of target.comments) {
+    comment.replyCount = branchSize(comment.id);
+  }
+  for (const item of [...target.characters, ...target.lorebooks, ...target.presets, ...target.posts]) {
+    item.commentCount = target.comments.filter((row) => row.itemId === item.id).length;
+  }
 }
 
 const store = load();
@@ -266,6 +300,17 @@ const PERSONA_ACCESS: Accessors<Persona> = {
   name: (row) => row.name,
 };
 
+/**
+ * Is there an item for a comment thread to live on? Posts have threads too, and a thread dies with
+ * its item (`comment-thread.md` → *The thread dies with its item*), so a write naming a missing
+ * item is refused rather than parked on no page.
+ */
+function threadOwner(id: string): boolean {
+  return [...store.characters, ...store.lorebooks, ...store.presets, ...store.posts].some(
+    (row) => row.id === id,
+  );
+}
+
 /** The mutable row behind a votable kind, or `null` when it does not exist. */
 function rowFor(kind: VotableKind, id: string): Character | Lorebook | Preset | Post | Comment | null {
   switch (kind) {
@@ -381,6 +426,68 @@ export const memoryRepo: Repo = {
     return store.comments
       .filter((row) => row.itemId === itemId)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+
+  /**
+   * Append a comment or a reply. The write is parsed through `commentWriteSchema` **before** it is
+   * stored (the composer's gate is that same schema, `safeParse` at the edge here), the author is
+   * the adapter's account — never a page's idea of who is posting — and both counts are recomputed
+   * afterwards, so `commentCount` on the page's strip and `replyCount` in each footer agree with
+   * the thread the moment it grows.
+   *
+   * `null` when the item is gone or the parent is not a comment on the same item: a reply can never
+   * hang off another thread.
+   */
+  async addComment(input) {
+    const parsed = commentWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    if (!threadOwner(write.itemId)) return null;
+
+    if (write.parentId !== null) {
+      const parent = store.comments.find((row) => row.id === write.parentId) ?? null;
+      if (!parent || parent.itemId !== write.itemId) return null;
+    }
+
+    const row = commentSchema.parse({
+      id: crypto.randomUUID(),
+      itemId: write.itemId,
+      parentId: write.parentId,
+      author: VIEWER,
+      body: write.body,
+      createdAt: new Date().toISOString(),
+      nsfw: write.nsfw,
+      likes: 0,
+      dislikes: 0,
+      replyCount: 0,
+      status: "visible",
+    });
+
+    store.comments.push(row);
+    recount(store);
+    return row;
+  },
+
+  /**
+   * Delete one comment — **author only** (another account's row is refused, which is what RLS will
+   * do to the Supabase adapter). The branch survives: the row stays as a `deleted` placeholder with
+   * its body gone, its engagement zeroed and its own vote dropped, and every reply beneath it keeps
+   * rendering at its depth (`comment-thread.md` → *Deleting a comment keeps its replies*).
+   */
+  async deleteComment(id) {
+    const row = store.comments.find((entry) => entry.id === id) ?? null;
+    if (!row || row.author !== VIEWER) return null;
+    // Already a placeholder: nothing left to take, and it must stay while replies hang beneath it.
+    if (row.status !== "visible") return row;
+
+    row.status = "deleted";
+    row.body = "";
+    row.likes = 0;
+    row.dislikes = 0;
+    votes.delete(voteKey("comment", id));
+    recount(store);
+    return row;
   },
 
   async listNotifications(options) {

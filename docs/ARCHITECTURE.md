@@ -86,6 +86,13 @@ Shapes, decided in T-03 (change them here before changing them in the code):
   memory. The `{ ok: false, error }` shape arrives with `supabase.ts`, which is the first adapter
   that can actually fail — inventing it now would make every page pay for a transport it does not
   have. Whoever writes `supabase.ts` changes this line in the same commit.
+- **Comment writes (T-11)** are `addComment(commentWriteSchema-shaped)` and `deleteComment(id)`. The
+  write carries **no author** — the adapter writes the row for the signed-in account, the same way it
+  owns one vote per viewer and one bookmark per item, so a page can never post as someone else. The
+  adapter parses the write with `safeParse` before it stores, appends `crypto.randomUUID()` for the id,
+  and **recomputes `replyCount` (the whole branch) and the item's `commentCount` after every write**;
+  a delete by anyone but the author answers `null`, and a delete by the author returns the row as a
+  `deleted` placeholder with its body gone and its branch intact.
 - **Counts are derived** in the adapter, never authored in a fixture: `commentCount` and
   `replyCount` are recomputed from the thread on load, and `ratio` is a function (`ratioOf`), never
   a stored field.

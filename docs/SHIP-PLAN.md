@@ -83,8 +83,16 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       a second session comes only from **New Session**. Landed with **Fork** in the settings menu
       (absent while private; the adapter refuses a private source) and DESIGN's *Start / Continue
       and Fork*. Brief: `docs/tickets/T-10B-fork-and-session-control.md`.
-- [ ] **T-11 Comment thread component.** Depth-limited nesting, reply, vote, delete → placeholder,
-      removed → placeholder, no bookmark on comments. Accept: deleting a parent keeps its replies.
+- [x] **T-11 Comment thread component.** `CommentThread.tsrx` builds the tree in code (oldest first
+      at every level, deeper than three folded onto the third indent, an orphan placeholder dropped),
+      renders placeholders with no actions but with their branch, folds a reply list past three
+      behind `Show N more replies`, retargets its one composer from any row's **Reply**, covers an
+      NSFW comment's own body, and honours `#comment-[id]` at mount. Adapter gained `addComment` /
+      `deleteComment` (author only, counts recomputed on every write, `replyCount` now the whole
+      branch) and `schema.ts` gained `commentBodySchema` / `commentWriteSchema` plus the row's
+      visible-has-text refinement. Mounted under the lorebooks on `/character/[id]` with a live
+      `Comments` cell. Accept: verified at 360/640/900/1200 via CDP metrics — deleting a parent keeps
+      its replies, posting moves the count.
 - [ ] **T-12 Report dialog.** Reasons from `components/report.md`, one-tap submit, identical
       confirmation whether it opened or joined a case. Accept: report appears on the moderation
       queue in the adapter with cumulative weight.

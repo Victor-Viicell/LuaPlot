@@ -445,6 +445,48 @@ decisions, and T-10 recorded them here rather than in a comment nobody reads.
 - **Continue and New session land on `/session/[id]`, still T-15's placeholder.** The write and the
   label are real; the transcript screen is not built, and this note is the honest half.
 
+## Comments (decided in T-11, do not re-invent)
+
+`src/components/CommentThread.tsrx` is shared by four detail pages, so nothing in it may be
+character-specific: it takes the item id and the viewer's handle and owns the thread's whole surface.
+
+- **The composer sits at the top of the thread**, in a 16px inset panel (`--color-bg-elevated`, 1px
+  `--color-border`, 6px radius) under a 12px uppercase label — *Add a comment*, or *Reply to @handle*
+  once a reply is targeted. It is inside the component because the spec puts it at the top of the
+  thread on every page that mounts it.
+- **One composer, retargeted.** A **Reply** control on any row points that same composer at the
+  comment, adds a 44px **Cancel** beside the label, and scrolls the composer into view. The flatten
+  rule means a reply *to a reply* still indents at the third level, so an inline third-level composer
+  would have nowhere to go; at depth three the control reads **Reply** like every other row and the
+  new row lands one indent deeper, which is where the spec puts it.
+- **The NSFW flag is a native checkbox in a 44px row** (`.flag`, 18px box, `accent-color` the accent),
+  not the `Toggle` primitive — that primitive is reserved for the two NSFW preferences, and the
+  composer needs a field-level control, not a preference switch. Label: `NSFW`. Default SFW, and it is
+  the comment's own flag, never the item's.
+- **`Post comment` is the only primary here** and sits in a page-owned `.post` wrapper (a page — and a
+  component — cannot style the primitive's `.btn`). It is disabled while empty or in flight; the error
+  line under the field is the schema's own message.
+- **Indentation is 16px per level at 360 and 24px from `sm`**, on the row's `--depth` custom property,
+  so three levels cost 48px of a 328px column and the body stays readable. A placeholder indents at its
+  own depth like any other row.
+- **Placeholders keep the shape and lose the actions**: header (24px avatar, `@handle`, `<time>`), the
+  sentence *This comment was deleted.* / *This comment was removed by moderation.* in 13px italic
+  `--color-text-subtle` in place of the body, and a footer carrying only the reply count. A comment
+  with nothing beneath it is dropped from the model, so it never draws at all.
+- **Collapsing is a reply list's rule**: more than three replies under one comment shows three and a
+  single 44px text button *Show N more replies* (singular *reply* at 1) at the children's indent. A
+  thread's own roots are never cut. Expanding is one-way within the mount.
+- **A comment's NSFW covers its body only** — 6px blur on `.row-body`, sibling scrim, 44px `Reveal`,
+  header and footer crisp. The account's **Show** decides (Blur is a listing preference); an
+  anchored row is marked with a 1px accent left rule and `scroll-margin-top: 72px` under the top bar.
+- **Delete is two taps** on the author's own row: `Delete` → `Confirm delete` / `Cancel`. The adapter
+  refuses another account's row, and the row it returns is already the placeholder — the page never
+  fakes one.
+- **The count strip's `Comments` cell is the thread's own number** (`onCount`), set from the item on
+  load and re-read after every write, so the cell and the rows cannot disagree.
+- **Report is absent from a comment's footer** until T-12 has a dialog; nothing is drawn disabled here
+  because the footer is dense and a dead control in it reads as a broken one.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

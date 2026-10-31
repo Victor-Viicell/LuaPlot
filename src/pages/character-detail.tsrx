@@ -1,6 +1,7 @@
 import { track } from "ripple";
 import { Avatar } from "../components/Avatar.tsrx";
 import { Button } from "../components/Button.tsrx";
+import { CommentThread } from "../components/CommentThread.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { IconMore } from "../components/Icons.tsrx";
 import { Sheet } from "../components/Sheet.tsrx";
@@ -100,6 +101,9 @@ export function CharacterDetail() @{
   onPrefs((next) => {
     show.value = next.show;
   });
+
+  /** The handle the comment thread writes as — live, so a sign-out empties the composer. */
+  const viewerHandle = track(() => viewer.value?.handle ?? "");
 
   const owner = track(
     () => viewer.value !== null && author.value !== "" && author.value === viewer.value.handle,
@@ -786,6 +790,15 @@ export function CharacterDetail() @{
         gap: 12px;
       }
 
+      /* The comment thread sits under the definition and the lorebooks, at every width: a thread
+         is part of the page's reading, not metadata for the aside. */
+      .comments {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
       @media (min-width: 640px) {
         .title {
           font-size: 34px;
@@ -955,6 +968,15 @@ export function CharacterDetail() @{
                     }
                   </ul>
                 }
+              </section>
+
+              <section class="comments" aria-label="Comments">
+                <h2 class="section-title">Comments</h2>
+                <CommentThread
+                  itemId={id}
+                  viewer={viewerHandle}
+                  onCount={(count) => (comments.value = count)}
+                />
               </section>
             </div>
 

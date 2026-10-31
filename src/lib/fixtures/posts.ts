@@ -435,4 +435,62 @@ export const COMMENTS: Comment[] = [
     replyCount: 0,
     status: "visible",
   },
+  /**
+   * T-11 grew the `CHARACTER(1)` thread so every shape the component promises is reachable in the
+   * preview: **four replies under `COMMENT(13)`** (one folds behind *Show 1 more reply*), a
+   * **reply to a reply** at the third indent, and an **NSFW reply** whose own body is covered while
+   * the rest of the thread stays crisp.
+   */
+  {
+    id: COMMENT(19),
+    itemId: CHARACTER(1),
+    parentId: COMMENT(13),
+    author: "quill",
+    body: "The ledger is an entry, not a stat block, and that is why it can be quoted back at her. Attach it and ask her to read a page from it.",
+    createdAt: at(24, 19, 0),
+    nsfw: false,
+    likes: 7,
+    dislikes: 0,
+    replyCount: 0,
+    status: "visible",
+  },
+  {
+    id: COMMENT(20),
+    itemId: CHARACTER(1),
+    parentId: COMMENT(13),
+    author: "sable",
+    body: "Mine reads it as a debt with no creditor named. Sessions handle it better than any field could.",
+    createdAt: at(24, 19, 10),
+    nsfw: false,
+    likes: 5,
+    dislikes: 1,
+    replyCount: 0,
+    status: "visible",
+  },
+  {
+    id: COMMENT(21),
+    itemId: CHARACTER(1),
+    parentId: COMMENT(13),
+    author: "bram",
+    body: "This is the fourth reply on purpose: three are inline and the rest folds, which is the one display rule a one-reply thread never proves.",
+    createdAt: at(24, 19, 20),
+    nsfw: false,
+    likes: 3,
+    dislikes: 0,
+    replyCount: 0,
+    status: "visible",
+  },
+  {
+    id: COMMENT(22),
+    itemId: CHARACTER(1),
+    parentId: COMMENT(14),
+    author: "mira",
+    body: "The entry does most of the work in the scene where she reads her own name off a smuggling manifest, and it earns the register it is written in.",
+    createdAt: at(24, 19, 30),
+    nsfw: true,
+    likes: 2,
+    dislikes: 0,
+    replyCount: 0,
+    status: "visible",
+  },
 ];

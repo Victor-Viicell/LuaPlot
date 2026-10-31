@@ -16,6 +16,7 @@ import type {
   AccountPreferences,
   Character,
   Comment,
+  CommentWrite,
   EntityOf,
   Handle,
   ItemKind,
@@ -93,6 +94,24 @@ export type Repo = {
    * `parentId` and folds branches deeper than three levels (`components/comment-thread.md`).
    */
   listComments(itemId: string): Promise<Comment[]>;
+
+  /**
+   * Append a comment or a reply (`T-11`). The write is `commentWriteSchema`-shaped, parsed by the
+   * adapter before it stores — the composer's gate and the stored row are the same schema, so the
+   * two cannot disagree. The row's **author is the signed-in account**, its `nsfw` flag is its own
+   * (SFW by default at the call site, never inherited), and `replyCount` / the item's
+   * `commentCount` are **recomputed after the write**, so the count strip can never disagree with
+   * the thread it counts. `null` when the item (or the parent being replied to) does not exist.
+   */
+  addComment(input: CommentWrite): Promise<Comment | null>;
+
+  /**
+   * Delete one comment — **author only**, refused for another account's row exactly as RLS will.
+   * Deletion never takes the branch: the row becomes a `deleted` placeholder (body gone, engagement
+   * zeroed, header and time kept) and every reply beneath stays. Returns the placeholder, or `null`
+   * when the row is missing or not the viewer's.
+   */
+  deleteComment(id: string): Promise<Comment | null>;
 
   /** Newest first. Rows are already aggregated by kind + target. */
   listNotifications(options?: ListOptions): Promise<Listing<Notification>>;

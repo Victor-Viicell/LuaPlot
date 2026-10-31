@@ -294,6 +294,36 @@ export const postSchema = z.strictObject({
 
 export const commentStatusSchema = z.enum(["visible", "deleted", "removed"]);
 
+/** The composer's one rule, so the inline error and the adapter cannot disagree. */
+export const COMMENT_REQUIRED = "Write something first.";
+export const COMMENT_TOO_LONG = "Keep it under 2000 characters.";
+export const COMMENT_MAX = 2000;
+
+/**
+ * A comment's text: **trimmed** where it enters, capped where it is stored. Deliberately not
+ * `min(1)` here — a placeholder keeps its row with the body **gone** (`components/comment-thread.md`
+ * → *Deleting a comment keeps its replies*: *the body, likes, and attachments go*), so the
+ * required-text rule belongs to the write (`commentWriteSchema`) and the visible-row invariant to
+ * `commentSchema`'s refinement below.
+ */
+export const commentBodySchema = z
+  .string()
+  .transform((value) => value.trim())
+  .pipe(z.string().max(COMMENT_MAX, COMMENT_TOO_LONG));
+
+/**
+ * One composer submission — a comment (`parentId: null`) or a reply. **No `author`**: the row is
+ * written for whoever is signed in, which the adapter owns (memory: `VIEWER`; Supabase:
+ * `auth.uid()`), exactly as `vote` owns one-vote-per-viewer. `nsfw` is the comment's own flag, SFW
+ * by default at the call site — never inherited from the item it sits under.
+ */
+export const commentWriteSchema = z.strictObject({
+  itemId: z.uuid(),
+  parentId: z.uuid().nullable(),
+  body: commentBodySchema.pipe(z.string().min(1, COMMENT_REQUIRED)),
+  nsfw: z.boolean(),
+});
+
 /**
  * `components/comment-thread.md` + `luaplot-pages.md` → *A comment carries likes, dislikes, and a
  * reply count, but deliberately no bookmark*; *NSFW is its own flag, never inherited*; *deleting or
@@ -301,19 +331,35 @@ export const commentStatusSchema = z.enum(["visible", "deleted", "removed"]);
  * for, and the branch beneath stays). Rows are **flat**: the tree is built from `parentId`, and
  * `replyCount` counts the whole branch beneath at every depth.
  */
-export const commentSchema = z.strictObject({
-  id: z.uuid(),
-  itemId: z.uuid(),
-  parentId: z.uuid().nullable(),
-  author: handleSchema,
-  body: z.string().min(1),
-  createdAt: isoSchema,
-  nsfw: z.boolean(),
-  likes: z.number().int().nonnegative(),
-  dislikes: z.number().int().nonnegative(),
-  replyCount: z.number().int().nonnegative(),
-  status: commentStatusSchema,
-});
+export const commentSchema = z
+  .strictObject({
+    id: z.uuid(),
+    itemId: z.uuid(),
+    parentId: z.uuid().nullable(),
+    author: handleSchema,
+    body: commentBodySchema,
+    createdAt: isoSchema,
+    nsfw: z.boolean(),
+    likes: z.number().int().nonnegative(),
+    dislikes: z.number().int().nonnegative(),
+    replyCount: z.number().int().nonnegative(),
+    status: commentStatusSchema,
+  })
+  /**
+   * The one cross-field rule the row carries: a visible comment has text, a **placeholder does not**
+   * — its body is gone (`comment-thread.md`), and the sentence in its place belongs to the
+   * component, not to the data. `superRefine` keeps the object schema's `.shape` and its inferred
+   * type, so nothing downstream pays for the check.
+   */
+  .superRefine((row, ctx) => {
+    if (row.status === "visible" && row.body.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: COMMENT_REQUIRED,
+        path: ["body"],
+      });
+    }
+  });
 
 /**
  * The one **recursive** shape in the app: the branch a page renders from the flat rows above.

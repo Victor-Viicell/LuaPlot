@@ -22,6 +22,7 @@ import type {
   avatarSchema,
   characterSchema,
   commentSchema,
+  commentWriteSchema,
   cutMessageSchema,
   engagementSchema,
   handleSchema,
@@ -85,6 +86,13 @@ export type PostAttachment = z.infer<typeof postAttachmentSchema>;
 export type Post = z.infer<typeof postSchema>;
 export type Comment = z.infer<typeof commentSchema>;
 export type CommentStatus = Comment["status"];
+
+/**
+ * One composer submission (`commentWriteSchema`): the text plus the comment's own NSFW flag. The
+ * author is deliberately not part of the write — the adapter writes the row for whoever is signed
+ * in, the same way it owns one vote per viewer.
+ */
+export type CommentWrite = z.infer<typeof commentWriteSchema>;
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 export type NotificationTarget = z.infer<typeof notificationTargetSchema>;
 export type Notification = z.infer<typeof notificationSchema>;
