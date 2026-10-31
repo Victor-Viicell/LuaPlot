@@ -225,7 +225,9 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       `bg-elevated`) and its `--color-surface` cannot carry the prose tier (4.05); dark flavours
       measure clean. Needs a decision — a darker light-mode accent ramp, or a lighter surface —
       not a hex in a page.
-- [ ] **T-38 End-to-end smoke.** Scripted walk of the 12 primary journeys against the Pages build.
+- [x] **T-38 End-to-end smoke.** Scripted walk of the 12 primary journeys against the Pages build.
+      — `scripts/smoke.mjs` (+ `scripts/smoke.sh`, `bun run smoke`) walks all twelve in one session at
+      360×740 and asserts on the DOM at every step; 12/12, ~7s; `--live` walks the published URL.
 - [ ] **T-39 Release.** Signed Android APK, desktop AppImage, README with links, tag `v0.1.0`.
 
 ## Failure bank (the ways this class of product breaks)

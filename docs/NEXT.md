@@ -1,100 +1,115 @@
 # Baton — what the next session does
 
-**Ticket: T-38 — end-to-end smoke: walk the twelve primary journeys against the published build.**
+**Ticket: T-34 — the native bridge, with a browser fallback for every capability.**
 
-Spec: `src/specs/luaplot-pages.md` (every route's *Actions* and *States*); `docs/CONTRACT.md` →
-*Report shape*; `docs/DESIGN.md` → *Contrast (measured in T-37)*.
+Spec: `src/specs/luaplot-pages.md` → *Conventions*; `docs/ARCHITECTURE.md` → *Tauri hardware*;
+`docs/CONTRACT.md` → *Engineering law* (*Tauri hardware*: mobile-only capabilities go through
+`src/lib/native.ts`, dynamically imported, with a browser fallback; the web build must never break).
 
-Why next: **T-37 closed the measurement half of P6** — the dark flavours now walk at **0 failing
-text pairs**, 0 unnamed focusables, 0 positive `tabindex`, 0 page-level horizontal scroll across seven
-widths, no layout shift on fonts, and the bundle is 186,716 B gz against a 300 KB budget. What has
-never been done is what T-38 asks: **one scripted walk of the twelve journeys against the published
-build, in-app** (not by reload), because every write goes through the memory adapter and a `goto_url`
-re-seed makes a passing write look like a failed one. P4 (T-29…T-32) stays blocked — no Supabase
-project ref, no `supabase` CLI. T-37B (light-flavour contrast) is a palette decision, not a walk;
-T-35/T-36/T-39 need a toolchain this box lacks.
+Why next: **T-38 closed the last verification gap on the web build** — twelve primary journeys walk
+green in one scripted session (`bun run smoke`, 12/12, ~7s) against the preview and, with `--live`,
+against the published URL. P4 (T-29…T-32) stays blocked — no Supabase project ref, no `supabase`
+CLI. T-37B (light-flavour contrast) is still a palette decision for a human, and T-35/T-36/T-39 need
+an Android toolchain this box lacks. Of the two unblocked P5 tickets, **T-34 is the one that can be
+finished and proven without a running Tauri shell**: `src/lib/native.ts` does not exist yet
+(`grep -rn "@tauri-apps" src` finds nothing outside `package.json`), and its acceptance — browser
+fallbacks proven, zero Tauri imports in the web bundle graph — is mechanically checkable here today.
+T-33 needs a `src-tauri` scaffold and a display; it is the ticket that makes a *device* run possible,
+not this one.
 
 ## Approach
 
-1. **Write the walk as a script, not as twelve browser sessions**: `scripts/smoke.mjs` (node, no new
-   dependency) driving CDP against a running preview (`bun run preview --port 4321`). Deliverable:
-   **twelve rows of {journey, started, ended, evidence}**, non-zero exit when a row fails.
-2. **The twelve** (each ends where the next begins, so it is one session): sign in from `/`; publish a
-   post from `/post/create`; comment on it; vote on it; save it and unsave it from `/bookmarks`;
-   follow and unfollow a profile; open a character and start a session; edit an own character (which
-   also unlocks *Request public again* while it is private); report a post and land on the case;
-   conclude a case as `removed`; read a notification (the badge drops); sign out.
-3. **Assert on the DOM, not on the adapter**: the sentence a page prints, the number in the tab
-   badge, the card leaving the grid. A journey that only passes because the adapter said so is not a
-   journey — the adapter is what the page is meant to be proving.
-4. Record the twelve rows in `docs/PROGRESS.md`, and any journey that cannot be walked (no fixture,
-   a control behind `?admin=1`) as a filed gap, never as a pass.
+1. **One module, one capability table.** `src/lib/native.ts` exports a small async API —
+   `haptic(kind)`, `share({title, text, url})`, `copy(text)`, `pickImage()`, `setBadge(n)` — each of
+   which: (a) checks `isNative()` (`"__TAURI_INTERNALS__" in window`, never a build-time env flag),
+   (b) `await import("@tauri-apps/api/...")` **inside** that branch so the browser never loads it,
+   (c) falls back: `navigator.vibrate`, `navigator.share` then `navigator.clipboard`,
+   `navigator.clipboard.writeText`, `<input type="file" accept="image/*">`, `document.title`.
+2. **Every capability answers a typed result, not `void | throw`** — `{ ok: true } | { ok: false,
+   reason: "unsupported" | "cancelled" | "failed" }` as a Zod schema in `src/lib/schema.ts` (T-07B's
+   rule: one shape, one home). A page must render *nothing happened* without a `try`.
+3. **Wire only what a spec already asks for.** A post's *Share* is in no spec — do not add a control
+   to a page in this ticket. If nothing calls a capability yet, ship the module and its fallbacks and
+   leave the call site for the ticket that does.
+4. **Prove the web path**: the built entry chunk must not statically import `@tauri-apps/*`
+   (`grep -o "@tauri-apps" dist/assets/index-*.js` must be empty), and the fallbacks must be
+   exercised — a temporary `/dev/native` route printing the last result of each call is the cheapest
+   honest harness, and it is the pattern `/dev/state` and `/dev/data` already set.
 
 ## Traps
 
-- **A hard reload re-seeds the memory adapter.** Walk with `navigate()`/clicks, never `goto_url`
-  between the steps of one journey; this cost T-28B a false "the removal did not stick" reading.
-- **`?admin=1` and `?auth=` are preview switches** — a journey that needs a moderator must re-write
-  `admin=1` after every `navigate()`, because the queue's own filter links do.
-- **Smoke the build that ships**: `https://victor-viicell.github.io/LuaPlot/` or `bun run preview` of
-  the same commit — not `bun run dev`, whose module graph differs from the published bundle.
-- **A journey is not a click**: every step needs an assertion, or the script reports twelve greens for
-  twelve no-ops.
-- **Removed post 6** (`/post/90570000-0000-4000-8000-000000000006`) is the only seeded dead state; do
-  not "fix" a journey by un-removing it.
-- **Counts drift after a write**: concluding a case deletes comment rows, so a row that reads a count
-  must read it before the write or take the adapter's answer to it.
+- **`isNative()` must be a runtime read.** An `import.meta.env` flag is baked at build time and makes
+  the Pages build pretend; `__TAURI_INTERNALS__` is what the shell actually injects.
+- **A dynamic import still gets bundled** — as its own chunk. The acceptance is that the web entry
+  never *loads* it: calling a capability in the browser must issue zero requests for that chunk.
+- **`navigator.share` rejects with `AbortError` on cancel** — that is `cancelled`, not `failed`; a
+  toast on cancel is a bug.
+- **Clipboard needs a user gesture**, and on Pages a secure context; write the fallback chain
+  (`share` → `clipboard` → `execCommand` → `unsupported`) down in the module, because no headless
+  walk can prove the gesture rule.
+- **`haptic()` on a desktop browser does nothing** (`navigator.vibrate` is undefined) — answer
+  `unsupported`, never throw.
+- Keep `bun run smoke` and `./scripts/check.sh` green before the commit.
 
 ## Open decisions
 
-- If a journey has no fixture (a notification for a `comment` target, for instance), **file it** and
-  walk the nearest one; do not seed fixtures inside a smoke ticket.
-- The smoke script may join `check.sh` only if it runs in < 60s; a gate that needs a browser on every
-  commit is a gate people learn to skip.
+- Whether the badge belongs in this ticket at all: `notifications.md` describes an unread *pill*, not
+  an app badge. If no spec calls for it, ship it answering `unsupported` in the browser and note that
+  in PROGRESS — or drop it.
+- `pickImage()` presumes an uploader and there is none (T-31 is blocked). Ship the picker behind the
+  result schema and wire **no** form to it this tick.
 
 ## Found while working (carried forward — keep this list growing)
 
-- **T-37 is done**: `--color-text-subtle` now equals `--color-text-muted` (overlay-1 measured 4.44:1
-  on the page, 3.40:1 on a card), muted steps to `subtext-1` on Frappé and Latte, `--color-accent-contrast`
-  is `--ctp-base` (crust on mauve was 4.09:1 in light), and `--color-avatar-text` is the one new named
-  token. Every value is a Catppuccin ramp step; a hex in a page is still a bug.
-- **The default flavour measures clean**: 0 failing text pairs across `/`, `/post/thread`, `/post/<id>`,
-  `/character/<id>`, `/bookmarks`, `/moderation?admin=1` at 360×740 in dark and in light (light leaves
-  one pair, below).
-- **Latte's active tab label is 4.45:1** (`accent` on `bg-elevated`) and Latte has no darker mauve —
-  T-37B needs a palette decision, not a swap. Do not close it with a hex.
+- **T-38 is done**: `scripts/smoke.mjs` walks the twelve journeys in one session at 360×740 and
+  asserts on the DOM at every step (badge label, `aria-pressed`, a card leaving the grid, a case
+  count 3 → 4 open, *Concluded · removed*). `scripts/smoke.sh` builds + previews + walks + tears
+  down; `--live` walks the Pages URL; `bun run smoke` is the alias. It ran 12/12 in ~7s, three times
+  in a row. **It is not in `check.sh`** — the gate stays browser-free, and a machine without Chromium
+  must not fail a commit.
+- **The report journey needs POST(8)**, not any post: the preview classifier buckets on
+  `hash("jev:post:" + body) % 5`, and only buckets 2/3/4 escalate (unsure → a case). A report on a
+  clean-pass post verifies the item and opens **no** case, so the journey would prove nothing. If a
+  fixture body changes, re-check the bucket before blaming the walk.
+- **A shared Chromium profile makes the walk flake** — it cost one run 58s and five cascading
+  failures. Profiles are unique per run (`tmpdir` + pid + clock, removed on exit); keep it that way,
+  and a failing row quotes the page's `Runtime.exceptionThrown`.
+- **`go()` must resolve against the served base.** `history.pushState("/bookmarks")` drops a
+  `/LuaPlot/` base and takes the router somewhere it has no route; the smoke resolves relative to the
+  `--url` base so one script walks preview and Pages.
+- **`?admin=1` survives an in-app hop but not a reload** — the queue's own filter links rewrite it;
+  any future walk step that reloads must re-add it (T-38's walk never reloads).
+- **The light flavour still measures one failing pair**: Latte's active tab label is 4.45:1
+  (`accent` on `bg-elevated`) and Latte has no darker mauve — T-37B needs a palette decision, not a
+  swap. Do not close it with a hex.
+- **T-37 is done**: `--color-text-subtle` equals `--color-text-muted`, muted steps to `subtext-1` on
+  Frappé and Latte, `--color-accent-contrast` is `--ctp-base`, `--color-avatar-text` is the one new
+  named token. Every value is a Catppuccin ramp step; a hex in a page is still a bug.
 - **`/bookmarks` carries an internal horizontal scroller** (`.tabs`, four type pills, `overflow-x:
   auto`): two pills sit past the 360 viewport by design while the **document** does not scroll
-  (`scrollWidth == clientWidth` in 35 width/route pairs). The page-level rule holds; not a bug.
-- **Tap targets**: 44px still fails for card-footer author links (16–21px tall, inline text — WCAG 2.2
-  `2.5.8` exempts inline links) and avatar links at 36×36 (AA's 24×24 floor passes). A fix is a card
-  redesign, not a padding tweak — keep it out of a measurement ticket.
+  (`scrollWidth == clientWidth` across 35 width/route pairs). The page-level rule holds; not a bug.
+- **Tap targets**: 44px still fails for card-footer author links (16–21px tall, inline text — WCAG
+  2.2 `2.5.8` exempts inline links) and avatar links at 36×36 (AA's 24×24 floor passes). A fix is a
+  card redesign, not a padding tweak.
 - **Measure a flavour through `Emulation.setEmulatedMedia`**, never by flipping `data-theme` from JS:
-  the theme blocks resolve `--ctp-*` on `:root`, and a JS flip plus the nav's `transition: color` reads
-  mid-flight values that look exactly like a broken palette (it cost T-37 one false "Mocha is broken"
-  reading).
+  the theme blocks resolve `--ctp-*` on `:root`, and a JS flip plus the nav's `transition: color`
+  reads mid-flight values that look exactly like a broken palette.
 - **T-37 bundle numbers, so nobody re-measures**: `dist` 1.1 MB; JS 728 KB raw / 186,716 B gz; CSS
   23,783 B gz; largest asset the JetBrains Mono Latin woff2 at 40,404 B. Budget 300 KB gz — met.
-- **T-28B is done**: `postStatusSchema` (`visible | removed`), `removePost()` (the one write both
-  `applyJevAction` and `concludeReport` make: status flipped, thread deleted in cascade, vote dropped,
-  row kept), `livePost()` filters `listPosts`/`profilePosts`, `getPost` still answers by id, the
-  bookmarks tab reads a removed post as a dead card, `/post/[id]` draws the spec's *Removed by JEV*
-  sentence plus one finality line for the author.
-- **A post's removal keeps no placeholder.** The comment rule (*a placeholder keeps its replies*) has
-  nothing to hang on when the item itself is gone, so `removePost` deletes the comments — the spec says
-  so in *Privacy and republication*.
-- **The ticket's copy lost to the spec.** T-28B proposed *This post was removed by moderation.*;
-  `post/detail.md` → *Removed by JEV* fixes the same sentence as a deleted post, so that is what the
-  page prints. Do not "improve" it back.
+- **`/character/[id]/edit` may render its inputs before the row resolves** — one probe reading the
+  form ~1.5s after navigation saw another character's name in the fields; a 1.8s read saw the right
+  one. Worth a look in a ticket that touches the edit form (uncontrolled inputs capturing their first
+  value?). Not reproduced since.
 - **The case page's *THE ITEM* panel does not re-render after *Conclude*** — it still shows the
   target's body until reload. Not a spec violation; worth a look if a ticket touches that page.
-- **T-28 is done**: `moderationNoticeSchema` + `republicationOutcomeSchema`; `repo.moderationNotice`
-  answers one shape from two sources; `repo.requestRepublication` is owner-only, authored-only, runs
-  `classify()` at once; `addReport`'s immediate branch writes the creator's notification **and** the
-  notice row. A refused republication rewrites the gate clock (`noticeAt = outcome.at`) and sets
-  `verified: false` — the next edit is what makes it eligible again.
-- **An immediate action files no report row** (T-27/T-28): only the creator's notification and the
-  notice row are stored. **`assets: []` is deliberate** (T-27) — an image-only report escalates
+- **T-28B is done**: `postStatusSchema` (`visible | removed`), `removePost()` (status flipped, thread
+  deleted in cascade, vote dropped, row kept), `livePost()` filters `listPosts`/`profilePosts`,
+  `getPost` still answers by id, the bookmarks tab reads a removed post as a dead card,
+  `/post/[id]` draws the spec's *Removed by JEV* sentence plus one finality line for the author.
+- **A post's removal keeps no placeholder** — the comment rule has nothing to hang on, so
+  `removePost` deletes the comments (spec: *Privacy and republication*).
+- **An immediate JEV action files no report row** (T-27/T-28): only the creator's notification and the
+  notice row are stored. **`assets: []` is deliberate** — an image-only report escalates
   (`imageOnly`) instead of asking a text model to judge a picture.
 - **A new case needs `history: []`** — build cases through `reportSchema.parse`.
 - **`event` is a DOM global**: name history helpers `historyEvent`.

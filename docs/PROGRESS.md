@@ -3,6 +3,42 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-38 — the twelve journeys, walked in one scripted session (2026-10-31)
+
+- **Changed:** `scripts/smoke.mjs` — a dependency-free CDP walk (Node's global `WebSocket` plus
+  `/json/new`) of the twelve primary journeys **in one session**, one Chromium at 360×740, twelve
+  rows of `{journey, started, ended, evidence}`, exit 1 unless all twelve pass. Every step asserts on
+  the DOM (the sentence a page prints, the badge label, the card leaving the grid, the button's
+  `aria-pressed`), never on the adapter. `scripts/smoke.sh` serves the build under test
+  (`bun run build` + `vite preview :4321`), walks it, tears the server down; `--live` walks
+  `https://victor-viicell.github.io/LuaPlot/`; `bun run smoke` is the alias. In-app hops push the
+  route and dispatch `popstate` — the router's own listener — so the memory adapter is never
+  re-seeded mid-journey, and every path resolves against the served base (`/`, `/LuaPlot/`).
+- **Verified (12/12, ~7s per walk, three consecutive runs + one through the wrapper):**
+  1. sign in from `/` — sign out in the menu, "Sign in" → `/authentification` → Google → home prints
+     *signed in as You*, tab bar back to Profile `/user/you`.
+  2. publish from `/post/create` — types a body, Publish lands on `/post/<uuid>` printing it back.
+  3. comment — the reply appears in the thread.
+  4. vote — Like reports `aria-pressed=true` (was `false` on a brand-new post).
+  5. save and unsave — the card is in `/bookmarks?type=post` and *Remove bookmark* takes it out.
+  6. follow and unfollow — mira's control walks Follow → Unfollow → Follow (the seed starts followed,
+     so the walk normalises first).
+  7. start a session — Sonic's page → *Start a session* → `/session/<uuid>` with a turn composer.
+  8. edit an own character — Iolande's *Request public again* is **disabled** before the edit and
+     **enabled** after *Save changes*.
+  9. report a post — the dialog's five steps submit and `/moderation?admin=1` goes **3 open → 4 open**.
+  10. conclude as removed — the post case prints *Concluded · removed*.
+  11. read a notification — 4 unread rows → 3, the tab bar goes "Alerts, 4 unread" → "Alerts, 3 unread".
+  12. sign out — home reads *signed out*, the Profile tab points at the site root.
+- **Not verified / notes:** pages other than these twelve (personas, presets, lorebooks, `/user/edit`,
+  `/terms`, `/onboarding`) are outside the present walk; the walk is not in `check.sh` because it
+  needs a browser + a preview server (the gate stays browser-free; a laptop without Chromium must not
+  fail a commit) — `bun run smoke` is the command. A journey's post is **POST(8)** on purpose: the
+  preview classifier's FNV bucket for its body is an *escalation*, which is the only way a report
+  lands on a case instead of an immediate verdict (`mock.ts`). The walk flaked once on a **reused**
+  Chromium profile (58s, five cascading failures); profiles are now unique per run (`mkdtemp`) and the
+  page's own `Runtime.exceptionThrown` is quoted on a failing row.
+
 ## Card tags on one line, the rest behind +N (2026-10-31)
 
 - **Changed:** the owner reported the card tag rows breaking lines. `Card` now measures which whole tags
