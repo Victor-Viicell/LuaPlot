@@ -541,7 +541,6 @@ export function Bookmarks() @{
             </div>
 
             <div class="meta">
-              <p class="filter-note">Filter: All — the tag taxonomy is still undecided.</p>
               <p class="saved-count">{`${counts.value[tab.value]} saved`}</p>
             </div>
           </div>
