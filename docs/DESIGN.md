@@ -379,8 +379,10 @@ decisions, and T-10 recorded them here rather than in a comment nobody reads.
   *second* menu on one screen — the shell's overflow already holds Bookmarks, Moderation, Terms and
   the preview switch — and the split is deliberate: the shell menu is app-level destinations, this
   one acts on *this* character. **An entry whose target lands later is drawn and `disabled`**, never
-  wired to a write that does not exist: New session waits for T-10B's `createSession`, Report for
-  T-12's dialog, so the menu is complete without a control that lies.
+  wired to a write that does not exist: Report waited for T-12's dialog, so the menu was complete
+  without a control that lied. **Report is wired now** and is absent, not disabled, while signed out
+  (`components/report.md` → States): it closes this menu and opens the dialog as its **sibling**, so
+  two sheets never share the z-ladder.
 - **Counts are one row of four at 360** — likes, dislikes, ratio, comments — in the count-strip
   gesture (1px gap on `--color-border`, square corners). Four cells fit a 328px column at 12px
   labels, so a two-row split would only add a break to read across. The ratio is a percentage from
@@ -484,8 +486,50 @@ character-specific: it takes the item id and the viewer's handle and owns the th
   fakes one.
 - **The count strip's `Comments` cell is the thread's own number** (`onCount`), set from the item on
   load and re-read after every write, so the cell and the rows cannot disagree.
-- **Report is absent from a comment's footer** until T-12 has a dialog; nothing is drawn disabled here
-  because the footer is dense and a dead control in it reads as a broken one.
+- **Report is the footer's last action**, after Reply and after Delete's pair, drawn only while signed in
+  and only on a live row (a placeholder has no actions). It opens T-12's dialog with the comment as its
+  target and changes nothing on the page: a report is not a delete, and the row stays where it is until a
+  verdict is certain.
+
+## Report dialog (decided in T-12, do not re-invent)
+
+`src/components/ReportDialog.tsrx` is one component for every surface (`components/report.md`). T-12
+mounts it twice — the character menu and a comment's footer — and **lorebook/preset/post detail get the
+same dialog by mounting it, not by a second flow**; a post's attachment has no part yet (see below).
+
+- **A `Sheet` with a four-stop stepper**, the spec's own action order: *what* → *reason* → *source*
+  (copy claims only) → *details* (optional) → **Submit report**. Each stop is one question; nothing is
+  asked twice.
+- **Choices are 44px rows**, a 1px `--color-border` box with a 2px lead, `--color-bg-elevated` behind,
+  and `aria-pressed` carrying the selection — the accent border marks the one in force. Not radio
+  inputs: the row's help line is part of the tap target, and a native radio at 44px inside a bordered row
+  draws two competing targets.
+- **The stepper's order is the dialog's; the rules are the schema's.** The submit parses
+  `reportWriteSchema` and prints its first issue, so the inline line, the adapter's refusal and the
+  stored reason are one string. A missing part or reason sends the reader back to that stop.
+- **The reason list comes from `REPORT_REASONS_BY_PART` in `schema.ts`** — one table, keyed by part, so
+  the window can never offer a code the queue has no rendering for, and the part→reason pairing is
+  validated as well as drawn.
+- **Which parts a target offers is `PARTS_BY_KIND`.** Character / lorebook / preset offer *Avatar or
+  image* and *Text*; a comment offers *Text* only. **A post offers text only for now**: a copied post
+  image is not an avatar, and `reportPartSchema` has no attachment value — T-14 decides that, and adding
+  a part to the schema is a spec question, not a dialog one.
+- **`myReport` is read when the dialog opens**, not on submit. *Already reported* then survives a
+  remount, and a report on already-verified content — which opens no case at all — is still found. The
+  record draws what was filed: part · reason · filed date, the source line if any, the note if any, and
+  the one sentence *One report per item, and a report cannot be withdrawn.* **No second submit.**
+- **A copy claim gets a source field**, a plain text input holding the item id or an outside link —
+  **a field, not a picker**, because the adapter only needs the string and a picker would turn a report
+  into a search. Recorded here so the picker is a product decision, not a drift.
+- **The confirmation is the spec's, and never an outcome.** Submitted: *Report submitted. / It is on file.
+  You will not see an outcome here.* Already verified: *Report recorded and held. / A review starts once
+  the content changes.* — never "we are looking at it now". No verdict, no case id, no queue position.
+- **The target is named at the top** (`Reporting a character` / `Reporting a comment`, then the label),
+  because a sheet covers the page it came from.
+- **Foot: primary on top at 360, Back and Cancel beneath it; one row from `sm`** with the primary right
+  and the secondaries left. The primary is the only accent fill; *Submitting…* is its disabled label.
+- **Failure** is one line in `--color-danger` under the last stop (*That report couldn't be filed.*) and
+  the form keeps everything typed. Loading is a two-line `Skeleton` while `myReport` answers.
 
 ## Do not
 

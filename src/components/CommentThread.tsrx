@@ -2,6 +2,7 @@ import { track, type Derived } from "ripple";
 import { Avatar } from "./Avatar.tsrx";
 import { Button } from "./Button.tsrx";
 import { Field } from "./Field.tsrx";
+import { ReportDialog } from "./ReportDialog.tsrx";
 import { Skeleton } from "./Skeleton.tsrx";
 import { resolveRepo } from "../lib/data/repo.ts";
 import { read } from "../lib/reactive.ts";
@@ -123,6 +124,14 @@ export function CommentThread({
 
   /** The confirm step on Delete — a destructive control does not fire on the first tap. */
   const confirmId = track("");
+
+  /**
+   * The Report dialog (T-12), pointed at one comment. Two strings rather than a target object,
+   * because ripple 0.4.7 loses a `null` check across a branch and the dialog is mounted inside `@if`:
+   * `reportId` is empty until a row's **Report** is pressed.
+   */
+  const reportId = track("");
+  const reportAuthor = track("");
 
   /** The account's NSFW Show preference; Blur is a listing preference and does not reach here. */
   const show = track(nsfwPreference().show);
@@ -389,6 +398,17 @@ export function CommentThread({
   function clearReply(): void {
     replyToId.value = "";
     replyToAuthor.value = "";
+  }
+
+  /**
+   * **Report** on a comment opens the same dialog the character page's menu does, with the comment
+   * as its target. It is drawn only on a live row and only while signed in (`comment-thread.md` →
+   * Actions; a placeholder carries no actions at all), and it touches nothing else: a report is not
+   * a delete, and the row stays exactly where it is until a verdict is certain.
+   */
+  function openReport(id: string, author: string): void {
+    reportId.value = id;
+    reportAuthor.value = author;
   }
 
   function expand(parentId: string): void {
@@ -846,13 +866,23 @@ export function CommentThread({
                       {row.replies === 1 ? "1 reply" : `${row.replies} replies`}
                     </p>
                     @if (signedIn.value) {
-                      <button
-                        class="act"
-                        type="button"
-                        onClick={() => targetReply(row.id, row.author)}
-                      >
-                        Reply
-                      </button>
+                      <>
+                        <button
+                          class="act"
+                          type="button"
+                          onClick={() => targetReply(row.id, row.author)}
+                        >
+                          Reply
+                        </button>
+                        <button
+                          class="act"
+                          type="button"
+                          aria-label={`Report ${row.author}'s comment`}
+                          onClick={() => openReport(row.id, row.author)}
+                        >
+                          Report
+                        </button>
+                      </>
                     }
                     @if (row.mine) {
                       @if (confirmId.value === row.id) {
@@ -886,6 +916,16 @@ export function CommentThread({
         </ul>
       }
     </div>
+
+    @if (reportId.value !== "") {
+      <ReportDialog
+        target={{ kind: "comment", id: reportId.value, label: `Comment by @${reportAuthor.value}` }}
+        onClose={() => {
+          reportId.value = "";
+          reportAuthor.value = "";
+        }}
+      />
+    }
   </>
 }
 

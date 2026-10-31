@@ -93,9 +93,13 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       visible-has-text refinement. Mounted under the lorebooks on `/character/[id]` with a live
       `Comments` cell. Accept: verified at 360/640/900/1200 via CDP metrics — deleting a parent keeps
       its replies, posting moves the count.
-- [ ] **T-12 Report dialog.** Reasons from `components/report.md`, one-tap submit, identical
-      confirmation whether it opened or joined a case. Accept: report appears on the moderation
-      queue in the adapter with cumulative weight.
+- [x] **T-12 Report dialog.** `ReportDialog.tsrx` — a `Sheet` stepper (what → reason → source for a
+      copy claim → optional details → submit) mounted by the character settings menu and by every
+      live comment footer. Reasons come from `REPORT_REASONS_BY_PART` in `schema.ts`, `reportWriteSchema`
+      is the one gate (source required for a copy claim, part/reason pair checked), and the adapter
+      owns one report per viewer per item, cumulative cases (`weight + 1`, `lastReportAt`) and
+      already-verified *held*. Accept met: a report opens/joins a case in the adapter with cumulative
+      weight (5/3-open → 6/4-open on `/dev/data` without a reload).
 - [ ] **T-13 `/post/thread`.** Public timeline, composer entry, NSFW handling, Load more.
 - [ ] **T-14 `/post/[id]` + `/post/create`.** Body + at most one attachment (own character or cut),
       image/GIF embed, no edit route. Accept: attaching another author's item is impossible.

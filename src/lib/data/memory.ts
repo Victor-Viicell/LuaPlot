@@ -25,6 +25,10 @@ import {
   handleSchema,
   normaliseHandle,
   profileWriteSchema,
+  reportOutcomeSchema,
+  reportReasonSchema,
+  reportSchema,
+  reportWriteSchema,
   seedSchemas,
   sessionSchema,
   userSchema,
@@ -45,6 +49,7 @@ import {
   type Persona,
   type Post,
   type Preset,
+  type ReportReason,
   type User,
   type VoteDirection,
   type VotableKind,
@@ -154,6 +159,13 @@ const store = load();
 const votes = new Map<string, VoteDirection>();
 /** `kind:id:viewer` → saved. A persona has no bookmark, so only shared content is ever a key. */
 const bookmarks = new Set<string>();
+/**
+ * `kind:id:viewer` → **the viewer's own report** on that item, the rule `report.md` calls *one report
+ * per user per item*. A `Map` rather than a `Set` because *Already reported* has to show what was
+ * filed, and because the page must read its own record without scanning the case list (a case on
+ * already-verified content is deliberately never opened, so a scan would miss it).
+ */
+const myReports = new Map<string, ReportReason>();
 
 /**
  * Preferences are per **account**, so this is keyed by handle and not by device — the bug the
@@ -503,6 +515,90 @@ export const memoryRepo: Repo = {
       // Weight never decays: most-reported first, then the newest report.
       .sort((a, b) => b.weight - a.weight || b.lastReportAt.localeCompare(a.lastReportAt));
     return pageOf(rows, options);
+  },
+
+  /**
+   * File a report. Parsed through `reportWriteSchema` **before** anything is stored (the dialog's
+   * gate is the same schema), and the three rules `components/report.md` puts on the write are
+   * owned here:
+   *
+   * - **one report per viewer per item** — `myReports` is keyed `kind:id:viewer`, the shape `votes`
+   *   already uses, so a second submit answers `already` with the report on file instead of
+   *   appending and inflating weight;
+   * - **cumulative cases** — an open case for the target takes the reason, `weight + 1` and a new
+   *   `lastReportAt`; without one the write opens a case at weight 1 (weight is the report count,
+   *   not the reason count);
+   * - **already verified** — the target's own `verified` flag means *a clean scan leaves the report
+   *   on file but starts no scan until the content changes*, so the reason is recorded for the
+   *   viewer and no case opens. A comment carries no flag, so a comment report always queues.
+   */
+  async addReport(input) {
+    const parsed = reportWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const row = rowFor(write.target.kind, write.target.id);
+    if (!row) return null;
+
+    const key = voteKey(write.target.kind, write.target.id);
+    const onFile = myReports.get(key);
+    if (onFile) return reportOutcomeSchema.parse({ state: "already", at: onFile.at });
+
+    const at = nowIso();
+    const reason = reportReasonSchema.parse({
+      part: write.part,
+      reason: write.reason,
+      details: write.details,
+      source: write.source,
+      at,
+    });
+    myReports.set(key, reason);
+
+    const verified = "verified" in row && row.verified;
+    if (verified) return reportOutcomeSchema.parse({ state: "held", at });
+
+    const open = store.reports.find(
+      (entry) =>
+        entry.status === "open" &&
+        entry.target.kind === write.target.kind &&
+        entry.target.id === write.target.id,
+    );
+
+    if (open) {
+      open.reasons.push(reason);
+      open.weight += 1;
+      open.lastReportAt = at;
+    } else {
+      store.reports.push(
+        reportSchema.parse({
+          id: freshId(),
+          target: write.target,
+          reasons: [reason],
+          weight: 1,
+          status: "open",
+          /**
+           * A case opens *before* a scan: nothing has been judged and nothing has been applied, so
+           * the verdict is `unsure` at 0.5 — the schema's own reading of "no idea", not a guess —
+           * and `action: none`. The dialog never reads this; `/moderation` does.
+           */
+          jev: {
+            verdict: "unsure",
+            confidence: 0.5,
+            action: "none",
+            note: "Queued for a first scan; the reasons are the reporter's, not a judgment.",
+            at,
+          },
+          createdAt: at,
+          lastReportAt: at,
+        }),
+      );
+    }
+
+    return reportOutcomeSchema.parse({ state: "submitted", at });
+  },
+
+  async myReport(kind, id) {
+    return myReports.get(voteKey(kind, id)) ?? null;
   },
 
   async vote<V extends VotableKind>(

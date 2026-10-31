@@ -3,6 +3,51 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-12 — the Report dialog, on `/character/[id]` and on a comment (2026-10-30)
+
+- **Changed:** `src/components/ReportDialog.tsrx` (new): one `Sheet` with a four-stop stepper — *what*
+  → *reason* → *source* (copy claims only) → *details* (optional) → **Submit report** — mounted by the
+  character page's settings menu and by every live comment footer. The reason list is
+  `REPORT_REASONS_BY_PART` in `schema.ts`, so the window cannot offer a code the queue has no
+  rendering for and the part→reason pairing is validated as well as drawn; `PARTS_BY_KIND` decides
+  what a surface can report (a comment: text only). `schema.ts` gained `reportTargetSchema`,
+  `reportWriteSchema` (trimmed, source required for every copy claim, part/reason pair checked) and
+  `reportOutcomeSchema`; `reportSchema.target` now reuses the extracted target shape, so it exists
+  once. `repo.addReport(write)` and `repo.myReport(kind, id)` are new: the adapter owns **one report
+  per viewer per item** (`myReports`, keyed `kind:id:viewer`, answering the report on file instead of
+  appending), **cumulative cases** (an open case takes the reason, `weight + 1` and a new
+  `lastReportAt`; otherwise a case opens at weight 1 with `verdict: unsure / action: none` because
+  nothing has been judged), and **already verified** — a target whose `verified` flag is set records
+  the report and opens no case, which is the spec's *held*. The adapter answers a `ReportOutcome`
+  (`submitted | held | already`), never the case: no verdict, no queue position. The character
+  menu's **Report** is wired (the `disabled` twin is gone) and is absent, not disabled, while signed
+  out; the menu closes and the dialog mounts as its sibling. A comment's footer gained **Report**
+  after Reply and after Delete's pair — signed in and live rows only. `docs/DESIGN.md` gained
+  *Report dialog*, and `scripts/schema-check.ts` gained the two negative cases the write relies on.
+- **Verified:** `./scripts/check.sh` → GREEN (build, 30 routes, fixtures, and the two new negatives:
+  a copy claim with no source and a part/reason mismatch both refused with the schema's own copy).
+  Live at https://victor-viicell.github.io/LuaPlot/ at 360×740 through CDP metrics: the menu reads
+  `New session / Bookmark / Fork / Report`; Continue with nothing chosen prints *Choose what is being
+  reported.*, then the reason stop lists exactly the text codes; *Copied text* routes through the
+  source stop and refuses an empty one with *Name the source…*; a report on a **verified** character
+  (Sonic) confirms *Report recorded and held. / A review starts once the content changes.*, and
+  reopening the dialog shows the record (`Text · Missing NSFW flag · filed 30 Oct · …`, the note,
+  *One report per item, and a report cannot be withdrawn.*) with **no submit** — one report per
+  viewer, surviving the reopen. On an **unverified** character (The Cartographer) the confirmation is
+  *Report submitted.*, and an in-app navigation to `/dev/data` (no reload, so the store survives)
+  moves `CASES` from 5/3-open to 6/4-open: the write really opened a case. A comment's footer Report
+  opens *REPORTING A COMMENT* with **Text** only and confirms *Report submitted.*; a placeholder row
+  draws zero `.act` buttons; signed out, the settings menu loses Report (and Edit) and every comment
+  footer loses Reply and Report while the composer gates with *Sign in*. At 900 the sheet is a 520px
+  centred dialog with a single 44px footer row; no horizontal scroll at 360 (`scrollWidth ==
+  clientWidth`).
+- **Not verified:** a case opened at runtime cannot be read back after a **hard reload** — the memory
+  store resets, so the new case is only observable inside the same page load (checked via in-app
+  navigation, as above). A **held** report opens no case at all, so `/moderation` has no view of it
+  yet; that follows the spec (*starts no scan*) but the queue has nothing to render it with. A
+  comment's footer does not mark a row as already reported — the dialog's record is the state, and a
+  per-row flag would cost one `myReport` read per row.
+
 ## T-11 — the comment thread on `/character/[id]` (2026-10-30)
 
 - **Changed:** `src/components/CommentThread.tsrx` (new): the flat adapter rows become a drawn list

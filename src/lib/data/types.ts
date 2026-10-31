@@ -39,11 +39,14 @@ import type {
   postSchema,
   presetSchema,
   presetSettingsSchema,
+  reportOutcomeSchema,
   reportPartSchema,
   reportReasonCodeSchema,
   reportReasonSchema,
   reportSchema,
   reportStatusSchema,
+  reportTargetSchema,
+  reportWriteSchema,
   sessionCopySchema,
   sessionSchema,
   turnSchema,
@@ -99,6 +102,16 @@ export type Notification = z.infer<typeof notificationSchema>;
 export type ReportPart = z.infer<typeof reportPartSchema>;
 export type ReportReasonCode = z.infer<typeof reportReasonCodeSchema>;
 export type ReportReason = z.infer<typeof reportReasonSchema>;
+/** What a report is filed against — `kind`, `id`, and the label a moderator reads. */
+export type ReportTarget = z.infer<typeof reportTargetSchema>;
+/**
+ * One dialog submission (`reportWriteSchema`): the target, the part, the reason and the optional
+ * note/source. The reporter is deliberately absent — the adapter files it for whoever is signed in,
+ * exactly as `CommentWrite` carries no author.
+ */
+export type ReportWrite = z.infer<typeof reportWriteSchema>;
+/** The only thing a submit answers with: never the case, never a verdict (`report.md`). */
+export type ReportOutcome = z.infer<typeof reportOutcomeSchema>;
 export type JevVerdict = z.infer<typeof jevVerdictSchema>;
 export type ReportStatus = z.infer<typeof reportStatusSchema>;
 export type Report = z.infer<typeof reportSchema>;

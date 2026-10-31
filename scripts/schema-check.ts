@@ -22,6 +22,7 @@ import {
   isoMessage,
   isoSchema,
   characterSchema,
+  reportWriteSchema,
   seedSchemas,
   type CommentBranch,
   type SeedCollection,
@@ -91,6 +92,24 @@ for (const value of ["2026-13-01T00:00:00.000Z", "2026-02-30T00:00:00.000Z", "20
 const realTimestamp = isoSchema.safeParse("2026-10-30T18:04:24.000Z");
 if (realTimestamp.success) ok(`isoSchema accepted a real timestamp`);
 else bad(`isoSchema rejected a real timestamp (${isoMessage})`);
+
+/* T-12: a copy claim with no source must be refused, and a part/reason pair the window cannot
+   offer must be too — the two rules the Report dialog relies on are the write's own. */
+const sourcelessCopy = reportWriteSchema.safeParse({
+  target: { kind: "character", id: CHARACTERS[0].id, label: CHARACTERS[0].name },
+  part: "text",
+  reason: "copied-text",
+});
+if (sourcelessCopy.success) bad("reportWriteSchema accepted a copied-text report with no source");
+else ok(`reportWriteSchema rejected a copy claim with no source (${sourcelessCopy.error.issues[0]?.message})`);
+
+const mismatchedPart = reportWriteSchema.safeParse({
+  target: { kind: "character", id: CHARACTERS[0].id, label: CHARACTERS[0].name },
+  part: "avatar",
+  reason: "copied-text",
+});
+if (mismatchedPart.success) bad("reportWriteSchema accepted copied-text on the avatar part");
+else ok(`reportWriteSchema rejected a part/reason mismatch (${mismatchedPart.error.issues[0]?.message})`);
 
 /* 3. The recursive shape: built from the flat rows, parsed through the lazy schema. */
 console.log("== recursive shape");

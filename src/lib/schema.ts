@@ -432,6 +432,79 @@ export const reportReasonCodeSchema = z.enum([
   "copied-image",
 ]);
 
+/**
+ * What a report is filed against. `label` is the name a moderator reads in the queue, taken at the
+ * moment of filing so a later rename cannot rewrite the case's history.
+ */
+export const reportTargetSchema = z.strictObject({
+  kind: z.enum(["character", "lorebook", "preset", "post", "comment"]),
+  id: z.uuid(),
+  label: z.string().trim().min(1),
+});
+
+/**
+ * `components/report.md` → *What can be reported depends on the surface, not the content type*:
+ * **avatars, images and GIFs** carry a missing flag, illegal content or a copied image; **text**
+ * carries a missing flag, illegal content or copied text. One table, so the dialog's reason list and
+ * the write's validation cannot drift apart — and a code the queue has no rendering for can never be
+ * filed. The dialog renders straight from this map.
+ */
+export const REPORT_REASONS_BY_PART = {
+  avatar: ["missing-nsfw", "illegal", "copied-image"],
+  text: ["missing-nsfw", "illegal", "copied-text"],
+} as const satisfies Record<z.infer<typeof reportPartSchema>, readonly z.infer<typeof reportReasonCodeSchema>[]>;
+
+export const REPORT_WHAT_REQUIRED = "Choose what is being reported.";
+export const REPORT_REASON_REQUIRED = "Choose a reason.";
+export const REPORT_SOURCE_REQUIRED = "Name the source: the item it was copied from, or a link.";
+export const REPORT_DETAILS_TOO_LONG = "Keep the note under 1000 characters.";
+export const REPORT_SOURCE_TOO_LONG = "Keep the source under 400 characters.";
+export const REPORT_REASON_MISMATCH = "That reason doesn't fit what you chose to report.";
+
+const REPORT_DETAILS_MAX = 1000;
+const REPORT_SOURCE_MAX = 400;
+
+/** Trimmed where it enters, capped where it is stored — the same shape for both free-text fields. */
+const reportText = (max: number, message: string) =>
+  z.string().transform((value) => value.trim()).pipe(z.string().min(1).max(max, message));
+
+/**
+ * One submission of the dialog. **No reporter id**: the row is filed for whoever is signed in, which
+ * the adapter owns (memory: `VIEWER`; Supabase: `auth.uid()`), exactly as `vote` owns one vote per
+ * viewer and `commentWrite` owns its author. `source` is required for every copy claim
+ * (*a copy claim names its source*) and the part/reason pair is checked against the table above, so
+ * a write that the dialog could never produce is refused at the adapter too.
+ */
+export const reportWriteSchema = z
+  .strictObject({
+    target: reportTargetSchema,
+    part: reportPartSchema,
+    reason: reportReasonCodeSchema,
+    details: reportText(REPORT_DETAILS_MAX, REPORT_DETAILS_TOO_LONG).optional(),
+    source: reportText(REPORT_SOURCE_MAX, REPORT_SOURCE_TOO_LONG).optional(),
+  })
+  .superRefine((write, ctx) => {
+    const allowed: readonly string[] = REPORT_REASONS_BY_PART[write.part];
+    if (!allowed.includes(write.reason)) {
+      ctx.addIssue({ code: "custom", message: REPORT_REASON_MISMATCH, path: ["reason"] });
+    }
+    const copyClaim = write.reason === "copied-text" || write.reason === "copied-image";
+    if (copyClaim && write.source === undefined) {
+      ctx.addIssue({ code: "custom", message: REPORT_SOURCE_REQUIRED, path: ["source"] });
+    }
+  });
+
+/**
+ * What a write answers the dialog with. **Never the case**: `weight`, `status` and `jev` are the
+ * moderator's view, and `report.md` says the reporter never sees an outcome. `held` is the spec's
+ * *already verified* — recorded and held, no scan started until the content changes; `already` is
+ * *one report per user per item*, answered with the report that is on file rather than a second one.
+ */
+export const reportOutcomeSchema = z.strictObject({
+  state: z.enum(["submitted", "held", "already"]),
+  at: isoSchema,
+});
+
 /** `components/report.md`: one reason per report, with its own detail and, for a copy claim, a source. */
 export const reportReasonSchema = z.strictObject({
   part: reportPartSchema,
@@ -464,11 +537,7 @@ export const reportStatusSchema = z.enum(["open", "concluded"]);
  */
 export const reportSchema = z.strictObject({
   id: z.uuid(),
-  target: z.strictObject({
-    kind: z.enum(["character", "lorebook", "preset", "post", "comment"]),
-    id: z.uuid(),
-    label: z.string().min(1),
-  }),
+  target: reportTargetSchema,
   reasons: z.array(reportReasonSchema).min(1),
   weight: z.number().int().min(1),
   status: reportStatusSchema,

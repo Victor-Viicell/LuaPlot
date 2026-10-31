@@ -4,6 +4,7 @@ import { Button } from "../components/Button.tsrx";
 import { CommentThread } from "../components/CommentThread.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { IconMore } from "../components/Icons.tsrx";
+import { ReportDialog } from "../components/ReportDialog.tsrx";
 import { Sheet } from "../components/Sheet.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
 import { href, navigate, useParams } from "../router.ts";
@@ -18,10 +19,11 @@ import { toast } from "../lib/toast.ts";
  * `/character/[character.id]` — the read surface (`src/specs/pages/character/detail.md`).
  *
  * Scope, decided in T-10 and extended in T-10B: identity + attached lorebooks + counts and ratio +
- * vote + bookmark + the owner's moderation notice + the settings menu, now holding **Fork** and a
- * wired **New session**, and the page's one `btn-primary`: **Start a session / Continue**, driven by
- * `repo.findSessionForCharacter`. **Report** is still T-12's dialog, drawn and disabled for the same
- * reason it always was — never wired to a write that does not exist.
+ * vote + bookmark + the owner's moderation notice + the settings menu, now holding **Fork**, a
+ * wired **New session** and **Report**, and the page's one `btn-primary`: **Start a session /
+ * Continue**, driven by `repo.findSessionForCharacter`. **Report** opens T-12's dialog with this
+ * character as its target; the dialog is a sibling of the menu, never nested in it, and the entry is
+ * absent while signed out (`components/report.md` → States).
  *
  * What this page owns, and what it deliberately does not:
  * - **The visibility rule.** `memory.ts`'s `getCharacter` answers any row by id (the owner and a
@@ -82,6 +84,15 @@ export function CharacterDetail() @{
   const noticeReasons = track<ReasonRow[]>([]);
 
   const menuOpen = track(false);
+  /**
+   * The Report dialog (T-12). It is a **sibling** of the settings sheet, never a nested one: opening
+   * it closes the menu, so a phone never has two sheets on the z-ladder at once.
+   */
+  const reportOpen = track(false);
+  /** Signed out draws no entry at all (`report.md` → States: *Signed out — no button*). */
+  const canReport = track(
+    () => phase.value === "ready" && !missing.value && viewerHandle.value !== "",
+  );
   const busy = track(false);
   const revealed = track(false);
 
@@ -303,6 +314,16 @@ export function CharacterDetail() @{
   function openEdit(): void {
     menuOpen.value = false;
     navigate(`/character/${id}/edit`);
+  }
+
+  /**
+   * **Report** hands the dialog this character's target. The menu closes first — one sheet on the z
+   * ladder, and the dialog's own close returns to the page rather than to a menu that is no longer
+   * the task.
+   */
+  function openReport(): void {
+    menuOpen.value = false;
+    reportOpen.value = true;
   }
 
   /** The title/author/lorebook links are real anchors; this keeps a plain click in-app. */
@@ -1054,12 +1075,21 @@ export function CharacterDetail() @{
           @if (canFork.value) {
             <button class="menu-item" type="button" onClick={fork}>Fork</button>
           }
-          <button class="menu-item" type="button" disabled>Report</button>
+          @if (canReport.value) {
+            <button class="menu-item" type="button" onClick={openReport}>Report</button>
+          }
           @if (owner.value) {
             <button class="menu-item" type="button" onClick={openEdit}>Edit</button>
           }
         </div>
       </Sheet>
+    }
+
+    @if (reportOpen.value) {
+      <ReportDialog
+        target={{ kind: "character", id, label: name.value }}
+        onClose={() => (reportOpen.value = false)}
+      />
     }
   </>
 }

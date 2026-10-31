@@ -26,7 +26,11 @@ import type {
   Post,
   Preset,
   Report,
+  ReportOutcome,
+  ReportReason,
   ReportStatus,
+  ReportTarget,
+  ReportWrite,
   Session,
   User,
   VoteDirection,
@@ -118,6 +122,32 @@ export type Repo = {
 
   /** Most-reported first; equal weight falls back to the newest report. */
   listReports(options?: ListOptions & { status?: ReportFilter }): Promise<Listing<Report>>;
+
+  /**
+   * File a report (`components/report.md`, T-12). The write is `reportWriteSchema`-shaped and parsed
+   * here before it is stored, so the dialog's gate and the stored reason are the same schema.
+   *
+   * The adapter owns the three rules no page may re-derive:
+   * - **one report per viewer per item** — a second submit answers `already` instead of appending;
+   * - **cumulative cases** — an open case for the target takes the reason, `weight` + 1 and a new
+   *   `lastReportAt`; with no open case the write opens one at weight 1. Those numbers are computed
+   *   here, exactly as every other count is;
+   * - **already verified** — a target whose `verified` flag is set leaves the report *on file* and
+   *   starts no scan, which is the spec's `held`.
+   *
+   * The answer is a `ReportOutcome`, never the case: `weight`, `status` and `jev` are the
+   * moderator's view, and *the reporter never sees an outcome*. `null` when the target is gone or
+   * the write does not parse.
+   */
+  addReport(input: ReportWrite): Promise<ReportOutcome | null>;
+
+  /**
+   * The viewer's own report on an item, or `null` when they have not filed one — what makes
+   * *Already reported* true on a remount. It answers the **reason record** (part, reason, details,
+   * source, time) and never the case, for the same reason `addReport` answers an outcome: the
+   * reporter is not shown the verdict, the queue position or who acted.
+   */
+  myReport(kind: ReportTarget["kind"], id: string): Promise<ReportReason | null>;
 
   /**
    * One vote per viewer per item, and a switch replaces the earlier vote — the adapter owns that
