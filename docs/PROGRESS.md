@@ -28,12 +28,26 @@ could not be verified.
   left exactly one; deleting the default handed it to *Ash* (most recently created); deleting every
   row left 0 rows and 0 defaults; the next `addPersona` on the empty collection came back
   `isDefault: true` with initials `SO` derived from the name; a blank name and an `nsfw` key both came
-  back `null` from the schema.
-- **Not verified:** the four pages were **not** driven in Chromium this tick — the 360/640/900/1200
-  measurements are the next session's first job (the form frame is T-19's unchanged, but the persona
-  card, the default line and the character picker sheet are new drawing). The picker offers only the
-  viewer's **own** characters (a public character from another author is not offered) — recorded as a
-  gap in `docs/NEXT.md`. More than 24 personas still needs an unpaged adapter answer.
+  back `null` from the schema. The **live** build then in Chromium at 360×740: the collection drew
+  three cards in one 328px column, one carrying `default`, `scrollWidth` 360; **Set as default on a
+  card moved the mark** (Ash took it, Nell's row flipped to *Set as default*, the held one disabled);
+  detail drew name, tagline, the four-action column, the description, a live delete row and a **320×320**
+  cover with no engagement row and `scrollWidth` 360; **Start a session** opened *Choose a character*
+  with the viewer's three characters. `create` rendered Name / Tagline / Who this persona is /
+  Initials in the spec's order with Save blocked while empty, saved `  Court   Scribe ` as *Court
+  Scribe* with initials `CO` and landed on the new id's detail; `edit` preloaded all four values and
+  its Delete opened the in-place confirmation; confirming **Delete on the default** landed on
+  `/persona` with the mark moved to *Ash* and the row gone. Grid measured 1-up at 360 (328px), 2-up at
+  640 (288px), 3-up at 900 (232px) and 4-up at 1280 (222px); the toolbar is one line at 900
+  (378/200/120); the form is one 328px column at 360 and `590px 320px` at 1280; no horizontal scroll
+  at any width.
+- **Not verified:** the signed-out collection state and the *not found* sentence were not exercised on
+  the live build (the adapter answers `null` and the pages render one branch of two comparisons — but
+  a human click through them is still owed). The create → collection round trip was checked with a
+  hard reload, which resets the memory adapter, so the new row was correctly absent: **SPA navigation
+  is still the only way to see a runtime row**, as T-18 recorded. The picker offers only the viewer's
+  **own** characters (a public character from another author is not offered) — recorded as a gap in
+  `docs/NEXT.md`. More than 24 personas still needs an unpaged adapter answer.
 
 ## T-19 — the four preset routes, and the form's dead root rule (2026-10-31)
 

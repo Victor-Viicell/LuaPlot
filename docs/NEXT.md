@@ -91,8 +91,15 @@ but it cannot list what is saved, when it was saved, or what used to be there.
   reading, not a page patch.
 - **More than 24 personas has no answer yet** (T-20): the collection asks for page 1 only. A `listPersonas`
   with no page cap (or a `page: 0` meaning unbounded) is the fix when an account can hold more.
-- **The persona pages were not driven in Chromium** (T-20): 360/640/900/1200 is unmeasured for the
-  collection, the card, detail and the picker sheet. Do that pass before trusting the drawing.
+- **A keyed `@for` reuses its block, so a prop expression does not re-evaluate** (T-20): the persona
+  card kept the `isDefault` it was first drawn with and *Set as default* wrote through the adapter but
+  repainted nothing. The collection's key is now `id:default` / `id:plain`, which remounts the one
+  stateless card. Any list whose row **renders a flag that the same page changes** needs this or a
+  `Derived` prop.
+- **A native `disabled={tracked}` is a type error and `{tracked ? a : b}` always takes `a`** (T-20):
+  read `.value`, or hand the `Derived` to `Button`, which reads it.
+- **`@if`/`@else` bodies with more than one node need a fragment `<>…</>`** (T-20): a toolbar div plus
+  a phase `@if` in one `@else` fails to compile (`A code block renders a single node`).
 - **A component's root element cannot be styled** (T-19): Ripple 0.4.7 adds `tsrx-<hash>` only to the
   elements it emits below the root, so `.character-form` / `.lorebook-form` / `.preset-form` was
   dropped by the compiler; each form now puts its grid on a child `.layout`.
