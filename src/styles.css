@@ -647,14 +647,25 @@ a.card-title:hover {
 }
 
 /* The cover on an item page is the same primitive, **full width of its column and square** (1:1),
-   with the initials scaled to it. The column's cap is the page's business — `.hero-avatar` owns the
-   max-width — because a 300px cover on a 1280 screen is the page's layout choice, not the avatar's. */
+   with the initials scaled to it. The column's cap is the page's business — a page-owned wrapper
+   inside the head grid — because a 320px cover on a 1280 screen is the page's layout choice, not the
+   avatar's. The initials are a **monogram** here, not a 13px label: at this size the type is the only
+   content the box has until art exists, so it is drawn at cover scale and the surface gets a two-stop
+   gradient so a 320px square does not read as an empty placeholder. */
 .avatar.is-hero {
     width: 100%;
     height: auto;
     aspect-ratio: 1 / 1;
-    font-size: clamp(40px, 16vw, 56px);
-    letter-spacing: 0.04em;
+    background-image: linear-gradient(
+        155deg,
+        var(--color-surface-hover),
+        var(--color-surface) 55%,
+        var(--color-bg-elevated)
+    );
+    font-size: clamp(56px, 24vw, 112px);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-indent: 0.06em;
 }
 
 .card-body {

@@ -438,6 +438,15 @@ export function CharacterDetail() @{
         grid-row: 2;
       }
 
+      /* Base placement comes **before** the media block: both selectors have the same specificity, so
+         a base rule declared after the query would win at every width and keep the name under the
+         cover on desktop. */
+      .identity-text {
+        grid-column: 1;
+        grid-row: 2;
+        min-width: 0;
+      }
+
       @media (min-width: 640px) {
         .head {
           grid-template-columns: 320px minmax(0, 1fr) auto;
@@ -453,18 +462,13 @@ export function CharacterDetail() @{
         .identity-text {
           grid-column: 2;
           grid-row: 1;
+          align-self: end;
         }
 
         .menu-btn {
           grid-column: 3;
           grid-row: 1;
         }
-      }
-
-      .identity-text {
-        grid-column: 1;
-        grid-row: 2;
-        min-width: 0;
       }
 
       .kicker {

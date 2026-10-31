@@ -276,11 +276,17 @@ list, so the decisions below are the ones they inherit.
   flag (`item.nsfw && prefs.blur`) and hands it over; the card never imports
   `lib/state/prefs.ts`. Show-off is the listing's job too — the card is never rendered for it.
 - **Item pages show the avatar as a cover** (T-12 follow-up, owner's call): `Avatar size="hero"` emits no
-  inline box and `.avatar.is-hero` gives it `width: 100%; aspect-ratio: 1/1` with the initial scaled by
-  `clamp(40px, 16vw, 56px)`. The page owns the column — full content width on a phone, a fixed 320px
-  column from `sm`, with the name and the settings button beside it — because a cover's size is a layout
-  decision, not a primitive's. **Square means square at every width**: never a 56px circle again, and never
-  a cropped rectangle, since there is no image set yet to crop and the initials must fit the box.
+  inline box and `.avatar.is-hero` gives it `width: 100%; aspect-ratio: 1/1` with the initials drawn as a
+  **monogram**, `clamp(56px, 24vw, 112px)` at weight 500, on a two-stop `155deg` gradient of
+  `--color-surface-hover → --color-surface → --color-bg-elevated`. At cover scale a 13px label in a 320px
+  square reads as a placeholder that failed to load; the monogram and the gradient are what make the box
+  look deliberate while there is no image set. The page owns the column — full content width on a phone, a
+  fixed 320px column from `sm`, with the name and the settings button beside it — because a cover's size is
+  a layout decision, not a primitive's. **Square means square at every width**: never a 56px circle again,
+  and never a cropped rectangle, since there is no image set yet to crop and the initials must fit the box.
+  The page's `.head` is a grid, and **every base placement rule is declared before the `@media` block**:
+  same specificity, so a base rule written after the query wins at every width — that is exactly how the
+  name ended up under the cover on desktop for one tick.
 - **The thumbnail is a third of the card, square** (T-09, owner's call): `Avatar` takes
   `size="fluid"` and `.card-veil .avatar.is-fluid` gives it `width: 33%; aspect-ratio: 1/1` with a
   22px initial (18px from `md`). It is a stylesheet rule, not a `size` prop, because the box has to
