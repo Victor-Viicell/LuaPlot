@@ -5,7 +5,9 @@ import { CardGrid } from "../components/CardGrid.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { PostCard } from "../components/PostCard.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
+import { PersonaSheet } from "../components/PersonaSheet.tsrx";
 import { Tabs } from "../components/Tabs.tsrx";
+import { UserCard } from "../components/UserCard.tsrx";
 import { href, useParams, useQuery } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type {
@@ -104,6 +106,8 @@ export function UserProfile() @{
   const failure = track("");
   const row = track<Profile | null>(null);
   const following = track(false);
+  /** The owner's persona dialog: listing and editing personas in place, beside Edit profile. */
+  const personasOpen = track(false);
   const followBusy = track(false);
 
   const tab = track<ProfileTab>(start.tab);
@@ -364,7 +368,7 @@ export function UserProfile() @{
 
   boot();
 
-  <div class="profile">
+  <>
     <style>
       .profile {
         display: flex;
@@ -610,6 +614,8 @@ export function UserProfile() @{
       }
     </style>
 
+  <div class="profile">
+
     @if (phase.value === "loading") {
       <div class="slab" aria-busy="true" aria-label="Loading profile">
         <Skeleton variant="block" height={22} />
@@ -648,7 +654,12 @@ export function UserProfile() @{
 
           <div class="head-action">
             @if (own.value) {
-              <a class="btn btn-secondary" href={href(`/user/${handle}/edit`)}>Edit profile</a>
+              <div class="owner-actions">
+                <button class="btn btn-secondary" type="button" onClick={() => (personasOpen.value = true)}>
+                  Personas
+                </button>
+                <a class="btn btn-secondary" href={href(`/user/${handle}/edit`)}>Edit profile</a>
+              </div>
             } @else if (myHandle === "") {
               <a class="btn btn-primary" href={href("/authentification")}>Sign in to follow</a>
             } @else {
@@ -703,23 +714,10 @@ export function UserProfile() @{
             }
           </ul>
         } @else {
-          <ul class="people" aria-label={tab.value}>
+          <ul class="card-grid" aria-label={tab.value}>
             @for (const person of people.value; key person.handle) {
-              <li class="person">
-                <a class="person-link" href={href(`/user/${person.handle}`)}>
-                  <Avatar
-                    initials={person.avatar.initials}
-                    label={`${person.displayName} avatar`}
-                    size={40}
-                  />
-                  <span class="person-who">
-                    <span class="person-name">{person.displayName}</span>
-                    <span class="person-handle">{`@${person.handle}`}</span>
-                    @if (person.bio) {
-                      <span class="person-bio">{person.bio}</span>
-                    }
-                  </span>
-                </a>
+              <li class="card-cell">
+                <UserCard person={person} />
               </li>
             }
           </ul>
@@ -743,7 +741,12 @@ export function UserProfile() @{
         }
       </>
     }
+
+    @if (personasOpen.value) {
+      <PersonaSheet onClose={() => (personasOpen.value = false)} />
+    }
   </div>
+  </>
 }
 
 export default UserProfile;

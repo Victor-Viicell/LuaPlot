@@ -3,6 +3,7 @@ import { Avatar } from "../components/Avatar.tsrx";
 import { Button } from "../components/Button.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { IconArrowUp, IconBack, IconMore } from "../components/Icons.tsrx";
+import { PersonaSheet } from "../components/PersonaSheet.tsrx";
 import { PostComposer } from "../components/PostComposer.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Sheet } from "../components/Sheet.tsrx";
@@ -1348,27 +1349,11 @@ export function SessionDetail() @{
     }
 
     @if (personaOpen.value) {
-      <Sheet title="Switch persona" onClose={() => (personaOpen.value = false)}>
-        <ul class="menu">
-          @for (const person of personas.value; key person.id) {
-            <li>
-              <button
-                class="menu-row"
-                type="button"
-                aria-pressed={personaId.value === person.id ? "true" : "false"}
-                onClick={() => choosePersona(person.id)}
-              >
-                {personaId.value === person.id ? `${person.name} · in use` : person.name}
-              </button>
-            </li>
-          }
-          <li>
-            <button class="menu-row" type="button" onClick={() => choosePersona(null)}>
-              No persona — your side reads User
-            </button>
-          </li>
-        </ul>
-      </Sheet>
+      <PersonaSheet
+        onClose={() => (personaOpen.value = false)}
+        picked={personaId.value}
+        onPick={(next) => choosePersona(next)}
+      />
     }
 
     @if (publishOpen.value) {

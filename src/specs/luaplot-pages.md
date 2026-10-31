@@ -127,6 +127,10 @@ Every route has its own spec under [`pages/`](pages). This file is the route ind
   **catalog switcher** at the top — three links, the current one underlined and marked `aria-current` —
   because a catalog that can only be reached by typing its URL is a catalog nobody finds. It is links,
   not tabs: they are three routes, so back/forward and a shared URL keep working.
+- **Personas are managed in a dialog, not on a page.** Listing, creating and editing a persona happens in
+  one component mounted wherever a persona matters (a session's header, the profile owner's actions);
+  on a phone that dialog is **full screen**, from `md` it is the ordinary centred sheet. `/persona/*`
+  remains only as a deep link for the same data.
 - **A session owns its chrome**: `/session/[id]` is the one route that hides the shell's top bar, tab bar
   and rail, because a conversation is a surface of its own — its header is the character and its composer
   is the only control. Every other page lives inside the shell.

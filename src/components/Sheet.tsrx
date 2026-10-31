@@ -20,12 +20,19 @@ export function Sheet({
   onClose,
   children,
   label,
+  full = false,
 }: {
   title: string;
   onClose: () => void;
   children?: Children;
   /** Accessible name when the visible title is not the whole name. */
   label?: string;
+  /**
+   * **Full screen on a phone** and a centred dialog from `md` up. For a sheet that is a place to
+   * work — the persona list, where rows are edited in place — rather than a question with two
+   * answers.
+   */
+  full?: boolean;
 }) @{
   let panel: HTMLDivElement | undefined;
 
@@ -78,7 +85,7 @@ export function Sheet({
     <Portal target={document.body}>
       <div class="sheet-scrim" onClick={onClose}></div>
       <div
-        class="sheet"
+        class={full ? "sheet is-full" : "sheet"}
         role="dialog"
         aria-modal="true"
         aria-label={label ?? title}

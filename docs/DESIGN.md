@@ -1378,6 +1378,26 @@ pass, and the rules they leave behind:
 - **An aside is a sidebar, not a peer**: 240px on a 794 column (a 300px aside left the post body 382
   wide — a phone measure on a desktop).
 
+## People and personas (owner's call)
+
+- **One card language, and it covers people.** `UserCard` is the catalog card wearing a person: title =
+  display name, the handle just under it, the **bio in the tagline slot**, and the footer carrying
+  **followers · following** instead of author · ratio. Same 1/3 square thumbnail, same veil, same
+  three-line clamp. A Followers tab therefore reads at the same rhythm as a catalog.
+- **Personas are a component, not a page.** `PersonaSheet` (list + inline editor + delete, gated by
+  `personaWriteSchema`) is mounted from the profile's *Personas* button beside *Edit profile* and from
+  the session's header; `onPick` turns the same list into a chooser. **Full screen on a phone**, the
+  centred dialog from `md` — `Sheet` gained a `full` prop for it, and a full sheet **fades** rather than
+  sliding 12px, which would leave a strip of the page under its own edge.
+
+## Scoping trap that cost a whole page's CSS
+
+`<style>` must be a **sibling of the root element**, never its first child: with the style block *inside*
+the root div, Ripple's scoped rule is `.profile.tsrx-…` while the root never receives the hash class, so
+**every rule on the page silently matched nothing** — the profile had no flex column, no gap under the
+tabs, no grid. The symptom reads as a layout bug; the cure is structural. Every page's template starts
+`<> <style>…</style> <div class="root">…</div> </>`.
+
 ## Copy law (owner's call, applies to every page)
 
 **The interface does not explain itself.** Four kinds of text exist, and only four:

@@ -3,6 +3,28 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## Profile cards, personas as a component, and the scoped-CSS bug behind the missing gap (2026-10-31)
+
+- **Found the cause of "no gap for the creation tabs":** `user-profile.tsrx` had its `<style>` block
+  *inside* the root `<div class="profile">`. Ripple scoped the rules to `.profile.tsrx-…`, the root never
+  got the hash class, and **the whole page's CSS was inert** — no flex column, no gap, no grid. Moving the
+  style out (root becomes a fragment) fixed it: `.profile` is `display:flex; gap:18px` again, measured 18px
+  between the tab strip and the cards.
+- **User cards:** new `UserCard` — the catalog card with the bio in the tagline slot and the footer
+  carrying *N followers · N following*, handle under the title. The Followers/Following tabs now draw a
+  `card-grid` of them (4 cards, avatar 102 on a 338 card, title/handle/bio/footer all measured).
+- **Personas as a component:** new `PersonaSheet` (list with the Default mark, **Edit** per row, inline
+  editor for name/tagline/description/initials gated by `personaWriteSchema`, Delete behind a confirm,
+  `New persona`), and `Sheet` gained `full` — **full screen on a phone, centred dialog from `md`** (measured
+  380×844 at 390 and 560×344 centred at 1280; a full sheet fades instead of sliding). Mounted from the
+  profile's **Personas** button, which now sits beside **Edit profile**, and from the session's header in
+  chooser mode (`Use` + *No persona*), replacing the old bare menu list.
+- **Verified:** editing *Ash* → *Ash Renamed* saved, returned to the list, toast *Persona saved*; the
+  session sheet shows 3 rows, one marked *In use*, `Use` on each, and the *No persona* line; closing works.
+- **Not verified:** `/persona/collection|create|edit|detail` still render their own forms — the deep links
+  were left as they are (the sheet is what the app uses), so the create/edit forms exist twice until they
+  are folded into the sheet.
+
 ## Card middle: tags get their own row (2026-10-31)
 
 - **Changed:** on the owner's call the card's middle split in two — `avatar | tagline` on the first row, the

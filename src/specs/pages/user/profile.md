@@ -11,11 +11,12 @@ There is no reporting and no hiding at the user level: a report names a shared i
 ## Layout
 
 - A header with the avatar, display name, `@username`, bio, the follow control, and the follower and following counts as plain figures. The counts are not links of their own: the followers and following tabs are the only way into those lists, so the header does not duplicate that target.
-- Four tabs under the header — Creations, Posts, Followers, Following — and the selected tab renders beneath them.
+- Four tabs under the header — Creations, Posts, Followers, Following — and the selected tab renders beneath them, with the page's own gap between the tab strip and whatever the tab draws.
+- **Followers and Following are drawn with the catalog card**: the same card a character wears, with the display name as the title, the handle beneath it, **the bio in the tagline's slot**, and a footer carrying **followers and following** instead of an author and a ratio. The thumbnail is the same third-of-the-card square.
 - The creations tab is one grid holding all three types, in the card the catalogs use, refined by a type control row: All (default), Characters, Lorebooks, Presets. Type is a filter here rather than a tab, because the profile's tabs are already creations, posts, followers, and following, and the three creation types share one card and one paging.
 - The posts tab uses the [thread](../post/thread.md) card, newest first, with the same engagement footer. The followers and following tabs list profile cards, each linking to that user.
 - Both grids page with **Load more**, per the [conventions](../../luaplot-pages.md#conventions); paging stays out of the URL.
-- No persona appears anywhere: personas are personal and are never listed on a profile.
+- No persona is ever *listed* on a profile — they are personal. The owner does get the **Personas** control beside **Edit profile**, which opens the persona dialog: listing and editing happen in place, never as a page.
 
 ## Data
 
@@ -33,6 +34,7 @@ Known so far:
 - **Open a creation** → its detail page
 - **Open a post** → [post detail](../post/detail.md)
 - **Open a follower or following** → their profile
+- **Personas** (own profile only) — opens the persona dialog (list, create, edit, delete; full screen on a phone)
 - **Edit profile** (own profile only) → [edit](edit.md)
 
 ## States
