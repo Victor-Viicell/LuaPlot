@@ -7,11 +7,14 @@ import { resolveRepo } from "../lib/data/repo.ts";
 import {
   REPORT_REASON_MISMATCH,
   REPORT_REASON_REQUIRED,
+  REPORT_REASON_RULE,
   REPORT_SOURCE_REQUIRED,
   REPORT_WHAT_REQUIRED,
+  TERMS_RULES,
   reasonFitsPart,
   reportWriteSchema,
 } from "../lib/schema.ts";
+import { href } from "../router.ts";
 import { shortStamp } from "../lib/format.ts";
 import type { ReportPart, ReportReasonCode, ReportTarget } from "../lib/data/types.ts";
 
@@ -359,6 +362,50 @@ export function ReportDialog({
       line-height: 1.6;
     }
 
+    /* The reason→rule map (`report.md` → *Purpose*): one link per offered reason, the anchor and
+       the rule title both read off `TERMS_RULES`, so the dialog cannot point at a rule the page
+       does not publish. */
+    .rules {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .rules-label {
+      margin: 0;
+      color: var(--color-text-subtle);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      line-height: 1.4;
+      text-transform: uppercase;
+    }
+
+    .rules-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .rules-link {
+      display: inline-block;
+      min-height: 24px;
+      color: var(--color-text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+      text-decoration-color: var(--color-border-strong);
+      text-underline-offset: 3px;
+    }
+
+    .rules-link:hover {
+      color: var(--color-accent-hover);
+      text-decoration-color: currentColor;
+    }
+
     .error {
       margin: 0;
       color: var(--color-danger);
@@ -572,6 +619,18 @@ export function ReportDialog({
             }
           </ul>
           <p class="note">Pick as many as apply. One report, one weight.</p>
+          <div class="rules">
+            <p class="rules-label">The rule each reason enforces</p>
+            <ul class="rules-list">
+              @for (const code of offered.value; key code) {
+                <li>
+                  <a class="rules-link" href={href(`/terms#${TERMS_RULES[REPORT_REASON_RULE[code]].anchor}`)}>
+                    {REASON_LABEL[code]} — {TERMS_RULES[REPORT_REASON_RULE[code]].title}
+                  </a>
+                </li>
+              }
+            </ul>
+          </div>
           </>
         } @else if (step.value === "source") {
           <>

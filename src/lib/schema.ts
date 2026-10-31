@@ -741,6 +741,29 @@ export function reasonFitsPart(
   return (REPORT_REASONS_BY_PART[part] as readonly string[]).includes(reason);
 }
 
+/**
+ * `pages/terms.md` → *Rules*: the three prohibitions, with the anchor each one answers to on
+ * `/terms` and the sentence it is titled by. Not a shape — no adapter reads it — but it belongs
+ * here because `report.md` → *Purpose* says **every report reason maps back to one of them**, and a
+ * mapping written three times (page, dialog, queue) drifts. The page takes its ids from here and
+ * the dialog takes its "the rule this enforces" link from here, so the two cannot disagree.
+ */
+export const TERMS_RULES = {
+  copied: { anchor: "copied-content", title: "No copied content" },
+  unmarked: { anchor: "unmarked-nsfw", title: "No unmarked NSFW" },
+  illegal: { anchor: "illegal-content", title: "No illegal content" },
+} as const;
+
+export type TermsRule = keyof typeof TERMS_RULES;
+
+/** Which prohibition a reason code enforces: `copied-image` and `copied-text` are one rule. */
+export const REPORT_REASON_RULE = {
+  "missing-nsfw": "unmarked",
+  illegal: "illegal",
+  "copied-text": "copied",
+  "copied-image": "copied",
+} as const satisfies Record<z.infer<typeof reportReasonCodeSchema>, TermsRule>;
+
 export const REPORT_WHAT_REQUIRED = "Choose what is being reported.";
 export const REPORT_REASON_REQUIRED = "Choose a reason.";
 export const REPORT_SOURCE_REQUIRED = "Name the source: the item it was copied from, or a link.";

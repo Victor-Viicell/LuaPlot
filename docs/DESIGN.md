@@ -1058,6 +1058,33 @@ and not as a settings panel, and the page has to survive the viewer not being th
 - **A forbidden edit draws one sentence**, `You can't edit this account.`, with the way back to the
   profile — not a 404, because the account exists and only the permission is missing.
 
+## Terms (decided in T-24)
+
+The only pure-copy page in the app, and the only one a report points into: three prohibitions, five
+notes, no control.
+
+- **Kicker, title, lede** (`content rules` / *Three prohibitions* / one-line purpose), then the
+  **rules as a numbered list** with a hairline above every item and the numeral (`01`, `02`, `03`)
+  hung in a 36px gutter from `md` — the numbers are the page's spine, and the notes below are prose
+  with an `h2` each (the settled hierarchy: one `h1`, `h2` for every section after it). Copy is the
+  spec's, whole: a shorter sentence is only ever a heading.
+- **The anchors are named in `schema.ts`**, not in the markup: `TERMS_RULES` holds the id and the
+  title per prohibition (`#copied-content`, `#unmarked-nsfw`, `#illegal-content`) and
+  `REPORT_REASON_RULE` maps each reason code to one of them. `ReportDialog`'s reason stop prints
+  *the rule each reason enforces* as one link per offered reason, so `/terms` and the dialog cite
+  the same strings — a reason can never point at a rule the page does not publish.
+- **A hash in the URL is honoured on mount** (`effect` → `scrollIntoView`, `scroll-margin-top:
+  72px` on every target): the shell renders the page after the browser has abandoned the fragment,
+  so without this a link into `#how-enforcement-works` lands at the top of the page.
+- **At `lg` the page gains a contents rail**: 200px, sticky under the top bar, a hairline on its
+  right edge, the page's own eight headings as jump links. It is navigation only, which the spec's
+  *no controls beyond links* allows, and it is what stops a 794px column from being a stretched
+  phone on a 1200px screen. Hidden below `lg`, where the prose is the page.
+- **No acceptance affordance, no version, no last-updated date.** `/onboarding`'s **Finish** is the
+  acceptance and that page says so beside the button, linking here; a button on `/terms` would
+  invent the acceptance record `terms.md` says is not kept. Signed out, the NSFW-preference mention
+  is plain text — the settings route needs the viewer's own handle.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

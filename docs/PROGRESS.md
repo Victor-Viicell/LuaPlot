@@ -3,6 +3,26 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-24 — the terms page, its anchors, and the report reason that points at one (2026-10-31)
+
+- **Changed:** `pages/terms.tsrx` is the page, not a placeholder — kicker/title/lede, the three
+  prohibitions as a numbered list (`#copied-content`, `#unmarked-nsfw`, `#illegal-content` from
+  `TERMS_RULES`), then the five notes (`#where-the-line-sits`, `#what-the-rules-apply-to`,
+  `#what-the-flag-covers`, `#accepting-the-terms`, `#how-enforcement-works`), spec copy kept whole.
+  `schema.ts` gained `TERMS_RULES` (anchor + title per prohibition, typed `TermsRule`) and
+  `REPORT_REASON_RULE` (reason code → rule), so the page's ids and the dialog's links come from one
+  table. `ReportDialog`'s reason stop now prints "the rule each reason enforces" — one link per
+  offered reason into the matching anchor. `/onboarding` finally carries the line `terms.md` says it
+  carries: **Finish** is the acceptance, with a link to `/terms`.
+- **Verified:** `scripts/check.sh` GREEN (build, 30 routes, schema check). In the browser against
+  `vite preview`: at 360×740 no horizontal scroll (`scrollWidth 360`), rules/notes present with the
+  expected ids; at 1280 the shell is a sidebar layout, the outlet reads 200px contents rail + 684px
+  column, hairlines at the measure; the report dialog's four reason links resolve to
+  `/terms#unmarked-nsfw`, `#illegal-content`, `#copied-content` ×2 and a click lands 128px from the
+  top (below the 56px bar); last paragraph clears the tab bar by 100px. Published: root **200**.
+- **Not verified:** no touch-device pass (no phone on this box) and no screen-reader pass; the
+  contents rail is a jump list only — no scroll-spy highlighting, which the spec does not ask for.
+
 ## T-23 — the profile that is somebody else's page, and the account behind it (2026-10-31)
 
 - **Changed:** the account finally has a **profile entity**. `schema.ts` gained `profileSeedSchema`

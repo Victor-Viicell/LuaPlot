@@ -146,7 +146,10 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 - [x] **T-22 `/notifications`.** Aggregated rows (same kind + same target fold), read state.
 - [x] **T-23 `/user/[username]` + `/user/edit`.** Profile tabs (creations, posts, follows,
       followers), account settings incl. NSFW prefs, no email/provider/delete controls.
-- [ ] **T-24 `/terms`.** Static legal copy from the spec, anchors, NSFW/JEV cross-links.
+- [x] **T-24 `/terms`.** Static legal copy from the spec, anchors, NSFW/JEV cross-links. Three
+      prohibitions as a numbered list, five notes, `TERMS_RULES` / `REPORT_REASON_RULE` in
+      `schema.ts` shared with `ReportDialog`, `lg` contents rail; onboarding's **Finish** now says
+      it is the acceptance and links here.
 
 ## P3 — Moderation and JEV
 
