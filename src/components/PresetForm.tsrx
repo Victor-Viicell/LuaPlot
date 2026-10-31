@@ -109,7 +109,6 @@ export function PresetForm({
         value={name}
         maxLength={80}
         placeholder="Long-form, low heat"
-        help="Display only — the same name can be used by anyone, any number of times."
         error={formError}
         onInput={(value) => {
           name.value = value;
@@ -127,7 +126,6 @@ export function PresetForm({
         maxLength={4000}
         value={description}
         placeholder="When to reach for it, and what it does to a scene."
-        help="Shown on the detail page above the settings. A preset has no tagline."
         onInput={(value) => {
           description.value = value;
           formError.value = "";
@@ -143,7 +141,6 @@ export function PresetForm({
           value={initials}
           maxLength={4}
           placeholder="LH"
-          help="Two letters drawn on the cover. There is no image uploader yet; empty uses the name's first letters."
           onInput={(value) => {
             initials.value = value;
             formError.value = "";
@@ -151,7 +148,6 @@ export function PresetForm({
         />
         <Toggle
           label="NSFW"
-          hint="Flags this preset for the blurred view"
           pressed={nsfw}
           onToggle={(next) => (nsfw.value = next)}
         />
@@ -160,15 +156,7 @@ export function PresetForm({
 
     <section class="section is-settings">
       <p class="section-label">Generation settings</p>
-      <p class="section-note">
-        What a session copies when it starts from this preset. Its own copy is the only thing an edit
-        cannot reach.
-      </p>
       <Select label="Model" name="model" value={model.value} options={modelOptions} onChange={(next) => (model.value = next)} />
-      <p class="field-note">
-        The provider behind the model belongs to the app: a preset records which model it generates
-        with, never where the model runs.
-      </p>
     </section>
 
     <div class="foot">

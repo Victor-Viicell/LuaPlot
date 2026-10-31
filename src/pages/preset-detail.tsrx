@@ -1095,7 +1095,7 @@ export function PresetDetail() @{
               <button class="menu-item" type="button" disabled>
                 Request public again
               </button>
-              <p class="menu-note">Not available yet — editing the preset is the path that exists.</p>
+              <p class="menu-note">Not available yet.</p>
             </>
           }
         </div>

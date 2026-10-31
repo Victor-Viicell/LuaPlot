@@ -259,15 +259,6 @@ export function Notifications() @{
       }
 
       /* One paragraph, and only where there is room: at 360 the list is the page. */
-      .lede {
-        display: none;
-        max-width: 56ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* Mark all read, at the top of the list, with the count it clears. */
       .toolbar {
@@ -433,10 +424,6 @@ export function Notifications() @{
           font-size: 28px;
         }
 
-        .lede {
-          display: block;
-          font-size: 15px;
-        }
 
         .row,
         .skel-row {
@@ -470,11 +457,6 @@ export function Notifications() @{
       <header class="head">
         <p class="kicker">notifications</p>
         <h1 class="title">Inbox</h1>
-        <p class="lede">
-          What is worth coming back for: a comment on your post, someone new following you, a piece
-          of yours that went private. Same-kind events on one target arrive as a single row, so a
-          busy post is one line, not forty.
-        </p>
       </header>
 
       @if (!signedIn) {

@@ -216,15 +216,10 @@ export function PersonaDetail() @{
     @if (pickerOpen.value) {
       <Sheet title="Choose a character" onClose={() => (pickerOpen.value = false)}>
         <div class="picker">
-          <p class="picker-note">
-            This persona is your side of the session. The character brings its lorebooks and preset,
-            and a session you already have with it is reopened instead of started again.
-          </p>
 
           @if (choices.value.length === 0) {
             <p class="picker-note">
-              You have not authored a character yet.{" "}
-              <a class="picker-link" href={href("/character/create")}>Create one</a> to start a session.
+              No characters yet. <a class="picker-link" href={href("/character/create")}>Create one</a>.
             </p>
           } @else {
             <ul class="picker-list">

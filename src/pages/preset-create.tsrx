@@ -24,10 +24,6 @@ export function PresetCreate() @{
   <div class="create-page">
     <header class="head">
       <p class="kicker">new preset</p>
-      <p class="lede">
-        A preset is public the moment it saves — there are no drafts. It holds the generation
-        settings a session copies when it starts from it, and nothing else.
-      </p>
     </header>
 
     @if (!signedIn) {
@@ -66,19 +62,8 @@ export function PresetCreate() @{
         text-transform: uppercase;
       }
 
-      .lede {
-        max-width: 58ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       @media (min-width: 640px) {
-        .lede {
-          font-size: 15px;
-        }
       }
     </style>
   </div>

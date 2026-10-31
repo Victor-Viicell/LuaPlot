@@ -1330,7 +1330,6 @@ export function ModerationDetail() @{
                       multiline={true}
                       rows={3}
                       placeholder="What you read, and what decided it."
-                      help="Recorded on the case and delivered to the creator. The reporter is never told."
                       error={reasonError}
                     />
                   </div>

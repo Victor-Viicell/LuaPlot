@@ -73,10 +73,6 @@ export function PersonaEdit() @{
   <div class="edit-page">
     <header class="head">
       <p class="kicker">edit persona</p>
-      <p class="lede">
-        Saving overwrites this persona in place. A session already running keeps its whole transcript;
-        only the name it attributes your side to changes.
-      </p>
     </header>
 
     @if (phase.value === "loading") {
@@ -135,14 +131,6 @@ export function PersonaEdit() @{
         text-transform: uppercase;
       }
 
-      .lede {
-        max-width: 58ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       .skel {
         display: flex;
@@ -151,9 +139,6 @@ export function PersonaEdit() @{
       }
 
       @media (min-width: 640px) {
-        .lede {
-          font-size: 15px;
-        }
       }
     </style>
   </div>

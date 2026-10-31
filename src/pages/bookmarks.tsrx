@@ -380,15 +380,6 @@ export function Bookmarks() @{
       }
 
       /* One line, and only where there is room: at 360 the strip and the toolbar are the page. */
-      .lede {
-        display: none;
-        max-width: 56ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* Three rows at 360: search, sort, the filter note with the count. */
       .toolbar {
@@ -471,10 +462,6 @@ export function Bookmarks() @{
           font-size: 28px;
         }
 
-        .lede {
-          display: block;
-          font-size: 15px;
-        }
 
         .toolbar {
           grid-template-columns: minmax(0, 1fr) 220px;
@@ -519,10 +506,6 @@ export function Bookmarks() @{
       <header class="head">
         <p class="kicker">bookmarks</p>
         <h1 class="title">Saved</h1>
-        <p class="lede">
-          One catalog per type, so a saved character is found the way a character is found anywhere
-          else. Private to you: nothing here appears on a profile, and it notifies no one.
-        </p>
       </header>
 
       @if (!signedIn) {

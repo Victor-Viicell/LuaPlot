@@ -89,10 +89,6 @@ export function CharacterEdit() @{
   <div class="edit-page">
     <header class="head">
       <p class="kicker">edit character</p>
-      <p class="lede">
-        Renaming reaches nothing else: URLs, bookmarks and lorebook attachments carry the ID, and a
-        published cut keeps the text it recorded.
-      </p>
     </header>
 
     @if (phase.value === "loading") {
@@ -177,14 +173,6 @@ export function CharacterEdit() @{
         text-transform: uppercase;
       }
 
-      .lede {
-        max-width: 58ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* The destructive row is marked by a 2px rule, not by a red box: one panel, one accent. */
       .danger-row {
@@ -228,9 +216,6 @@ export function CharacterEdit() @{
       }
 
       @media (min-width: 640px) {
-        .lede {
-          font-size: 15px;
-        }
 
         .danger-line {
           flex-direction: row;

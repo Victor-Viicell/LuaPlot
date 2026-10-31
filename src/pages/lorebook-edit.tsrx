@@ -89,10 +89,6 @@ export function LorebookEdit() @{
   <div class="edit-page">
     <header class="head">
       <p class="kicker">edit lorebook</p>
-      <p class="lede">
-        Saving writes the live lorebook: a new session or a fork copies the entries as they now stand,
-        while a session already in progress reads its own copy until its owner updates it.
-      </p>
     </header>
 
     @if (phase.value === "loading") {
@@ -177,14 +173,6 @@ export function LorebookEdit() @{
         text-transform: uppercase;
       }
 
-      .lede {
-        max-width: 58ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* The destructive row is marked by a 2px rule, not by a red box: one panel, one accent. It
          sits below the form, so Save is never beside Delete. */
@@ -230,9 +218,6 @@ export function LorebookEdit() @{
       }
 
       @media (min-width: 640px) {
-        .lede {
-          font-size: 15px;
-        }
 
         .danger-line {
           flex-direction: row;

@@ -81,13 +81,11 @@ export function NsfwControl({ noun }: { noun: string }) @{
       <>
         <Toggle
           label="Show NSFW content"
-          hint={`Keeps flagged ${noun} in the list.`}
           pressed={show}
           onToggle={setShowNsfw}
         />
         <Toggle
           label="Blur NSFW content"
-          hint="Keeps them listed but covered."
           pressed={blur}
           onToggle={setBlurNsfw}
         />

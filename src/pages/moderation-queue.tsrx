@@ -270,15 +270,6 @@ export function ModerationQueue() @{
       }
 
       /* One paragraph, and only where there is room: at 360 the list is the page. */
-      .lede {
-        display: none;
-        max-width: 56ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       .preview-chip {
         align-self: flex-start;
@@ -535,10 +526,6 @@ export function ModerationQueue() @{
           font-size: 28px;
         }
 
-        .lede {
-          display: block;
-          font-size: 15px;
-        }
 
         .row,
         .skel-row {
@@ -586,11 +573,6 @@ export function ModerationQueue() @{
       <header class="head">
         <p class="kicker">moderation</p>
         <h1 class="title">Queue</h1>
-        <p class="lede">
-          What JEV could not decide: content it is unsure about, and copy claims it will not judge.
-          Most reported first, because a pile-on outranks a single allegation. Every decision happens
-          on the case itself — this page carries no content, only the paperwork.
-        </p>
         @if (preview.value) {
           <p class="preview-chip" title="No model is connected: every verdict below was classified locally from the reported text.">
             Preview mode

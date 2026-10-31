@@ -209,7 +209,6 @@ export function CharacterForm({
         value={name}
         maxLength={80}
         placeholder="Sonic the Hedgehog"
-        help="Display only — the same name can be used by anyone, any number of times."
         error={formError}
         onInput={(value) => {
           name.value = value;
@@ -221,7 +220,6 @@ export function CharacterForm({
         value={inSessionName}
         maxLength={40}
         placeholder="Sonic"
-        help="How a session calls this character. Left empty, the Name is used."
         onInput={(value) => {
           inSessionName.value = value;
           formError.value = "";
@@ -238,7 +236,6 @@ export function CharacterForm({
         maxLength={4000}
         value={description}
         placeholder="Who they are, how they speak, what they want."
-        help="One field, because the spec names description and personality together."
         onInput={(value) => {
           description.value = value;
           formError.value = "";
@@ -254,7 +251,6 @@ export function CharacterForm({
           value={initials}
           maxLength={4}
           placeholder="SO"
-          help="Two letters drawn on the card. There is no image uploader yet; empty uses the name's first letters."
           onInput={(value) => {
             initials.value = value;
             formError.value = "";
@@ -262,7 +258,6 @@ export function CharacterForm({
         />
         <Toggle
           label="NSFW"
-          hint="Flags this character for the blurred view"
           pressed={nsfw}
           onToggle={(next) => (nsfw.value = next)}
         />
@@ -271,9 +266,6 @@ export function CharacterForm({
 
     <section class="section is-attach">
       <p class="section-label">Attached lorebooks</p>
-      <p class="section-note">
-        References, not copies: editing a lorebook changes what every character attached to it reads.
-      </p>
 
       <div class="attach-add">
         <Field

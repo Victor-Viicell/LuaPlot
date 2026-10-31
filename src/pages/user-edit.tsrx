@@ -277,14 +277,6 @@ export function UserEdit() @{
         line-height: 1.15;
       }
 
-      .lede {
-        max-width: 56ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       .form {
         display: flex;
@@ -345,9 +337,6 @@ export function UserEdit() @{
           font-size: 32px;
         }
 
-        .lede {
-          font-size: 15px;
-        }
 
         .actions {
           position: static;
@@ -372,10 +361,6 @@ export function UserEdit() @{
     <header class="head">
       <p class="kicker">account</p>
       <h1 class="title">Edit profile</h1>
-      <p class="lede">
-        What LuaPlot knows about you: a display name, an avatar, a bio and the username your profile
-        lives at. Sign-in identity stays with Supabase, so nothing here touches your email provider.
-      </p>
     </header>
 
     @if (phase.value === "loading") {
@@ -410,7 +395,6 @@ export function UserEdit() @{
           name="initials"
           value={initialsDraft}
           maxLength={4}
-          help="One or two characters. Uploads arrive later; initials stand in until they do."
           onInput={(next) => (initialsDraft.value = next)}
         />
 
@@ -437,13 +421,11 @@ export function UserEdit() @{
           <p class="pair-label">NSFW content</p>
           <Toggle
             label="Show NSFW content"
-            hint="Flagged items are listed."
             pressed={show}
             onToggle={(next) => (show.value = next)}
           />
           <Toggle
             label="Blur NSFW content"
-            hint="Flagged items are listed behind a cover."
             pressed={blur}
             onToggle={(next) => (blur.value = next)}
           />

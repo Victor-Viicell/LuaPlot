@@ -113,6 +113,16 @@ Every route has its own spec under [`pages/`](pages). This file is the route ind
 - Fixed segments (`catalog`, `create`, `thread`) are matched before the ID parameter, and IDs must use a constrained format (e.g. UUID) so no real ID can collide with those words.
 - Catalog and thread state belongs in the query string, not the path, so one set of routes serves every filtered view. The same convention should be reused for the persona collection, for profile tabs, and for the bookmark tabs.
 - Catalogs and feeds page with an explicit **Load more** control that appends the next 24 items. No page numbers and no scroll-triggered fetching, and paging is not part of the URL: returning to a listing shows its first page.
+- **The interface does not explain itself.** Four kinds of text are allowed, and nothing else:
+  1. **Labels** — the name of a control or a field.
+  2. **Content** — what a person wrote: descriptions, taglines, lorebook entries, turns, comments, preset values.
+  3. **State** — one line, only when it is true right now: empty, signed out, pending, failed, removed.
+  4. **Consequences** — what cannot be undone: delete confirmations, the terms, a moderation outcome.
+
+  No page lede describing the page, no "how it works" paragraph, no per-field help line, no hint under a
+  switch, no note under a section title. **If a control needs a sentence, the control is wrong** — rename
+  it, or move the explanation to the terms. A page's first line is a control or content, never a
+  description of itself; a reader scrolls past prose, so the prose is only cost.
 - **The three catalogs are siblings, and say so.** Characters, lorebooks and presets each carry a
   **catalog switcher** at the top — three links, the current one underlined and marked `aria-current` —
   because a catalog that can only be reached by typing its URL is a catalog nobody finds. It is links,

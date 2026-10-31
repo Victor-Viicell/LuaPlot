@@ -204,15 +204,6 @@ export function PostThread() @{
         text-transform: uppercase;
       }
 
-      .lede {
-        display: none;
-        max-width: 52ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* Three rows on a phone: sort, then the filter chip beside Create, then the two switches. A
          single row cannot hold a labelled select, a chip, two switches and a button in 328px, and an
@@ -320,10 +311,6 @@ export function PostThread() @{
       }
 
       @media (min-width: 640px) {
-        .lede {
-          display: block;
-          font-size: 15px;
-        }
 
         /* One row from `sm`: sort keeps a column, the chip and the switches take the middle, the
            button ends the row. */
@@ -370,18 +357,12 @@ export function PostThread() @{
           grid-template-columns: 220px auto minmax(0, 1fr) auto;
         }
 
-        .lede {
-          max-width: 62ch;
-        }
       }
     </style>
 
     <div class="thread">
       <header class="head">
         <p class="kicker">thread</p>
-        <p class="lede">
-          Everything anyone has posted, newest first. Comments stay on the post; the count opens it.
-        </p>
       </header>
 
       <div class="controls">

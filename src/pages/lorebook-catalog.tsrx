@@ -271,15 +271,6 @@ export function LorebookCatalog() @{
 
       /* One line of copy, and only where there is room for it: at 360 the catalog opens on the
          controls instead, because 100px of introduction pushes the first card below the fold. */
-      .lede {
-        display: none;
-        max-width: 52ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* Four rows, all full width until `sm`: search, tags, sort, the two switches. Nothing is
          sticky — at 360 the shell's 56px bar plus a sticky toolbar would leave a third of a phone
@@ -354,10 +345,6 @@ export function LorebookCatalog() @{
           align-items: flex-end;
         }
 
-        .lede {
-          display: block;
-          font-size: 15px;
-        }
 
         /* The two text fields keep the full width; sort and the switches share the row beneath. */
         .toolbar {
@@ -410,9 +397,6 @@ export function LorebookCatalog() @{
       }
 
       @media (min-width: 1200px) {
-        .lede {
-          max-width: 68ch;
-        }
       }
     </style>
 
@@ -422,10 +406,6 @@ export function LorebookCatalog() @{
       <header class="head">
         <div>
           <p class="kicker">lorebook catalog</p>
-          <p class="lede">
-            Everything published, newest first. Search matches a name or a description; the tag field
-            narrows to what is tagged with any of the tags you pick.
-          </p>
         </div>
         <a
           class="btn btn-secondary"

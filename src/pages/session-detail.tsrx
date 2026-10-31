@@ -1364,10 +1364,6 @@ export function SessionDetail() @{
             </button>
           </li>
         </ul>
-        <p class="menu-note">
-          The persona is not copied and the switch leaves no mark: the transcript keeps no boundary,
-          so the next cut takes the attribution you choose when you publish it.
-        </p>
       </Sheet>
     }
 
@@ -1387,10 +1383,6 @@ export function SessionDetail() @{
               options={turnOptions.value}
               onChange={(value) => (rangeTo.value = value)}
             />
-            <p class="range-note">
-              The cut is the range between these two turns, as it stands in the session. A post is
-              public immediately and a cut is a snapshot: later edits here do not reach it.
-            </p>
             <Button variant="primary" disabled={cutTurns.value.length === 0} onClick={beginCut}>
               Continue
             </Button>

@@ -281,14 +281,6 @@ export function Onboarding() @{
         line-height: 1.2;
       }
 
-      .lede {
-        max-width: 52ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* The hairline is the same gesture as home's entry rule: the reading ends, the form begins. */
       .form {
@@ -354,9 +346,6 @@ export function Onboarding() @{
         animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 40ms both;
       }
 
-      .lede {
-        animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms both;
-      }
 
       .form {
         animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both;
@@ -422,15 +411,11 @@ export function Onboarding() @{
           font-size: 34px;
         }
 
-        .lede {
-          font-size: 15px;
-        }
       }
 
       @media (prefers-reduced-motion: reduce) {
         .kicker,
         .title,
-        .lede,
         .form {
           animation-name: fade;
           animation-duration: 120ms;
@@ -443,10 +428,6 @@ export function Onboarding() @{
       <header class="head">
         <p class="kicker">first run</p>
         <h1 class="title">Claim your handle</h1>
-        <p class="lede">
-          Two fields and two preferences. The handle is the only URL this account has; the name is
-          what everyone reads.
-        </p>
       </header>
 
       @if (phase.value === "loading") {
@@ -482,7 +463,6 @@ export function Onboarding() @{
               label="Display name"
               name="displayName"
               value={nameDraft}
-              help="Shown on your profile and beside everything you publish."
               error={nameError}
               placeholder="Your name"
               onInput={onNameInput}
@@ -493,13 +473,11 @@ export function Onboarding() @{
             <p class="group-label">NSFW content</p>
             <Toggle
               label="Show NSFW content"
-              hint="Keeps flagged items in every listing."
               pressed={show}
               onToggle={(next) => setShowNsfw(next)}
             />
             <Toggle
               label="Blur NSFW content"
-              hint="Keeps them listed but covered until revealed."
               pressed={blur}
               onToggle={(next) => setBlurNsfw(next)}
             />

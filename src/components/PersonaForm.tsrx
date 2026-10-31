@@ -98,7 +98,6 @@ export function PersonaForm({
           value={name}
           maxLength={80}
           placeholder="Nell"
-          help="Display only — two personas may carry the same name, because the id is the identity."
           error={formError}
           onInput={(value) => {
             name.value = value;
@@ -110,7 +109,6 @@ export function PersonaForm({
           value={tagline}
           maxLength={140}
           placeholder="Blunt, curious, asks the question nobody wants."
-          help="The one line the collection card carries under the name."
           onInput={(value) => {
             tagline.value = value;
             formError.value = "";
@@ -127,7 +125,6 @@ export function PersonaForm({
           maxLength={4000}
           value={description}
           placeholder="How they talk, what they notice, what they would rather not say."
-          help="Read-only on the persona's page. A persona has no comment thread, so nothing discusses it."
           onInput={(value) => {
             description.value = value;
             formError.value = "";
@@ -142,7 +139,6 @@ export function PersonaForm({
           value={initials}
           maxLength={4}
           placeholder="NL"
-          help="Two letters drawn on the square. There is no image uploader yet; empty uses the name's first letters."
           onInput={(value) => {
             initials.value = value;
             formError.value = "";

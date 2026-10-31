@@ -20,10 +20,6 @@ export function CharacterCreate() @{
   <div class="create-page">
     <header class="head">
       <p class="kicker">new character</p>
-      <p class="lede">
-        A character is public the moment it saves — there are no drafts, and moderation is the only
-        thing that can take it out of public view.
-      </p>
     </header>
 
     @if (!signedIn) {
@@ -62,19 +58,8 @@ export function CharacterCreate() @{
         text-transform: uppercase;
       }
 
-      .lede {
-        max-width: 58ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       @media (min-width: 640px) {
-        .lede {
-          font-size: 15px;
-        }
       }
     </style>
   </div>

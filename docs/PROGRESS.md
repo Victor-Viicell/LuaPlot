@@ -3,6 +3,28 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## Copy pass — the interface stops explaining itself (2026-10-31)
+
+- **Changed:** on the owner's call (*too much text on the users' faces … no one will read*), the copy law is
+  now written twice — `luaplot-pages.md` → Conventions and `docs/DESIGN.md` → *Copy law* — and applied
+  across the app: **21 page ledes gone** (catalogs, forms, home, bookmarks, notifications, moderation, the
+  thread, auth, persona collection, post create), every per-field `help` line in `CharacterForm`,
+  `LorebookForm`, `PresetForm`, `PersonaForm`, `user-edit`, `moderation-detail` and `ReportDialog`, the
+  `hint` under every NSFW switch (forms, `NsfwControl`, onboarding), the "Pick one, or both / Pick as many
+  as apply" instructions, every `.section-note` / `.field-note` (references-not-copies, persona-stamp,
+  preset-provider, entry-injection), the session's cut-range note and persona explainer, and the persona
+  picker's paragraph. Dead `.lede` CSS removed with them. **429 lines deleted, 3 added.**
+- **Kept on purpose**, per the law: delete confirmations ("Delete this character and its whole comment
+  thread? This cannot be undone."), the terms page, moderation outcomes, and one-line states — *Nothing
+  has been said yet*, *This lorebook has no entries yet*, *No characters yet. Create one*, *Sign in to keep
+  flagged characters in listings*, *Preview — no provider is contacted*.
+- **Verified:** build clean at every step; a browser sweep at 390 found zero `.lede` / `.section-note` /
+  `.field-note` / `.range-note` / `hint`-derived lines on `/character/catalog`, `/character/[id]`,
+  `/post/thread`, `/character/create`, `/preset/create`, `/bookmarks`, `/notifications`, `/persona/[id]`
+  and `/moderation?admin=1`, no horizontal scroll, and the forms still open on their first control at 122px.
+  A lowercase-fragment scan over every `.tsrx` found no sentence cut in half.
+- **Not verified:** touch-device pass; the empty-state lines kept on purpose were not re-read on every page.
+
 ## T-09 follow-up — the catalogs link to each other (2026-10-31)
 
 - **Changed:** the owner could only reach the character catalog: lorebooks and presets had pages but no

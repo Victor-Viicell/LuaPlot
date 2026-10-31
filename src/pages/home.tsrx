@@ -83,14 +83,6 @@ export function Home() @{
         line-height: 1.05;
       }
 
-      .lede {
-        max-width: 44ch;
-        margin: 4px 0 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       .entry {
         display: flex;
@@ -142,9 +134,6 @@ export function Home() @{
         animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 40ms both;
       }
 
-      .lede {
-        animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms both;
-      }
 
       .entry {
         animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both;
@@ -210,16 +199,12 @@ export function Home() @{
           font-size: 44px;
         }
 
-        .lede {
-          font-size: 15px;
-        }
       }
 
       /* Reduced motion keeps the reveal, loses the travel. */
       @media (prefers-reduced-motion: reduce) {
         .kicker,
         .wordmark,
-        .lede,
         .entry {
           animation-name: fade;
           animation-duration: 120ms;
@@ -232,10 +217,6 @@ export function Home() @{
       <header class="mast">
         <p class="kicker">a writing room for fiction</p>
         <h1 class="wordmark">LuaPlot</h1>
-        <p class="lede">
-          Write with characters that remember: author a lorebook, talk in a session, publish the
-          best of it as a cut.
-        </p>
       </header>
 
       <div class="entry">

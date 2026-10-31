@@ -22,10 +22,6 @@ export function PersonaCreate() @{
   <div class="create-page">
     <header class="head">
       <p class="kicker">new persona</p>
-      <p class="lede">
-        A persona is the side you speak from, not a character someone else can start a session with. It
-        is never published and never moderated, so there is nothing here to make public.
-      </p>
     </header>
 
     @if (!signedIn) {
@@ -64,19 +60,8 @@ export function PersonaCreate() @{
         text-transform: uppercase;
       }
 
-      .lede {
-        max-width: 58ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       @media (min-width: 640px) {
-        .lede {
-          font-size: 15px;
-        }
       }
     </style>
   </div>

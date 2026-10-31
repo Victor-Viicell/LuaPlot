@@ -166,7 +166,6 @@ export function LorebookForm({
         value={name}
         maxLength={80}
         placeholder="The Hollow Court"
-        help="Display only — the same name can be used by anyone, any number of times."
         error={formError}
         onInput={(value) => {
           name.value = value;
@@ -184,7 +183,6 @@ export function LorebookForm({
         maxLength={4000}
         value={description}
         placeholder="The world it describes, and when it applies."
-        help="Shown on the detail page above the entries. A lorebook has no tagline."
         onInput={(value) => {
           description.value = value;
           formError.value = "";
@@ -200,7 +198,6 @@ export function LorebookForm({
           value={initials}
           maxLength={4}
           placeholder="HC"
-          help="Two letters drawn on the cover. There is no image uploader yet; empty uses the name's first letters."
           onInput={(value) => {
             initials.value = value;
             formError.value = "";
@@ -208,7 +205,6 @@ export function LorebookForm({
         />
         <Toggle
           label="NSFW"
-          hint="Flags this lorebook for the blurred view"
           pressed={nsfw}
           onToggle={(next) => (nsfw.value = next)}
         />
@@ -222,10 +218,6 @@ export function LorebookForm({
           {entryCount.value === 1 ? "1 entry" : `${entryCount.value} entries`}
         </p>
       </div>
-      <p class="section-note">
-        Each entry is injected when one of its keywords comes up. Order is reading order only —
-        matching never depends on it.
-      </p>
 
       @if (entries.value.length === 0) {
         <p class="empty-note">No entries yet. A lorebook can be saved with none.</p>
@@ -262,7 +254,6 @@ export function LorebookForm({
                 label="Keywords"
                 value={row.keywords}
                 placeholder="king, court, throne"
-                help="Separated by commas. At least one."
                 error={rowErrors.value[row.key] ?? ""}
                 onInput={(value) => patch(row.key, "keywords", value)}
               />

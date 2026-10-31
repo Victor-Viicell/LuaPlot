@@ -270,15 +270,6 @@ export function PresetCatalog() @{
 
       /* One line of copy, and only where there is room for it: at 360 the catalog opens on the
          controls instead, because 100px of introduction pushes the first card below the fold. */
-      .lede {
-        display: none;
-        max-width: 52ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* Four rows, all full width until `sm`: search, tags, sort, the two switches. Nothing is
          sticky — at 360 the shell's 56px bar plus a sticky toolbar would leave a third of a phone
@@ -353,10 +344,6 @@ export function PresetCatalog() @{
           align-items: flex-end;
         }
 
-        .lede {
-          display: block;
-          font-size: 15px;
-        }
 
         /* The two text fields keep the full width; sort and the switches share the row beneath. */
         .toolbar {
@@ -409,9 +396,6 @@ export function PresetCatalog() @{
       }
 
       @media (min-width: 1200px) {
-        .lede {
-          max-width: 68ch;
-        }
       }
     </style>
 
@@ -421,10 +405,6 @@ export function PresetCatalog() @{
       <header class="head">
         <div>
           <p class="kicker">preset catalog</p>
-          <p class="lede">
-            Everything published, newest first. Search matches a name or a description; a card shows
-            what a preset is called, never what it sets — its settings are read on its own page.
-          </p>
         </div>
         <a
           class="btn btn-secondary"

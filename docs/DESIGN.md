@@ -1335,6 +1335,24 @@ it in cascade*); `pages/post/detail.md` → *States* → *Removed by JEV*; `page
 report, so nothing else in the seed contradicts it, and `/post/<its id>` proves the state without
 walking a report first.
 
+## Copy law (owner's call, applies to every page)
+
+**The interface does not explain itself.** Four kinds of text exist, and only four:
+
+1. **Labels** — the name of a control or a field (`Sort`, `Show NSFW content`).
+2. **Content** — what a person wrote: descriptions, taglines, entries, turns, comments, preset values.
+3. **State** — one line, and only while it is true: empty, signed out, pending, failed, removed.
+4. **Consequences** — what cannot be undone: delete confirmations, the terms, a moderation outcome.
+
+What was removed and stays removed: page ledes (`.lede`), per-field `help` lines, `hint` lines under
+switches, notes under section titles (`.section-note`, `.field-note`), "Pick as many as apply" style
+instructions, and sentences that explain a rule the UI already enforces. **If a control needs a sentence,
+the control is the problem** — rename it, or move the explanation to `/terms`, which is the one page whose
+job is prose.
+
+A page's first line is a control or its content, never a description of itself. On a phone the fold is
+~740px: a 90px lede costs the first card, and it is the first thing the eye skips.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

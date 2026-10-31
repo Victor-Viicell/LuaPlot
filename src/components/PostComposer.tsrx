@@ -453,10 +453,6 @@ export function PostComposer({
                 <p class="alert" role="alert">{loadFailure.value}</p>
               }
 
-              <p class="section-note">
-                At most one, and only your own: one of your characters, or a cut from one of your
-                sessions.
-              </p>
 
               <div class="choices">
                 <label class="choice">
@@ -519,7 +515,7 @@ export function PostComposer({
 
                 @if (mine.value.length === 0 && sessions.value.length === 0) {
                   <p class="empty-note">
-                    You have no characters or sessions to attach yet. This will be a plain text post.
+                    You have no characters or sessions to attach yet.
                   </p>
                 }
               </div>
@@ -564,9 +560,6 @@ export function PostComposer({
                 </span>
               </label>
             </div>
-            <p class="section-note">
-              The word is stamped at publish time: a later persona rename does not change it.
-            </p>
           </section>
         }
 
@@ -574,7 +567,6 @@ export function PostComposer({
           <div class="toggle-row">
             <Toggle
               label="NSFW"
-              hint="Flags this post for the blurred view"
               pressed={nsfw}
               onToggle={(next) => (nsfw.value = next)}
             />

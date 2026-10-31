@@ -596,9 +596,6 @@ export function ReportDialog({
               </li>
             }
           </ul>
-          @if (parts.length > 1) {
-            <p class="note">Pick one, or both — the image and the text can go in the same report.</p>
-          }
           </>
         } @else if (step.value === "reason") {
           <>
@@ -618,7 +615,6 @@ export function ReportDialog({
               </li>
             }
           </ul>
-          <p class="note">Pick as many as apply. One report, one weight.</p>
           <div class="rules">
             <p class="rules-label">The rule each reason enforces</p>
             <ul class="rules-list">
@@ -639,7 +635,6 @@ export function ReportDialog({
             label="Source"
             value={source}
             placeholder="Character id, or a link"
-            help="A copy claim names its source: the item inside LuaPlot, or an outside link."
             error={error}
             onInput={(value) => {
               source.value = value;
@@ -655,7 +650,6 @@ export function ReportDialog({
             multiline={true}
             rows={3}
             value={details}
-            help="A moderator reads this. Nothing about the report is shown to the author."
             error={error}
             onInput={(value) => {
               details.value = value;

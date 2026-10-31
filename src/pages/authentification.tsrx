@@ -159,14 +159,6 @@ export function Authentification() @{
         line-height: 1.05;
       }
 
-      .lede {
-        max-width: 44ch;
-        margin: 4px 0 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       /* The hairline is the same gesture as home's entry rule: the paragraph ends, the controls begin. */
       .gate {
@@ -287,9 +279,6 @@ export function Authentification() @{
         animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 40ms both;
       }
 
-      .lede {
-        animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms both;
-      }
 
       .gate {
         animation: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both;
@@ -350,15 +339,11 @@ export function Authentification() @{
           font-size: 44px;
         }
 
-        .lede {
-          font-size: 15px;
-        }
       }
 
       @media (prefers-reduced-motion: reduce) {
         .kicker,
         .wordmark,
-        .lede,
         .gate {
           animation-name: fade;
           animation-duration: 120ms;
@@ -371,9 +356,6 @@ export function Authentification() @{
       <header class="mast">
         <p class="kicker">a writing room for fiction</p>
         <h1 class="wordmark">LuaPlot</h1>
-        <p class="lede">
-          Signing in and signing up are the same three providers. Pick yours.
-        </p>
       </header>
 
       <div class="gate">
@@ -397,7 +379,6 @@ export function Authentification() @{
             <p class="nsfw-label">nsfw content</p>
             <Toggle
               label="Show NSFW content"
-              hint="Applies to the account you sign in with."
               pressed={wanted}
               onToggle={toggleNsfw}
             />

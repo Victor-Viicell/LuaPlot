@@ -41,29 +41,14 @@ export function PostCreate() @{
         text-transform: uppercase;
       }
 
-      .lede {
-        max-width: 52ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       @media (min-width: 640px) {
-        .lede {
-          font-size: 15px;
-        }
       }
     </style>
 
     <div class="compose-page">
       <header class="head">
         <p class="kicker">new post</p>
-        <p class="lede">
-          A post is written once. Correcting it means deleting it and publishing again — publishing
-          makes it public immediately.
-        </p>
       </header>
 
       @if (!signedIn) {

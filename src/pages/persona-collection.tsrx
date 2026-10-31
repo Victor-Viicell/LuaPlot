@@ -167,10 +167,6 @@ export function PersonaCollection() @{
     <header class="head">
       <p class="kicker">personas</p>
       <h1 class="title">Your personas</h1>
-      <p class="lede">
-        The side you speak from in a session. Personal, never shared, never moderated — and only the
-        one marked default is used when you do not pick.
-      </p>
     </header>
 
     @if (!signedIn) {
@@ -271,14 +267,6 @@ export function PersonaCollection() @{
         line-height: 1.2;
       }
 
-      .lede {
-        max-width: 58ch;
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: 14px;
-        line-height: 1.7;
-        text-wrap: pretty;
-      }
 
       .toolbar {
         display: flex;
@@ -320,9 +308,6 @@ export function PersonaCollection() @{
           font-size: 28px;
         }
 
-        .lede {
-          font-size: 15px;
-        }
 
         /* Search keeps the row; sort and Create share the line beneath it. */
         .toolbar {
