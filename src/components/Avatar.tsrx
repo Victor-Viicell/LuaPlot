@@ -2,9 +2,10 @@
  * Avatar: square, 2px radius, 1px border, initials fallback.
  * No image set exists yet — every item carries one later, initials stand in until it does.
  *
- * `size` is either a pixel box or `"fluid"`: a catalog card wants a thumbnail measured against its
- * own width (a third of it, square), which is a stylesheet's job, not a prop's — so `"fluid"` emits
- * no inline size and lets `.card-veil .avatar.is-fluid` in `src/styles.css` size it.
+ * `size` is a pixel box, `"fluid"`, or `"hero"`. The two named variants emit **no** inline size and
+ * let `src/styles.css` own the box, because both follow their container: `"fluid"` is a card
+ * thumbnail (a third of the card, square), `"hero"` is the cover on a character, lorebook or preset
+ * page (**full width of its column, 1:1**), which no constant could express.
  */
 export function Avatar({
   initials,
@@ -15,14 +16,14 @@ export function Avatar({
   initials: string;
   /** Accessible name; when absent the avatar is decorative. */
   label?: string;
-  size?: number | "fluid";
+  size?: number | "fluid" | "hero";
 }) {
-  const fluid = size === "fluid";
+  const variant = size === "fluid" ? " is-fluid" : size === "hero" ? " is-hero" : "";
 
   return (
     <span
-      class={fluid ? "avatar is-fluid" : "avatar"}
-      style={fluid ? undefined : { width: `${size}px`, height: `${size}px` }}
+      class={`avatar${variant}`}
+      style={typeof size === "number" ? { width: `${size}px`, height: `${size}px` } : undefined}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : "true"}

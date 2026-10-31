@@ -3,6 +3,20 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-12 follow-up — the item avatar is a square cover (2026-10-30)
+
+- **Changed:** on the owner's call, an item's avatar is no longer a 56px thumbnail: `Avatar` gained
+  `size="hero"` (no inline box, `.avatar.is-hero` in `styles.css` owns it) and `/character/[id]` now lays
+  its head out as a grid whose first row is the cover — **full content width and 1:1** with the name and
+  the settings button beneath it on a phone, a fixed 320px column with both beside it from `sm`. The rule
+  is written into the character, lorebook and preset detail specs, so the two pages still to be built
+  inherit it instead of re-deciding.
+- **Verified:** build clean; measured on the dev server at 360/390/640/1280: cover 308×308, 338×338,
+  320×320, 320×320 (ratio 1.000 at every width), flush with the head's left edge, name 33px beneath at a
+  phone and beside it from `sm`, no horizontal scroll anywhere, initials at 56px.
+- **Not verified:** `/lorebook/[id]` and `/preset/[id]` are still placeholders, so their covers exist as a
+  spec rule and a primitive variant, not as a rendered page. No Tauri/Android build.
+
 ## T-12 follow-up — one report can cover image + text, and several reasons (2026-10-30)
 
 - **Changed:** the owner reported that the dialog forced one choice at each stop. Both stops are toggles

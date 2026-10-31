@@ -8,6 +8,10 @@ Public read-only detail page for one character. Shows the full definition, credi
 
 ## Layout
 
+- **The avatar is the cover**: it spans the full width of the content column and is **square (1:1)** — full-bleed
+  on a phone, a fixed 320px column from `sm` — with the name and the controls beside it rather than above it.
+  The same treatment carries to every item page, so a lorebook or preset reads with the same portrait the
+  character does.
 - A **settings button** sits in the top right of the header, the same control the [session](../session/detail.md) carries. Its menu holds, in order: **New Session**, **Bookmark / Remove bookmark**, **Report**, and **Edit** for the owner. The page's main controls stay on the page; the menu is for what does not need a permanent button.
 - The rest of the layout is still to be specified.
 

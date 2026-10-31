@@ -8,6 +8,10 @@ Public read-only detail page for one preset, showing its settings and offering t
 
 ## Layout
 
+- **The avatar is the cover**: it spans the full width of the content column and is **square (1:1)** — full-bleed
+  on a phone, a fixed 320px column from `sm` — with the name and the controls beside it rather than above it.
+  The same treatment carries to every item page, so a lorebook or preset reads with the same portrait the
+  character does.
 - The settings are read as a flat list of fields, in the same order as the [create](create.md) form, not grouped into sections. The list is whatever the generation layer exposes, as it is on create.
 - Values are shown as saved, with no default beside them and no mark of what the author changed: a preset is read for what it sets, and a fork starts from all of those values rather than from a diff against a baseline.
 

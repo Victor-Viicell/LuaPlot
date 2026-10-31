@@ -275,6 +275,12 @@ list, so the decisions below are the ones they inherit.
 - **`nsfw` means "draw the cover", not "the item is flagged".** The listing computes the effective
   flag (`item.nsfw && prefs.blur`) and hands it over; the card never imports
   `lib/state/prefs.ts`. Show-off is the listing's job too — the card is never rendered for it.
+- **Item pages show the avatar as a cover** (T-12 follow-up, owner's call): `Avatar size="hero"` emits no
+  inline box and `.avatar.is-hero` gives it `width: 100%; aspect-ratio: 1/1` with the initial scaled by
+  `clamp(40px, 16vw, 56px)`. The page owns the column — full content width on a phone, a fixed 320px
+  column from `sm`, with the name and the settings button beside it — because a cover's size is a layout
+  decision, not a primitive's. **Square means square at every width**: never a 56px circle again, and never
+  a cropped rectangle, since there is no image set yet to crop and the initials must fit the box.
 - **The thumbnail is a third of the card, square** (T-09, owner's call): `Avatar` takes
   `size="fluid"` and `.card-veil .avatar.is-fluid` gives it `width: 33%; aspect-ratio: 1/1` with a
   22px initial (18px from `md`). It is a stylesheet rule, not a `size` prop, because the box has to

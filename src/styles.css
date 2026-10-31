@@ -646,6 +646,17 @@ a.card-title:hover {
     }
 }
 
+/* The cover on an item page is the same primitive, **full width of its column and square** (1:1),
+   with the initials scaled to it. The column's cap is the page's business — `.hero-avatar` owns the
+   max-width — because a 300px cover on a 1280 screen is the page's layout choice, not the avatar's. */
+.avatar.is-hero {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    font-size: clamp(40px, 16vw, 56px);
+    letter-spacing: 0.04em;
+}
+
 .card-body {
     display: flex;
     flex-direction: column;

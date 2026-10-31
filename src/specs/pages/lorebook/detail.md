@@ -9,6 +9,10 @@ Public read-only detail page for one lorebook, listing its entries and offering 
 ## Layout
 
 - A header holding the avatar, the name, and the link to the author, with the engagement controls and the owner's **Edit** beside it.
+- **The avatar is the cover** (same treatment as the character page): it spans the full width of the content column and is **square (1:1)** — full-bleed
+  on a phone, a fixed 320px column from `sm` — with the name and the controls beside it rather than above it.
+  The same treatment carries to every item page, so a lorebook or preset reads with the same portrait the
+  character does.
 - Beneath it the entry list: every entry expanded, in the order its author arranged them, each showing its keywords and its content. The list is not collapsible, not filtered by keyword, and not paged — a long list scrolls with the page.
 - The [comment thread](../../components/comment-thread.md) sits at the foot of the page, after the entry list.
 

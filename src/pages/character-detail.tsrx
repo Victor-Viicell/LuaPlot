@@ -415,23 +415,55 @@ export function CharacterDetail() @{
         gap: 20px;
       }
 
+      /* The head is a grid: the cover owns the first row, **full width of the content column and
+         square** (1:1); the name sits under it and the settings button beside the name, so the
+         cover never has to share a row with a 44px control. From `sm` the cover becomes a fixed
+         320px column with the name and the button to its right. */
       .head {
-        display: flex;
-        align-items: flex-start;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
         gap: 12px;
         padding-bottom: 12px;
         border-bottom: 1px solid var(--color-border);
       }
 
-      .identity {
-        display: flex;
-        flex: 1;
-        align-items: flex-start;
-        gap: 12px;
-        min-width: 0;
+      .portrait {
+        grid-column: 1 / -1;
+        width: 100%;
+      }
+
+      .menu-btn {
+        grid-column: 2;
+        grid-row: 2;
+      }
+
+      @media (min-width: 640px) {
+        .head {
+          grid-template-columns: 320px minmax(0, 1fr) auto;
+          align-items: start;
+          gap: 20px;
+        }
+
+        .portrait {
+          grid-column: 1;
+          grid-row: 1;
+        }
+
+        .identity-text {
+          grid-column: 2;
+          grid-row: 1;
+        }
+
+        .menu-btn {
+          grid-column: 3;
+          grid-row: 1;
+        }
       }
 
       .identity-text {
+        grid-column: 1;
+        grid-row: 2;
         min-width: 0;
       }
 
@@ -891,15 +923,15 @@ export function CharacterDetail() @{
       } @else {
         <>
           <header class="head">
-            <div class="identity">
-              <Avatar initials={initials.value} size={56} label={name.value} />
-              <div class="identity-text">
-                <p class="kicker">character</p>
-                <h1 class="title">{name.value}</h1>
-                @if (inSession.value) {
-                  <p class="in-session">{`Called “${inSession.value}” inside a session.`}</p>
-                }
-              </div>
+            <div class="portrait">
+              <Avatar initials={initials.value} size="hero" label={name.value} />
+            </div>
+            <div class="identity-text">
+              <p class="kicker">character</p>
+              <h1 class="title">{name.value}</h1>
+              @if (inSession.value) {
+                <p class="in-session">{`Called “${inSession.value}” inside a session.`}</p>
+              }
             </div>
             <button
               class="menu-btn"
