@@ -506,6 +506,26 @@ character-specific: it takes the item id and the viewer's handle and owns the th
   target and changes nothing on the page: a report is not a delete, and the row stays where it is until a
   verdict is certain.
 
+## Session surface (decided in T-15, do not re-invent)
+
+`/session/[id]` is the one **immersive** route: `App.tsrx` holds one predicate
+(`/^\/session\//`) that hides the shell's top bar, tab bar and rail, and the page owns the viewport.
+The page is a three-row column — header, scrolling transcript, docked composer — with no page title
+block and no cards.
+
+- **Header**: 44px **back**, the character's **32px square avatar** (link), the in-session name, the
+  persona line as the control that switches it, and **settings**. Blurred, hairline bottom border, no
+  shadow and no accent.
+- **Composer**: one field — a 22px-radius pill that grows to 160px, a 44px round accent **Send** with an
+  up-arrow, `Enter` sends, `Shift+Enter` breaks. It is a **native `textarea` + a ref, not `Field`**: the
+  label-and-box field belongs in forms, and a native element's `onInput` hands Ripple an event whose
+  target is not the box, while `value={tracked}` stringifies to `[object Object]`. Read the ref, clear
+  the ref.
+- **Column**: the transcript and the composer share one **A4** cap (794px, 210mm at 96dpi) on a desktop
+  and take the full width on a phone. The same cap is the shell outlet's, so no page invents a width.
+- **Publish a cut** is 11px text beneath the field, never a second filled button: the accent on this
+  screen belongs to Send.
+
 ## Report dialog (decided in T-12, do not re-invent)
 
 `src/components/ReportDialog.tsrx` is one component for every surface (`components/report.md`). T-12

@@ -15,7 +15,18 @@ Sessions are private and unmoderated: JEV never reads one, and no other user can
 ## Layout
 
 - The top right of the session header carries a **settings button**. Its first option is **New Session**, which starts a fresh session from the same participants — new copies of the character, its lorebooks, and the preset, with the current persona — while this session and its copies stay exactly as they are. The same menu appears on the [character's page](../character/detail.md); the primary Start/Continue control never opens a second session.
-- The rest of the layout is still to be specified.
+- **A session is its own surface, not a page inside the shell.** No app bar, no tab bar, no rail: the
+  route hides them and the page owns the viewport — its header on top, the transcript scrolling in the
+  middle, the composer docked at the bottom.
+- **The header carries four things and nothing else**: a **back** control (history, or the character when
+  there is no entry), the character's **avatar** and **in-session name** (a link back to the character),
+  the **persona in use** under the name as the control that switches it, and the **settings** button.
+- **The composer is one modern field**: a single rounded input that grows with the text, a round accent
+  **Send** control, `Enter` sends and `Shift+Enter` breaks the line. **Publish a cut** stays as a quiet
+  text action beneath it, never a second filled button.
+- **The reading column is one A4 page wide on a desktop (≈794px) and the whole screen on a phone**, the
+  same column as every other page, so a transcript reads like a document and a line of dialogue never
+  reaches across a monitor.
 
 ## Data
 

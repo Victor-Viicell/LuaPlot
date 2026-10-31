@@ -61,6 +61,15 @@ export function IconBack() {
   );
 }
 
+export function IconArrowUp() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 19V6" />
+      <path d="M6 12l6-6 6 6" />
+    </svg>
+  );
+}
+
 export function IconMore() {
   return (
     <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">

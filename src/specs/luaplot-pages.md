@@ -113,6 +113,11 @@ Every route has its own spec under [`pages/`](pages). This file is the route ind
 - Fixed segments (`catalog`, `create`, `thread`) are matched before the ID parameter, and IDs must use a constrained format (e.g. UUID) so no real ID can collide with those words.
 - Catalog and thread state belongs in the query string, not the path, so one set of routes serves every filtered view. The same convention should be reused for the persona collection, for profile tabs, and for the bookmark tabs.
 - Catalogs and feeds page with an explicit **Load more** control that appends the next 24 items. No page numbers and no scroll-triggered fetching, and paging is not part of the URL: returning to a listing shows its first page.
+- **A session owns its chrome**: `/session/[id]` is the one route that hides the shell's top bar, tab bar
+  and rail, because a conversation is a surface of its own — its header is the character and its composer
+  is the only control. Every other page lives inside the shell.
+- The reading column is one **A4 page** wide on a desktop (210mm ≈ 794px at 96dpi) and the screen width
+  on a phone. The cap lives once, on the shell's outlet, so no page invents a second column width.
 - Tags are authored on the content, never invented by a listing: characters, lorebooks and presets may carry tags, a card renders them when present and shows no row when there are none, and a catalog's tag filter offers exactly the tags in use (`repo.listTags`) as a multi-select. Picking two tags matches items carrying **either**, and no tag selected means **All**; the choice lives in the URL (`?tags=a,b`) so links stay shareable.
 - Personas are personal, not confidential: they are not shared because sharing them serves no purpose. The consequence is scope, not secrecy — no public catalog, no owner-qualified URL, no follows — and nothing is lost if a persona is named in a published cut.
 - Profiles and posts are public. Personas are absent from profiles because they are personal rather than shared content; a persona's name appears in a cut only when the author chooses to attribute their own messages that way.

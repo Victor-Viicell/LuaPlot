@@ -70,6 +70,13 @@ export function App() @{
 
   const Page = track<Component | null>(null);
   const status = track<Status>("loading");
+  /**
+   * A session draws its own chrome (`session/detail.md` → *Layout*): the shell hides its bar, its
+   * tabs and its rail, and the page owns the viewport. One predicate, so the rule is the route and
+   * not a class a page has to remember to add.
+   */
+  const immersive = track(() => /^\/session\//.test(route.value.path));
+
   const menuOpen = track(false);
   const attempt = track(0);
 
@@ -162,6 +169,25 @@ export function App() @{
 
   <>
     <style>
+      /* A session is a conversation, not a page in a shell: no top bar, no tab bar, no rail. The
+         page draws its own header and composer and owns the whole viewport. */
+      .shell.is-immersive .topbar,
+      .shell.is-immersive .tabbar,
+      .shell.is-immersive .rail {
+        display: none;
+      }
+
+      .shell.is-immersive .content {
+        overflow: hidden;
+        padding-bottom: 0;
+      }
+
+      .shell.is-immersive .outlet {
+        max-width: none;
+        height: 100%;
+        padding: 0;
+      }
+
       .shell {
         display: flex;
         height: 100dvh;
@@ -258,8 +284,10 @@ export function App() @{
         padding-bottom: calc(60px + env(safe-area-inset-bottom));
       }
 
+      /* The reading column is one A4 page wide on a desktop (210mm ≈ 794px at 96dpi, the width a
+         document is set to) and the whole screen on a phone, where 16px of padding is the gutter. */
       .outlet {
-        max-width: 720px;
+        max-width: 794px;
         margin: 0 auto;
         padding: 20px 16px 32px;
       }
@@ -608,7 +636,7 @@ export function App() @{
       }
     </style>
 
-    <div class="shell">
+    <div class={immersive.value ? "shell is-immersive" : "shell"}>
       <aside class="rail">
         <a class="mark" href={href("/")} onClick={follow("/")}>LuaPlot</a>
         <nav class="rail-nav" aria-label="Sections">

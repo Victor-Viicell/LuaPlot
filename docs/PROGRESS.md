@@ -3,6 +3,25 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-15 follow-up — the session gets its own chrome (2026-10-31)
+
+- **Changed:** on the owner's call, `/session/[id]` is no longer a page inside the shell: one predicate in
+  `App.tsrx` (`/^\/session\//`) adds `is-immersive`, which hides the top bar, the tab bar and the rail and
+  hands the page the viewport. The page is now a three-row column — a new header (44px back, 32px square
+  character avatar, in-session name, the persona line as the switch control, settings), a scrolling
+  transcript, and a docked modern composer: one growing pill field, a round accent Send with an up-arrow,
+  `Enter` to send, `Shift+Enter` for a new line, *Publish a cut* demoted to 11px text beneath. The reading
+  column became **A4 on a desktop (794px)** and the screen width on a phone, set once on the shell's
+  outlet.
+- **Verified:** build clean. On the dev server at 390 and 1280: `.topbar`/`.tabbar`/`.rail` compute
+  `display:none`, header 57px with a 32px avatar, name and the persona sub-line, transcript scrolled
+  (clientHeight 744 vs scrollHeight 880) with the composer docked at the bottom edge, `.main` 338 wide at
+  390 and **794** at 1280, no horizontal scroll, no page-level scroll (`docH == viewportH`). Typing grows
+  the field (46→87px) and enables Send; `Enter` appended the turn (9 rows), cleared the field and reset it
+  to 46px; settings opens the two-option sheet; the persona sub-line opens the persona picker.
+- **Not verified:** the on-screen keyboard path (`--keyboard-inset` is read but a desktop browser has no
+  IME inset to prove it); `Publish a cut` still opens the T-13 composer, unchanged.
+
 ## T-15 — `/session/[id]` (2026-10-31)
 
 - **Changed:** `src/components/PostComposer.tsrx` (new — T-14's form, extracted with a `cut` prop so

@@ -2,8 +2,7 @@ import { track } from "ripple";
 import { Avatar } from "../components/Avatar.tsrx";
 import { Button } from "../components/Button.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
-import { Field } from "../components/Field.tsrx";
-import { IconMore } from "../components/Icons.tsrx";
+import { IconArrowUp, IconBack, IconMore } from "../components/Icons.tsrx";
 import { PostComposer } from "../components/PostComposer.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Sheet } from "../components/Sheet.tsrx";
@@ -11,7 +10,7 @@ import { Skeleton } from "../components/Skeleton.tsrx";
 import { href, navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Persona, Session, Turn } from "../lib/data/types.ts";
-import { clockTime, initialsOf, shortStamp } from "../lib/format.ts";
+import { clockTime, initialsOf } from "../lib/format.ts";
 import { turnWriteSchema } from "../lib/schema.ts";
 import { currentUser } from "../lib/state/session.ts";
 import { replyTo } from "../lib/llm/chat.ts";
@@ -273,6 +272,12 @@ export function SessionDetail() @{
     }
 
     draft.value = "";
+    // The field is uncontrolled (a native element + a tracked box stringifies badly), so the box is
+    // cleared here rather than by a re-render.
+    if (sayBox) {
+      sayBox.value = "";
+      sayBox.style.height = "auto";
+    }
     applySession(next);
 
     // The seam T-16 fills. `null` today: nothing is invented, and the page says so once.
@@ -382,6 +387,31 @@ export function SessionDetail() @{
 
   // ---- Publish a cut ---------------------------------------------------------------------------
 
+  /** Back out of the conversation: the history entry if there is one, the character otherwise. */
+  function leaveSession(): void {
+    if (window.history.length > 1) window.history.back();
+    else navigate(`/character/${sourceId.value}`);
+  }
+
+  /**
+   * The composer grows with what is typed and stops at 160px — the field is the modern kind: no
+   * visible chrome until it is focused, one line at rest, multi-line when the thought is longer.
+   */
+  let sayBox: HTMLTextAreaElement | undefined;
+
+  function growSay(): void {
+    if (!sayBox) return;
+    sayBox.style.height = "auto";
+    sayBox.style.height = `${Math.min(sayBox.scrollHeight, 160)}px`;
+  }
+
+  /** Enter sends, Shift+Enter starts a line — the one shortcut a chat field is allowed to have. */
+  function onSayKeyDown(event: KeyboardEvent): void {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    if (!denySend.value) void send();
+  }
+
   function openPublish(): void {
     rangeFrom.value = "1";
     rangeTo.value = String(Math.max(1, turns.value.length));
@@ -402,70 +432,103 @@ export function SessionDetail() @{
 
   <>
     <style>
+      /* A session is its own surface: the shell hides its bar, its tabs and its rail on this route
+         (`src/App.tsrx`), and the page fills the viewport — header on top, transcript scrolling in
+         the middle, composer docked at the bottom. Minimal by construction: no page title block,
+         no cards, one accent (the send button). */
       .session {
         display: flex;
         flex-direction: column;
-        gap: 20px;
+        height: 100%;
+        min-height: 0;
       }
 
-      /* The identity block: an avatar, the in-session name and the persona, with the settings
-         button at the top right of the block (`detail.md` → *Layout*). */
-      .head {
+      /* The header owns the top: back, who you are talking to, settings — and nothing else. */
+      .bar {
         display: grid;
+        flex: none;
         grid-template-columns: 44px minmax(0, 1fr) 44px;
-        align-items: start;
-        gap: 12px;
+        align-items: center;
+        gap: 2px;
+        padding: calc(6px + env(safe-area-inset-top)) 8px 6px;
+        border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+        background-color: color-mix(in srgb, var(--color-bg) 84%, transparent);
+        backdrop-filter: blur(16px) saturate(1.15);
       }
 
-      .identity {
+      .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 22px;
+        background: transparent;
+        color: var(--color-text-muted);
+        cursor: pointer;
+      }
+
+      .icon-btn:hover,
+      .icon-btn:active {
+        color: var(--color-text);
+        background-color: var(--color-surface);
+      }
+
+      .who {
         display: flex;
-        flex-direction: column;
-        gap: 2px;
+        align-items: center;
+        gap: 10px;
         min-width: 0;
       }
 
-      .kicker {
-        margin: 0;
-        color: var(--color-text-subtle);
-        font-size: 12px;
-        letter-spacing: 0.12em;
-        line-height: 1.4;
-        text-transform: uppercase;
+      .who-avatar {
+        flex: none;
+        display: inline-flex;
+        border-radius: 2px;
       }
 
-      .title {
-        margin: 0;
+      .who-text {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+      }
+
+      .who-name {
+        overflow: hidden;
         color: var(--color-text);
-        font-size: 20px;
+        font-size: 15px;
         font-weight: 600;
         letter-spacing: -0.01em;
         line-height: 1.25;
-        overflow-wrap: anywhere;
+        text-decoration: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
-      .persona-line {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 4px 8px;
-        margin: 2px 0 0;
-        color: var(--color-text-muted);
-        font-size: 12px;
-        line-height: 1.5;
-      }
-
-      .switch {
-        min-height: 44px;
-        margin: -12px 0 -12px -8px;
-        padding: 0 8px;
+      /* The persona is the one piece of metadata the header keeps, and it is the control: tap it to
+         attach or switch one. */
+      .who-sub {
+        min-height: 16px;
+        margin: 0;
+        padding: 0;
         border: 0;
         background: none;
+        overflow: hidden;
         color: var(--color-text-subtle);
         font: inherit;
-        font-size: 12px;
-        text-decoration: underline;
-        text-underline-offset: 3px;
+        font-size: 11px;
+        line-height: 1.3;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         cursor: pointer;
+      }
+
+      .who-sub:hover {
+        color: var(--color-text-muted);
       }
 
       .switch:hover {
@@ -490,10 +553,23 @@ export function SessionDetail() @{
         color: var(--color-text);
       }
 
+      /* The transcript scrolls; the header and the composer never do. */
       .layout {
         display: grid;
+        flex: 1;
         grid-template-columns: minmax(0, 1fr);
         gap: 20px;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 16px 16px 8px;
+      }
+
+      /* A4 on a desktop, the screen on a phone — the same reading column as every other page. */
+      .main {
+        width: 100%;
+        max-width: 794px;
+        margin: 0 auto;
       }
 
       .main {
@@ -567,22 +643,97 @@ export function SessionDetail() @{
 
       /* ---- composer ---- */
 
+      /* Docked, blurred, one field: a rounded pill that grows with the text and a round accent
+         button. No label above it, no border box, no second row of buttons. */
+      .dock {
+        flex: none;
+        padding: 8px 16px calc(8px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px));
+        border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+        background-color: color-mix(in srgb, var(--color-bg) 90%, transparent);
+        backdrop-filter: blur(16px) saturate(1.15);
+      }
+
       .composer {
         display: flex;
-        flex-direction: column;
-        gap: 12px;
-        padding-top: 16px;
-        border-top: 1px solid var(--color-border);
+        align-items: flex-end;
+        gap: 8px;
+        width: 100%;
+        max-width: 794px;
+        margin: 0 auto;
       }
 
-      .composer-actions {
+      .say {
+        flex: 1;
+        min-width: 0;
+        min-height: 44px;
+        max-height: 160px;
+        padding: 11px 16px;
+        border: 1px solid var(--color-border);
+        border-radius: 22px;
+        background-color: var(--color-bg-elevated);
+        color: var(--color-text);
+        font: inherit;
+        font-size: 15px;
+        line-height: 1.45;
+        resize: none;
+        outline: none;
+        overflow-y: auto;
+        transition: border-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      .say::placeholder {
+        color: var(--color-text-subtle);
+      }
+
+      .say:focus {
+        border-color: var(--color-accent);
+      }
+
+      .send {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 22px;
+        background-color: var(--color-accent);
+        color: var(--color-bg);
+        cursor: pointer;
+        transition: opacity 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      .send:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      .dock-meta {
         display: flex;
-        flex-direction: column-reverse;
-        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        max-width: 794px;
+        margin: 4px auto 0;
       }
 
-      .composer-actions > * {
-        flex: 1 1 auto;
+      .cut {
+        min-height: 32px;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--color-text-subtle);
+        font: inherit;
+        font-size: 11px;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+      }
+
+      .cut:hover {
+        color: var(--color-text-muted);
       }
 
       .note {
@@ -929,21 +1080,23 @@ export function SessionDetail() @{
         />
       } @else {
         <>
-          <header class="head">
-            <Avatar initials={initials.value} label={speaker.value} size={44} />
-            <div class="identity">
-              <p class="kicker">session · {shortStamp(createdAt.value)}</p>
-              <h1 class="title">{speaker.value}</h1>
-              <p class="persona-line">
-                <span>{`You are ${userSide.value}`}</span>
-                <span>· {presetName.value}</span>
-                <button class="switch" type="button" onClick={openPersona}>
-                  {personaName.value === "" ? "Attach a persona" : "Switch persona"}
+          <header class="bar">
+            <button class="icon-btn" type="button" aria-label="Back" onClick={leaveSession}>
+              <IconBack />
+            </button>
+            <div class="who">
+              <a class="who-avatar" href={href(`/character/${sourceId.value}`)} aria-hidden="true">
+                <Avatar initials={initials.value} label={speaker.value} size={32} />
+              </a>
+              <div class="who-text">
+                <a class="who-name" href={href(`/character/${sourceId.value}`)}>{speaker.value}</a>
+                <button class="who-sub" type="button" onClick={openPersona}>
+                  {`${userSide.value} · ${presetName.value}`}
                 </button>
-              </p>
+              </div>
             </div>
             <button
-              class="gear"
+              class="icon-btn"
               type="button"
               aria-label="Session settings"
               onClick={() => (settingsOpen.value = true)}
@@ -1060,33 +1213,50 @@ export function SessionDetail() @{
                 </ol>
               }
 
-              <div class="composer">
-                <Field
-                  label="Message"
-                  multiline={true}
-                  rows={3}
-                  maxLength={4000}
-                  value={draft}
-                  error={sendError}
-                  placeholder="Say something to the room."
-                  onInput={(value) => {
-                    draft.value = value;
-                    sendError.value = "";
-                  }}
-                />
-
-                @if (note.value) {
-                  <p class="note" role="status">{note.value}</p>
-                }
-
-                <div class="composer-actions">
-                  <Button variant="secondary" onClick={openPublish}>Publish a cut</Button>
-                  <Button variant="primary" disabled={denySend} onClick={send}>
-                    {sending.value ? "Sending…" : "Send"}
-                  </Button>
-                </div>
-              </div>
             </main>
+          </div>
+
+          <div class="dock">
+            <div class="composer">
+              <textarea
+                class="say"
+                rows={1}
+                maxlength={4000}
+                placeholder={`Message ${speaker.value}…`}
+                aria-label="Message"
+                ref={(element) => {
+                  sayBox = element;
+                }}
+                onInput={() => {
+                  /* Read the field itself: a native `onInput` hands Ripple an event, and the event's
+                     target is not the box we typed into (T-15's trap). The ref is. */
+                  draft.value = sayBox?.value ?? "";
+                  sendError.value = "";
+                  growSay();
+                }}
+                onKeyDown={onSayKeyDown}
+              ></textarea>
+              <button
+                class="send"
+                type="button"
+                aria-label={sending.value ? "Sending" : "Send"}
+                disabled={denySend.value}
+                onClick={send}
+              >
+                <IconArrowUp />
+              </button>
+            </div>
+
+            @if (sendError.value !== "") {
+              <p class="alert" role="alert">{sendError.value}</p>
+            }
+
+            <div class="dock-meta">
+              <button class="cut" type="button" onClick={openPublish}>Publish a cut</button>
+              @if (note.value) {
+                <p class="note" role="status">{note.value}</p>
+              }
+            </div>
           </div>
         </>
       }
