@@ -17,7 +17,7 @@ Browsable, searchable list of characters. Each item links to [`/character/[chara
 
 Built from the shared card structure, per the [conventions](../../luaplot-pages.md#conventions): the title in the header, the avatar, tagline, and tags between, and the author beside the ratio as a percentage in the footer. No comment count and no like or dislike counts on the card — those live on [detail](detail.md).
 
-Every card renders its **tags row** when the item carries tags; an item with none renders no row and no placeholder. The tag vocabulary is authored on the content, never invented by a listing (`luaplot-pages.md` → Conventions), so the filter's options are exactly the tags in use.
+Every card renders its **tags row** when the item carries tags — one line, never wrapped, with the tags that do not fit behind a `+N` chip that opens them as a floating list (`luaplot-pages.md` → Conventions); an item with none renders no row and no placeholder. The tag vocabulary is authored on the content, never invented by a listing (`luaplot-pages.md` → Conventions), so the filter's options are exactly the tags in use.
 
 ## Actions
 

@@ -323,6 +323,17 @@ list, so the decisions below are the ones they inherit.
   link strip and not the `Tabs` primitive: these are three routes, not three views of one page, so
   middle-click, back/forward and a shared URL all have to keep working. Placement is directly under the
   page's top edge and above the header, so it is reachable without scrolling on a phone.
+- **The tags row is one line** (owner's call): the chips never wrap, so the row is `nowrap` + clipped and
+  `Card` decides how many whole tags fit, reserving ~42px for the counter. The extras become a `+N` chip
+  that opens `.card-menu` — `position: fixed` (a card's overflow would clip an absolute child), rung
+  **20** on the z-ladder (above cards, below sheets at 40), 1px `--color-border-strong`, elevated
+  background, and the second sanctioned shadow in the system because a floating layer needs separation
+  from what it covers. Escape and an outside tap both close it; a `ResizeObserver` on the card re-measures
+  and closes the menu when the grid reflows.
+  **How it measures:** a hidden twin of the row (`.card-tags.is-measure`, out of flow, `visibility:
+  hidden`) keeps every chip at its real size, so `offsetLeft`/`offsetWidth` stay available even after most
+  tags have been dropped from the visible row. Counting visible chips instead would measure the wrong
+  set on every re-render.
 - **The thumbnail is a third of the card, square** (T-09, owner's call): `Avatar` takes
   `size="fluid"` and `.card-veil .avatar.is-fluid` gives it `width: 33%; aspect-ratio: 1/1` with a
   22px initial (18px from `md`). It is a stylesheet rule, not a `size` prop, because the box has to

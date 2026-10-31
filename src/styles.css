@@ -710,7 +710,66 @@ a.card-title:hover {
     -webkit-line-clamp: 2;
 }
 
+/* One line, always (owner's call): tags never wrap a card. The row clips, the chips that do not fit
+   are dropped by `Card` and replaced by a `+N` chip that opens `.card-menu`. */
 .card-tags {
+    display: flex;
+    flex: none;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* The measuring twin: every chip at its real size, out of flow and invisible, so `Card` can decide
+   how many fit without rendering them twice on screen. */
+.card-tags.is-measure {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: visible;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.card-tag.is-more {
+    border-color: var(--color-border-strong);
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.card-tag.is-more:hover {
+    border-color: var(--color-accent);
+}
+
+/* The floating list of hidden tags. Fixed, so a card's overflow cannot clip it; rung 20 on the
+   z-ladder — above cards, below the tag field's dropdown (10) is wrong, so: above both, below the
+   shell menu and the sheets (40). */
+.card-menu-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+}
+
+.card-menu {
+    position: fixed;
+    z-index: 20;
+    width: max-content;
+    max-width: 200px;
+    padding: 8px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    background-color: var(--color-bg-elevated);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.card-menu-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;

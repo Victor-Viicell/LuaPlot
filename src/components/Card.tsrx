@@ -49,7 +49,86 @@ export function Card({
   const covered = track(() => read(nsfw) && read(blur) && !revealed.value);
   const path = `/${item.kind}/${item.id}`;
 
-  <article class={covered.value ? "card is-covered" : "card"}>
+  /**
+   * Tags never wrap on a card (`owner's call`): the row is one line and the ones that do not fit go
+   * behind a `+N` chip that opens a floating list.
+   *
+   * The measurement needs every chip at its real size, so a **hidden mirror** of the row is rendered
+   * inside the same body (absolutely positioned, `visibility: hidden`). It costs one extra list per
+   * card and never touches layout, while giving `offsetLeft`/`offsetWidth` for all tags even after
+   * most of them have been dropped from the visible row. `fits` is the state; a `ResizeObserver` on
+   * the card re-measures when the grid changes column count or the viewport turns.
+   */
+  const fits = track(item.tags.length);
+  const hidden = track(() => item.tags.slice(fits.value));
+  const menuOpen = track(false);
+  const menuX = track(0);
+  const menuY = track(0);
+
+  let mirror: HTMLUListElement | undefined;
+  let row: HTMLUListElement | undefined;
+  let observer: ResizeObserver | undefined;
+
+  /** Escape closes the list; the scrim closes it on an outside tap. */
+  function onKeyDown(event: KeyboardEvent): void {
+    if (event.key === "Escape") closeMenu();
+  }
+
+  function closeMenu(): void {
+    menuOpen.value = false;
+    document.removeEventListener("keydown", onKeyDown);
+  }
+
+  /** Width the `+N` chip needs, so the count is stable whatever the number reads. */
+  const MORE_W = 42;
+
+  function measure(): void {
+    if (!mirror || !row) return;
+    const room = row.clientWidth;
+    if (room === 0) return;
+
+    const chips = [...mirror.querySelectorAll<HTMLElement>(".card-tag")];
+    if (chips.length === 0) return;
+
+    const total = chips.length;
+    // Try dropping one chip at a time: the last visible set has to fit *and* leave room for `+N`.
+    let keep = total;
+    while (keep > 0) {
+      const used = chips[keep - 1].offsetLeft + chips[keep - 1].offsetWidth;
+      const needsMore = keep < total;
+      if (used + (needsMore ? 6 + MORE_W : 0) <= room) break;
+      keep -= 1;
+    }
+
+    if (keep !== fits.value) fits.value = keep;
+  }
+
+  /** Open the floating list under the `+N` chip, clamped into the viewport. */
+  function openMenu(event: MouseEvent): void {
+    if (menuOpen.value) {
+      closeMenu();
+      return;
+    }
+    const chip = event.currentTarget as HTMLElement;
+    const box = chip.getBoundingClientRect();
+    const width = 200;
+    menuX.value = Math.max(8, Math.min(box.left, window.innerWidth - width - 8));
+    menuY.value = box.bottom + 6;
+    menuOpen.value = true;
+    document.addEventListener("keydown", onKeyDown);
+  }
+
+  <article
+    class={covered.value ? "card is-covered" : "card"}
+    ref={(element) => {
+      if (!element || observer) return;
+      observer = new ResizeObserver(() => {
+        if (menuOpen.value) closeMenu();
+        measure();
+      });
+      observer.observe(element);
+    }}
+  >
     <div class="card-head">
       <a class="card-title" href={href(path)} onClick={onOpen}>{item.name}</a>
     </div>
@@ -62,11 +141,46 @@ export function Card({
             <p class="card-tagline">{item.tagline}</p>
           }
           @if (item.tags.length > 0) {
-            <ul class="card-tags">
+            <>
+            <ul
+              class="card-tags"
+              ref={(element) => {
+                row = element;
+                queueMicrotask(measure);
+              }}
+            >
+              @for (const tag of item.tags.slice(0, fits.value); key tag) {
+                <li class="card-tag">{tag}</li>
+              }
+              @if (hidden.value.length > 0) {
+                <li>
+                  <button
+                    class="card-tag is-more"
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={menuOpen.value ? "true" : "false"}
+                    aria-label={`${hidden.value.length} more tags`}
+                    onClick={openMenu}
+                  >
+                    {`+${hidden.value.length}`}
+                  </button>
+                </li>
+              }
+            </ul>
+
+            <ul
+              class="card-tags is-measure"
+              aria-hidden="true"
+              ref={(element) => {
+                mirror = element;
+                queueMicrotask(measure);
+              }}
+            >
               @for (const tag of item.tags; key tag) {
                 <li class="card-tag">{tag}</li>
               }
             </ul>
+            </>
           }
         </div>
       </div>
@@ -77,6 +191,24 @@ export function Card({
         </div>
       }
     </div>
+
+    @if (menuOpen.value) {
+      <>
+      <div class="card-menu-scrim" onClick={closeMenu}></div>
+      <div
+        class="card-menu"
+        role="menu"
+        aria-label="All tags"
+        style={{ top: `${menuY.value}px`, left: `${menuX.value}px` }}
+      >
+        <ul class="card-menu-tags">
+          @for (const tag of hidden.value; key tag) {
+            <li class="card-tag">{tag}</li>
+          }
+        </ul>
+      </div>
+      </>
+    }
 
     <div class="card-foot">
       <a class="card-author" href={href(`/user/${item.author}`)}>{`@${item.author}`}</a>

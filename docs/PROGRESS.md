@@ -3,6 +3,25 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## Card tags on one line, the rest behind +N (2026-10-31)
+
+- **Changed:** the owner reported the card tag rows breaking lines. `Card` now measures which whole tags
+  fit the row (reserving ~42px for the counter), renders only those, and puts the rest behind a `+N`
+  chip; tapping it opens a floating `.card-menu` listing exactly the hidden tags (fixed positioning so a
+  card cannot clip it, z-index 20, Escape and an outside tap close it, a `ResizeObserver` re-measures and
+  closes it on reflow). The measurement reads a hidden twin of the row (`.card-tags.is-measure`) so
+  every chip keeps its real width even after the visible ones change. `luaplot-pages.md`, the character
+  catalog spec and DESIGN carry the rule; two fixtures gained tags (Lamplighter's Widow 5, Hollow Saint 5)
+  so the path is visible in the preview rather than only in tests.
+- **Verified:** at 390 the widow's card shows `ghost · harbor · +3` in one 25px row with no overflow, and
+  the menu opens under the chip with `ritual, family, debt`, clamped into a 390 viewport (chip left 264 →
+  menu left 182); scrim tap closes it, `Escape` closes it, and reopening works. At 1280 the same card is
+  225px with a 118px tag row showing `ghost · +4`, still one line, no overflow. Cards with two tags show
+  no counter.
+- **Not verified:** the menu over a *covered* (blurred) card — the trigger sits inside the veiled middle,
+  so it is unreadable until Reveal; judged acceptable (the tags are content, and the cover hides content),
+  but not walked on a device.
+
 ## Desktop audit — the A4 cap that never applied (2026-10-31)
 
 - **Root cause:** the owner reported the NSFW rows looking compressed and misaligned on desktop. The
