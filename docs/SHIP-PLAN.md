@@ -103,8 +103,13 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 - [x] **T-13 `/post/thread`.** Public timeline, composer entry, NSFW handling, Load more. Landed: post
       card (own primitive), sort in the URL (`newest | discussed | liked`), `All` chip, Show/Blur pair,
       Load more mounted from `hasMore`. Load more's append path is unverified — 12 fixtures, page 24.
-- [ ] **T-14 `/post/[id]` + `/post/create`.** Body + at most one attachment (own character or cut),
-      image/GIF embed, no edit route. Accept: attaching another author's item is impossible.
+- [x] **T-14 `/post/[id]` + `/post/create`.** Body + at most one attachment (own character or cut),
+      image/GIF embed, no edit route. Landed: permalink reuses `PostCard` (`fold={false}`,
+      `foot={false}`) + ratio/counts aside + vote/bookmark/report/delete + `CommentThread`;
+      composer with body gate (`postWriteSchema`), own-characters / own-session-cut picker,
+      attribution for a cut, NSFW toggle. `repo.addPost` / `deletePost` (cascade) / `listMySessions`.
+      Accept met: the adapter refuses a character the viewer does not author, and the picker only
+      lists the viewer's own. Image/GIF embed deliberately not drawn — no uploader, no media field.
 - [ ] **T-15 `/session/[id]`.** Transcript, composer, awaiting-response state, settings menu
       (New Session, Delete with confirmation), Switch persona, publish-a-cut flow, participant
       copies with Edited/Updated/Restore/Unlinked states.

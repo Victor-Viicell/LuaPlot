@@ -25,6 +25,8 @@ import {
   REPORT_REASON_MISMATCH,
   REPORT_SOURCE_REQUIRED,
   reportWriteSchema,
+  POST_REQUIRED,
+  postWriteSchema,
   seedSchemas,
   type CommentBranch,
   type SeedCollection,
@@ -129,6 +131,25 @@ const mixed = reportWriteSchema.safeParse({
 });
 if (mixed.success) ok("reportWriteSchema accepted image + text with two reasons");
 else bad(`reportWriteSchema refused a mixed report (${mixed.error.issues[0]?.message})`);
+
+/* 2b. The composer's gate (T-14): an empty body is the only hard rule, and the body it stores is the
+   one it validated — a body of spaces must fail with the **schema's own** sentence, and a padded body
+   must arrive trimmed, so the inline error and the stored row can never disagree. */
+const emptyBody = postWriteSchema.safeParse({ body: "   \n ", nsfw: false, attachment: null });
+if (emptyBody.success) bad("postWriteSchema accepted a body of spaces");
+else if (emptyBody.error.issues[0]?.message !== POST_REQUIRED) {
+  bad(`postWriteSchema refused an empty body for the wrong reason (${emptyBody.error.issues[0]?.message})`);
+} else ok("postWriteSchema rejected a whitespace-only body");
+
+const paddedBody = postWriteSchema.safeParse({
+  body: "  a body with air around it \n",
+  nsfw: false,
+  attachment: null,
+});
+if (!paddedBody.success) bad(`postWriteSchema refused a real body (${paddedBody.error.issues[0]?.message})`);
+else if (paddedBody.data.body !== "a body with air around it") {
+  bad(`postWriteSchema did not trim the body ("${paddedBody.data.body}")`);
+} else ok("postWriteSchema trimmed the body it accepted");
 
 /* 3. The recursive shape: built from the flat rows, parsed through the lazy schema. */
 console.log("== recursive shape");

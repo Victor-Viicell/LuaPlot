@@ -27,6 +27,8 @@ import {
   profileWriteSchema,
   reportOutcomeSchema,
   reportEntrySchema,
+  postSchema,
+  postWriteSchema,
   reportSchema,
   reportWriteSchema,
   seedSchemas,
@@ -458,6 +460,74 @@ export const memoryRepo: Repo = {
     const row = store.sessions.find((entry) => entry.id === id) ?? null;
     // Participant only: not-a-participant reads the same as not-found (`session/detail.md`).
     return row && row.owner === VIEWER ? row : null;
+  },
+
+  /**
+   * Publish a post. Parsed through `postWriteSchema` **before** anything is stored, so the composer's
+   * gate and the row are the same rule, and the **attachment is checked against ownership here** —
+   * the picker filters to the viewer's own characters, but a picker cannot be the only guard
+   * (`luaplot-pages.md`: *the attachment is always the author's own*).
+   *
+   * A new post is unscanned: `verified: false`, zero engagement. A cut is text with no id, so it has
+   * no owner to verify — the composer stamps it from the viewer's own session.
+   */
+  async addPost(input) {
+    const parsed = postWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const attachment = write.attachment;
+    if (attachment?.kind === "character") {
+      const person = store.characters.find((row) => row.id === attachment.characterId) ?? null;
+      if (!person || person.author !== VIEWER) return null;
+    }
+
+    const row = postSchema.parse({
+      id: freshId(),
+      author: VIEWER,
+      body: write.body,
+      createdAt: nowIso(),
+      nsfw: write.nsfw,
+      attachment: write.attachment,
+      verified: false,
+      likes: 0,
+      dislikes: 0,
+      bookmarks: 0,
+      commentCount: 0,
+    });
+
+    store.posts.push(row);
+    recount(store);
+    return row;
+  },
+
+  /**
+   * Delete a post and, in cascade, its whole thread — **author only**. The comments are removed from
+   * the store rather than left as placeholders: a placeholder keeps a branch alive because its
+   * replies still exist, and here there is no parent page left to draw them on. Every dropped
+   * comment's vote goes with it, and the post's own vote too.
+   */
+  async deletePost(id) {
+    const index = store.posts.findIndex((row) => row.id === id);
+    if (index < 0) return false;
+    if (store.posts[index].author !== VIEWER) return false;
+
+    store.posts.splice(index, 1);
+
+    for (const row of store.comments) {
+      if (row.itemId === id) votes.delete(voteKey("comment", row.id));
+    }
+    store.comments = store.comments.filter((row) => row.itemId !== id);
+    votes.delete(voteKey("post", id));
+
+    recount(store);
+    return true;
+  },
+
+  async listMySessions() {
+    return store.sessions
+      .filter((row) => row.owner === VIEWER)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   },
   async getReport(id) {
     return store.reports.find((row) => row.id === id) ?? null;

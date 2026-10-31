@@ -3,6 +3,32 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-14 — `/post/[id]` and `/post/create` (2026-10-30)
+
+- **Changed:** `src/pages/post-detail.tsrx` (permalink: `PostCard` with `fold={false}` /
+  `foot={false}`, ratio + raw like/dislike/comment counts in an aside that goes sticky beside the
+  reading column from `md`, vote pair from `repo.myVote`, bookmark, `ReportDialog` on
+  `kind: "post"`, two-step **Delete post** for the author, `CommentThread` beneath, not-found
+  state); `src/pages/post-create.tsrx` (body `Field` gated by `postWriteSchema`, attachment picker
+  over the viewer's own characters and the viewer's own sessions as cuts with the persona/`User`
+  attribution choice once a cut is attached, NSFW `Toggle`, Publish / Cancel); `src/lib/schema.ts`
+  gains `postWriteSchema` + `POST_REQUIRED`; `src/lib/data/{repo,memory}.ts` gain `addPost`
+  (`safeParse`, **character attachment must be the viewer's**, `verified: false`, zero counts),
+  `deletePost` (author only, **comments cascade** with their votes), `listMySessions`;
+  `PostCard` gains `fold` / `foot`; `docs/DESIGN.md` → *Post detail and composer*.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30/30 routes, schema). Dev server via CDP
+  `Emulation.setDeviceMetricsOverride`: `/post/90570000-…-0003` at 360 → 4 cut turns and **no Show
+  more**, RATIO 99% / LIKES 133 / DISLIKES 2 / COMMENTS 3, thread rows with their own actions; at
+  900/1200/1440 the aside sits beside the card (x=510 / 840 / 1050) and no width overflows
+  (`scrollWidth ≤ innerWidth` at 360/640/900/1200/1440, both pages). Publish flow walked end to end at
+  360: typed body → picked *Rook Venner* → Publish → `/post/d17a0e56-…` with the character card and
+  **Delete post**; one comment posted (counts 0/0/0/1, one `.row-body`); Confirm delete → back on
+  `/post/thread` with the post gone. `post-create` lists 5 attachment choices (none + own items) with
+  the body 328px at 360 and 284px at 900 beside the 340px attachment column.
+- **Not verified:** the image/GIF embed (no uploader, no media field — deliberately not drawn); the
+  panel-over-the-page composer (`Sheet` host waits for T-15); Load more on the thread (still 12
+  fixtures against a 24-row page); no Tauri/Android build.
+
 ## T-13 — the public timeline at `/post/thread` (2026-10-30)
 
 - **Changed:** `src/components/PostCard.tsrx` (new primitive: `.post-head` poster + `<time>`, `.post-middle`

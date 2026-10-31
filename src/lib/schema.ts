@@ -292,6 +292,26 @@ export const postSchema = z.strictObject({
   ...engagementSchema.shape,
 });
 
+/**
+ * The composer's gate (`post/create.md` → *States* → *Validation error*). Parsed by the form's
+ * `safeParse` **and** again by `repo.addPost`, so the inline line and the stored row are one rule.
+ *
+ * Only the body is gated today: there is no uploader, so the image and size rules the spec lists
+ * have no control to fire from, and the attachment is either a character id or a non-empty cut —
+ * both already constrained by `postAttachmentSchema`. The body is **trimmed** here, which is what
+ * makes *a body of spaces* the empty body the spec refuses.
+ */
+export const POST_REQUIRED = "Write something before publishing.";
+
+export const postWriteSchema = z.strictObject({
+  body: z
+    .string()
+    .transform((value) => value.trim())
+    .pipe(z.string().min(1, POST_REQUIRED)),
+  nsfw: z.boolean(),
+  attachment: postAttachmentSchema.nullable(),
+});
+
 export const commentStatusSchema = z.enum(["visible", "deleted", "removed"]);
 
 /** The composer's one rule, so the inline error and the adapter cannot disagree. */

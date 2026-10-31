@@ -594,6 +594,53 @@ the card's parts and the loads; these are the choices the spec left open.
   preview**: the control is mounted from `hasMore` and its append path is unverified until the
   fixtures grow past 24.
 
+## Post detail and composer (decided in T-14, do not re-invent)
+
+`/post/[id]` is the permalink `PostCard` already linked to, and `/post/create` is the only way to make
+a post. `post/detail.md` leaves its *Layout* to us; `post/create.md` fixes the parts of the form but
+not its frame. These are the choices.
+
+- **The permalink reuses `PostCard` and adds only what a permalink adds.** The card takes
+  `fold={false}` — the whole cut, no **Show more** (`detail.md`: *rendered in full here*) — and
+  `foot={false}`, because a permalink owns engagement itself. Two props, not a second drawing of a
+  post: T-30's profile reuses the same card with both on.
+- **Engagement is four cells, ratio first**: `percent(ratioOf(...))` with the raw like and dislike
+  counts beside it and the comment count, never a like/total fraction (`luaplot-pages.md` →
+  *Engagement*). The cells are a 2×2 grid at 360, one row of four from `sm` and 2×2 again in the
+  `md` aside, where the cell is 300px wide and four columns would make 70px of number.
+- **One column on a phone, two from `md`.** The reading column holds the card and then the thread;
+  the aside holds counts and the action row and is `position: sticky` at 88px. The DOM order —
+  card, aside, comments — **is** the phone order, so the wide layout is a grid-area swap and not a
+  second tree.
+- **The action row is one column of 44px rows at 360 and `md`, one wrapped row at `sm`**: Like /
+  Dislike (`aria-pressed` from `repo.myVote`), Bookmark, Report, and — for the author only — Delete.
+  Delete is two-step (`Confirm delete` / `Cancel`) because it takes the whole thread with it, and its
+  label says so when the post has comments.
+- **Signed out is read-only**, and every action leads to `/authentification` rather than being hidden:
+  a visitor can see the controls exist (`detail.md` → States → *Signed out — read only*).
+- **Not-found, deleted and removed are one state.** The adapter answers `null` for all three; the page
+  prints *This post doesn't exist.* and offers the thread. The spec's two sentences for a deleted and
+  a removed post exist so neither is *privatized*, not so the page can guess which happened.
+- **The composer is one column, and the sections are hairline labels, not nested cards.** At `md` it
+  becomes the reading column (body) with a 340px attachment column beside it — a composer that stays
+  328px at 1440 is a stretched phone.
+- **The attachment picker is native radios in 44px rows** (`Toggle` is reserved for the two NSFW
+  preferences), one list with *No attachment* first, then the viewer's own characters, then the
+  viewer's own sessions as cuts with their message count. Empty lists print one sentence instead of an
+  empty box.
+- **Inline image and GIF insertion is deliberately not drawn.** There is no uploader and no storage,
+  and `postSchema` has no media field, so the control would do nothing. It arrives with the uploader;
+  the media rules in `create.md` (PNG/JPEG/WebP/GIF, 10 MB, four per post) have nothing to fire from
+  until then.
+- **A cut is stamped as text at publish time.** The character side always reads the session's
+  character name; the user side reads the chosen attribution — the persona's name, or `User` when the
+  session has no persona or the author picks the generic one. The choice appears only once a cut is
+  attached (`create.md`: *Sender attribution appears only once a cut is attached*), and a later
+  persona rename leaves the post alone.
+- **The panel-over-the-page instance is not built.** The route is; the `Sheet` host waits for T-15's
+  session page, which is the only other place the spec opens the composer from, and Cancel goes back
+  to the thread because that is where the only **Create** control lives today.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

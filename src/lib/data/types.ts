@@ -37,6 +37,7 @@ import type {
   personaSchema,
   postAttachmentSchema,
   postSchema,
+  postWriteSchema,
   presetSchema,
   presetSettingsSchema,
   reportOutcomeSchema,
@@ -87,6 +88,7 @@ export type Persona = z.infer<typeof personaSchema>;
 export type CutMessage = z.infer<typeof cutMessageSchema>;
 export type PostAttachment = z.infer<typeof postAttachmentSchema>;
 export type Post = z.infer<typeof postSchema>;
+export type PostWrite = z.infer<typeof postWriteSchema>;
 export type Comment = z.infer<typeof commentSchema>;
 export type CommentStatus = Comment["status"];
 

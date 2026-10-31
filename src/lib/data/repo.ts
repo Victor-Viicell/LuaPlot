@@ -24,6 +24,7 @@ import type {
   Notification,
   Persona,
   Post,
+  PostWrite,
   Preset,
   Report,
   ReportOutcome,
@@ -104,6 +105,35 @@ export type Repo = {
    * `parentId` and folds branches deeper than three levels (`components/comment-thread.md`).
    */
   listComments(itemId: string): Promise<Comment[]>;
+
+  /**
+   * Publish a post (`post/create.md`). The write is `postWriteSchema`-shaped and parsed here, so the
+   * composer's gate and the stored row are one rule; `body` arrives already trimmed.
+   *
+   * **The attachment must be the author's own** — that is the creator's accept line, and it is
+   * enforced here, not in the picker: a character id the viewer does not author is refused (`null`),
+   * so a caller cannot attach somebody else's item even by posting the id by hand. A cut carries no
+   * id at all — it is text stamped at publish time — so there is nothing to own.
+   *
+   * Engagement starts at zero and `verified` is **false**: a new post has not been scanned, and
+   * moderation (`JEV`) is what flips the flag. Returns the stored row, or `null` on a failed parse or
+   * a refused attachment.
+   */
+  addPost(input: PostWrite): Promise<Post | null>;
+
+  /**
+   * Delete one post — **author only** — and, in cascade, its whole comment thread
+   * (`post/detail.md` → *Delete*: *deletes the post and, in cascade, its entire comment thread*).
+   * The comments are dropped, never orphaned: an orphaned reply would keep counting on a parent that
+   * no longer exists. `false` when the post is missing or another account's.
+   */
+  deletePost(id: string): Promise<boolean>;
+
+  /**
+   * The viewer's own sessions, newest first — what `post/create` offers as a **cut** source. A session
+   * is participant-only, so this answers the viewer's rows and nobody else's by construction.
+   */
+  listMySessions(): Promise<Session[]>;
 
   /**
    * Append a comment or a reply (`T-11`). The write is `commentWriteSchema`-shaped, parsed by the

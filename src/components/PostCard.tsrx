@@ -33,12 +33,25 @@ export function PostCard({
   post,
   people = {},
   blur = false,
+  fold = true,
+  foot = true,
 }: {
   post: Post;
   /** Attachment characters by id, resolved once by the listing. */
   people?: Derived<Record<string, Character>> | Record<string, Character>;
   /** Blur is the account's listing preference; Show-off absence is the listing's job, not a card's. */
   blur?: boolean | Derived<boolean>;
+  /**
+   * The **feed** folds a cut at two messages behind Show more; the **permalink** draws all of it
+   * (`post/detail.md` → *Rendered in full here*: *no fold, no Show more*). One prop, so the card
+   * still has exactly one drawing of a cut.
+   */
+  fold?: boolean;
+  /**
+   * The feed's footer is the card's own engagement strip. A permalink owns engagement itself
+   * (`ratio` + raw counts + comments), so it turns this off instead of drawing the numbers twice.
+   */
+  foot?: boolean;
 }) @{
   const revealed = track(false);
   const expanded = track(false);
@@ -103,13 +116,13 @@ export function PostCard({
 
         @if (cut.length > 0) {
           <div class="post-cut">
-            @for (const message of expanded.value ? cut : cut.slice(0, FOLD); key message.text) {
+            @for (const message of !fold || expanded.value ? cut : cut.slice(0, FOLD); key message.text) {
               <div class="cut-turn">
                 <p class="cut-who">{`${message.attribution} · ${message.speaker}`}</p>
                 <p class="cut-text">{message.text}</p>
               </div>
             }
-            @if (!expanded.value && cut.length > FOLD) {
+            @if (fold && !expanded.value && cut.length > FOLD) {
               <div class="cut-more">
                 <Button variant="ghost" onClick={() => (expanded.value = true)}>
                   {`Show ${cut.length - FOLD} more`}
@@ -127,20 +140,22 @@ export function PostCard({
       }
     </div>
 
-    <footer class="post-foot">
-      <ul class="post-counts">
-        <li class="post-count">
-          <span class="post-count-label">likes</span>
-          <span class="post-count-value">{post.likes}</span>
-        </li>
-        <li class="post-count">
-          <span class="post-count-label">dislikes</span>
-          <span class="post-count-value">{post.dislikes}</span>
-        </li>
-      </ul>
-      <a class="post-comments" href={permalink} aria-label={`${post.commentCount} comments`}>
-        {`${post.commentCount} ${post.commentCount === 1 ? "comment" : "comments"}`}
-      </a>
-    </footer>
+    @if (foot) {
+      <footer class="post-foot">
+        <ul class="post-counts">
+          <li class="post-count">
+            <span class="post-count-label">likes</span>
+            <span class="post-count-value">{post.likes}</span>
+          </li>
+          <li class="post-count">
+            <span class="post-count-label">dislikes</span>
+            <span class="post-count-value">{post.dislikes}</span>
+          </li>
+        </ul>
+        <a class="post-comments" href={permalink} aria-label={`${post.commentCount} comments`}>
+          {`${post.commentCount} ${post.commentCount === 1 ? "comment" : "comments"}`}
+        </a>
+      </footer>
+    }
   </article>
 }
