@@ -25,6 +25,7 @@ import type {
   LorebookWrite,
   Notification,
   Persona,
+  PersonaWrite,
   Post,
   PostWrite,
   Preset,
@@ -252,6 +253,48 @@ export type Repo = {
    * moderation took out of view.
    */
   forkPreset(id: string): Promise<Preset | null>;
+
+  /**
+   * **Save** on `/persona/create` (`persona/create.md`). The write is `personaWriteSchema`-shaped and
+   * parsed here, so the form's gate and the stored row are one rule; the adapter owns `id`, `owner`,
+   * `verified: false` and the clock.
+   *
+   * **The first persona of the account takes the default mark in the same step** (`create.md` →
+   * *States* → *First persona*: *there is no separate promotion afterwards*), so a page never makes
+   * a second call to promote it. `null` on a failed parse.
+   */
+  addPersona(input: PersonaWrite): Promise<Persona | null>;
+
+  /**
+   * **Save** on `/persona/[id]/edit` — **owner only**, `null` for anyone else. The fields are replaced
+   * by the write, `updatedAt` moves and `verified` clears (*any edit clears the cached scan*);
+   * `id`, `owner`, `isDefault` and `createdAt` are the adapter's and survive.
+   *
+   * Nothing outside this page reads the row: a session holds a **live reference**, so a rename
+   * reaches the session's attribution and a published cut keeps the text it went out with
+   * (`persona/edit.md` → *Data*).
+   */
+  updatePersona(id: string, input: PersonaWrite): Promise<Persona | null>;
+
+  /**
+   * **Delete** on `/persona/[id]/edit` and `/persona/[id]` — **owner only**, immediate and final
+   * (`edit.md` → *Delete*: *no undo window and no trash*).
+   *
+   * **The default mark moves in the same step**: if the row held it, the most recently created
+   * remaining persona takes it, and deleting the last persona leaves an empty collection with no
+   * default (`edit.md` → *Delete confirmation*). A session that pinned this persona is untouched —
+   * its transcript stays and its user side reads `User` — so nothing here edits a session row.
+   * `false` when the row is missing or another account's.
+   */
+  deletePersona(id: string): Promise<boolean>;
+
+  /**
+   * **Set as default** on the collection, on detail and on edit — **owner only**. One write that
+   * clears the mark from whichever persona held it and sets it on this one, because a two-call
+   * sequence can be interrupted and leave two defaults or none. Idempotent: setting the current
+   * default answers the row unchanged.
+   */
+  setDefaultPersona(id: string): Promise<Persona | null>;
 
   /**
    * The lorebooks the picker may offer (`character/create.md` → *From a picker*): **the author's own

@@ -140,7 +140,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       lorebook saves with its entries, edit preloads them, reorder persists, and delete removes the row
       without touching a character's attachment.
 - [x] **T-19 `/preset/*` (catalog, create, detail, edit).** Generation settings form.
-- [ ] **T-20 `/persona` collection + create/edit/detail.** Default persona rules, delete moves the
+- [x] **T-20 `/persona` collection + create/edit/detail.** Default persona rules, delete moves the
       mark, never shared/flagged. Accept: deleting the default reassigns in one step.
 - [ ] **T-21 `/bookmarks`.** One catalog per type, dead cards for removed items, tabs in query.
 - [ ] **T-22 `/notifications`.** Aggregated rows (same kind + same target fold), read state.

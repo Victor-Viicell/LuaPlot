@@ -39,6 +39,7 @@ import type {
   notificationSchema,
   notificationTargetSchema,
   personaSchema,
+  personaWriteSchema,
   postAttachmentSchema,
   postSchema,
   postWriteSchema,
@@ -109,6 +110,11 @@ export type Preset = z.infer<typeof presetSchema>;
  */
 export type PresetWrite = z.infer<typeof presetWriteSchema>;
 export type Persona = z.infer<typeof personaSchema>;
+/**
+ * One persona submission (`personaWriteSchema`): name, tagline, description and the avatar.
+ * The adapter owns `id`, `owner`, the clock, `verified` and the `isDefault` mark.
+ */
+export type PersonaWrite = z.infer<typeof personaWriteSchema>;
 export type CutMessage = z.infer<typeof cutMessageSchema>;
 export type PostAttachment = z.infer<typeof postAttachmentSchema>;
 export type Post = z.infer<typeof postSchema>;

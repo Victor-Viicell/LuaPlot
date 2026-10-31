@@ -35,6 +35,8 @@ import {
   postWriteSchema,
   presetSchema,
   presetWriteSchema,
+  personaSchema,
+  personaWriteSchema,
   reportSchema,
   reportWriteSchema,
   seedSchemas,
@@ -589,8 +591,11 @@ export const memoryRepo: Repo = {
   },
 
   async listPersonas(options) {
+    // `persona/collection.md` → *Search*: *filters the grid by name* — and only the name, unlike the
+    // catalogues, which match the tagline and description too. The rule lives here so the page cannot
+    // grow a second, wider search by accident.
     const rows = store.personas.filter(
-      (row) => row.owner === VIEWER && matches([row.name, row.tagline, row.description], options?.query),
+      (row) => row.owner === VIEWER && matches([row.name], options?.query),
     );
     return pageOf(order(rows, options?.sort, PERSONA_ACCESS), options);
   },
@@ -1042,6 +1047,113 @@ export const memoryRepo: Repo = {
 
     store.presets.push(fork);
     return fork;
+  },
+
+  /**
+   * Save a persona (`persona/create.md`). Parsed through `personaWriteSchema` before anything is
+   * stored, so the form's gate and the row are one rule.
+   *
+   * **The first persona takes the default mark here**, in the same write: the spec says saving the
+   * user's first persona *also makes it the default, in the same step; there is no separate promotion
+   * afterwards*. A page that promoted it in a second call could be interrupted and leave a collection
+   * with personas and no default.
+   */
+  async addPersona(input) {
+    const parsed = personaWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const at = nowIso();
+    const first = !store.personas.some((row) => row.owner === VIEWER);
+    const row = personaSchema.parse({
+      id: freshId(),
+      owner: VIEWER,
+      name: write.name,
+      tagline: write.tagline,
+      description: write.description,
+      avatar: write.avatar,
+      isDefault: first,
+      verified: false,
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    store.personas.push(row);
+    return row;
+  },
+
+  /** Edit: the mark and the creation clock survive; the scan cache does not (`edit.md` → *Data*). */
+  async updatePersona(id, input) {
+    const row = store.personas.find((entry) => entry.id === id) ?? null;
+    if (!row || row.owner !== VIEWER) return null;
+
+    const parsed = personaWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const next = personaSchema.parse({
+      ...row,
+      name: write.name,
+      tagline: write.tagline,
+      description: write.description,
+      avatar: write.avatar,
+      verified: false,
+      updatedAt: nowIso(),
+    });
+
+    store.personas.splice(store.personas.indexOf(row), 1, next);
+    return next;
+  },
+
+  /**
+   * Delete a persona — **owner only**, immediate. If it held the default, the mark moves to the most
+   * recently created remaining persona **in this same step** (*the collection is never left holding
+   * personas with no default*); deleting the last one leaves an empty collection with no default.
+   *
+   * Sessions are not touched: a pinned persona is a live reference, so its session keeps its whole
+   * transcript and its user side reads `User` until **Switch persona** attaches another.
+   */
+  async deletePersona(id) {
+    const index = store.personas.findIndex((row) => row.id === id);
+    if (index < 0) return false;
+
+    const row = store.personas[index];
+    if (row.owner !== VIEWER) return false;
+
+    store.personas.splice(index, 1);
+
+    if (row.isDefault) {
+      const remaining = store.personas
+        .filter((entry) => entry.owner === VIEWER)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const heir = remaining[0];
+      if (heir) {
+        store.personas.splice(store.personas.indexOf(heir), 1, { ...heir, isDefault: true });
+      }
+    }
+
+    return true;
+  },
+
+  /**
+   * Set as default: **one write** that clears the old mark and sets the new one, because a two-call
+   * sequence can be interrupted and leave two defaults or none. Idempotent — setting the current
+   * default answers the row unchanged instead of rewriting it.
+   */
+  async setDefaultPersona(id) {
+    const row = store.personas.find((entry) => entry.id === id) ?? null;
+    if (!row || row.owner !== VIEWER) return null;
+    if (row.isDefault) return row;
+
+    for (const entry of store.personas) {
+      if (entry.owner === VIEWER && entry.isDefault) {
+        store.personas.splice(store.personas.indexOf(entry), 1, { ...entry, isDefault: false });
+      }
+    }
+
+    const next = { ...row, isDefault: true };
+    store.personas.splice(store.personas.indexOf(row), 1, next);
+    return next;
   },
 
   /**

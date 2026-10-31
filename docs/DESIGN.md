@@ -877,6 +877,53 @@ the settings down the left, and the foot across both.
   `PresetForm` all now put their grid on a child `.layout` div. The same fix was applied to the two
   older forms in T-19: their `lg` two-column layout had never actually applied.
 
+## Persona collection and detail (decided in T-20, do not re-invent)
+
+`persona/collection.md` and `detail.md` describe the **only** page family in the app that is neither
+authored content nor a shared surface: a persona is personal, never shared, never moderated and never
+counted. That one sentence removes most of the chrome the other item pages inherit, and this section
+is what is left.
+
+- **The persona card is its own component, not `Card`.** The catalogue card's footer *is* an author
+  link and the derived ratio, and the spec says a persona card has *no author, no ratio, no comment
+  count*. `Card`'s `item` prop is also the `AuthoredItem` union, which a persona is deliberately not
+  a member of, so a "no footer" switch would have dragged it into a union the spec keeps it out of.
+  `components/PersonaCard.tsrx` draws avatar (56px), name, tagline and the default line, and shares
+  the box through `.persona-card` in `src/styles.css` (1px border, 6px radius, elevated surface), so a
+  persona grid and a catalogue grid still read as one system. The **grid** is the app's `card-grid` /
+  `card-cell` classes — 1 / 2 / 3 / 4-up at 360 / 640 / 900 / 1200 — with no page-local gutter.
+- **The default mark is a line above the name**: a 2px `--color-accent` top edge plus the word
+  `default` at 11px, uppercase. Settled at 360 with two personas, one default, against a corner badge
+  (collides with the name's ellipsis) and an eyebrow line (reads as a second title). A line cannot
+  collide with anything, and it survives a name that truncates.
+- **`Set as default` sits on the card and on detail**, because *Actions* lists it in both places, and
+  it is **drawn disabled** (`Default persona`) when this persona already holds the mark — idempotent
+  writes should not be dressed as live actions. The collection patches the two rows it knows about
+  (previous holder, new holder) instead of refetching the grid it already has.
+- **The collection is a collection: one adapter call, page 1, no Load more.** `listPersonas` still
+  slices at 24 like every listing; the page draws every row it is handed and never draws a paging
+  control the spec forbids. **Search is by name only** and the rule lives in the adapter — the
+  catalogues match name, tagline and description, this one does not.
+- **Sort is Newest / Oldest / Name.** `ratio`, `discussed` and `liked` are absent because a persona
+  carries no engagement at all, and a sort that silently falls back would be a control that lies.
+- **Detail carries no shared chrome**: no engagement row, no report, no comment thread, no owner
+  notice, no settings `Sheet`. Header = cover (`Avatar size="hero"`, 320px column from `sm`, the
+  T-12 item-page frame), name, tagline, the mark, and the four actions; description read-only beneath.
+- **Missing and unowned are one sentence**: `This persona doesn't exist in your collection.`
+  `repo.getPersona` answers `null` for another account's row, and the edit page has **no `forbidden`
+  phase** — unlike the three authored types, where "not yours" is its own state.
+- **Delete has two hosts and one row.** `components/DeleteRow.tsrx` is the in-place confirmation used
+  by detail (directly under the header, where the spec lists the action) and by edit (at the foot,
+  after Save and Cancel): one sentence, one write, one landing — `/persona`. It is never a dialog.
+  The copy names only what `edit.md` names: immediate, no undo, no trash, the mark moves to the most
+  recently created remaining persona, and a session that pinned it keeps its transcript and reads
+  `User`.
+- **`Start a session` asks for a character first, in a `Sheet`.** The picker lists the viewer's **own**
+  characters, by name; choosing one reopens the session they already have with that character (with
+  this persona attached through `repo.setSessionPersona`) or creates one with the persona in the same
+  write (`repo.createSession(characterId, personaId)`). There is no preset step — the preset travels
+  with the character — and the persona is never attached to an arbitrary character.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

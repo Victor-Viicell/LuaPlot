@@ -1,176 +1,134 @@
 # Baton — what the next session does
 
-**Ticket: T-20 — `/persona`, all four routes.**
+**Ticket: T-21 — `/bookmarks`, four tabs over saved items.**
 
-Specs: `src/specs/pages/persona/collection.md`, `create.md`, `detail.md`, `edit.md` (whole files);
-`src/specs/luaplot-pages.md` → *Conventions* (personas: personal, never shared, never moderated,
-never counted); `docs/ARCHITECTURE.md` → *Data* (personas are per-account) and *Validation*;
-`docs/DESIGN.md` → *Preset create and edit (T-19)* — the form convention this ticket is the last to
-copy — and the **root element cannot be styled** bullet, which applies to every `.tsrx` you write.
+Specs: `src/specs/pages/bookmarks.md` (whole file); `src/specs/luaplot-pages.md` → *Conventions*
+(query-string state) and *Engagement is metadata on cards*; `docs/ARCHITECTURE.md` → *Data*
+(listings, `toggleBookmark`, `isBookmarked`) and *Validation*; `docs/DESIGN.md` → *Catalog* (the
+listing frame, the six states, the NSFW pair) and *Persona collection and detail (T-20)* — the last
+ticket that built a toolbar, and the one that added the shared `DeleteRow`.
 
-Why next: T-17, T-18 and T-19 built the three authored types and every catalog card now points at a
-real page. Personas are the fourth collection and the **only** one that is not authored content: the
-spec calls it `a smaller, distinct model rather than a character with sharing removed`, so this
-ticket is where the copy-the-last-form habit has to stop and the differences get read properly. It is
-also the last route family in P2 before `/bookmarks`.
+Why next: it is the last page family in P2 before the account surfaces, and it is the first page that
+has to draw a card for an item that **no longer exists** — the spec's *A bookmark outlives the item*
+rule. It also has no adapter behind it yet: `repo` can answer *is this one bookmarked* and toggle it,
+but it cannot list what is saved, when it was saved, or what used to be there.
 
 ## Approach
 
-1. **Schema first, in `src/lib/schema.ts`.** `personaWriteSchema` beside `presetWriteSchema`: `name`
-   (collapse, its own `PERSONA_NAME_REQUIRED`), `tagline` (a persona **has** one — the collection card
-   draws it, unlike a character/lorebook/preset), `description`, `avatar` (`{initials}`, filled from
-   the name — reuse `withInitials`). **No** `nsfw`, no `lorebookIds`, no preset, no in-session name,
-   no engagement: `personaSchema` has none of them and `create.md` → *Absent by design* says why.
-   The isDefault mark is **not** in the write — the adapter owns it (below).
-2. **Four adapter methods, and the default rule is the adapter's**, not a page's:
-   `addPersona` (first persona of the account takes `isDefault: true` in the same step —
-   `create.md` → *States* → *First persona*), `updatePersona` (owner only, keeps `isDefault`,
-   moves `updatedAt`, clears `verified`), `deletePersona` (owner only; **if it held the default, the
-   mark moves to the most recently created remaining persona, and deleting the last leaves an empty
-   collection with no default** — `edit.md` → *Delete confirmation*), and `setDefaultPersona(id)`
-   (owner only, one write that clears the old mark and sets the new — a two-call sequence can be
-   interrupted and leave two defaults or none). `listPersonas` and `getPersona` already exist;
-   `getPersona` answers **only** the viewer's own and `null` otherwise, which is exactly the spec's
-   *missing and unowned are one state*.
-3. **`components/PersonaForm.tsrx`, two hosts** (`persona: null` is create) — `PresetForm` without
-   the settings block and **with** a tagline field. Order is the spec's: name and tagline, then
-   description/personality, then the avatar (initials). No NSFW toggle, no attachments section.
-   Frame: one column at 360, `lg` two columns with the picture beside the definition, Save/Cancel at
-   the foot, and the layout on a child `.layout` div (see the root-element bullet).
-4. **`/persona` is a collection, not a catalog**: search (name only — the spec says *filters the grid
-   by name*), sort, **Create**, one grid, **no paging and no Load more**. The `Card` primitive is the
-   public card (author + ratio in the footer); a persona card is *avatar, name, tagline, default mark*
-   and nothing else, so the collection needs either a persona card or `Card`'s "no footer" path —
-   read `components/Card.tsrx` before deciding, and record the choice in `docs/DESIGN.md`.
-   `Set as default` belongs on the **card** (the spec's *Actions* lists it for the collection) as
-   well as on detail.
-5. **`/persona/[id]` is personal detail**: header with avatar, name, tagline, the default mark and
-   the four actions (**Set as default**, **Start a session**, **Edit**, **Delete**); description
-   beneath, read-only. No engagement row, no report control, no comment thread, no owner notice, no
-   `Sheet` menu. *Not found* and *another account's id* are the **same** sentence —
-   `This persona doesn't exist in your collection.`
-6. **Delete has two hosts**: detail (`detail.md` → *Delete with confirmation*) and edit
-   (`edit.md` → *Delete with confirmation*). Decide once (a shared confirm row or a small dialog) and
-   say so in DESIGN; after a delete from a persona that was not the last, land on the collection.
+1. **Schema first, in `src/lib/schema.ts`.** A saved row is `{ kind, id, savedAt }` plus the item when
+   it still resolves; the dead case is a row whose item is gone, so the listing cannot be `AuthoredItem[]`
+   (a post is not one either). One `bookmarkRowSchema` per tab: `kind` (`ItemKind | "post"`), `id`
+   (uuid), `savedAt` (iso), `item` (the entity or `null`), and derive the type in `types.ts` with
+   `z.infer`. `savedAt` is the *sort* — *newest saved first is the default* — so today's
+   `Set<string>` in the memory adapter becomes a `Map<string, string>` (`key → savedAt`), and
+   `toggleBookmark` stamps `nowIso()` on save and drops the key on remove.
+2. **Adapter:** `listBookmarks(kind, { query, sort, page })` answering `Listing<BookmarkRow>`, with
+   `sort` = `recent` (newest saved) | `oldest` | `name` (title A–Z). Search must be *the same matching
+   the type's catalog uses*, restricted to saved rows — so reuse each listing's own fields, not a
+   fourth matcher. Posts answer through the thread card, so their listing matches `body`.
+3. **A dead card is a `bookmarkRow` with `item: null`**, drawn as the type's not-exist sentence in the
+   title slot (`This character doesn't exist.`), non-linking, still carrying **Remove bookmark**. The
+   memory adapter must be able to *produce* one: deleting a post or dropping a row through moderation
+   must leave the bookmark key behind, so `deletePost` / `deleteCharacter` / `deleteLorebook` /
+   `deletePreset` must stop clearing bookmarks, and the fixture set needs at least one saved-then-gone
+   pair (a seeded orphan key is the cheap way; say so in PROGRESS if you seed it).
+4. **Tabs.** Four tabs with counts, in the query string (`?type=`), defaulting to the type holding the
+   **most recently saved** item. `components/Tabs.tsrx` already exists — read it before inventing one.
+   Counts come from the adapter, never from the visible slice.
+5. **The card.** Characters/lorebooks/presets use `Card` + `CardGrid` unchanged; posts use `PostCard`.
+   Every card needs a **Remove bookmark** control *on the card* (the spec's *so unbookmarking never
+   requires opening the item*), so this ticket either adds a slot/prop to `Card` (a footer action it
+   does not have) or wraps each cell in the page — decide, and record it in `docs/DESIGN.md`.
+6. **State lives in the URL**: `?type=character&q=&sort=recent&tag=`; `tag` is the reserved `All`-only
+   filter, drawn as a disabled `Select` or omitted with a note (the catalogues wait on the same
+   undecided taxonomy). NSFW is *not* in the URL: it is the account's pair.
 
 ## Traps
 
-- **A persona is not authored content.** No `nsfw`, no `isPublic`, no tags, no `tagline: ""`, no
-  engagement, no fork, no bookmark, no report. If you find yourself writing `reportTarget` or
-  `voteTarget` for a persona, stop — the spec forbids it four ways.
-- **The default mark is a one-step invariant** (*the collection is never left with personas and no
-  default*). Do it inside the adapter write, never as a page's second call, and test delete-of-default
-  and create-first in one adapter probe.
-- **No paging** on the collection: `listPersonas` pages at 24 in the adapter, and the page must still
-  draw every row the spec says it draws. Either the page requests page 1 and the fixtures hold fewer
-  than 24, or the adapter needs an unpaged answer — decide and record it; do not draw a Load more.
-- **A card cannot show a ratio it does not have** — the persona card is the first card with no
-  footer author and no ratio. Check `CardGrid`/`Card` props before adding a page-local card.
-- **`repo.createSession(characterId, personaId?)`** already carries a persona through **New
-  session**, and `session-detail.tsrx` calls it. **Start a session** from a persona asks for a
-  character *first* (`detail.md`) — there is no character picker component on this page yet, so
-  either build the smallest one the spec allows or link to `/character/catalog` and record the
-  decision as a gap in `docs/NEXT.md`; never start a session with an arbitrary character.
-- **`Set as default` is idempotent** and the button says so when this persona already holds it
-  (drawn disabled, as `Request public again` is), rather than writing a no-op.
-- **A block's validation error is a template-owned paragraph**, not a `Field.error` prop (T-18);
-  **a schema that transforms must accept its own output** (T-18) — `withInitials` satisfies this,
-  a new transform must too.
-- **`track(() => …)` is a read-only derived** (T-18): a list that will be reassigned must be built
-  eagerly and passed as a value.
-- **`@if` with multiple children needs a fragment**; `@for` needs `const`; `@empty` does not parse in
-  ripple 0.4.7 — an empty list is a sibling sentence.
-- **A page's scoped `<style>` cannot touch a primitive's elements** — wrap, never reach in.
-- **A component's root element carries no `tsrx-*` scope class**, so a rule written on it is dropped
-  (T-19). Put every layout rule on a child element.
-- **A persona id is a UUID**, so a hard reload of a runtime-created row loses it (`memory` resets);
-  navigation must stay in-app to test a created row.
+- **`repo.toggleBookmark` refuses a missing row** (`sharedRowFor`), so *Remove bookmark* on a **dead**
+  card cannot go through it — the adapter needs a remove that works on the key alone, or
+  `toggleBookmark` has to accept a saved-but-gone id. A dead bookmark that cannot be cleared is the
+  one thing this page exists to avoid.
+- **A post is not an `AuthoredItem`** and has no `tagline`, `author`-only card, or ratio. Do not widen
+  `Card`'s union to make posts fit; `PostCard` exists.
+- **Counts must survive the NSFW filter**: the tab count is *saved rows*, not *visible rows* — with
+  Show off a tab can read `3` and draw `1`, which is correct and not a bug.
+- **Bookmarks are silent** (`bookmarks.md` → *Purpose*): no toast that promises a notification, no
+  notification write, nothing on a profile.
+- **The published cut and the saved post are different objects** — removing a bookmark never touches
+  the item, and deleting the item never removes the bookmark.
+- **`@if`/`@else` bodies with more than one node need a fragment `<>…</>`** (found in T-20): a toolbar
+  div followed by a phase `@if` in the same `@else` is two nodes and fails to compile.
+- **A native `disabled={tracked}` is a type error, and `{tracked ? … : …}` always takes the first
+  branch** (T-20): read `.value` at the call site or hand a `Derived` to `Button`, which already reads.
+- **A component's root element cannot be styled**, and a page's scoped `<style>` cannot reach into a
+  primitive — wrap (`.delete-slot`, `.layout`), never write a rule on the primitive's own class.
+- **Paging**: this is a real catalog per tab, so it *does* take **Load more** and the 24-row page —
+  unlike `/persona`, which is deliberately unpaged.
 
 ## Open decisions
 
-- **Where the default mark lives on a card** — a corner badge, a line under the name, or the
-  card's eyebrow — decided at 360 with two personas, one of them default.
-- **How `Start a session` asks for a character** — the spec says it *asks for a character first*;
-  whether that is a `Sheet` with a picker or a route to the catalog is this ticket's call, and it
-  must not invent a "choose a preset" step (the preset travels with the character).
-- **Whether the collection reuses `Card`** or grows a `PersonaCard` — whichever, the ratio and the
-  author must not appear.
+- **Where the remove control sits on a `Card`** — a footer action beside the author, a corner control,
+  or a page-owned wrapper per cell. Decide at 360, with a covered (blurred) card in view: the control
+  must stay crisp, exactly as `Reveal` does.
+- **How the seeded dead card is produced** — a fixture key with no row, or a fixture row that a
+  `--seed` step deletes. Whichever, the preview must show one dead card without a manual delete.
+- **The default tab when nothing is saved at all** — Characters (the spec's list order) is the safe
+  reading; record it.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **`/persona` exists and is the only unpaged listing** (T-20): one `listPersonas` call, page 1, no
+  Load more, name-only search; `/persona/[id]` has no engagement, report, thread or settings sheet.
+- **A persona card is `PersonaCard`, not `Card`** (T-20): avatar, name, tagline, a 2px accent top edge
+  plus the word `default` when it holds the mark, and `Set as default` drawn **disabled** (`Default
+  persona`) when it already does.
+- **`DeleteRow` is the one delete confirmation for personas** (T-20): in-place, shared by detail and
+  edit, `.delete-row*` in `styles.css`; detail lands on `/persona` after a delete.
+- **`Start a session` from a persona offers only the viewer's own characters** (T-20) — a public
+  character by another author is not offered, and `createSession` returns `null` when there is no
+  preset to copy. If the product wants any startable character, that is a picker change plus a spec
+  reading, not a page patch.
+- **More than 24 personas has no answer yet** (T-20): the collection asks for page 1 only. A `listPersonas`
+  with no page cap (or a `page: 0` meaning unbounded) is the fix when an account can hold more.
+- **The persona pages were not driven in Chromium** (T-20): 360/640/900/1200 is unmeasured for the
+  collection, the card, detail and the picker sheet. Do that pass before trusting the drawing.
 - **A component's root element cannot be styled** (T-19): Ripple 0.4.7 adds `tsrx-<hash>` only to the
   elements it emits below the root, so `.character-form` / `.lorebook-form` / `.preset-form` was
-  dropped by the compiler and all three forms were `display: block` — their `lg` two-column layout
-  had never applied. Fixed in T-19 by moving each grid onto a child `.layout` div.
-- **`PRESET_MODELS`** (T-19) lives beside `presetSettingsSchema` and is what the model `Select` and
-  the fixtures agree on; `presetSettingsSchema.model` stays `min(1)` so a new model is a list change,
-  not a migration.
-- **A preset's detail shows its settings as a `<dl>` after the description** (T-19), the value as
-  saved in `--font-mono`, with no default and no diff.
-- **`repo.addPreset` / `updatePreset` / `deletePreset` / `forkPreset` exist** (T-19), mirroring the
-  lorebook four; a preset has no entries, so delete has no cascade beyond its comment thread.
+  dropped by the compiler; each form now puts its grid on a child `.layout`.
 - **A schema that transforms must accept its own output** (T-18): `lorebookEntryWriteSchema.keywords`
   takes the typed line *or* the split list, because the form parses and then the adapter parses again.
-  A transform whose output is not a valid input surfaces as *Save failed* with no inline error.
-- **A per-row error is a template paragraph, not a `Field.error` prop** (T-18): props are evaluated
-  once and a keyed `@for` reuses its blocks, so the line would never appear.
+- **A per-row error is a template paragraph, not a `Field.error` prop** (T-18).
 - **`track(() => …)` makes a read-only derived** (T-18): build a reassignable list eagerly.
-- **A lorebook authored by the form has `tagline: ""` and no tags**, and its entry ids are the
-  adapter's `entry-1…n`, renumbered on every save and fork.
-- **The memory adapter loses runtime rows on a hard reload** (T-18): a created row survives only SPA
-  navigation, so a "paste this id" check has to happen in-app.
-- **`Request public again` has no write** (T-18/T-19): drawn disabled on lorebook and preset detail.
-- **Description and personality are one field** (T-17): `characterWriteSchema.description` is the one
-  stored text; a persona's `description` follows the same rule *and* carries its own `tagline`.
-- **The avatar is initials only** (T-17): there is no uploader, so an empty control is filled from the
-  name by the schema. An image control needs storage, not a form.
-- **`Edit session copy` is not built** (T-15): it needs `sessionCopyWriteSchema` in `schema.ts` and a
-  session-scoped editor form; the copy rows draw state + link actions only.
-- **`Restore` has no version history** (T-15): a stored snapshot is the fix and it is a schema change.
-- **`components/PostComposer.tsrx` serves two hosts** — `/post/create` (picker) and the session's
-  Publish-a-cut sheet (`cut` locked).
-- **`components/CharacterForm.tsrx` serves create + edit**; so do `LorebookForm` (T-18) and
-  `PresetForm` (T-19), and `PersonaForm` (T-20) will.
-- **The publish-a-cut sheet is two steps** because a prop expression is evaluated once; *Change the
-  range* is the one path that loses a draft.
-- **`repo.createSession(characterId, personaId?)`** carries the current persona through **New
-  session**; another account's persona is ignored, not attached.
-- **A session's two-column layout is `lg`, not `md`** (T-15): at 900 the outlet is 656 and a 300px
-  aside leaves a 324px reading column.
-- **Load more is unverified on the thread**: 12 fixtures against a 24-row page.
-- **`postWriteSchema` / `characterWriteSchema` / `lorebookWriteSchema` / `presetWriteSchema` + their
-  `*_REQUIRED` constants are the pattern**: one schema, one normalisation, parsed by the form and
-  again by the adapter.
-- **`repo.listAttachableLorebooks()` / `repo.attachableLorebook(id)` exist** (T-17): the picker is
-  *own + bookmarked*, the by-ID rule is *own + any public* — both are the spec's.
-- **A character's attachments degrade, never vanish** (T-17), and **`deleteLorebook` must not strip
-  its id from every character's `lorebookIds`** (T-18).
-- **A cut with no messages is refused** (`postAttachmentSchema.messages.min(1)`).
-- **`repo.listMySessions()` exists** (newest `updatedAt` first).
-- **A held report opens no case** (T-12): `/moderation` has no view of held reports.
-- **`reportPartSchema` has no attachment value**, so a post's image can only be reported as text.
-- **`status: "removed"` has no fixture**; the removed-by-moderation placeholder is unreachable.
-- **Comment attachments are not drawn** — `commentSchema` has no attachment field until an uploader.
-- **`sessionSchema.personaId` is optional** — an unattributed session reads `User`.
-- **Rows created at runtime take `crypto.randomUUID()`**; fixture ids come from `fixtures/ids.ts`.
+- **`PRESET_MODELS`** (T-19) lives beside `presetSettingsSchema`; a preset's detail shows its settings
+  as a `<dl>` after the description, values as saved.
+- **`repo.addPreset` / `updatePreset` / `deletePreset` / `forkPreset` exist** (T-19).
+- **`personaWriteSchema` + `PERSONA_NAME_REQUIRED` and the four persona adapter methods exist** (T-20):
+  `addPersona` (first one takes the mark), `updatePersona`, `deletePersona` (mark moves to the most
+  recently created remaining row), `setDefaultPersona` (one write). `listPersonas` searches the name
+  only.
+- **A lorebook authored by the form has `tagline: ""` and no tags**; a **persona's tagline is a real
+  field** (T-20) and an empty one draws nothing on the card.
+- **The memory adapter loses runtime rows on a hard reload** (T-18): navigation must stay in-app.
+- **`Request public again` has no write** (T-18/T-19): drawn disabled.
+- **Description and personality are one field** (T-17); a persona follows the same rule *and* carries
+  its own tagline.
+- **The avatar is initials only** (T-17): no uploader, so an empty control is filled from the name.
+- **`Edit session copy` is not built** (T-15); **`Restore` has no version history** (T-15).
+- **`repo.createSession(characterId, personaId?)`** carries the persona; **`repo.setSessionPersona`**
+  re-attaches one without touching the transcript; **`repo.findSessionForCharacter`** is the
+  Continue check.
+- **`repo.listAttachableLorebooks()` / `attachableLorebook(id)` exist** (T-17).
 - **`repo.myVote` / `repo.myReport` / `isBookmarked` exist** — never a page-local flag.
-- **A base rule declared AFTER a `@media` block wins at every width.**
-- **Zod costs +26.4 KB gzip on the boot chunk**; `zod/mini` is the lever if a budget is named.
-- **T-16's seam is proven only on its mock and its failure branch**: `VITE_CHAT_ENDPOINT` is unset, so
-  no real model has answered yet. A deployed `supabase/functions/chat` is its own ticket.
-- **`chatReplySchema` is the one LLM payload shape** — a JEV call must add its own schema beside it,
-  and JEV payloads are `safeParse`d like this one.
-- **`repo.appendReply(id, text)` exists** — the model's write path; do not add a second one.
-- **The `Preview mode` chip lives in the session's composer meta line**, because `/session/…` hides
-  the shell's top bar. Any other surface that shows a mock answer needs its own marker.
-- **T-17's form is proven at 360 only**; T-18 measured the lorebook pages at 360 and 1200; T-19
-  measured the preset form at 360/640/1200 and detail at 360/640/1200, catalog at 360/1200.
+- **`chatReplySchema` is the one LLM payload shape**; a JEV call adds its own beside it and
+  `safeParse`s it. **`repo.appendReply(id, text)`** is the model's write path.
 - **Counts now: characters 28 (27 public), lorebooks 6, presets 5, personas 3, posts 12, reports 5,
-  comments 22, sessions 2.**
+  comments 22, sessions 2.** Bookmarks are a seeded `Set` today, so the first fixture pass for T-21
+  must decide how many save rows exist.
 
 ## After this
 
-**T-21** `/bookmarks` — one catalog per type, dead cards for removed items, tabs in the query string.
+**T-22** `/notifications` — aggregated rows (same kind + same target fold), read state.
 
 ## When blocked
 

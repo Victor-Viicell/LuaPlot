@@ -3,6 +3,38 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-20 — `/persona`, the fourth collection, and the default mark that is the adapter's (2026-10-31)
+
+- **Changed:** `personaWriteSchema` (+ `PERSONA_NAME_REQUIRED`) beside `personaSchema` — name,
+  tagline, description, avatar; **no** nsfw/isPublic/tags/lorebooks/preset/in-session name/engagement,
+  and `isDefault` is not a write value. `PersonaWrite` in `types.ts`; `repo.addPersona` (the first
+  persona of an account takes the default mark in the same write), `updatePersona` (owner only, keeps
+  the mark and `createdAt`, clears `verified`), `deletePersona` (owner only; if it held the default the
+  **most recently created remaining** persona takes it, and deleting the last leaves an empty
+  collection with no default), `setDefaultPersona` (one write that clears the old mark and sets the
+  new). `listPersonas` now searches **the name only** — the spec's *filters the grid by name*, owned by
+  the adapter so no page can widen it. New `components/PersonaForm.tsrx` (one form, two hosts; name and
+  tagline → description → avatar; no NSFW, no settings) and `components/PersonaCard.tsrx` (avatar,
+  name, tagline, default line — **not** `Card`, which draws an author and a ratio), plus the shared
+  `components/DeleteRow.tsrx` (one in-place confirmation for detail and edit; the stylesheet carries
+  `.persona-card*` and `.delete-row*`). `/persona` is a collection: search + sort (Newest/Oldest/Name)
+  + Create over one unpaged grid, `Set as default` on each card; `/persona/[id]` is personal detail —
+  cover, name, tagline, the mark, four actions, description read-only, **no** engagement, report,
+  thread or owner notice, and `Start a session` opens a `Sheet` picker of the viewer's own characters
+  (an existing session with that character is reopened with this persona attached instead of
+  duplicated).
+- **Verified:** `scripts/check.sh` → GREEN (build, 30 routes, schema). A bun probe of the memory
+  adapter printed the whole default invariant: 3 fixtures with exactly 1 default; `setDefaultPersona`
+  left exactly one; deleting the default handed it to *Ash* (most recently created); deleting every
+  row left 0 rows and 0 defaults; the next `addPersona` on the empty collection came back
+  `isDefault: true` with initials `SO` derived from the name; a blank name and an `nsfw` key both came
+  back `null` from the schema.
+- **Not verified:** the four pages were **not** driven in Chromium this tick — the 360/640/900/1200
+  measurements are the next session's first job (the form frame is T-19's unchanged, but the persona
+  card, the default line and the character picker sheet are new drawing). The picker offers only the
+  viewer's **own** characters (a public character from another author is not offered) — recorded as a
+  gap in `docs/NEXT.md`. More than 24 personas still needs an unpaged adapter answer.
+
 ## T-19 — the four preset routes, and the form's dead root rule (2026-10-31)
 
 - **Changed:** `presetWriteSchema` (+ `PRESET_NAME_REQUIRED`) and `PRESET_MODELS` beside

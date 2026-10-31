@@ -734,6 +734,155 @@ a.card-author:hover {
     font-variant-numeric: tabular-nums;
 }
 
+/* Persona card (T-20) — the personal collection's card. It is deliberately **not** `.card`: a
+   persona has one possible owner and no engagement, so the catalogue card's footer (author + ratio)
+   is exactly what it must never draw. It keeps the same box so a persona grid and a catalogue grid
+   read as one system, and the default mark is a 2px accent rule across the top edge plus the word —
+   a line cannot collide with a long name at 360 the way a corner badge would. */
+.persona-card {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background-color: var(--color-bg-elevated);
+}
+
+.persona-card.is-default {
+    border-top: 2px solid var(--color-accent);
+    padding-top: 13px;
+}
+
+.persona-card-mark {
+    margin: 0;
+    color: var(--color-accent);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    line-height: 1.3;
+    text-transform: uppercase;
+}
+
+.persona-card-body {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    min-width: 0;
+}
+
+.persona-card-text {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.persona-card-name {
+    overflow: hidden;
+    color: var(--color-text);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+a.persona-card-name:hover {
+    color: var(--color-accent-hover);
+}
+
+.persona-card-tagline {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.persona-card-foot {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.persona-card-foot .btn {
+    padding: 0 12px;
+}
+
+.persona-card-open {
+    flex: none;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    text-decoration: none;
+}
+
+a.persona-card-open:hover {
+    color: var(--color-accent);
+}
+
+/* The shared destructive row (T-20): one in-place confirmation, used by persona detail and edit. It
+   carries the 2px `--color-danger` rule T-17 established and sits *after* Save, so the primary action
+   and the destructive one are never side by side. */
+.delete-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding-left: 12px;
+    border-left: 2px solid var(--color-danger);
+}
+
+.delete-line {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.delete-copy {
+    margin: 0;
+    color: var(--color-text-subtle);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.delete-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.delete-alert {
+    margin: 0;
+    color: var(--color-danger);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+@media (min-width: 640px) {
+    .delete-line {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+    }
+
+    .delete-actions {
+        flex: 0 0 auto;
+        flex-direction: row;
+    }
+}
+
 /* Post card (T-13) — the timeline's own card. It shares `.card`'s box and nothing else: a post has
    no `name` and no `tagline`, so it cannot be a catalogue card with the title slot empty. Header
    (poster + time) and footer (likes, dislikes, comment count) stay crisp; only the body and its

@@ -422,6 +422,33 @@ export const personaSchema = z.strictObject({
   verified: z.boolean(),
 });
 
+/**
+ * The persona **write** (`persona/create.md` → *Data*, `edit.md` → *Same fields as create*).
+ *
+ * A persona is *a smaller, distinct model rather than a character with sharing removed* — its own
+ * schema, not a subset — so this carries `tagline` (the collection card draws it) and nothing the
+ * spec's *Absent by design* list refuses: no `nsfw`, no `isPublic`, no tags, no lorebooks, no preset,
+ * no in-session name, no engagement. `isDefault` is **not** a write value: the adapter owns the mark
+ * (`addPersona` and `deletePersona` move it in the same step), so a page can never save a persona
+ * that claims the default while another holds it.
+ *
+ * `withInitials` fills an empty avatar from the name, exactly as the character/lorebook/preset writes
+ * do, and its output is valid input to this schema (a transform must accept its own output).
+ */
+export const PERSONA_NAME_REQUIRED = "A persona needs a name.";
+
+export const personaWriteSchema = z
+  .strictObject({
+    name: z
+      .string()
+      .transform(normaliseDisplayName)
+      .pipe(z.string().min(1, PERSONA_NAME_REQUIRED)),
+    tagline: z.string().transform((raw) => raw.trim()),
+    description: z.string().transform((raw) => raw.trim()),
+    avatar: z.strictObject({ initials: initialsInputSchema }),
+  })
+  .transform(withInitials);
+
 /* ------------------------------------------------------------------------------------------------
  * Posts and comments
  * ---------------------------------------------------------------------------------------------- */
