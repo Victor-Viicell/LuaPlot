@@ -16,9 +16,14 @@
  * `await` from the first day and the swap is not a rewrite.
  */
 import { seed } from "../fixtures/index.ts";
+import { BOOKMARKS } from "../fixtures/bookmarks.ts";
 import {
   accountPreferencesSchema,
   accountPreferencesPatchSchema,
+  bookmarkCountsSchema,
+  bookmarkKindSchema,
+  bookmarkRowSchema,
+  bookmarkSeedSchema,
   characterSchema,
   characterWriteSchema,
   commentSchema,
@@ -45,12 +50,15 @@ import {
   userSchema,
   type SeedCollection,
 } from "../schema.ts";
-import type { z } from "zod";
+import { z } from "zod";
 import { PAGE_SIZE } from "./repo.ts";
 import type { Listing, ListOptions, ReportFilter, Repo, SortOrder } from "./repo.ts";
 import {
   ratioOf,
   type AccountPreferences,
+  type BookmarkCounts,
+  type BookmarkKind,
+  type BookmarkRow,
   type Character,
   type Comment,
   type EntityOf,
@@ -170,8 +178,22 @@ const store = load();
 
 /** `kind:id:viewer` → the vote in force. */
 const votes = new Map<string, VoteDirection>();
-/** `kind:id:viewer` → saved. A persona has no bookmark, so only shared content is ever a key. */
-const bookmarks = new Set<string>();
+/**
+ * `kind:id` → **when the viewer saved it**. A `Map`, not a `Set`, because `/bookmarks` sorts by the
+ * save clock (*newest saved first*) and the tab's counts read saved rows, not visible ones. A persona
+ * has no bookmark, so only shared content is ever a key.
+ *
+ * **A key outlives its row**: nothing here deletes a key when the item is deleted, because *a
+ * bookmark outlives the item* — the listing answers `item: null` and the page draws the type's
+ * not-exist sentence with a working **Remove bookmark**. Seeded from `fixtures/bookmarks.ts`,
+ * including one key with no item behind it.
+ */
+const bookmarks = new Map<string, string>(
+  parseCollection("bookmarks", z.array(bookmarkSeedSchema), BOOKMARKS).map((row) => [
+    savedKey(row.kind, row.id),
+    row.savedAt,
+  ]),
+);
 /**
  * `kind:id:viewer` → **the viewer's own report** on that item, the rule `report.md` calls *one report
  * per user per item*. A `Map` rather than a `Set` because *Already reported* has to show what was
@@ -213,6 +235,16 @@ const CLAIMED_HANDLES = new Set(
 
 function voteKey(kind: string, id: string): string {
   return `${kind}:${id}:${VIEWER}`;
+}
+
+/**
+ * A bookmark's key: `kind:id`, **without the viewer**. Votes and reports are per viewer because both
+ * are per-item facts about a person; a saved row is also one viewer's, but the listing has to read
+ * *everything this viewer saved in a kind* and parse the id back out, and a trailing `:viewer` makes
+ * that split a guessing game. `supabase.ts` keys the table by `(user_id, kind, id)`.
+ */
+function savedKey(kind: BookmarkKind, id: string): string {
+  return `${kind}:${id}`;
 }
 
 /** A row a session creates. `crypto.randomUUID()` is a v4 UUID, which `z.uuid()` accepts. */
@@ -677,7 +709,9 @@ export const memoryRepo: Repo = {
    * Delete a post and, in cascade, its whole thread — **author only**. The comments are removed from
    * the store rather than left as placeholders: a placeholder keeps a branch alive because its
    * replies still exist, and here there is no parent page left to draw them on. Every dropped
-   * comment's vote goes with it, and the post's own vote too.
+   * comment's vote goes with it, and the post's own vote too. **A bookmark to the post survives** as
+   * a dead card (`pages/bookmarks.md` → *A bookmark outlives the item*), so the saved key is not
+   * cleared: the card reads *This post doesn't exist anymore.* and can still be removed.
    */
   async deletePost(id) {
     const index = store.posts.findIndex((row) => row.id === id);
@@ -776,9 +810,14 @@ export const memoryRepo: Repo = {
   },
 
   /**
-   * **Delete** — author only, immediate, with the character's whole comment thread and the votes and
-   * bookmarks on it (`edit.md`: *the character row and its comment thread go in cascade*). The
-   * lorebooks it referenced are untouched: an attachment is a reference, not a copy.
+   * **Delete** — author only, immediate, with the character's whole comment thread and the votes on
+   * it (`edit.md`: *the character row and its comment thread go in cascade*). The lorebooks it
+   * referenced are untouched: an attachment is a reference, not a copy.
+   *
+   * **A bookmark to it survives** (`pages/bookmarks.md` → *A bookmark outlives the item*): the saved
+   * key is deliberately not cleared, so the card stays on `/bookmarks` and reads *This character
+   * doesn't exist.* with a working **Remove bookmark**. Deleting it here would silently lose the one
+   * row the reader can still act on.
    */
   async deleteCharacter(id) {
     const index = store.characters.findIndex((row) => row.id === id);
@@ -794,11 +833,9 @@ export const memoryRepo: Repo = {
         continue;
       }
       votes.delete(voteKey("comment", row.id));
-      bookmarks.delete(voteKey("comment", row.id));
     }
     store.comments = kept;
     votes.delete(voteKey("character", id));
-    bookmarks.delete(voteKey("character", id));
 
     recount(store);
     return true;
@@ -878,7 +915,8 @@ export const memoryRepo: Repo = {
   /**
    * **Delete** — author only, immediate, with the entries and the whole comment thread. It reaches
    * no further: a character's `lorebookIds` keeps the id (the attachment degrades to *unavailable*
-   * on its own page) and a session keeps the copy it started from.
+   * on its own page), a session keeps the copy it started from, and **a bookmark to it survives** as
+   * a dead card (`pages/bookmarks.md`), so the saved key is not cleared here either.
    */
   async deleteLorebook(id) {
     const index = store.lorebooks.findIndex((row) => row.id === id);
@@ -894,11 +932,9 @@ export const memoryRepo: Repo = {
         continue;
       }
       votes.delete(voteKey("comment", row.id));
-      bookmarks.delete(voteKey("comment", row.id));
     }
     store.comments = kept;
     votes.delete(voteKey("lorebook", id));
-    bookmarks.delete(voteKey("lorebook", id));
 
     recount(store);
     return true;
@@ -996,6 +1032,10 @@ export const memoryRepo: Repo = {
     return next;
   },
 
+  /**
+   * **Delete** (`preset/edit.md`) — author only, immediate, with the comment thread and the votes.
+   * A bookmark to it survives as a dead card, exactly as a deleted character's does.
+   */
   async deletePreset(id) {
     const index = store.presets.findIndex((row) => row.id === id);
     if (index < 0) return false;
@@ -1010,11 +1050,9 @@ export const memoryRepo: Repo = {
         continue;
       }
       votes.delete(voteKey("comment", row.id));
-      bookmarks.delete(voteKey("comment", row.id));
     }
     store.comments = kept;
     votes.delete(voteKey("preset", id));
-    bookmarks.delete(voteKey("preset", id));
 
     recount(store);
     return true;
@@ -1165,7 +1203,7 @@ export const memoryRepo: Repo = {
     const rows = store.lorebooks.filter(
       (row) =>
         reachable(row) &&
-        (row.author === VIEWER || bookmarks.has(voteKey("lorebook", row.id))),
+        (row.author === VIEWER || bookmarks.has(savedKey("lorebook", row.id))),
     );
     return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   },
@@ -1496,23 +1534,145 @@ export const memoryRepo: Repo = {
   },
 
   async isBookmarked(kind, id) {
-    return bookmarks.has(voteKey(kind, id));
+    return bookmarks.has(savedKey(kind, id));
   },
 
   async myVote(kind, id) {
     return votes.get(voteKey(kind, id)) ?? null;
   },
 
+  /**
+   * Add or remove a bookmark and return the item's new state. **It refuses a missing row** — a
+   * bookmark on a deleted item is cleared through `removeBookmark`, which works on the key alone.
+   * The engagement count moves with it, because `bookmarks` on the row is the number of people who
+   * saved it and this viewer is one of them.
+   */
   async toggleBookmark(kind, id) {
     const item = sharedRowFor(kind, id);
     if (!item) return null;
 
-    const key = voteKey(kind, id);
+    const key = savedKey(kind, id);
     const saved = !bookmarks.has(key);
-    if (saved) bookmarks.add(key);
+    if (saved) bookmarks.set(key, nowIso());
     else bookmarks.delete(key);
     item.bookmarks = Math.max(0, item.bookmarks + (saved ? 1 : -1));
     return { bookmarked: saved };
+  },
+
+  /**
+   * Clear a saved row **by its key**, whether or not the item still exists — the control on a dead
+   * card (`pages/bookmarks.md`: *It links nowhere and **Remove bookmark** clears it*). `toggleBookmark`
+   * cannot do this job: it looks the item up first and answers `null` for a row that is gone, which
+   * would leave a dead bookmark impossible to remove.
+   */
+  async removeBookmark(kind, id) {
+    const key = savedKey(kind, id);
+    if (!bookmarks.has(key)) return false;
+
+    bookmarks.delete(key);
+
+    // The item may be gone; when it is not, its count drops by the one viewer who just left.
+    const item = sharedRowFor(kind, id);
+    if (item) item.bookmarks = Math.max(0, item.bookmarks - 1);
+    return true;
+  },
+
+  /**
+   * One tab of `/bookmarks` (`pages/bookmarks.md` → *Actions*): the viewer's saved rows of one kind,
+   * each with **the item when it still resolves** and `null` when it is gone.
+   *
+   * - **Search reuses the type's own matcher.** A saved character is matched on name, tagline and
+   *   description exactly as `/character/catalog` matches it; a saved post on its body, like the
+   *   thread. A fourth matcher invented here would drift from the catalog it mirrors.
+   * - **Visibility is the catalogue's rule**: a row that is not public (removed by moderation) is a
+   *   dead card, not a hidden one — the bookmark outlives it.
+   * - **Order is the save clock** (`newest` = newest saved first, the spec's default), `oldest` its
+   *   reverse, `name` the title A–Z with a dead card sorted last (it has no title to sort by).
+   */
+  async listBookmarks(kind, options) {
+    type Saved = { row: BookmarkRow; name: string };
+
+    const rows: Saved[] = [];
+
+    for (const [key, savedAt] of bookmarks) {
+      const colon = key.indexOf(":");
+      if (colon < 0 || key.slice(0, colon) !== kind) continue;
+
+      const id = key.slice(colon + 1);
+      const found = sharedRowFor(kind, id);
+      // A bookmarked row that moderation made private is gone from this listing, as it is from a
+      // catalog: the bookmark keeps its card, and the card says the item does not exist.
+      const item = found && (!("isPublic" in found) || listed(found)) ? found : null;
+
+      const parsed = bookmarkRowSchema.safeParse({ kind, id, savedAt, item });
+      // A key that cannot be shaped is dropped rather than drawn half: the id is not a uuid, which
+      // means the key is not one this adapter wrote.
+      if (!parsed.success) continue;
+
+      const row = parsed.data;
+      const live = row.item;
+      const name = live ? ("body" in live ? live.body : live.name) : "\uffff";
+      const haystack: (string | undefined)[] = live
+        ? "body" in live
+          ? [live.body]
+          : [live.name, live.tagline, "description" in live ? live.description : undefined]
+        : [];
+
+      if (!matches(haystack, options?.query)) continue;
+      rows.push({ row, name });
+    }
+
+    const sorted = rows.sort((a, b) => {
+      switch (options?.sort) {
+        case "oldest":
+          return a.row.savedAt.localeCompare(b.row.savedAt);
+        case "name":
+          return a.name.localeCompare(b.name);
+        default:
+          return b.row.savedAt.localeCompare(a.row.savedAt);
+      }
+    });
+
+    return pageOf(
+      sorted.map((entry) => entry.row),
+      options,
+    );
+  },
+
+  /**
+   * The four tab counts. They count **saved rows**, not visible ones: with Show off a tab can read
+   * `3` and draw `1`, which the spec allows and a page must not "fix" (`pages/bookmarks.md` →
+   * *Layout*).
+   */
+  async bookmarkCounts() {
+    const counts: BookmarkCounts = { character: 0, lorebook: 0, preset: 0, post: 0 };
+
+    for (const key of bookmarks.keys()) {
+      const parsed = bookmarkKindSchema.safeParse(key.slice(0, key.indexOf(":")));
+      if (parsed.success) counts[parsed.data] += 1;
+    }
+
+    // Parsed on the way out, like every other answer this adapter gives a page.
+    return bookmarkCountsSchema.parse(counts);
+  },
+
+  /**
+   * The kind holding the **most recently saved** item — what `/bookmarks` opens on (*The page opens
+   * on the type holding the most recently saved item*), or `null` when nothing is saved at all and
+   * the page falls back to the spec's list order (Characters).
+   */
+  async latestBookmarkKind() {
+    let latest: { kind: BookmarkKind; savedAt: string } | null = null;
+
+    for (const [key, savedAt] of bookmarks) {
+      const parsed = bookmarkKindSchema.safeParse(key.slice(0, key.indexOf(":")));
+      if (!parsed.success) continue;
+      if (latest === null || savedAt.localeCompare(latest.savedAt) > 0) {
+        latest = { kind: parsed.data, savedAt };
+      }
+    }
+
+    return latest?.kind ?? null;
   },
 
   async findSessionForCharacter(characterId, owner) {

@@ -142,7 +142,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 - [x] **T-19 `/preset/*` (catalog, create, detail, edit).** Generation settings form.
 - [x] **T-20 `/persona` collection + create/edit/detail.** Default persona rules, delete moves the
       mark, never shared/flagged. Accept: deleting the default reassigns in one step.
-- [ ] **T-21 `/bookmarks`.** One catalog per type, dead cards for removed items, tabs in query.
+- [x] **T-21 `/bookmarks`.** One catalog per type, dead cards for removed items, tabs in query.
 - [ ] **T-22 `/notifications`.** Aggregated rows (same kind + same target fold), read state.
 - [ ] **T-23 `/user/[username]` + `/user/edit`.** Profile tabs (creations, posts, follows,
       followers), account settings incl. NSFW prefs, no email/provider/delete controls.

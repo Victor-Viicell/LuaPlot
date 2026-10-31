@@ -924,6 +924,53 @@ is what is left.
   write (`repo.createSession(characterId, personaId)`). There is no preset step — the preset travels
   with the character — and the persona is never attached to an arbitrary character.
 
+## Bookmarks (decided in T-21, do not re-invent)
+
+`/bookmarks` is the first page that has to draw a card for an item that **no longer exists**. It is
+also the first listing whose counts are not the rows it draws, and the first whose remove control
+lives **on the card**. The four page decisions below are that.
+
+- **Four tabs in `Tabs`, with counts.** The strip is the existing `components/Tabs.tsrx`, extended
+  with an optional `counts` prop read live: a removed row has to move its tab's number without
+  remounting the strip. The label stays first and the number is a 11px muted `span` after it (accent
+  when the tab is selected, tabular figures), because a count is data beside a name, not a badge
+  competing with it. At 360 the four pills simply scroll — the strip already does, and shrinking the
+  labels to fit would break the spec's own tab names.
+- **The count is saved rows, never visible rows.** With Show off a tab can read `3` and draw `1`;
+  the number comes from `repo.bookmarkCounts()` and the grid from `repo.listBookmarks`, and the two
+  are never reconciled. A tab whose saved rows are all hidden gets its own one-line state
+  (*Everything saved here is hidden by your NSFW preference.*) rather than the lie *Nothing saved
+  here yet.*
+- **Remove bookmark is a page-owned wrapper, not a `Card` prop.** `Card`'s footer is author + ratio
+  and the control belongs to the saved view on every card of every tab; a prop would have to be
+  threaded through four drawings (three `Card` hosts plus `PostCard`) to say the same thing. The
+  cell is `<div class="saved-card">` — a `flex: 1` column holding the card and a `ghost` button —
+  so the card still fills the grid cell (`.saved-card > .card { flex: 1 }`). It lives in
+  `src/styles.css`, not in the page's scoped block, because a scoped rule cannot reach a component's
+  root (T-19). **The control sits outside the blurred veil** (a sibling layer, under it in document
+  order), so on a covered card it stays crisp exactly as `Reveal` does. No success toast: the card
+  leaving the grid is the feedback, and bookmarks are silent by spec.
+- **A dead card keeps the card box and loses the link.** `kind + id` survive with `item: null`
+  (`bookmarkRowSchema`), so the cell still knows its type: the title slot reads the type's own
+  not-exist sentence (*This character doesn't exist.*, *This post doesn't exist anymore.*), one muted
+  line says why, there is **no link and no Reveal** (nothing is left to cover), and **Remove
+  bookmark** is still there. It is drawn with a dashed border and no fill, so a gone row cannot be
+  mistaken for a live one at a glance.
+- **The filter is a note, not a disabled control.** The tag taxonomy is undecided for every
+  catalog (`ARCHITECTURE.md` → open decisions 3), and `Select` has no disabled state to borrow: the
+  control row carries *Filter: All — the tag taxonomy is still undecided.* beside the tab's saved
+  count. No fake control that does nothing.
+- **The page opens on `latestBookmarkKind()`**, the kind holding the most recently saved item, and on
+  **Characters** when nothing is saved at all (the spec's list order). The resolved tab is written to
+  the URL immediately, so the address bar always names the tab being drawn.
+- **URL**: `?type=` is always written (the tab is the view); `q` and `sort` only when they differ
+  from their defaults. `sort` is `recent` (the adapter's `newest`) / `oldest` / `name`, labelled
+  *Newest saved* / *Oldest saved* / *Title A–Z*; `name` sorts a dead card last, because it has no
+  title to sort by. The NSFW pair is never in the URL — it is the account's.
+- **Paging**: 24 at a time with an explicit **Load more**; this is a real catalog per tab. Removing
+  the last visible row of a page pulls the next one instead of showing *Nothing saved here yet.*
+  while more rows wait behind it.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

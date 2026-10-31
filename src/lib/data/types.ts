@@ -20,6 +20,9 @@ import type {
   accountPreferencesSchema,
   authoredItemSchema,
   avatarSchema,
+  bookmarkCountsSchema,
+  bookmarkKindSchema,
+  bookmarkRowSchema,
   characterSchema,
   characterWriteSchema,
   chatReplySchema,
@@ -119,6 +122,16 @@ export type CutMessage = z.infer<typeof cutMessageSchema>;
 export type PostAttachment = z.infer<typeof postAttachmentSchema>;
 export type Post = z.infer<typeof postSchema>;
 export type PostWrite = z.infer<typeof postWriteSchema>;
+
+/** The four `/bookmarks` tabs. A persona and a comment are deliberately not one. */
+export type BookmarkKind = z.infer<typeof bookmarkKindSchema>;
+/**
+ * One saved row, discriminated by `kind`; `item` is `null` when the item is gone and the card draws
+ * the type's not-exist sentence instead (`pages/bookmarks.md` → *A bookmark outlives the item*).
+ */
+export type BookmarkRow = z.infer<typeof bookmarkRowSchema>;
+/** Per-tab saved-row counts — saved rows, not visible rows. */
+export type BookmarkCounts = z.infer<typeof bookmarkCountsSchema>;
 export type Comment = z.infer<typeof commentSchema>;
 export type CommentStatus = Comment["status"];
 

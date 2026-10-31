@@ -510,6 +510,60 @@ export const postWriteSchema = z.strictObject({
   attachment: postAttachmentSchema.nullable(),
 });
 
+/* ------------------------------------------------------------------------------------------------
+ * Bookmarks — one saved row per tab (`/bookmarks`)
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * The four tabs a bookmark can live under. A persona is personal and is never saved, and a comment
+ * is reachable from its parent, so neither is a bookmark kind (`pages/bookmarks.md` → *Purpose*).
+ */
+export const bookmarkKindSchema = z.enum(["character", "lorebook", "preset", "post"]);
+
+/**
+ * One row on `/bookmarks` (`pages/bookmarks.md` → *Data*) — **one shape per tab**, discriminated by
+ * `kind`, so `item` can never be a post under the characters tab. `savedAt` is the save clock the
+ * two save-order sorts read (*newest saved first is the default*); `id` carries identity, exactly as
+ * it does everywhere else (*names never do*).
+ *
+ * **`item` is nullable** because *a bookmark outlives the item*: a row whose item was deleted by its
+ * author or removed by moderation keeps its kind and its title slot reads the type's not-exist
+ * sentence. `null` is that state, never an error — the page still draws the card, still clears it.
+ */
+const savedRow = <const K extends z.infer<typeof bookmarkKindSchema>, S extends z.ZodType>(
+  kind: K,
+  item: S,
+) => z.strictObject({ kind: z.literal(kind), id: z.uuid(), savedAt: isoSchema, item: item.nullable() });
+
+export const bookmarkRowSchema = z.discriminatedUnion("kind", [
+  savedRow("character", characterSchema),
+  savedRow("lorebook", lorebookSchema),
+  savedRow("preset", presetSchema),
+  savedRow("post", postSchema),
+]);
+
+/**
+ * The four tab counts, answered by the adapter. They are **saved rows**, not visible rows: with Show
+ * off a tab reads 3 and draws 1, which is correct (`docs/NEXT.md` T-21 → *Traps*).
+ */
+export const bookmarkCountsSchema = z.strictObject({
+  character: z.number().int().nonnegative(),
+  lorebook: z.number().int().nonnegative(),
+  preset: z.number().int().nonnegative(),
+  post: z.number().int().nonnegative(),
+});
+
+/**
+ * What the adapter seeds a saved row from — the key half of a bookmark with no item attached. It is
+ * parsed on load like every other fixture, so a seeded key and a saved key are the same shape; a
+ * fixture whose `id` matches no row is the *deleted item* case, not a broken fixture.
+ */
+export const bookmarkSeedSchema = z.strictObject({
+  kind: bookmarkKindSchema,
+  id: z.uuid(),
+  savedAt: isoSchema,
+});
+
 export const commentStatusSchema = z.enum(["visible", "deleted", "removed"]);
 
 /** The composer's one rule, so the inline error and the adapter cannot disagree. */

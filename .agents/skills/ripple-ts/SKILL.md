@@ -308,6 +308,12 @@ fallback. Direct `continue`, `break`, and `return` statements are not allowed in
 `@switch` cases use `@case` and `@default` clauses with isolated `{...}` blocks.
 They do not fall through, and do not use `break` or `return`.
 
+`@for` **requires `const`** on its binding: `@for (const row of rows; key row.id)`. Writing
+`@for (row of rows; ...)` does not fail with a syntax error — `tsrx-tsc` crashes with
+`Cannot read properties of undefined (reading '0')`, then falls back to plain TypeScript and reports
+a dozen bogus `'{' or ';' expected` errors on the nearest `@{` component (T-21). If the compiler
+prints that crash, check every `@for` binding first.
+
 ```tsrx
 export function UserList({ users }: { users: User[] }) @{
 	const visibleUsers = users.filter((user) => !user.hidden);

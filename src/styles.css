@@ -734,6 +734,50 @@ a.card-author:hover {
     font-variant-numeric: tabular-nums;
 }
 
+/* Bookmark cell (T-21) — a catalogue card plus the one control `pages/bookmarks.md` puts **on the
+   card**: Remove bookmark, *so unbookmarking never requires opening the item*. It is a wrapper, not
+   a `Card` prop, because the card's footer is author + ratio and the spec's remove control is not a
+   footer slot: it belongs to the saved view, on every card of every tab, and a prop would have to be
+   threaded through four drawings. Global rather than page-scoped so the rule can reach the card's
+   own root, which a scoped block cannot (T-19).
+   The control sits **outside** the blurred veil and under it in document order, so on a covered card
+   it stays crisp and reachable exactly as Reveal does — the veil is a sibling, never its parent. */
+.saved-card {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    gap: 8px;
+}
+
+.saved-card > .card {
+    flex: 1;
+    min-width: 0;
+}
+
+.saved-card-remove {
+    align-self: flex-start;
+}
+
+/* A saved row whose item is gone is still a card — same box, same radius — with the type's
+   not-exist sentence in the title slot and nothing to open. It is deliberately **not** covered by
+   the blur: there is no content left to hide, so a Reveal button over it would be a lie. */
+.card.is-missing {
+    border-style: dashed;
+    background-color: transparent;
+}
+
+.card.is-missing .card-title {
+    color: var(--color-text-muted);
+}
+
+.card-missing-note {
+    margin: 0;
+    color: var(--color-text-subtle);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
 /* Persona card (T-20) — the personal collection's card. It is deliberately **not** `.card`: a
    persona has one possible owner and no engagement, so the catalogue card's footer (author + ratio)
    is exactly what it must never draw. It keeps the same box so a persona grid and a catalogue grid
@@ -1591,6 +1635,19 @@ a.post-time:hover {
     height: 2px;
     background-color: var(--color-accent);
     content: "";
+}
+
+/* The tab's saved count. Tabular figures so two tabs' numbers keep the same width, and muted so the
+   label still reads first — the count is data beside a name, not a badge competing with it. */
+.tab-count {
+    margin-left: 6px;
+    color: var(--color-text-subtle);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.tab-pill[aria-selected="true"] .tab-count {
+    color: var(--color-accent);
 }
 
 /* Empty state — one line of copy plus the primary action. */

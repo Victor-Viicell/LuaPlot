@@ -14,6 +14,9 @@
  */
 import type {
   AccountPreferences,
+  BookmarkCounts,
+  BookmarkKind,
+  BookmarkRow,
   Character,
   CharacterWrite,
   Comment,
@@ -459,6 +462,37 @@ export type Repo = {
 
   /** Adds or removes the viewer's bookmark and returns the item's new state. */
   toggleBookmark(kind: ItemKind | "post", id: string): Promise<{ bookmarked: boolean } | null>;
+
+  /**
+   * Clear a bookmark **by its key**, whether or not the item still exists (`/bookmarks` →
+   * *Remove bookmark*). `toggleBookmark` refuses a missing row — it looks the item up first — so a
+   * dead card needs this method to be removable at all, which is the one thing the page exists to
+   * guarantee. `false` when the row was not saved.
+   */
+  removeBookmark(kind: BookmarkKind, id: string): Promise<boolean>;
+
+  /**
+   * One `/bookmarks` tab (`pages/bookmarks.md` → *Data*): the viewer's saved rows of one kind, each
+   * carrying **the item when it still resolves and `null` when it is gone** (*a bookmark outlives
+   * the item*). `query` reuses the type's own matcher — a saved character is matched the way the
+   * character catalog matches it, a saved post on its body — and `sort` is the save order:
+   * `newest` (newest saved first, the spec's default), `oldest`, or `name` (title A–Z).
+   */
+  listBookmarks(kind: BookmarkKind, options?: ListOptions): Promise<Listing<BookmarkRow>>;
+
+  /**
+   * The four tab counts — **saved rows, not visible rows** (`pages/bookmarks.md` → *Layout*). With
+   * Show off a tab can read `3` and draw `1`; that is correct, so a page must never derive the
+   * count from the slice it happens to hold.
+   */
+  bookmarkCounts(): Promise<BookmarkCounts>;
+
+  /**
+   * The kind holding the most recently saved item, or `null` when nothing is saved — the page opens
+   * on that tab (*The page opens on the type holding the most recently saved item*) and falls back
+   * to Characters when nothing is saved at all.
+   */
+  latestBookmarkKind(): Promise<BookmarkKind | null>;
 
   /**
    * The character page's **Start a session** / **Continue**: one session per character per user,

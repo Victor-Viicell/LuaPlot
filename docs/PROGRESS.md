@@ -3,6 +3,44 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-21 — `/bookmarks`, four tabs over saved rows and the card that outlives its item (2026-10-31)
+
+- **Changed:** `schema.ts` gained `bookmarkKindSchema`, **`bookmarkRowSchema`** (a discriminated
+  union of four `{ kind, id, savedAt, item }` rows — `item` is the type's entity or `null`, so the
+  item can never disagree with its tab), `bookmarkCountsSchema` and `bookmarkSeedSchema`; `types.ts`
+  derives `BookmarkKind` / `BookmarkRow` / `BookmarkCounts` from them. `repo` gained
+  `listBookmarks(kind, { query, sort, page })`, **`removeBookmark(kind, id)`** (key-only, because
+  `toggleBookmark` refuses a missing row), `bookmarkCounts()` and `latestBookmarkKind()`. The memory
+  adapter's `bookmarks` is now a **`Map<key, savedAt>`** keyed `kind:id` (no viewer suffix) seeded
+  from the new `fixtures/bookmarks.ts` — **eight saved rows including one key with no item behind it**
+  (a saved-then-deleted character), so the preview draws a dead card with no manual delete; the four
+  `delete*` methods **stop clearing bookmark keys** (votes still go), and `listBookmarks` reuses each
+  type's own matcher, drops rows moderation made private to `item: null`, and sorts on the save clock.
+  `components/Tabs.tsrx` gained an optional live `counts` prop (a 11px muted `span`, accent when
+  selected) — no second strip was invented. New `pages/bookmarks.tsrx` replaces the placeholder:
+  four tabs with adapter counts, the tab resolved from the most recently saved row (Characters when
+  nothing is saved), search + sort (Newest saved / Oldest saved / Title A–Z) + the reserved
+  `Filter: All` note + the saved count, `Card`/`PostCard` per type with saved-post attachments resolved
+  through `getCharacter`, a **page-owned `.saved-card` wrapper** carrying **Remove bookmark** on every
+  card, the **dead card** (type's not-exist sentence in the title slot, no link, no Reveal, dashed
+  border, still removable), 24-row **Load more**, and all six states. `src/styles.css` carries
+  `.tab-count`, `.saved-card*` and `.card.is-missing`; `docs/DESIGN.md` → *Bookmarks (T-21)* records
+  the six decisions.
+- **Verified:** `scripts/check.sh` → **GREEN** (build, 30 routes, schema: 8 seeded bookmark keys parse
+  through `bookmarkSeedSchema`, every fixture collection still parses). `scripts/publish.sh` →
+  `gh-pages` `f0ed2b0`, **live 200** at the URL. The **live** build in Chromium: `/bookmarks` opened on
+  **Characters** (the tab holding the newest saved row), counts `3 / 2 / 1 / 2`, the first card the
+  dead one reading *This character doesn't exist.*, two live cards under it; **clicking Remove
+  bookmark on the dead card** dropped the grid to 2 cards, the control row to `2 saved` and the
+  Characters tab to `2` while the other three counts stayed put, and a live character took its place.
+  `?type=post` drew both saved posts with the character attachment resolved (*Aurelia of the Tides*)
+  and their like/dislike/comment footers; `?type=preset` drew the `Card` with title and ratio.
+- **Not verified:** nothing was measured at 640/900/1200 in a browser this tick — the toolbar's
+  `sm`/`md` placements follow the catalog's proven grid, but the `md` three-column line has not been
+  seen at 900. Removal, tab switching and paging were exercised on the live build at 360 only; a
+  dead card on the **Posts** tab has no fixture (the dead fixture row is a character), so that
+  sentence is drawn by the same code path but was not seen end-to-end.
+
 ## T-20 — `/persona`, the fourth collection, and the default mark that is the adapter's (2026-10-31)
 
 - **Changed:** `personaWriteSchema` (+ `PERSONA_NAME_REQUIRED`) beside `personaSchema` — name,
