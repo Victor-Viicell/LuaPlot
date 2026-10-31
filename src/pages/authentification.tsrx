@@ -1,7 +1,10 @@
 import { track } from "ripple";
 import { Button } from "../components/Button.tsrx";
+import { Toggle } from "../components/Toggle.tsrx";
 import { href } from "../router.ts";
 import { PROVIDERS, PROVIDER_NAMES, signInWithProvider, type Provider } from "../lib/auth.ts";
+import { requestShowNsfw, showRequested } from "../lib/state/prefs.ts";
+import { currentUser, onSession } from "../lib/state/session.ts";
 
 /**
  * `/authentification` — the single auth screen (`src/specs/pages/authentification.md`).
@@ -35,6 +38,25 @@ type AuthStatus =
 
 export function Authentification() @{
   const status = track<AuthStatus>({ kind: "idle" });
+
+  /**
+   * The signed-out NSFW control (`systems/nsfw.md` → Rules, States): **one** action, never the pair,
+   * because there is no account here to hold Blur. It writes no preference — `lib/state/prefs.ts`
+   * holds the answer as one pending intent and applies it to the account that signs in, so the
+   * action is real without pretending the visitor has a setting yet. Signed in, the page draws no
+   * NSFW control at all: the pair belongs to account settings, not to the sign-in screen.
+   */
+  const signedIn = track(currentUser() !== null);
+  const wanted = track(showRequested());
+  onSession((next) => {
+    signedIn.value = next !== null;
+    wanted.value = showRequested();
+  });
+
+  function toggleNsfw(next: boolean): void {
+    requestShowNsfw(next);
+    wanted.value = showRequested();
+  }
 
   /** One attempt at a time: while the provider is being contacted, all three buttons are disabled. */
   const busy = track(() => status.value.kind === "redirecting");
@@ -199,6 +221,26 @@ export function Authentification() @{
         color: var(--color-danger);
       }
 
+      /* The signed-out single control: one action, in the pair's own position, under its own
+         12px caption. No border box — a settings row is not a panel (DESIGN: the toggle row is the
+         control's whole frame). */
+      .nsfw {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid var(--color-border);
+      }
+
+      .nsfw-label {
+        margin: 0;
+        color: var(--color-text-subtle);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        line-height: 1.4;
+        text-transform: uppercase;
+      }
+
       .tail {
         display: flex;
         flex-direction: column;
@@ -281,6 +323,7 @@ export function Authentification() @{
         /* A 420 measure for the controls, not three buttons stretched across 640: the paragraph above
            already holds 44ch, so the two left edges agree and the rule still spans the column. */
         .providers,
+        .nsfw,
         .status {
           max-width: 420px;
         }
@@ -348,6 +391,18 @@ export function Authentification() @{
             <Button variant="ghost" label={retryLabel.value} onClick={retry}>Try again</Button>
           }
         </div>
+
+        @if (!signedIn.value) {
+          <div class="nsfw">
+            <p class="nsfw-label">nsfw content</p>
+            <Toggle
+              label="Show NSFW content"
+              hint="Applies to the account you sign in with."
+              pressed={wanted}
+              onToggle={toggleNsfw}
+            />
+          </div>
+        }
 
         <div class="tail">
           <p class="note">Preview — no provider is contacted.</p>

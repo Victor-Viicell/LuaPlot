@@ -3,15 +3,14 @@ import { Button } from "../components/Button.tsrx";
 import { CardGrid } from "../components/CardGrid.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Field } from "../components/Field.tsrx";
+import { NsfwControl } from "../components/NsfwControl.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
 import { TagPicker } from "../components/TagPicker.tsrx";
-import { Toggle } from "../components/Toggle.tsrx";
 import { href, navigate, useQuery } from "../router.ts";
 import { PAGE_SIZE, resolveRepo } from "../lib/data/repo.ts";
 import type { Lorebook } from "../lib/data/types.ts";
-import { currentUser } from "../lib/state/session.ts";
-import { nsfwPreference, onPrefs, setBlurNsfw, setShowNsfw } from "../lib/state/prefs.ts";
+import { nsfwPreference, onPrefs } from "../lib/state/prefs.ts";
 
 /**
  * `/lorebook/catalog` — the grid's second host (`src/specs/pages/lorebook/catalog.md`, which says
@@ -101,6 +100,11 @@ export function LorebookCatalog() @{
   /** Mirrors of the account's pair, so a toggle re-renders the grid without a refetch. */
   const show = track(nsfwPreference().show);
   const blur = track(nsfwPreference().blur);
+  /**
+   * Which fetch this is. It rides in the grid's row keys, so a refetch remounts the cards and every
+   * reveal is forgotten (`nsfw.md` → *A reveal lasts one view*); **Load more** leaves it alone.
+   */
+  const epoch = track(0);
   onPrefs((next) => {
     show.value = next.show;
     blur.value = next.blur;
@@ -127,6 +131,7 @@ export function LorebookCatalog() @{
       items.value = [];
       hasMore.value = false;
       nextPage.value = 1;
+      epoch.value += 1;
     } else {
       appending.value = true;
     }
@@ -219,23 +224,6 @@ export function LorebookCatalog() @{
     tags.value = next;
     writeQuery(applied.value, sort.value, next, "push");
     fetchPage(1, "replace");
-  }
-
-  /** The preference belongs to the account. Signed out there is nowhere to put it (`nsfw.md`). */
-  function toggleShow(next: boolean): void {
-    if (!currentUser()) {
-      navigate("/authentification");
-      return;
-    }
-    setShowNsfw(next);
-  }
-
-  function toggleBlur(next: boolean): void {
-    if (!currentUser()) {
-      navigate("/authentification");
-      return;
-    }
-    setBlurNsfw(next);
   }
 
   function loadMore(): void {
@@ -482,18 +470,7 @@ export function LorebookCatalog() @{
         </div>
 
         <div class="prefs">
-          <Toggle
-            label="Show NSFW content"
-            hint="Keeps flagged lorebooks in the list."
-            pressed={show}
-            onToggle={toggleShow}
-          />
-          <Toggle
-            label="Blur NSFW content"
-            hint="Keeps them listed but covered."
-            pressed={blur}
-            onToggle={toggleBlur}
-          />
+          <NsfwControl noun="lorebooks" />
         </div>
       </div>
 
@@ -528,7 +505,13 @@ export function LorebookCatalog() @{
         />
       } @else {
         <>
-          <CardGrid items={visible} blurNsfw={blur} label="Lorebooks" onOpen={openItem} />
+          <CardGrid
+            items={visible}
+            blurNsfw={blur}
+            revealEpoch={epoch}
+            label="Lorebooks"
+            onOpen={openItem}
+          />
 
           <div class="pager">
             @if (appendFailure.value) {

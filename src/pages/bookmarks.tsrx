@@ -85,8 +85,8 @@ type Cell = { key: string; kind: BookmarkKind; id: string } & (
   | { mode: "gone"; title: string }
 );
 
-function cellOf(row: BookmarkRow): Cell {
-  const base = { key: `${row.kind}:${row.id}`, kind: row.kind, id: row.id };
+function cellOf(row: BookmarkRow, epoch = 0): Cell {
+  const base = { key: `${row.kind}:${row.id}#${epoch}`, kind: row.kind, id: row.id };
 
   if (row.kind === "post") {
     return row.item
@@ -165,7 +165,11 @@ export function Bookmarks() @{
   /** Attachment characters for saved posts, resolved once per distinct id (the thread's rule). */
   const people = track<Record<string, Character>>({});
 
-  const cells = track(() => items.value.map(cellOf));
+  /** Which fetch this is, in every cell's key: a tab, query, sort or Retry remounts the cards, so a
+      reveal dies with the fetch that produced it (`nsfw.md` → *A reveal lasts one view*). **Load
+      more** leaves it alone. */
+  const epoch = track(0);
+  const cells = track(() => items.value.map((row) => cellOf(row, epoch.value)));
   /** Show off removes a flagged row; Blur keeps it and covers it (`Card`/`PostCard` own that). */
   const visible = track(() =>
     show.value ? cells.value : cells.value.filter((cell) => cell.mode === "gone" || !cell.nsfw),
@@ -213,6 +217,7 @@ export function Bookmarks() @{
       items.value = [];
       hasMore.value = false;
       nextPage.value = 1;
+      epoch.value += 1;
     } else {
       appending.value = true;
     }

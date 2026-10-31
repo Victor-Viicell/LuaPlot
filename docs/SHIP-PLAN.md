@@ -153,10 +153,16 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 
 ## P3 — Moderation and JEV
 
-- [ ] **T-25 NSFW preference everywhere.** Every listing surface honours Show/Blur; signed-out
-      state exposes the sign-in control; blur survives navigation per the one-view rule.
-- [ ] **T-26 `/moderation` queue + `/moderation/[id]`.** Weight-ordered, cumulative report list,
-      conclude action (visibility/removal), case history, admin gate.
+- [x] **T-25 NSFW preference everywhere.** `NsfwControl` on the three catalogs and the thread
+      (pair signed in, one sign-in control signed out); the same single action on
+      `/authentification`, held as an intent in `prefs.ts` and applied at sign-in; reveals keyed by
+      a per-fetch epoch so a refetch re-covers them. Detail routes already drew the Show-off veil.
+- [ ] **T-26 `/moderation` queue.** Weight-ordered, cumulative report list, open/concluded filter,
+      counts, admin gate. Row is metadata only — no preview of the reported content.
+- [ ] **T-26B `/moderation/[report.id]`.** The case itself: cumulative reports, conclude with a
+      visibility outcome (remove avatar as part of it), dismiss after the full term checklist, set
+      reason, internal comments, flat history, and the notification the conclusion writes. Needs its
+      own writes (`caseCommentSchema`, conclude, dismiss) — split out of T-26 on purpose.
 - [ ] **T-27 JEV adapter.** `lib/llm/jev.ts` posting `{model,state,questions}` to
       `POST https://openrouter.ai/api/alpha/decisions` with `typesafe/jev-1.14` (docs/JEV.md has the
       exact question set and state shape); `lib/llm/jevPolicy.ts` holding the thresholds and the

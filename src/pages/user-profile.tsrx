@@ -130,6 +130,12 @@ export function UserProfile() @{
   const visibleCreations = track(() =>
     show.value ? creations.value : creations.value.filter((item) => !item.nsfw),
   );
+  /**
+   * Which fetch this is, in the grid's row keys: a tab change, a filter change or a Retry
+   * remounts the cards, so a reveal does not outlive the fetch that produced it
+   * (`nsfw.md` → *A reveal lasts one view*). **Load more** leaves it alone.
+   */
+  const epoch = track(0);
   const own = track(() => myHandle !== "" && myHandle === handle);
   const initials = track(() => row.value?.avatar.initials ?? handle.slice(0, 2).toUpperCase());
 
@@ -189,6 +195,7 @@ export function UserProfile() @{
       creations.value = [];
       posts.value = [];
       people.value = [];
+      epoch.value += 1;
     }
     return ++seq;
   }
@@ -686,7 +693,7 @@ export function UserProfile() @{
         } @else if (sectionEmpty.value) {
           <EmptyState message={sectionEmptyCopy.value} />
         } @else if (tab.value === "creations") {
-          <CardGrid items={visibleCreations} blurNsfw={blur} label="Creations" />
+          <CardGrid items={visibleCreations} blurNsfw={blur} revealEpoch={epoch} label="Creations" />
         } @else if (tab.value === "posts") {
           <ul class="feed" aria-label="Posts">
             @for (const post of posts.value; key post.id) {

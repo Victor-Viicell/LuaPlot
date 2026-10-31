@@ -3,6 +3,33 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-25 — the NSFW preference on every listing, in both signed states (2026-10-31)
+
+- **Changed:** new `components/NsfwControl.tsrx` — the Show/Blur pair signed in, one `Show NSFW
+  content` control leading to `/authentification` signed out — now used by the three catalogs and
+  `/post/thread`; those pages lost their `Toggle` pair, their two handlers and their signed-out
+  navigate branch. `lib/state/prefs.ts` gained the signed-out **intent** (`requestShowNsfw`,
+  `showRequested`, applied after the sign-in re-read, dropped on sign-out), and
+  `/authentification` draws that one action under a 12px `nsfw content` caption. A reveal now dies
+  with its fetch: `CardGrid` takes `revealEpoch`, `/post/thread` keys its feed by
+  `id#epoch`, `/bookmarks`' `cellOf` and the profile grid do the same, and every `replace` fetch
+  bumps the counter (an `append` does not). `docs/DESIGN.md` → *NSFW preference everywhere*.
+- **Verified:** `scripts/check.sh` GREEN (build, 30 routes, schema check). Against the live build at
+  360×740 (`scrollWidth 360` on `/authentification`, `/character/catalog`, `/post/thread`): signed in
+  both catalogs draw the pair with their own noun in the hint; Show on + Blur on → 24 cards, 4
+  `.is-covered`, each veil `filter: blur(6px)` and each `.card-foot` `filter: none` (*the numbers are
+  never hidden*); Reveal takes that one card to covered 3; a sort change and back re-covers it
+  (4 again). Signed out (preview switch): catalogs/thread draw one `.btn` and zero `.toggle`, feed
+  down to 11 posts, control lands on `/authentification`, whose `.nsfw` row reads
+  `Show NSFW content · Applies to the account you sign in with.`; pressing it sets
+  `aria-pressed="true"`, signing in removes the row, and the shell's dev line then reads
+  `nsfw · listed, uncovered` — the intent reached the account.
+- **Unverified:** the auth page's intent path is only exercised through the preview's memory
+  adapter and its sign-in switch (a real provider redirect is T-30). The profile posts feed still
+  keys on `post.id`, so a revealed post there survives a tab switch — filed below. No automated
+  browser test exists; the pass above was driven by script against the live URL.
+
+
 ## T-24 — the terms page, its anchors, and the report reason that points at one (2026-10-31)
 
 - **Changed:** `pages/terms.tsrx` is the page, not a placeholder — kicker/title/lede, the three

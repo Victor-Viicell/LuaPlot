@@ -9,8 +9,10 @@
  * - the pair is **per account**, not per device: it lives in the adapter keyed by handle, and the
  *   store re-reads it on every sign-in/sign-out, clearing to off first so one account's Show flag
  *   can never survive into another's;
- * - signed out it answers `{ show: false, blur: false }` and refuses to write — the signed-out
- *   control that leads to `/authentification` is a page concern (T-25);
+ * - signed out it answers `{ show: false, blur: false }` and refuses to write a preference; the
+ *   signed-out visitor's *Show NSFW content* answer is kept as one **pending intent** here
+ *   (`requestShowNsfw`) and applied the moment there is an account to hold it, so
+ *   `/authentification`'s single action is a real action and never a page-local boolean;
  * - the two flags stay **independent**: Show off with Blur on is allowed, and blur simply has
  *   nothing to act on. Coupling them here would be a rule the spec does not have.
  *
@@ -119,10 +121,50 @@ export function setBlurNsfw(blur: boolean): void {
   write({ blur });
 }
 
+/**
+ * The signed-out visitor's *Show NSFW content* answer, held for the account they sign in with.
+ *
+ * `systems/nsfw.md` → Rules: signed out there is one control rather than the pair, and signing in
+ * follows the ordinary outcome. There is no account to write to yet, so the answer waits here —
+ * it is **not** a preference (the store still answers off), it is one intent, it is never written
+ * to the adapter while signed out, and it is dropped by a sign-out so it cannot leak into the next
+ * account. `null` means the visitor has not answered.
+ */
+let pendingShow: boolean | null = null;
+
+/** What the signed-out control should read: the held intent, else the account's Show flag. */
+export function showRequested(): boolean {
+  return pendingShow ?? state.show;
+}
+
+/**
+ * One action from either side of the sign-in: signed in it is the preference's own write, signed
+ * out it records the intent that {@link applyPendingIntent} carries into the new account.
+ */
+export function requestShowNsfw(show: boolean): void {
+  if (currentUser()) {
+    setShowNsfw(show);
+    pendingShow = null;
+    return;
+  }
+  pendingShow = show;
+}
+
+/** Spend the held intent once an account exists. Called on every session change. */
+function applyPendingIntent(): void {
+  const wanted = pendingShow;
+  pendingShow = null;
+  if (wanted === null) return;
+  if (!currentUser()) return;
+  setShowNsfw(wanted);
+}
+
 // Per account means per sign-in: whoever just arrived re-reads their own pair, and a sign-out
-// clears to off (`systems/nsfw.md` → Signed out).
+// clears to off (`systems/nsfw.md` → Signed out). A held intent is spent after that re-read, so
+// the account's own row is what gets the write rather than the pair being overwritten by it.
 onSession(() => {
-  void reloadPreferences();
+  pendingShow = currentUser() ? pendingShow : null;
+  void reloadPreferences().then(applyPendingIntent);
 });
 
 // Seed from whoever the session says is here — signed in at boot, so the fixture owner's pair.

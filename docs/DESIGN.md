@@ -1085,6 +1085,51 @@ notes, no control.
   invent the acceptance record `terms.md` says is not kept. Signed out, the NSFW-preference mention
   is plain text — the settings route needs the viewer's own handle.
 
+## NSFW preference everywhere (decided in T-25)
+
+`systems/nsfw.md` is now the app's whole behaviour, not three listings plus a promise. The surfaces
+had already been built one at a time (T-09 catalog, T-13 thread, T-21 bookmarks, T-23 profile); T-25
+is the audit and the two states the spec named and nothing drew — the signed-out control and the
+reveal's expiry. These are the decisions.
+
+- **One control component, two drawings.** `components/NsfwControl.tsrx` is the pair on every
+  listing that carries one (three catalogs, `/post/thread`), mirroring `lib/state/prefs.ts` itself
+  and writing through `setShowNsfw` / `setBlurNsfw`. The four pages deleted their own `Toggle` pair,
+  their `toggleShow`/`toggleBlur` handlers and their "signed out → navigate" branch; a page keeps a
+  mirror of the pair only because it has to filter its own rows on it. No page owns a private copy of
+  the pair, and the hint's noun (*characters* / *lorebooks* / *presets* / *posts*) is the one thing
+  the page supplies.
+- **Signed out, the single control sits in the pair's own place**, not beside the filter row (open
+  decision): a `secondary` button *Show NSFW content* plus one 12px line (*Sign in to keep flagged
+  characters in listings.*), inside the same `.prefs` wrapper, so the toolbar is the same height and
+  the control is where a signed-in reader expects it. Blur is not drawn at all — there is no account
+  to hold it — and no page attempts a write while signed out.
+- **`/authentification` carries the same single action, and it is an intent, not a preference**
+  (open decision). `prefs.ts` holds it in one `pendingShow` slot (`requestShowNsfw` /
+  `showRequested`), applies it to the account the moment a session exists, and drops it on a
+  sign-out so it can never leak into the next visitor's account. Signed in, the auth page draws no
+  NSFW control: the pair belongs to account settings. The spec's *no return-to-page parameter* is
+  untouched — the intent is about the preference, not about the listing.
+- **A reveal ends with the fetch that produced it.** The reveal still lives in the card
+  (`Card`, `PostCard`), and the listing now hands it a lifetime: `CardGrid` takes `revealEpoch`, the
+  thread's feed, `/bookmarks`' cells and the profile grid put the same counter in their row keys, and
+  every `replace` fetch bumps it — so the keyed `@for` **remounts** instead of reusing a block and a
+  revealed card cannot survive a re-sort, a tab change or a Retry (T-20's trap). An `append`
+  (**Load more**) does not bump: those rows were already on screen and are the same view. Nothing
+  about a reveal reaches `repo.savePreferences`; that is still Blur on.
+- **`Reveal` is the word**, on a covered card, a covered post and a withheld detail body (open
+  decision). It is the one verb the spec uses for the glance, and a per-item label that named the
+  item would be a second string to keep in sync across five drawings.
+- **The Show-off detail route needed nothing new**: `character`/`lorebook`/`preset`/`post` detail
+  already compute `covered = nsfw && !show && !revealed`, draw the chrome and withhold the body
+  behind the same Reveal. Verified while auditing rather than rebuilt.
+- **Audit result, so the next session does not repeat it:** all four catalogs/feed filter on Show,
+  all pass `blurNsfw` to their grid and card, `/bookmarks` counts saved rows regardless of the
+  filter (and says so when a tab is all hidden), `/user/[username]` filters creations *and* applies
+  no exemption to the viewer's own items, and every detail route resolves with Show off. The
+  `profile` posts feed keys rows on `post.id` alone, so a reveal there survives a tab switch — the
+  one remaining gap, filed in `docs/NEXT.md`.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

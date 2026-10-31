@@ -1,15 +1,14 @@
 import { track } from "ripple";
 import { Button } from "../components/Button.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
+import { NsfwControl } from "../components/NsfwControl.tsrx";
 import { PostCard } from "../components/PostCard.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { Toggle } from "../components/Toggle.tsrx";
 import { href, navigate, useQuery } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Character, Post } from "../lib/data/types.ts";
-import { currentUser } from "../lib/state/session.ts";
-import { nsfwPreference, onPrefs, setBlurNsfw, setShowNsfw } from "../lib/state/prefs.ts";
+import { nsfwPreference, onPrefs } from "../lib/state/prefs.ts";
 
 /**
  * `/post/thread` — the public timeline (`src/specs/pages/post/thread.md`).
@@ -80,6 +79,15 @@ export function PostThread() @{
   /** Show off wins over Blur: a flagged post is absent from the feed, not covered. */
   const visible = track(() => (show.value ? items.value : items.value.filter((row) => !row.nsfw)));
 
+  /**
+   * Which fetch this is. It rides in each row's key, so a refetch remounts the cards and every
+   * reveal is forgotten (`nsfw.md` → *A reveal lasts one view*); **Load more** leaves it alone.
+   */
+  const epoch = track(0);
+  const feed = track(() =>
+    visible.value.map((post) => ({ key: `${post.id}#${epoch.value}`, post })),
+  );
+
   let seq = 0;
 
   function fetchPage(page: number, mode: "replace" | "append"): void {
@@ -92,6 +100,7 @@ export function PostThread() @{
       items.value = [];
       hasMore.value = false;
       nextPage.value = 1;
+      epoch.value += 1;
     } else {
       appending.value = true;
     }
@@ -163,23 +172,6 @@ export function PostThread() @{
     sort.value = next;
     writeSort(next, "push");
     fetchPage(1, "replace");
-  }
-
-  /** The preference belongs to the account; signed out there is nowhere to put it (`nsfw.md`). */
-  function toggleShow(next: boolean): void {
-    if (!currentUser()) {
-      navigate("/authentification");
-      return;
-    }
-    setShowNsfw(next);
-  }
-
-  function toggleBlur(next: boolean): void {
-    if (!currentUser()) {
-      navigate("/authentification");
-      return;
-    }
-    setBlurNsfw(next);
   }
 
   function loadMore(): void {
@@ -409,8 +401,7 @@ export function PostThread() @{
         </div>
 
         <div class="prefs">
-          <Toggle label="Show NSFW" pressed={show} onToggle={toggleShow} />
-          <Toggle label="Blur NSFW" pressed={blur} onToggle={toggleBlur} />
+          <NsfwControl noun="posts" />
         </div>
 
         <div class="create">
@@ -442,9 +433,9 @@ export function PostThread() @{
       } @else {
         <>
           <ul class="feed" aria-label="Posts">
-            @for (const post of visible.value; key post.id) {
+            @for (const cell of feed.value; key cell.key) {
               <li>
-                <PostCard post={post} people={people} blur={blur} />
+                <PostCard post={cell.post} people={people} blur={blur} />
               </li>
             }
           </ul>

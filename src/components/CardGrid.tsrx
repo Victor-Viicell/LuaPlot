@@ -1,3 +1,4 @@
+import { track } from "ripple";
 import type { Children, Derived } from "ripple";
 import type { AuthoredItem } from "../lib/data/types.ts";
 import { read } from "../lib/reactive.ts";
@@ -28,6 +29,7 @@ import { Card } from "./Card.tsrx";
 export function CardGrid({
   items,
   blurNsfw = false,
+  revealEpoch = 0,
   onOpen,
   label,
   children,
@@ -35,23 +37,36 @@ export function CardGrid({
   items: Derived<AuthoredItem[]> | AuthoredItem[];
   /** The account's Blur NSFW preference — the card never reads the store. */
   blurNsfw?: Derived<boolean> | boolean;
+  /**
+   * A counter the listing bumps whenever it **fetches again** (`nsfw.md` → *A reveal lasts one
+   * view*). It rides in each row's key, so a refetch remounts the rows and every reveal is
+   * forgotten — a keyed `@for` otherwise reuses the block under the same item id and a revealed
+   * card would survive the fetch that was supposed to cover it (T-20's trap, T-25's fix). An
+   * append (`Load more`) leaves it alone: the rows already on screen are the same view.
+   */
+  revealEpoch?: Derived<number> | number;
   onOpen?: (event: MouseEvent, item: AuthoredItem) => void;
   /** Accessible name for the list, e.g. `Characters`. */
   label?: string;
   /** The listing's empty state, rendered inside the grid when there is nothing to draw. */
   children?: Children;
 }) @{
+  /** Rows carry their own key: the item's identity **and** the fetch it arrived in. */
+  const cells = track(() =>
+    read(items).map((item) => ({ key: `${item.id}#${read(revealEpoch)}`, item })),
+  );
+
   @if (read(items).length === 0) {
     <div class="card-grid-empty">{children}</div>
   } @else {
     <ul class="card-grid" aria-label={label}>
-      @for (const item of read(items); key item.id) {
+      @for (const cell of cells.value; key cell.key) {
         <li class="card-cell">
           <Card
-            {item}
-            nsfw={item.nsfw}
+            item={cell.item}
+            nsfw={cell.item.nsfw}
             blur={blurNsfw}
-            onOpen={onOpen ? (event) => onOpen(event, item) : undefined}
+            onOpen={onOpen ? (event) => onOpen(event, cell.item) : undefined}
           />
         </li>
       }
