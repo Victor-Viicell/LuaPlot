@@ -26,7 +26,7 @@ import {
   normaliseHandle,
   profileWriteSchema,
   reportOutcomeSchema,
-  reportReasonSchema,
+  reportEntrySchema,
   reportSchema,
   reportWriteSchema,
   seedSchemas,
@@ -49,7 +49,7 @@ import {
   type Persona,
   type Post,
   type Preset,
-  type ReportReason,
+  type ReportEntry,
   type User,
   type VoteDirection,
   type VotableKind,
@@ -165,7 +165,7 @@ const bookmarks = new Set<string>();
  * filed, and because the page must read its own record without scanning the case list (a case on
  * already-verified content is deliberately never opened, so a scan would miss it).
  */
-const myReports = new Map<string, ReportReason>();
+const myReports = new Map<string, ReportEntry>();
 
 /**
  * Preferences are per **account**, so this is keyed by handle and not by device — the bug the
@@ -545,9 +545,9 @@ export const memoryRepo: Repo = {
     if (onFile) return reportOutcomeSchema.parse({ state: "already", at: onFile.at });
 
     const at = nowIso();
-    const reason = reportReasonSchema.parse({
-      part: write.part,
-      reason: write.reason,
+    const reason = reportEntrySchema.parse({
+      parts: write.parts,
+      reasons: write.reasons,
       details: write.details,
       source: write.source,
       at,

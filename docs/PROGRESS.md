@@ -3,6 +3,27 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-12 follow-up — one report can cover image + text, and several reasons (2026-10-30)
+
+- **Changed:** the owner reported that the dialog forced one choice at each stop. Both stops are toggles
+  now: *what* takes one or more surfaces the item carries (a character's image **and** text), *why*
+  takes one or more reasons, and the list is the **union** of what the chosen surfaces allow. Dropping a
+  surface drops the reasons that no longer fit it. The stored row follows the same shape —
+  `reportEntrySchema` is `{ parts, reasons, details?, source?, at }` (was one `part` + one `reason`), the
+  write takes `parts`/`reasons` arrays with a `superRefine` that refuses a reason fitting nothing chosen,
+  and the source is required when *any* chosen reason is a copy claim. One report is still **one
+  weight**. The 22 fixture entries, the owner's moderation notice and the dialog's record line moved to
+  the array shape (`reasonFitsPart` is the shared pair rule).
+- **Verified:** build clean. In the app at 390: both surfaces press and stay pressed through Back; the
+  reason list is four (missing-nsfw, illegal, copied text, copied image) with both chosen and three with
+  the text surface dropped; a copy claim reaches the source stop; submitting stores
+  `parts: [avatar, text], reasons: [missing-nsfw, copied-image]` with the source and the note, answers
+  *Report recorded and held* (the fixture is already verified), and reopening draws
+  `Avatar or image + Text · Missing NSFW flag, Copied image · filed 30 Oct · 22:00` with no form.
+- **Not verified:** the owner's moderation notice (`/character/[id]`, `.notice .reason`) still renders
+  nothing in this session — the fixture case belongs to a character this viewer does not own, so the
+  array→text mapping there is compile-checked only. No Tauri/Android build.
+
 ## T-12 — the Report dialog, on `/character/[id]` and on a comment (2026-10-30)
 
 - **Changed:** `src/components/ReportDialog.tsrx` (new): one `Sheet` with a four-stop stepper — *what*

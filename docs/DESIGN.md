@@ -501,22 +501,26 @@ same dialog by mounting it, not by a second flow**; a post's attachment has no p
   (copy claims only) → *details* (optional) → **Submit report**. Each stop is one question; nothing is
   asked twice.
 - **Choices are 44px rows**, a 1px `--color-border` box with a 2px lead, `--color-bg-elevated` behind,
-  and `aria-pressed` carrying the selection — the accent border marks the one in force. Not radio
-  inputs: the row's help line is part of the tap target, and a native radio at 44px inside a bordered row
-  draws two competing targets.
+  and `aria-pressed` carrying the selection — the accent border and a tick in the corner mark every one
+  in force. Not radio inputs, and no longer single-select: **both stops are toggles** (the owner's call
+  after the first build), because an item can be reported for its image *and* its text, for several
+  reasons, in one report. One report, one weight.
 - **The stepper's order is the dialog's; the rules are the schema's.** The submit parses
   `reportWriteSchema` and prints its first issue, so the inline line, the adapter's refusal and the
   stored reason are one string. A missing part or reason sends the reader back to that stop.
 - **The reason list comes from `REPORT_REASONS_BY_PART` in `schema.ts`** — one table, keyed by part, so
-  the window can never offer a code the queue has no rendering for, and the part→reason pairing is
-  validated as well as drawn.
+  the window can never offer a code the queue has no rendering for. The dialog draws the **union** of
+  what the chosen surfaces allow (`reasonFitsPart`, the same helper the write's `superRefine` uses), and
+  deselecting a surface drops the reasons that no longer fit one — so the visible list and the accepted
+  write can never disagree.
 - **Which parts a target offers is `PARTS_BY_KIND`.** Character / lorebook / preset offer *Avatar or
   image* and *Text*; a comment offers *Text* only. **A post offers text only for now**: a copied post
   image is not an avatar, and `reportPartSchema` has no attachment value — T-14 decides that, and adding
   a part to the schema is a spec question, not a dialog one.
 - **`myReport` is read when the dialog opens**, not on submit. *Already reported* then survives a
   remount, and a report on already-verified content — which opens no case at all — is still found. The
-  record draws what was filed: part · reason · filed date, the source line if any, the note if any, and
+  record draws what was filed: the surfaces (`Avatar or image + Text`) · the reasons · the filed date,
+  the source line if any, the note if any, and
   the one sentence *One report per item, and a report cannot be withdrawn.* **No second submit.**
 - **A copy claim gets a source field**, a plain text input holding the item id or an outside link —
   **a field, not a picker**, because the adapter only needs the string and a picker would turn a report

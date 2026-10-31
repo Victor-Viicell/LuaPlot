@@ -42,7 +42,7 @@ import type {
   reportOutcomeSchema,
   reportPartSchema,
   reportReasonCodeSchema,
-  reportReasonSchema,
+  reportEntrySchema,
   reportSchema,
   reportStatusSchema,
   reportTargetSchema,
@@ -101,7 +101,7 @@ export type NotificationTarget = z.infer<typeof notificationTargetSchema>;
 export type Notification = z.infer<typeof notificationSchema>;
 export type ReportPart = z.infer<typeof reportPartSchema>;
 export type ReportReasonCode = z.infer<typeof reportReasonCodeSchema>;
-export type ReportReason = z.infer<typeof reportReasonSchema>;
+export type ReportEntry = z.infer<typeof reportEntrySchema>;
 /** What a report is filed against — `kind`, `id`, and the label a moderator reads. */
 export type ReportTarget = z.infer<typeof reportTargetSchema>;
 /**

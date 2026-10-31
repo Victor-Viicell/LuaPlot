@@ -27,7 +27,7 @@ import type {
   Preset,
   Report,
   ReportOutcome,
-  ReportReason,
+  ReportEntry,
   ReportStatus,
   ReportTarget,
   ReportWrite,
@@ -147,7 +147,7 @@ export type Repo = {
    * source, time) and never the case, for the same reason `addReport` answers an outcome: the
    * reporter is not shown the verdict, the queue position or who acted.
    */
-  myReport(kind: ReportTarget["kind"], id: string): Promise<ReportReason | null>;
+  myReport(kind: ReportTarget["kind"], id: string): Promise<ReportEntry | null>;
 
   /**
    * One vote per viewer per item, and a switch replaces the earlier vote — the adapter owns that

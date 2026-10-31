@@ -22,6 +22,8 @@ import {
   isoMessage,
   isoSchema,
   characterSchema,
+  REPORT_REASON_MISMATCH,
+  REPORT_SOURCE_REQUIRED,
   reportWriteSchema,
   seedSchemas,
   type CommentBranch,
@@ -93,23 +95,40 @@ const realTimestamp = isoSchema.safeParse("2026-10-30T18:04:24.000Z");
 if (realTimestamp.success) ok(`isoSchema accepted a real timestamp`);
 else bad(`isoSchema rejected a real timestamp (${isoMessage})`);
 
-/* T-12: a copy claim with no source must be refused, and a part/reason pair the window cannot
-   offer must be too — the two rules the Report dialog relies on are the write's own. */
+/* T-12: a copy claim with no source must be refused, a reason that fits none of the chosen
+   surfaces must be too, and the mixed write the dialog produces — image **and** text, two reasons —
+   must be accepted. Both stops take sets, so the fixtures are arrays; the message matters, not just
+   the refusal, because an empty array would fail these same asserts for the wrong reason. */
+const reportTarget = { kind: "character" as const, id: CHARACTERS[0].id, label: CHARACTERS[0].name };
+
 const sourcelessCopy = reportWriteSchema.safeParse({
-  target: { kind: "character", id: CHARACTERS[0].id, label: CHARACTERS[0].name },
-  part: "text",
-  reason: "copied-text",
+  target: reportTarget,
+  parts: ["text"],
+  reasons: ["copied-text"],
 });
 if (sourcelessCopy.success) bad("reportWriteSchema accepted a copied-text report with no source");
-else ok(`reportWriteSchema rejected a copy claim with no source (${sourcelessCopy.error.issues[0]?.message})`);
+else if (sourcelessCopy.error.issues[0]?.message !== REPORT_SOURCE_REQUIRED) {
+  bad(`reportWriteSchema refused a sourceless copy claim for the wrong reason (${sourcelessCopy.error.issues[0]?.message})`);
+} else ok("reportWriteSchema rejected a copy claim with no source");
 
 const mismatchedPart = reportWriteSchema.safeParse({
-  target: { kind: "character", id: CHARACTERS[0].id, label: CHARACTERS[0].name },
-  part: "avatar",
-  reason: "copied-text",
+  target: reportTarget,
+  parts: ["avatar"],
+  reasons: ["copied-text"],
 });
-if (mismatchedPart.success) bad("reportWriteSchema accepted copied-text on the avatar part");
-else ok(`reportWriteSchema rejected a part/reason mismatch (${mismatchedPart.error.issues[0]?.message})`);
+if (mismatchedPart.success) bad("reportWriteSchema accepted copied-text on the avatar surface");
+else if (mismatchedPart.error.issues[0]?.message !== REPORT_REASON_MISMATCH) {
+  bad(`reportWriteSchema refused a mismatched reason for the wrong reason (${mismatchedPart.error.issues[0]?.message})`);
+} else ok("reportWriteSchema rejected a reason that fits no chosen surface");
+
+const mixed = reportWriteSchema.safeParse({
+  target: reportTarget,
+  parts: ["avatar", "text"],
+  reasons: ["missing-nsfw", "copied-text"],
+  source: CHARACTERS[1].id,
+});
+if (mixed.success) ok("reportWriteSchema accepted image + text with two reasons");
+else bad(`reportWriteSchema refused a mixed report (${mixed.error.issues[0]?.message})`);
 
 /* 3. The recursive shape: built from the flat rows, parsed through the lazy schema. */
 console.log("== recursive shape");

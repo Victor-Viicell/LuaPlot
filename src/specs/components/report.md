@@ -14,6 +14,7 @@ One consistent way to flag content that breaks the [terms of use](../pages/terms
   - **Avatars, images, and GIFs** (on any content): a missing NSFW flag, illegal content, or a copied image.
   - **Post and comment text**: a missing NSFW flag, illegal content, or copied text.
   - **Character, lorebook, and preset text**: a missing NSFW flag, copied text, or illegal content. These bodies are never judged for illegal content by [JEV](../systems/jev.md) — that reason goes straight to a moderator.
+- **Both choices are multi-select.** A viewer reports *what* by picking one or more of the surfaces the item carries — a character's image and its text can go in the same report — and picks one or more reasons for it. The reason list is the union of what the chosen surfaces allow, and every chosen reason has to fit at least one of them, so "copied image" cannot be filed against text alone. Removing a surface removes the reasons that no longer fit it. **One report, one weight**: filing for two surfaces and three reasons raises the item's weight once, like any other report.
 - **A copy claim names its source** — the item inside LuaPlot it was copied from, or a link to an outside source. Copied text with an internal source is compared by [JEV](../systems/jev.md); copied text from outside, and every copied image, goes to a moderator.
 - An optional free-text note is always allowed.
 - Reporting is not engagement: it does not move likes or dislikes, and the author is never shown who reported.
@@ -31,9 +32,9 @@ Submitting a report queues the item for [JEV](../systems/jev.md), unless the con
 ## Actions
 
 - **Report**
-- **Choose what is being reported** — the avatar or image, or the text; the reason list follows that choice
-- **Choose reason**
-- **Name the source** — the copied-from item or an outside link; required for every copy claim
+- **Choose what is being reported** — one or more of the surfaces the item carries: the avatar or image, the text, or both; the reason list follows that choice
+- **Choose reasons** — one or more, from what those surfaces allow
+- **Name the source** — the copied-from item or an outside link; required when any chosen reason is a copy claim
 - **Add details** (optional)
 - **Submit**
 - **Cancel**

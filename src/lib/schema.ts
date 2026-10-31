@@ -454,6 +454,14 @@ export const REPORT_REASONS_BY_PART = {
   text: ["missing-nsfw", "illegal", "copied-text"],
 } as const satisfies Record<z.infer<typeof reportPartSchema>, readonly z.infer<typeof reportReasonCodeSchema>[]>;
 
+/** Does this reason fit that surface? The one place the pair rule lives (`report.md` → *Rules*). */
+export function reasonFitsPart(
+  part: z.infer<typeof reportPartSchema>,
+  reason: z.infer<typeof reportReasonCodeSchema>,
+): boolean {
+  return (REPORT_REASONS_BY_PART[part] as readonly string[]).includes(reason);
+}
+
 export const REPORT_WHAT_REQUIRED = "Choose what is being reported.";
 export const REPORT_REASON_REQUIRED = "Choose a reason.";
 export const REPORT_SOURCE_REQUIRED = "Name the source: the item it was copied from, or a link.";
@@ -478,17 +486,23 @@ const reportText = (max: number, message: string) =>
 export const reportWriteSchema = z
   .strictObject({
     target: reportTargetSchema,
-    part: reportPartSchema,
-    reason: reportReasonCodeSchema,
+    /** One or more surfaces — an image and a text can be reported together. */
+    parts: z.array(reportPartSchema).min(1),
+    /** One or more reasons; each must fit at least one of the chosen surfaces (checked below). */
+    reasons: z.array(reportReasonCodeSchema).min(1),
     details: reportText(REPORT_DETAILS_MAX, REPORT_DETAILS_TOO_LONG).optional(),
     source: reportText(REPORT_SOURCE_MAX, REPORT_SOURCE_TOO_LONG).optional(),
   })
   .superRefine((write, ctx) => {
-    const allowed: readonly string[] = REPORT_REASONS_BY_PART[write.part];
-    if (!allowed.includes(write.reason)) {
-      ctx.addIssue({ code: "custom", message: REPORT_REASON_MISMATCH, path: ["reason"] });
+    // Every chosen reason has to land on something the reporter actually pointed at: "copied image"
+    // with only the text selected is a claim about a surface that was never chosen.
+    const orphan = write.reasons.find(
+      (reason) => !write.parts.some((part) => reasonFitsPart(part, reason)),
+    );
+    if (orphan !== undefined) {
+      ctx.addIssue({ code: "custom", message: REPORT_REASON_MISMATCH, path: ["reasons"] });
     }
-    const copyClaim = write.reason === "copied-text" || write.reason === "copied-image";
+    const copyClaim = write.reasons.includes("copied-text") || write.reasons.includes("copied-image");
     if (copyClaim && write.source === undefined) {
       ctx.addIssue({ code: "custom", message: REPORT_SOURCE_REQUIRED, path: ["source"] });
     }
@@ -506,9 +520,16 @@ export const reportOutcomeSchema = z.strictObject({
 });
 
 /** `components/report.md`: one reason per report, with its own detail and, for a copy claim, a source. */
-export const reportReasonSchema = z.strictObject({
-  part: reportPartSchema,
-  reason: reportReasonCodeSchema,
+/**
+ * One report on file. **The surfaces and the reasons are sets, not a pair**: `report.md` lets a
+ * viewer report an item's image *and* its text in one report, for as many reasons as apply — so the
+ * row keeps what was filed instead of fanning into one row per (part, reason) pair, which would
+ * print the same reason twice in the owner's notice and in the queue. `parts` is what the claim
+ * points at, `reasons` is why, and the pair rule is enforced at write time.
+ */
+export const reportEntrySchema = z.strictObject({
+  parts: z.array(reportPartSchema).min(1),
+  reasons: z.array(reportReasonCodeSchema).min(1),
   details: z.string().min(1).optional(),
   /** Required for a copy claim: an internal item id, or a link to an outside source. */
   source: z.string().min(1).optional(),
@@ -538,7 +559,7 @@ export const reportStatusSchema = z.enum(["open", "concluded"]);
 export const reportSchema = z.strictObject({
   id: z.uuid(),
   target: reportTargetSchema,
-  reasons: z.array(reportReasonSchema).min(1),
+  reasons: z.array(reportEntrySchema).min(1),
   weight: z.number().int().min(1),
   status: reportStatusSchema,
   jev: jevVerdictSchema,

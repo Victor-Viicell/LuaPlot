@@ -50,7 +50,7 @@ type Phase = "loading" | "ready" | "error";
 type Attachment = { id: string; available: boolean; name: string; tagline: string };
 
 /** One reason on the owner's notice, flattened: no nullable read survives into the template. */
-type ReasonRow = { key: string; part: string; reason: string; details: string };
+type ReasonRow = { key: string; parts: string; reasons: string; details: string };
 
 export function CharacterDetail() @{
   const repo = resolveRepo();
@@ -258,11 +258,11 @@ export function CharacterDetail() @{
           row.jev.action === "made-private"
             ? "JEV found the body reproduced another character and made this private. Editing it is the only way to request a review."
             : "JEV has not concluded this case yet, so it stays private until it does.";
-        noticeReasons.value = row.reasons.map((reason, index) => ({
-          key: `${index}-${reason.at}`,
-          part: reason.part,
-          reason: reason.reason,
-          details: reason.details ?? "",
+        noticeReasons.value = row.reasons.map((entry, index) => ({
+          key: `${index}-${entry.at}`,
+          parts: entry.parts.join(" + "),
+          reasons: entry.reasons.join(" + "),
+          details: entry.details ?? "",
         }));
         hasNotice.value = true;
       },
@@ -929,8 +929,8 @@ export function CharacterDetail() @{
               <ul class="reasons">
                 @for (const row of noticeReasons.value; key row.key) {
                   <li class="reason">
-                    <span class="reason-tag">{row.part}</span>
-                    <span>{row.reason}</span>
+                    <span class="reason-tag">{row.parts}</span>
+                    <span>{row.reasons}</span>
                     @if (row.details.length > 0) {
                       <span>{`— ${row.details}`}</span>
                     }

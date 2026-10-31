@@ -7,9 +7,9 @@ import { resolveRepo } from "../lib/data/repo.ts";
 import {
   REPORT_REASON_MISMATCH,
   REPORT_REASON_REQUIRED,
-  REPORT_REASONS_BY_PART,
   REPORT_SOURCE_REQUIRED,
   REPORT_WHAT_REQUIRED,
+  reasonFitsPart,
   reportWriteSchema,
 } from "../lib/schema.ts";
 import { shortStamp } from "../lib/format.ts";
@@ -26,6 +26,10 @@ import type { ReportPart, ReportReasonCode, ReportTarget } from "../lib/data/typ
  * - **The stepper is the spec's action list**, in order: *choose what* → *choose reason* → *name the
  *   source* (only for a copy claim) → *add details* (optional) → submit. **Back** and **Cancel** never
  *   submit.
+ * - **Both stops are multi-select** (`report.md` → *Rules*): a viewer can report the image *and* the
+ *   text in one report, for as many reasons as apply. The reason list is the union of what the chosen
+ *   surfaces allow, deselecting a surface drops the reasons that no longer fit one, and the write's
+ *   own superRefine refuses a reason that fits nothing that was picked.
  * - **The reason list is the schema's table** (`REPORT_REASONS_BY_PART`), so the dialog cannot offer
  *   a code the queue has no rendering for, and the part→reason relationship exists once instead of in
  *   markup.
@@ -99,8 +103,9 @@ export function ReportDialog({
   const recordDetails = track("");
 
   const step = track<Step>("what");
-  const part = track<ReportPart | "">("");
-  const reason = track<ReportReasonCode | "">("");
+  /** The surfaces and the reasons are both sets: one report can cover an image and a text. */
+  const partsSel = track<ReportPart[]>([]);
+  const reasonsSel = track<ReportReasonCode[]>([]);
   const source = track("");
   const details = track("");
 
@@ -110,20 +115,28 @@ export function ReportDialog({
   const outcome = track<"" | "submitted" | "held" | "already">("");
 
   const parts = PARTS_BY_KIND[target.kind];
-  const reasons = track<ReportReasonCode[]>(() =>
-    part.value === "" ? [] : [...REPORT_REASONS_BY_PART[part.value]],
-  );
+  /** The union of what the chosen surfaces allow, in the table's order: one list, no per-part copy. */
+  const offered = track<ReportReasonCode[]>(() => {
+    const seen: ReportReasonCode[] = [];
+    for (const code of Object.keys(REASON_LABEL) as ReportReasonCode[]) {
+      if (partsSel.value.some((part) => reasonFitsPart(part, code))) seen.push(code);
+    }
+    return seen;
+  });
+  /** A copy claim is any selected reason that names a source. */
+  const copyClaim = track(() => reasonsSel.value.some((code) => isCopyClaim(code)));
   /** The primary reads *Submit report* on the last stop only. */
   const last = track(() => step.value === "details");
   const primaryLabel = track(() => (last.value ? "Submit report" : "Continue"));
-  const help = track(() => (reason.value === "" ? "" : REASON_HELP[reason.value]));
 
   repo
     .myReport(target.kind, target.id)
     .then((mine) => {
       if (mine === null) return;
       reported.value = true;
-      recordMeta.value = `${PART_LABEL[mine.part]} · ${REASON_LABEL[mine.reason]} · filed ${shortStamp(mine.at)}`;
+      const what = mine.parts.map((part) => PART_LABEL[part]).join(" + ");
+      const why = mine.reasons.map((code) => REASON_LABEL[code]).join(", ");
+      recordMeta.value = `${what} · ${why} · filed ${shortStamp(mine.at)}`;
       recordSource.value = mine.source ?? "";
       recordDetails.value = mine.details ?? "";
     })
@@ -135,21 +148,28 @@ export function ReportDialog({
       reading.value = false;
     });
 
+  /** Toggle one surface. A reason that no longer fits anything gets dropped with it. */
   function pickPart(next: ReportPart): void {
-    part.value = next;
-    // A reason from the other part is not offered any more: the list follows the part.
-    reason.value = "";
+    partsSel.value = partsSel.value.includes(next)
+      ? partsSel.value.filter((part) => part !== next)
+      : [...partsSel.value, next];
+
+    reasonsSel.value = reasonsSel.value.filter((code) =>
+      partsSel.value.some((part) => reasonFitsPart(part, code)),
+    );
     error.value = "";
   }
 
   function pickReason(next: ReportReasonCode): void {
-    reason.value = next;
+    reasonsSel.value = reasonsSel.value.includes(next)
+      ? reasonsSel.value.filter((code) => code !== next)
+      : [...reasonsSel.value, next];
     error.value = "";
   }
 
   function back(): void {
     error.value = "";
-    if (step.value === "details") step.value = isCopyClaim(reason.value) ? "source" : "reason";
+    if (step.value === "details") step.value = copyClaim.value ? "source" : "reason";
     else if (step.value === "source") step.value = "reason";
     else step.value = "what";
   }
@@ -160,7 +180,7 @@ export function ReportDialog({
     error.value = "";
 
     if (step.value === "what") {
-      if (part.value === "") {
+      if (partsSel.value.length === 0) {
         error.value = REPORT_WHAT_REQUIRED;
         return;
       }
@@ -169,15 +189,15 @@ export function ReportDialog({
     }
 
     if (step.value === "reason") {
-      if (reason.value === "") {
+      if (reasonsSel.value.length === 0) {
         error.value = REPORT_REASON_REQUIRED;
         return;
       }
-      if (!reasons.value.includes(reason.value)) {
+      if (reasonsSel.value.some((code) => !offered.value.includes(code))) {
         error.value = REPORT_REASON_MISMATCH;
         return;
       }
-      step.value = isCopyClaim(reason.value) ? "source" : "details";
+      step.value = copyClaim.value ? "source" : "details";
       return;
     }
 
@@ -196,21 +216,21 @@ export function ReportDialog({
   async function submit(): Promise<void> {
     const parsed = reportWriteSchema.safeParse({
       target,
-      part: part.value === "" ? undefined : part.value,
-      reason: reason.value === "" ? undefined : reason.value,
+      parts: partsSel.value,
+      reasons: reasonsSel.value,
       details: details.value.trim() === "" ? undefined : details.value,
       source: source.value.trim() === "" ? undefined : source.value,
     });
 
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      // A missing part/reason can only be a step that was skipped; send the reader back to it.
-      if (issue?.path[0] === "part") {
+      // A missing surface/reason can only be a step that was skipped; send the reader back to it.
+      if (issue?.path[0] === "parts") {
         step.value = "what";
         error.value = REPORT_WHAT_REQUIRED;
         return;
       }
-      if (issue?.path[0] === "reason") {
+      if (issue?.path[0] === "reasons") {
         step.value = "reason";
         error.value = issue.message;
         return;
@@ -282,14 +302,16 @@ export function ReportDialog({
       list-style: none;
     }
 
-    /* A choice is a 44px row with a 2px lead; the accent marks the one in force. */
+    /* A choice is a 44px row with a 2px lead; the accent and a tick mark every one in force —
+       these are toggles, so more than one can be pressed at a time. */
     .choice {
+      position: relative;
       display: flex;
       flex-direction: column;
       gap: 2px;
       width: 100%;
       min-height: 44px;
-      padding: 10px 12px;
+      padding: 10px 36px 10px 12px;
       border: 1px solid var(--color-border);
       border-left-width: 2px;
       border-radius: 2px;
@@ -308,6 +330,16 @@ export function ReportDialog({
 
     .choice[aria-pressed="true"] {
       border-color: var(--color-accent);
+    }
+
+    .choice[aria-pressed="true"]::after {
+      content: "✓";
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      color: var(--color-accent);
+      font-size: 14px;
+      line-height: 1;
     }
 
     .choice-label {
@@ -509,7 +541,7 @@ export function ReportDialog({
                 <button
                   class="choice"
                   type="button"
-                  aria-pressed={part.value === option ? "true" : "false"}
+                  aria-pressed={partsSel.value.includes(option) ? "true" : "false"}
                   onClick={() => pickPart(option)}
                 >
                   <span class="choice-label">{PART_LABEL[option]}</span>
@@ -517,17 +549,20 @@ export function ReportDialog({
               </li>
             }
           </ul>
+          @if (parts.length > 1) {
+            <p class="note">Pick one, or both — the image and the text can go in the same report.</p>
+          }
           </>
         } @else if (step.value === "reason") {
           <>
           <p class="prompt">Why?</p>
           <ul class="choices">
-            @for (const option of reasons.value; key option) {
+            @for (const option of offered.value; key option) {
               <li>
                 <button
                   class="choice"
                   type="button"
-                  aria-pressed={reason.value === option ? "true" : "false"}
+                  aria-pressed={reasonsSel.value.includes(option) ? "true" : "false"}
                   onClick={() => pickReason(option)}
                 >
                   <span class="choice-label">{REASON_LABEL[option]}</span>
@@ -536,9 +571,7 @@ export function ReportDialog({
               </li>
             }
           </ul>
-          @if (help.value !== "") {
-            <p class="note">{help.value}</p>
-          }
+          <p class="note">Pick as many as apply. One report, one weight.</p>
           </>
         } @else if (step.value === "source") {
           <>
