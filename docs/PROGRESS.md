@@ -8,12 +8,22 @@ could not be verified.
 - **Changed:** on the owner's call, an item's avatar is no longer a 56px thumbnail: `Avatar` gained
   `size="hero"` (no inline box, `.avatar.is-hero` in `styles.css` owns it) and `/character/[id]` now lays
   its head out as a grid whose first row is the cover — **full content width and 1:1** with the name and
-  the settings button beneath it on a phone, a fixed 320px column with both beside it from `sm`. The rule
-  is written into the character, lorebook and preset detail specs, so the two pages still to be built
+  the settings button beneath it on a phone, a fixed 320px column with both beside it from `sm`. The
+  initials are drawn as a **monogram** (`clamp(56px, 24vw, 112px)`, weight 500) on a two-stop surface
+  gradient, because a 13px label in a 320px square reads as an image that failed to load. The rule is
+  written into the character, lorebook and preset detail specs, so the two pages still to be built
   inherit it instead of re-deciding.
-- **Verified:** build clean; measured on the dev server at 360/390/640/1280: cover 308×308, 338×338,
-  320×320, 320×320 (ratio 1.000 at every width), flush with the head's left edge, name 33px beneath at a
-  phone and beside it from `sm`, no horizontal scroll anywhere, initials at 56px.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30/30 routes, schema). Measured with real Chromium at
+  360/640/900/1280 on the dev server: cover **328×328** at 360 (inside the 16px page padding) and
+  **320×320** at 640/900/1280 — ratio 1.000 at every width; the name sits **beneath** the cover at 360
+  (title y 437 against a cover bottom of 404) and **beside** it from `sm` (title x 364 / 494 / 620 against
+  cover right edges 344 / 474 / 600); settings stays 44×44 at the row's right edge; initials compute to
+  86.4px at 360 and 112px at 1280; `scrollWidth` never exceeds the viewport.
+- **Corrected:** the first version of this entry measured a 308×308 cover with 56px initials and claimed
+  the name sat beside the cover from `sm`. That code never committed, and its ≥640 layout was **broken**:
+  the base `.identity-text` rule was declared *after* the `@media` block, and at equal specificity a base
+  rule written after the query wins at every width, so the name rendered under the cover on desktop. Base
+  placement now comes before the query, and DESIGN.md carries the trap.
 - **Not verified:** `/lorebook/[id]` and `/preset/[id]` are still placeholders, so their covers exist as a
   spec rule and a primitive variant, not as a rendered page. No Tauri/Android build.
 

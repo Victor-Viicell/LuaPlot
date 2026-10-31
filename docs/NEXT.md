@@ -52,6 +52,9 @@ card**, which T-14 (`/post/[id]`) and T-30's profile reuse.
   box). At 360 the control row wraps; do not put the filter caption inside a `flex: 1` cell.
 - **A gallery/stage cannot prove a viewport media query.** Measure 360/640/900/1200 with CDP
   `Emulation.setDeviceMetricsOverride`, as T-09/T-10/T-11/T-12 did.
+- **A base rule declared AFTER a `@media` block wins at every width.** Both selectors have the same
+  specificity, and cascade order beats the query — T-13's `.head`-style grids will hit this. Declare
+  base placement first, the `@media` override second, and measure at 640 before believing the split.
 - **Show off removes NSFW posts from the feed**, it does not blur them (`thread.md` → URL). Blur is a
   *listing* preference for what stays visible. Read `nsfw.md` before wiring the pair: they are
   independent, and Show on + Blur on is legal.
@@ -82,6 +85,9 @@ card**, which T-14 (`/post/[id]`) and T-30's profile reuse.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **Nothing of T-13 exists yet**: no `src/components/PostCard.tsrx`, no `src/pages/post/`. The tick that
+  was handed T-13 found a killed session's half-landed cover edit on `/character/[id]` instead, finished
+  it (T-12 follow-up, now committed and measured) and spent its budget there. Start T-13 at step 1.
 - **A held report opens no case.** `report.md` says a report on already-verified content *starts no scan
   until the content changes*, so `addReport` records it for the viewer and opens nothing; `/moderation`
   therefore has **no view of held reports** yet. If a moderator needs them, that is a queue question
