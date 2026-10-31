@@ -333,7 +333,7 @@ results.push(
     await waitUrl("/authentification");
     await waitText("Continue with Google", 8000);
     await click("Continue with Google");
-    await waitFor(`[...document.querySelectorAll("a")].some((e) => (e.getAttribute("href") || "") === "/user/you")`, "the session to reach the shell", 8000);
+    await waitFor(`[...document.querySelectorAll("a")].some((e) => (e.getAttribute("href") || "").endsWith("/user/you"))`, "the session to reach the shell", 8000);
     await go("/");
     await waitText("signed in as You", 8000);
     const label = await badge();
