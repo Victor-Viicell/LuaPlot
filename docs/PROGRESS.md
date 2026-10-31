@@ -30,6 +30,12 @@ could not be verified.
   10. conclude as removed — the post case prints *Concluded · removed*.
   11. read a notification — 4 unread rows → 3, the tab bar goes "Alerts, 4 unread" → "Alerts, 3 unread".
   12. sign out — home reads *signed out*, the Profile tab points at the site root.
+- **Live walk:** the same twelve rows pass against **https://victor-viicell.github.io/LuaPlot/**
+  (`node scripts/smoke.mjs --url https://victor-viicell.github.io/LuaPlot/`, 12/12 in 7s) after one
+  fix the live run found: journey 1 waited for `href === "/user/you"` and Pages prefixes the base
+  (`/LuaPlot/user/you`), so the assertion matches the suffix — the fact is "the Profile tab follows
+  the session", not the base path. `go()` resolves every hop against the served base for the same
+  reason.
 - **Not verified / notes:** pages other than these twelve (personas, presets, lorebooks, `/user/edit`,
   `/terms`, `/onboarding`) are outside the present walk; the walk is not in `check.sh` because it
   needs a browser + a preview server (the gate stays browser-free; a laptop without Chromium must not
