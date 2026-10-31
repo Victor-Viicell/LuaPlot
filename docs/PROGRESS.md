@@ -3,6 +3,35 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+
+## T-26 — the moderation queue, weight first and metadata only (2026-10-31)
+
+- **Changed:** `pages/moderation-queue.tsrx` is no longer a `PagePlaceholder` — it draws the queue on
+  the spec's one order (`weight` desc, then newest report, both the adapter's), page 1 with no
+  `Load more`, a `Select` filter (open / concluded / all) in the query string, and one counts line
+  (`3 open · 2 concluded`) read from two `listReports` calls made on every mount. A row carries the
+  content type and status, the clamped `target.label`, the reason spread with `jev.verdict` leading
+  (`JEV unsure · NSFW flag · copied text`), the weight as a tabular numeral under a `weight / case`
+  header, `last report 2d ago`, and what JEV already did when it acted — no preview of the content
+  anywhere. `forbidden` is a phase, not a redirect (mock `isAdmin` is false; `?admin=1` is the
+  reviewer's switch and survives a filter change). Schema side: `reportFilterSchema` (the URL and
+  `listReports` now share one vocabulary, `ReportFilter` is its `z.infer`), `reportSourceIsExternal()`
+  (internal id vs outside link, one home), and `relativeAge()` in `lib/format.ts` for *2d ago* /
+  *on 13 Oct*. `docs/DESIGN.md` → *Moderation queue (decided in T-26)*.
+- **Verified:** `scripts/check.sh` GREEN (build, 30 routes, schema check). Against the dev build at
+  360×740: `/moderation` draws *Only a moderator can open the queue.* + **Go home**; `?admin=1` draws
+  weights `6, 3, 2` (open) and `9, 2` (concluded), `?status=all` re-asks the adapter and draws
+  `9, 6, 3, 2, 2`; the filter writes `?status=concluded&admin=1` and the counts line stays
+  `3 open · 2 concluded`; the post case reads `JEV unsure · NSFW flag · copied image`, the newest
+  concluded one `JEV unsure · copied text from outside` (*that* is the internal/external split
+  working), and the privatised character `JEV violation · copied text` + `JEV made it private`.
+  `scrollWidth - clientWidth` is `0` at 360 and at 640 / 900 / 1280, where the weight moves to 26px
+  and the lede appears; clicking a row lands on `/moderation/<id>` in-app (the case placeholder).
+- **Unverified:** the `error` arm is drawn but not provoked (the memory adapter cannot fail), and
+  nothing here is a real role — `isAdmin` stays the mock's `false` until T-30, so `?admin=1` is the
+  only route to the queue. Paging is untested beyond five fixtures: `hasMore` would print `24+` and
+  still draw no control, which is the deliberate gap recorded in NEXT.
+
 ## T-25 — the NSFW preference on every listing, in both signed states (2026-10-31)
 
 - **Changed:** new `components/NsfwControl.tsrx` — the Show/Blur pair signed in, one `Show NSFW

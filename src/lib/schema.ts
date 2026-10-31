@@ -742,6 +742,18 @@ export function reasonFitsPart(
 }
 
 /**
+ * `components/report.md` → *A copy claim names its source*: **the item inside LuaPlot it was copied
+ * from, or a link to an outside source.** Only the string is stored, and the two answers take
+ * different routes — an internal source is fetched and compared by JEV, an outside one goes to a
+ * moderator (`systems/jev.md` → *Scope*). The test therefore lives here, once, so the queue's *why
+ * is this here* word, the case page's *internal / external*, and T-27's adapter cannot disagree.
+ * `http(s)` is the whole rule a link has to satisfy: a scheme and a host, nothing to resolve.
+ */
+export function reportSourceIsExternal(source: string): boolean {
+  return /^https?:\/\//i.test(source.trim());
+}
+
+/**
  * `pages/terms.md` → *Rules*: the three prohibitions, with the anchor each one answers to on
  * `/terms` and the sentence it is titled by. Not a shape — no adapter reads it — but it belongs
  * here because `report.md` → *Purpose* says **every report reason maps back to one of them**, and a
@@ -852,6 +864,14 @@ export const jevVerdictSchema = z.strictObject({
 });
 
 export const reportStatusSchema = z.enum(["open", "concluded"]);
+
+/**
+ * The queue's filter (`pages/moderation/queue.md` → *Actions*): one status, or both. A schema and not
+ * a page-local string check, because the same three words are read from the URL by the page and
+ * passed straight to `listReports` — one vocabulary at both ends, and an unknown `?status=` falls
+ * back to `open` instead of asking the adapter a question it cannot answer.
+ */
+export const reportFilterSchema = z.enum(["open", "concluded", "all"]);
 
 /**
  * `systems/jev.md` + `luaplot-pages.md`: *Reports are cumulative … each new report raises the

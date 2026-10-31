@@ -81,6 +81,19 @@ export function relativeTime(iso: string): string {
 }
 
 
+/**
+ * The same age as `relativeTime()`, phrased so a sentence can hold it: *just now*, *2h ago*,
+ * *on 19 Oct*. The inbox prints the bare stamp (`2h`) at the end of a row; the moderation queue
+ * reads *last report 2h ago*, and the phrase belongs beside the time it phrases, not in the page.
+ * An unparseable value is an empty string, exactly as `relativeTime()` answers.
+ */
+export function relativeAge(iso: string): string {
+  const stamp = relativeTime(iso);
+  if (stamp === "") return "";
+  if (stamp === "now") return "just now";
+  return /^\d+[mhd]$/.test(stamp) ? `${stamp} ago` : `on ${stamp}`;
+}
+
 /** The badge's cap, fixed by `pages/notifications.md` → *Badge*: it does not scale with the nav. */
 export const BADGE_CAP = 9;
 

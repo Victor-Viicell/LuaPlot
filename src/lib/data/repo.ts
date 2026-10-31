@@ -40,6 +40,7 @@ import type {
   Report,
   ReportOutcome,
   ReportEntry,
+  ReportFilter,
   ReportStatus,
   ReportTarget,
   ReportWrite,
@@ -82,7 +83,10 @@ export type ListOptions = {
 
 export type Listing<T> = { items: T[]; hasMore: boolean };
 
-export type ReportFilter = ReportStatus | "all";
+/** `ReportStatus` is still re-exported for the callers that name a single status. */
+export type { ReportStatus };
+/** The queue's filter is the schema's (`reportFilterSchema`), never a second union. */
+export type { ReportFilter };
 
 export type Repo = {
   /** Which adapter answered — the `/dev/data` badge, never a product surface. */

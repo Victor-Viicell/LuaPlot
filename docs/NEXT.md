@@ -1,105 +1,133 @@
 # Baton — what the next session does
 
-**Ticket: T-26 — the moderation queue (`/moderation`). P3 continues.**
+**Ticket: T-26B — the case itself (`/moderation/[report.id]`). P3 continues.**
 
-Spec: `src/specs/pages/moderation/queue.md` (whole file — *Purpose*, *Data*, *Actions*, *States*,
-*Rules*); `src/specs/systems/jev.md` → what escalates and what JEV already did;
-`src/specs/components/report.md` → what a report holds and why the reporter sees no outcome. Then
-`src/specs/pages/moderation/detail.md` (read it, but only its *Data* list matters this tick: it is
-what a case row must be able to name). `docs/DESIGN.md` → *Report dialog (T-12)* and
-*Notifications (T-22)* for the row idiom already settled.
+Spec: `src/specs/pages/moderation/detail.md` (whole file — *Purpose*, *Data*, *Actions*, *States*,
+*Rules*); `src/specs/systems/jev.md` → *Decisions*, *Privacy and republication*, *Cumulative reports*;
+`src/specs/components/report.md` → what a report holds and why the reporter sees no outcome;
+`src/specs/pages/terms.md` → the three terms the dismissal checklist ticks (anchors already in
+`TERMS_RULES`). `docs/DESIGN.md` → *Moderation queue (decided in T-26)* — this page copies that row
+idiom — and *Notifications (T-22)* for the notice the conclusion writes.
 
-Why next: every write that feeds this page already exists — `repo.addReport` opens one cumulative
-case per item (`weight`, `status`, `lastReportAt`, `jev.action`), `repo.listReports` answers
-most-reported-first with a `status` filter, and `reportSchema` already carries the fields. What is
-missing is the page: **today `/moderation` is a `PagePlaceholder`.** Until it exists, escalation has
-no destination, and `systems/jev.md`'s whole "unsure → a human decides" half is a sentence with no
-surface.
+Why next: T-26 built the list and every row already links to `/moderation/<report.id>`, which is still
+a `PagePlaceholder`. Escalation now has a destination but not a decision surface: `systems/jev.md`'s
+whole half — *unsure → a human decides* — has nowhere to land. This is the last moderation surface
+before the JEV adapter (T-27), and it is the page T-27's verdict will be displayed on.
 
 ## Approach
 
-1. **Read the adapter before drawing anything.** `reportSchema` (line ~861 of `schema.ts`) and
-   `repo.listReports` are the contract; run `/dev/data` once and read the five fixture reports to see
-   which are open, which concluded, and what `weight` they carry. If a field the queue's *Data*
-   section names has no home on the row, that is a schema question for the baton — do not invent a
-   page-local shape and do not add `z.any()`.
-2. **The row is metadata only — this is the spec's one hard drawing rule.** Content type, JEV's
-   classification, the report reason, the weight, the age of the last report, and the status. **No
-   preview, no avatar of the reported item, no body excerpt.** A queue that shows the content is a
-   queue that gets read in public.
-3. **Weight is the order and the only order.** Most reports first; equal weight breaks on
-   `lastReportAt`, newest first. No sort control, no claim/assign control, no moderator column. The
-   spec says ordering is not a control.
-4. **Filter is a query-string choice of three**: open (default), concluded, all. `Select` or a chip
-   row — decide once and record it in DESIGN, because `/moderation` is the app's first admin page and
-   the shape will be copied by the case page.
-5. **Counts are one line above the list**, open versus concluded, read from the same listing answer
-   (or a second `listReports` call with the other filter — never a number the adapter did not say).
-6. **The admin gate is a state, not a redirect.** `currentUser()?.isAdmin` is `false` for the mock
-   account, so draw the forbidden state (`Only a moderator can open the queue.` + a link home) rather
-   than an empty list, and say in DESIGN how a reviewer reaches the page in the preview. No route
-   blocking — `router.ts` keeps its declarative `access`, the redirect matrix is T-30.
-7. **Empty, populated, loading, not-admin, and an error state** — five drawings, one phase union
-   exactly as the catalogs do it (`loading | ready | forbidden | error`), no shoal of booleans.
-8. **Zod is unchanged by this ticket** unless a field is missing: every row already comes out of
-   `reportSchema`, and the page parses what it reads at the boundary like every other page.
+1. **Read the adapter first, then the gaps.** `reportSchema` (line ~861 of `schema.ts`) already holds
+   everything the *Data* list names except the case's own writes: there is **no** stored history,
+   **no** case comment, **no** conclude, **no** dismiss. This ticket adds those writes to
+   `repo.ts` + `memory.ts` **and their shapes to `schema.ts`** (`caseCommentSchema`,
+   `caseDecisionSchema` or two narrower writes, `caseEventSchema` for the flat history). Every write
+   is `safeParse`d at the adapter, `z.infer` in `types.ts` — never a hand type.
+2. **The history is append-only and flat.** *Comments are a flat chronological list, never a thread —
+   no replies — and every admin sees the whole history.* One array of events (`comment`, `concluded`,
+   `dismissed`, `reason-set`, `avatar-removed`), each with the admin's handle and its time; JEV's own
+   action appears **without an admin attached**, as what it already did, not as an event.
+3. **`Conclude` is one operation, not a form.** A visibility outcome (`public` | `private`), plus the
+   optional `Remove avatar` when the avatar carries the violation while the text is valid, plus the
+   reason. It writes: the outcome, `status: "concluded"`, `concludedAt`, the history event, and the
+   creator's notification (`measure: made-private | avatar-removed`, `kind: "moderation"`) through
+   the same shape `repo.listNotifications` already returns. Removing the avatar clears the verified
+   flag like any edit (`detail.md` → *Rules*) but does not delay the conclusion.
+4. **`Dismiss` needs the terms checklist ticked.** No violation, no visibility change (escalated
+   content was never hidden). The checklist is `TERMS_RULES`' three entries — render the rule title
+   and a checkbox per rule, all three required, gate the button on all three (a derived, handed to
+   `Button` as a tracked, never an inline expression that freezes at mount).
+5. **`Remove avatar` is not standalone** (`detail.md` → *Actions*): it is an option inside the
+   conclude flow, drawn disabled with its own line when the item has no avatar (*No avatar to
+   remove*).
+6. **The case is still a display of metadata plus the content** — this is the one page where the item
+   *is* rendered (the moderator must inspect it): type, content, avatar, current visibility, the
+   cumulative reports with each reason and details, the copy claim's named source (internal id or
+   link, split by `reportSourceIsExternal()`), and JEV's classification with its confidence
+   (`percent()` from `lib/format.ts`). Keep the item itself in a read-only block: no edit controls,
+   no link to the public page that would let an admin act there.
+7. **One phase union**, like T-26: `loading | ready | forbidden | notfound | error`. Not found is the
+   spec's own sentence, *"This report doesn't exist."* `currentUser()?.isAdmin` is false on the mock,
+   so `?admin=1` stays the reviewer's switch (`docs/DESIGN.md` → *Moderation queue*), read here the
+   same way T-26 reads it — the queue's filter **and** its row links already carry it.
+8. **Zod at every boundary**: the route param is a uuid — `reportIdSchema.safeParse`-style
+   (`z.uuid()`) before the adapter call, so a malformed deep link is *not found*, not a crash; the
+   conclude/dismiss writes parse before storage; the notification is built from the schema.
 
 ## Traps
 
-- **`/moderation` is in the overflow menu already** (`Bookmarks, Moderation, Terms`) and in
-  `src/specs/luaplot-pages.md`; it is not a new route — replace the placeholder
-  (`pages/moderation-queue.tsrx`) and keep the route entry as it is.
-- **`listReports` answers `Listing<Report>`**, so paging is a real question: the spec's *States* do
-  not mention **Load more**, but the adapter slices. Either page one (and say so) or add `Load more`
-  — decide, record, and match `/notifications`' precedent (no paging) only if the fixtures justify
-  it. There are five reports; the honest answer is probably page 1 with no control, plus a line in
-  DESIGN.
-- **A concluded case stays in the list forever** (Rules): the concluded filter is the only way back
-  to one, so the default filter must not silently hide the fact that the page has history.
-- **`Report` not anything else**: `weight` is the report count, never a stored score; do not compute
-  a "severity".
-- **Page CSS cannot reach a primitive** (T-09): wrap the `Select`/chip row in a page-owned element.
-- **A keyed `@for` needs the row's own identity**: `key report.id`, and if a reveal-like per-row state
-  ever appears, key it by a fetch epoch the way `CardGrid.revealEpoch` does (T-25).
+- **`/moderation/[report.id]` is already routed** (`router.ts`, `access: "admin"`) — replace
+  `pages/moderation-detail.tsrx`, keep the entry.
+- **A concluded case is final.** No reopen control for any admin (`detail.md` → *Rules*); a fresh
+  report opens a new case. Do not draw a disabled Conclude either — draw the case as read-only with
+  its decision and history.
+- **Authored content is never deleted**, only made private; a post or comment is *removed* only after
+  a confirmed violation, and a removed comment becomes the placeholder `comment-thread.md` describes.
+- **The reporter is never told anything** — no notification to the reporter, no verdict on their
+  surface. Only the creator gets one.
+- **`weight` and `jev` are not editable** by this page: weight is the report count, JEV's verdict is
+  stored history.
+- **Page CSS cannot reach a primitive** (T-09): wrap `Checkbox`/`Field`/`Button` in page-owned
+  elements.
+- **A keyed `@for` needs the row's own identity**: `key event.id`, never the index.
+- **Ripple:** a raw `try` statement inside a `@{ … }` setup block breaks the compiler (see *Found
+  while working*); use `.then/.catch`. JSX text after an `{expr}` loses its leading space — put
+  separators inside a template literal.
 
 ## Open decisions
 
-- **Filter control**: `Select` (three options) versus a chip row. The toolbars use `Select` for
-  enumerations and a chip for a one-value fact; three real options are a `Select`.
-- **Whether the queue carries per-row status words or a chip.** The spec lists status as data; a
-  12px word in the row's meta line is cheaper than a badge and does not compete with the accent.
-- **Paging**: page 1 only, or **Load more** when `hasMore`.
+- **Whether the conclude and dismiss forms are a `Sheet` or an inline panel** under the case. The
+  report dialog is the app's only sheet; a moderator's decision is rarer and longer, so an inline
+  panel that keeps the history visible may be better. Decide once and record it.
+- **The history's event vocabulary** — the exact strings and whether a `reason-set` is its own event
+  or an edit of the concluded one.
+- **The reason on a case**: `detail.md` says *record or correct the reason behind the decision*, and
+  `reportSchema.reasons` is the reporters' set. A moderator's reason needs its own slot (a
+  `decision.reason` on the case), not a rewrite of what was filed.
+- **Where the conclusion's notification lands** when the case is on a comment (a comment has no
+  route of its own — `/notifications` already draws such a row without a link).
 
 ## After this
 
-**T-26B `/moderation/[report.id]`** — the case itself: cumulative report list, the four actions
-(conclude with a visibility outcome, remove avatar as part of concluding, set reason, comment,
-dismiss after ticking every term), the flat chronological history, and the notification the
-conclusion writes. It needs new repo writes (`caseCommentSchema`, conclude, dismiss) that T-26 does
-not; splitting it is deliberate, and `docs/SHIP-PLAN.md` carries both.
-
-**T-27 JEV adapter** waits behind it because the case page is where a verdict is displayed.
+**T-27 JEV adapter** — `lib/llm/jev.ts` posting `{model,state,questions}` to
+`POST https://openrouter.ai/api/alpha/decisions` with `typesafe/jev-1.14`, `lib/llm/jevPolicy.ts`
+holding the thresholds and the action table. Read `.agents/skills/typesafe-ai/SKILL.md` and the live
+docs first; decisions models never go through `chat/completions`, and the response must carry
+`provider: "TypeSafe"` before any answer is trusted. The case page is where its verdict is displayed,
+which is why it waits behind T-26B.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **T-26 is done**: `pages/moderation-queue.tsrx` is the queue — page 1, `Select` filter in the URL
+  (`?status=open|concluded|all`), counts from two `listReports` calls, `forbidden` as a phase,
+  `?admin=1` the reviewer's switch. `reportFilterSchema` + `reportSourceIsExternal()` live in
+  `schema.ts`; `relativeAge()` (`2d ago`, `on 13 Oct`) lives in `lib/format.ts`; `ReportFilter` is
+  now `z.infer`, not a hand union in `repo.ts`.
+- **A raw `try` statement inside a `@{ … }` setup block breaks `tsrx-tsc`** (T-26): the compiler
+  produces no source-map entry for the `try` and falls back to plain TypeScript, which then reports a
+  dozen bogus `Unexpected token` errors inside the component's `<style>` block. Use `.then/.catch`
+  (the notifications idiom) or move the logic into a plain `.ts` module. **When the errors point at
+  CSS, look at the setup code first.**
+- **JSX text after `{expr}` loses its leading space** (T-26): `{a} concluded` renders `2concluded` —
+  put the separator in a template literal (`{` · ${b} concluded`}`).
+- **`navigate()` writes only what you give it** (T-26): a filter change dropped `?admin=1` and locked
+  the preview out of the page. Any URL the queue page writes must re-add the preview switch.
+- **Open rows on `/moderation` are the escalated cases only**: `jev.action` is `escalated` on every
+  open fixture (an immediate action opens no case), so the row prints an action word only for
+  `made-private` / `removed` / `held`.
 - **T-25 is done**: `components/NsfwControl.tsrx` draws the Show/Blur pair signed in and one
   **Show NSFW content** control leading to `/authentification` signed out, on all three catalogs and
   `/post/thread` — never a page-local pair again. `lib/state/prefs.ts` holds the signed-out answer as
   one **pending intent** (`requestShowNsfw` / `showRequested`), applies it after the sign-in re-read,
-  and drops it on sign-out; `/authentification` draws that single action under a 12px caption and
-  nothing when signed in.
-- **A reveal's lifetime is now a fetch epoch** (T-25): `CardGrid` takes `revealEpoch`, `/post/thread`
-  keys its feed by `` `${post.id}#${epoch}` ``, `/bookmarks`' `cellOf(row, epoch)` and the profile
-  grid's key do the same, and every `replace` fetch bumps the counter; an `append` does not. **Any new
-  listing that can refetch must pass it**, or a revealed card survives the fetch that should cover it.
+  and drops it on sign-out.
+- **A reveal's lifetime is now a fetch epoch** (T-25): `CardGrid` takes `revealEpoch`, and every
+  `replace` fetch bumps the counter; an `append` does not. **Any new listing that can refetch must
+  pass it.**
 - **`/user/[username]`'s posts feed still keys on `post.id`** (T-25): a revealed post there survives
-  a tab switch. One line to fix when that feed is next touched; not worth a ticket of its own.
+  a tab switch. One line to fix when that feed is next touched.
 - **The preview's sign-in switch is the only way into the signed-out states** — a hard reload seeds
-  `session.ts` signed in again, so signed-out testing must be done by signing out *in-app* (overflow →
-  **Sign out**), and the in-app sign-in button reads **Sign in as @you**.
+  `session.ts` signed in again.
 - **`/terms` is done** (T-24): `TERMS_RULES` + `REPORT_REASON_RULE` in `schema.ts`, ids
-  `#copied-content` / `#unmarked-nsfw` / `#illegal-content`, `ReportDialog`'s reason stop prints the
-  rule each reason enforces, onboarding's **Finish** is the acceptance.
+  `#copied-content` / `#unmarked-nsfw` / `#illegal-content`.
 - **A hash in the URL needs a mount jump** (T-24): `effect()` → `scrollIntoView` plus
   `scroll-margin-top: 72px` on every target.
 - **`<a>` and `<button>` do not nest**; **`{<Component />}` inside a fragment is a parse error**;
@@ -112,13 +140,11 @@ not; splitting it is deliberate, and `docs/SHIP-PLAN.md` carries both.
   still name the old handle; viewer wiring is T-30's.
 - **`/notifications` is done** (T-22): `markNotificationRead`, `markAllNotificationsRead`,
   `unreadNotificationCount`, `lib/state/inbox.ts`, badge in both nav hosts.
-- **The inbox fixture count is 6** (T-22): three unread, one `count: 2`, one `count: 3`.
 - **`repo.myVote` / `repo.myReport` / `isBookmarked` exist** — never a page-local flag.
 - **Counts now: characters 28 (27 public), lorebooks 6, presets 5, personas 3, posts 12, reports 5,
   comments 22, sessions 2, bookmarks 8 (one dead), notifications 6 (3 unread), profiles 7, follow
   edges 15.**
-- **The memory adapter loses runtime rows on a hard reload** (T-18): navigation must stay in-app, and
-  a signed-out or prefs-changed state cannot be tested by reloading.
+- **The memory adapter loses runtime rows on a hard reload** (T-18): navigation must stay in-app.
 
 ## When blocked
 

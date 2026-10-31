@@ -1130,6 +1130,61 @@ reveal's expiry. These are the decisions.
   `profile` posts feed keys rows on `post.id` alone, so a reveal there survives a tab switch — the
   one remaining gap, filed in `docs/NEXT.md`.
 
+## Moderation queue (decided in T-26, do not re-invent)
+
+`/moderation` is the app's first **admin** page, so its shape is the one the case page (T-26B) copies.
+`pages/moderation/queue.md` fixes the data, the two actions and the one order; these are the drawings.
+
+- **A row is metadata, never content.** Five strings and a numeral: the content type and status
+  (12px uppercase eyebrow), the item's `target.label` (one line, `text-overflow: ellipsis`), the
+  reason spread with JEV's classification (`JEV unsure · NSFW flag · copied text`), and
+  `last report 2d ago`. No avatar, no image, no rendered body, no visibility badge — *a queue that
+  shows the content is a queue that gets read in public*. The label is the schema's own filing-time
+  name (`reportTargetSchema` says it exists for exactly this row), and clamping it to one line is what
+  keeps a post's label a title instead of an excerpt: `"The closed chapter's litany…"` is cut, not
+  scrolled.
+- **Weight is the loudest thing in the row**, because it is the order: a 20px (26px at `sm`) tabular
+  numeral in a fixed 44/56px leading column, under a one-time `weight / case` column header that
+  names it instead of repeating the word on every row. Open rows carry it at `--color-text`; a
+  concluded row is history, so its numeral and title drop to `--color-text-subtle` / weight 400. The
+  page prints `weight` and derives nothing from it — **no severity, no score, no re-sort**; the
+  adapter's order (`weight` desc, `lastReportAt` desc) is the only order. There is no sort control,
+  no claim/assign control and no moderator column.
+- **The filter is a `Select`** (open / concluded / all) inside a page-owned `.filter` wrapper, in a
+  toolbar row whose left side is the counts line. Three real options is what a `Select` is for (the
+  catalogs' sort precedent); a chip row was rejected because it grows badly and three chips at 360
+  steal the counts' line. The filter lives **in the query string** (`?status=concluded`), parsed once
+  at mount by `reportFilterSchema` — an unknown value falls back to `open` — and a change goes
+  through `navigate()`, which remounts the page and re-asks the adapter: no second source of truth.
+- **Counts are one 12px line above the list**, open first (in `--color-text`) then concluded:
+  `3 open · 2 concluded`. They are the lengths of two `listReports` calls made on every mount, so the
+  line and the list can never disagree; a listing whose `hasMore` is true prints `24+`, never a total
+  invented from a page. The page asks for **page 1 only and draws no `Load more`**: the spec's
+  *States* has no paging step, and the five fixtures fit one page (the notifications precedent, with
+  the difference that `/notifications` is capped by a rule and this one simply has no more).
+- **The admin gate is a state, not a redirect** — `forbidden` is one arm of the page's phase union,
+  drawn as `EmptyState` (*Only a moderator can open the queue.* + **Go home**). `router.ts` keeps its
+  declarative `access: "admin"` and the redirect matrix stays T-30's. `currentUser()?.isAdmin` is
+  false on the mock account, so **a reviewer reaches the populated queue with `?admin=1`** — the
+  `?auth=` preview idiom from T-06, deleted when T-30 has real roles. The switch survives a filter
+  change: `chooseFilter` re-writes `admin=1`, because a filter must not lock the reviewer out of the
+  page they are filtering.
+- **One phase union, five drawings**: `loading | ready | forbidden | error`, and empty is `ready`
+  with nothing in it (`No open cases.` / `No concluded cases.` / `No cases yet.`). Loading is a
+  4-row skeleton matching the final layout (weight box + three lines), never a spinner; error is one
+  `--color-danger` line plus **Retry**.
+- **The row is the link** via a stretched `::after`, and opening goes through `navigate()` so it stays
+  in-app (a hard reload would drop the memory adapter's runtime rows). The entrance is the one
+  sanctioned orchestration: 8px up, 40ms apart, capped after six rows, and nothing under
+  `prefers-reduced-motion`.
+- **JEV's judgment is read, never recomputed.** `jev.verdict` and `jev.action` are stored at classify
+  time, and the page prints them: the causes line leads with `JEV <verdict>`, and the meta line names
+  what JEV already did (`JEV made it private`, `removed`, `held`) only when it acted — `escalated` is
+  what every open case is by definition, so printing it would be a tautology. **No model is called
+  from this page** (T-27 owns the adapter); the only policy here is the copy claim split, which reads
+  `reportSourceIsExternal()` from `schema.ts`: an internal source is *copied text*, a link is
+  *copied text from outside*, and those two take different routes through `systems/jev.md`.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

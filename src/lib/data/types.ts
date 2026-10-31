@@ -57,6 +57,7 @@ import type {
   reportPartSchema,
   reportReasonCodeSchema,
   reportEntrySchema,
+  reportFilterSchema,
   reportSchema,
   reportStatusSchema,
   reportTargetSchema,
@@ -163,6 +164,8 @@ export type ReportWrite = z.infer<typeof reportWriteSchema>;
 export type ReportOutcome = z.infer<typeof reportOutcomeSchema>;
 export type JevVerdict = z.infer<typeof jevVerdictSchema>;
 export type ReportStatus = z.infer<typeof reportStatusSchema>;
+/** The queue's filter (`pages/moderation/queue.md`): one status, or both. */
+export type ReportFilter = z.infer<typeof reportFilterSchema>;
 export type Report = z.infer<typeof reportSchema>;
 export type SessionCopy = z.infer<typeof sessionCopySchema>;
 export type CharacterCopy = Extract<SessionCopy, { kind: "character" }>;
