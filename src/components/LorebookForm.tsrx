@@ -156,6 +156,9 @@ export function LorebookForm({
       save();
     }}
   >
+    {/* The root element carries no scope class in Ripple 0.4.7, so a rule on `.lorebook-form` is
+        dropped and the form never becomes a grid (found in T-19). The layout lives on this child. */}
+    <div class="layout">
     <section class="section is-identity">
       <p class="section-label">Identity</p>
       <Field
@@ -298,9 +301,10 @@ export function LorebookForm({
         </Button>
       </div>
     </div>
+    </div>
 
     <style>
-      .lorebook-form {
+      .layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
         gap: 24px;
@@ -459,7 +463,7 @@ export function LorebookForm({
 
       @media (min-width: 900px) {
         /* The entries are the form, so they take the wide column; identity and media sit beside. */
-        .lorebook-form {
+        .layout {
           grid-template-columns: minmax(0, 1fr) 320px;
           column-gap: 40px;
         }

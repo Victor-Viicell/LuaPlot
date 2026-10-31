@@ -3,6 +3,40 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-19 — the four preset routes, and the form's dead root rule (2026-10-31)
+
+- **Changed:** `presetWriteSchema` (+ `PRESET_NAME_REQUIRED`) and `PRESET_MODELS` beside
+  `presetSettingsSchema` in `schema.ts`; `PresetWrite` in `types.ts`; `repo.addPreset` /
+  `updatePreset` / `deletePreset` / `forkPreset` mirroring the lorebook four (author-only update and
+  delete, fork refuses a private source). One form, `components/PresetForm.tsrx` (`preset: null` is
+  create) — `LorebookForm` minus the entries editor, plus a **Model `Select`** over `PRESET_MODELS`
+  in its own labelled block, with the provider named as the app's and never drawn as a field —
+  mounted by `/preset/create` and `/preset/[id]/edit` (Delete at the foot, confirming in place; the
+  sentence says the thread goes and a running session keeps its copy). `/preset/[id]` inherits the
+  character/lorebook detail page and swaps the entry list for a `<dl>` of generation settings, read
+  **as saved**, placed after the description and before the comments; `Request public again` is drawn
+  disabled. `/preset/catalog` is the lorebook catalog with `listPresets` / `listTags("preset")` and
+  no model or provider facet. Also fixed: **a component's root element never receives Ripple's
+  `tsrx-*` scope class**, so the `.character-form` / `.lorebook-form` / `.preset-form` grid rule was
+  dropped by the compiler and all three forms were silently `display: block` — the `lg` two-column
+  layout had never applied in T-17 or T-18. Each form now puts its grid on a child `.layout` div.
+- **Verified:** `scripts/check.sh` → GREEN (build, 30 routes, schema). The **live** build in Chromium
+  at **360×740**: the catalog listed five presets with ratios; a seed preset's detail drew *Two-Hander*,
+  its description, `GENERATION SETTINGS / MODEL / deepseek-chat`, then comments, with the counts row
+  above the definition and `scrollWidth` 360; the create form blocked Save while the name was empty,
+  collapsed `  Late   Night Draft ` to *Late Night Draft*, filled initials to `LA` from the name,
+  saved `deepseek-reasoner` and landed on detail with it; edit preloaded all four values, Save changes
+  persisted `deepseek-chat`, Fork produced a `@you` copy carrying the settings, and Delete confirmed in
+  place and landed on the catalog. Search narrowed the grid (URL `?q=…`, *Nothing matches those
+  filters*); a random id gave `This preset doesn't exist.` Measured the form at 360 (one 328px
+  column, 44px `Select` and Save), 640 (single column, image row split) and 1200/1280
+  (`510px 320px`, then `590px 320px` at 1280) with no horizontal scroll; the same pass confirmed
+  `CharacterForm` and `LorebookForm` now split at `lg` too (`540px 360px`, `580px 320px`).
+- **Not verified:** the signed-out create state and the edit refusals were not exercised on the live
+  build (same components as T-17/T-18, and the adapter refuses the writes); the moderation notice for
+  a private preset is unreachable — no preset fixture is private. 640 was measured on the form only,
+  not on detail or catalog.
+
 ## T-18 — the four lorebook routes, and the first entries editor (2026-10-31)
 
 - **Changed:** `lorebookWriteSchema` + `lorebookEntryWriteSchema` (+ `LOREBOOK_NAME_REQUIRED`,

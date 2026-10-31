@@ -33,6 +33,8 @@ import {
   reportEntrySchema,
   postSchema,
   postWriteSchema,
+  presetSchema,
+  presetWriteSchema,
   reportSchema,
   reportWriteSchema,
   seedSchemas,
@@ -925,6 +927,120 @@ export const memoryRepo: Repo = {
     });
 
     store.lorebooks.push(fork);
+    return fork;
+  },
+
+  /**
+   * The preset picker's four writes copy the lorebook four exactly: the adapter owns the id, the
+   * author, the clock and the empty engagement, and `settings` is stored as written because a preset
+   * has no entries and no derived field.
+   */
+  async addPreset(input) {
+    const parsed = presetWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const at = nowIso();
+    const row = presetSchema.parse({
+      kind: "preset",
+      id: freshId(),
+      name: write.name,
+      author: VIEWER,
+      tagline: "",
+      description: write.description,
+      nsfw: write.nsfw,
+      avatar: write.avatar,
+      settings: write.settings,
+      isPublic: true,
+      verified: false,
+      tags: [],
+      likes: 0,
+      dislikes: 0,
+      bookmarks: 0,
+      commentCount: 0,
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    store.presets.push(row);
+    recount(store);
+    return row;
+  },
+
+  async updatePreset(id, input) {
+    const row = store.presets.find((entry) => entry.id === id) ?? null;
+    if (!row || row.author !== VIEWER) return null;
+
+    const parsed = presetWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const next = presetSchema.parse({
+      ...row,
+      name: write.name,
+      description: write.description,
+      nsfw: write.nsfw,
+      avatar: write.avatar,
+      settings: write.settings,
+      verified: false,
+      updatedAt: nowIso(),
+    });
+
+    store.presets.splice(store.presets.indexOf(row), 1, next);
+    recount(store);
+    return next;
+  },
+
+  async deletePreset(id) {
+    const index = store.presets.findIndex((row) => row.id === id);
+    if (index < 0) return false;
+    if (store.presets[index].author !== VIEWER) return false;
+
+    store.presets.splice(index, 1);
+
+    const kept: Comment[] = [];
+    for (const row of store.comments) {
+      if (row.itemId !== id) {
+        kept.push(row);
+        continue;
+      }
+      votes.delete(voteKey("comment", row.id));
+      bookmarks.delete(voteKey("comment", row.id));
+    }
+    store.comments = kept;
+    votes.delete(voteKey("preset", id));
+    bookmarks.delete(voteKey("preset", id));
+
+    recount(store);
+    return true;
+  },
+
+  /**
+   * Fork: every setting as it now stands, the NSFW flag included — `detail.md` is explicit that a
+   * copy starts from all of the values rather than from a diff. Private rows are refused, because a
+   * copy would republish what moderation removed.
+   */
+  async forkPreset(id) {
+    const source = store.presets.find((row) => row.id === id) ?? null;
+    if (!source || !source.isPublic) return null;
+
+    const at = nowIso();
+    const fork = presetSchema.parse({
+      ...source,
+      id: freshId(),
+      author: VIEWER,
+      settings: { ...source.settings },
+      isPublic: true,
+      verified: false,
+      likes: 0,
+      dislikes: 0,
+      bookmarks: 0,
+      commentCount: 0,
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    store.presets.push(fork);
     return fork;
   },
 

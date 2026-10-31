@@ -831,6 +831,52 @@ differences are all about the **entries editor**, which T-19's settings form doe
   write exists, so it says *Not available yet* rather than pretending to succeed.
 - **Cancel differs by host**: catalog from create, detail from edit; Save lands on detail both ways.
 
+## Preset create and edit (decided in T-19, do not re-invent)
+
+`preset/create.md` fixes the form's order (*the avatar and the NSFW toggle at the top, then the
+generation settings, then Save and Cancel*) and `preset/edit.md` leaves its frame *to be specified*.
+Both routes mount the **same** `components/PresetForm.tsrx` (`preset: null` is create, a row is
+edit). The frame is T-17/T-18's unchanged — one column at 360 in the spec's order (identity →
+description → image and NSFW → generation settings → Save/Cancel), the image row splitting at `sm`,
+and at `lg` a two-column grid with identity and media in a 320px right column, the description and
+the settings down the left, and the foot across both.
+
+- **Model is a `Select` of `PRESET_MODELS`, never a free-text field.** *Data* → *Model* says the
+  model is *chosen by its author from the ones the app offers*, so a text box would let an author
+  name a model that does not exist, and the inline error would have nothing to point at. The list
+  lives in `schema.ts` beside `presetSettingsSchema` — the app's generation layer is DeepSeek, so it
+  holds `deepseek-chat` and `deepseek-reasoner`, which is exactly what the five fixtures carry.
+  The option labels are the ids themselves: the id is the word the detail page shows "as saved", and
+  a friendly alias here would make the form and the read page disagree.
+- **`presetSettingsSchema.model` stays `min(1)`, not an enum.** *The settings list follows the
+  generation layer and is added here as that surface settles*, so a new model is a list-and-fixture
+  change, not a migration of every stored preset. The control offers what exists; the row records
+  what was chosen.
+- **The provider is not a control and not shown as one.** *It is never a field and is not shown*, so
+  the block carries one `Select` and a sentence saying the provider belongs to the app. No provider
+  chip, no second select, no "via …" suffix on the option labels.
+- **Settings get their own labelled section although the list is flat.** The spec's *not grouped
+  into sections* is about the fields — a section here is the labelled region every other block of
+  the frame already has, and it is what makes **Model** findable at `lg` in the wide column's second
+  row. A preset's settings are its payload, so the block is not folded into the description.
+- **Detail shows the settings after the description and before the comments**, as a `<dl>`: one row
+  per field, term above value at 360 and side by side from `sm`, the value in `--font-mono` because
+  it is a saved token rather than prose. Values are **as saved** — no default beside them, no mark of
+  what the author changed, no friendly name (`detail.md`). A preset's description is the one prose
+  line above them; it is the row's `description`, which the catalog searches.
+- **Delete's sentence names only what `edit.md` names**: the comment thread goes, and *a running
+  session keeps its own copy*. A preset has no entries, so there is no entries cascade to state, and
+  it is not attachable the way a lorebook is — the character form's `unavailable` sentence would be
+  a promise about a reference that does not exist.
+- **`Request public again` is drawn disabled** (owner, while private), exactly as on lorebook detail:
+  `detail.md` names it, no write exists.
+- **A component's root element cannot be styled** (found in T-19, applies to every `.tsrx`): Ripple
+  0.4.7 scopes a `<style>` block by adding a `tsrx-<hash>` class to the elements it emits, and the
+  root element does not get one — so a rule written on `.preset-form` is dropped by the compiler and
+  the form silently stays `display: block`. That is why `CharacterForm`, `LorebookForm` and
+  `PresetForm` all now put their grid on a child `.layout` div. The same fix was applied to the two
+  older forms in T-19: their `lg` two-column layout had never actually applied.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

@@ -353,10 +353,47 @@ export const presetSettingsSchema = z.strictObject({
   model: z.string().min(1),
 });
 
+/**
+ * The models a preset may name — *chosen by its author from the ones the app offers*
+ * (`preset/create.md` → *Data* → *Model*). The app's generation layer is DeepSeek
+ * (`docs/ARCHITECTURE.md` → *LLM (chat turns)*), so these are its two models, and this list is the
+ * one place both the form's control and the fixtures read it from.
+ *
+ * `presetSettingsSchema.model` stays `min(1)` rather than an enum of this list: the spec says the
+ * settings list *follows the generation layer*, so adding a model is a fixture-and-list change, not
+ * a migration of every stored preset. The control offers what exists; the row records what was
+ * chosen.
+ */
+export const PRESET_MODELS: readonly string[] = ["deepseek-chat", "deepseek-reasoner"];
+
 export const presetSchema = authored("preset", {
   description: z.string(),
   settings: presetSettingsSchema,
 });
+
+/**
+ * The preset form's one shape (`preset/create.md`, and `edit.md` *is the same form*, preloaded),
+ * parsed by `PresetForm` **and** again by `repo.addPreset` / `repo.updatePreset` — the pattern
+ * `characterWriteSchema` and `lorebookWriteSchema` established.
+ *
+ * Deliberately no `tagline` (a preset has none, so the card's stays `""`) and no tags (the taxonomy
+ * is undecided). `settings` is the whole generation block: `model` is the only named field, and the
+ * provider behind it belongs to the app, so it is not a field a write can carry.
+ */
+export const PRESET_NAME_REQUIRED = "A preset needs a name.";
+
+export const presetWriteSchema = z
+  .strictObject({
+    name: z
+      .string()
+      .transform(normaliseDisplayName)
+      .pipe(z.string().min(1, PRESET_NAME_REQUIRED)),
+    description: z.string().transform((raw) => raw.trim()),
+    nsfw: z.boolean(),
+    avatar: z.strictObject({ initials: initialsInputSchema }),
+    settings: presetSettingsSchema,
+  })
+  .transform(withInitials);
 
 /** The union a listing or a detail lookup can answer with; `kind` is the discriminator. */
 export const authoredItemSchema = z.discriminatedUnion("kind", [

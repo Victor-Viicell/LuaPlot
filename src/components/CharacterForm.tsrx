@@ -199,6 +199,9 @@ export function CharacterForm({
       save();
     }}
   >
+    {/* The root element carries no scope class in Ripple 0.4.7, so a rule on `.character-form` is
+        dropped and the form never becomes a grid (found in T-19). The layout lives on this child. */}
+    <div class="layout">
     <section class="section is-identity">
       <p class="section-label">Identity</p>
       <Field
@@ -331,9 +334,10 @@ export function CharacterForm({
         </Button>
       </div>
     </div>
+    </div>
 
     <style>
-      .character-form {
+      .layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
         gap: 24px;
@@ -491,7 +495,7 @@ export function CharacterForm({
       @media (min-width: 900px) {
         /* Two columns: the definition reads down the left, identity and the image sit beside it.
            A form that stayed one 328px column at 1440 would be a stretched phone. */
-        .character-form {
+        .layout {
           grid-template-columns: minmax(0, 1fr) 360px;
           column-gap: 40px;
         }

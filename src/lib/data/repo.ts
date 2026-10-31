@@ -28,6 +28,7 @@ import type {
   Post,
   PostWrite,
   Preset,
+  PresetWrite,
   Report,
   ReportOutcome,
   ReportEntry,
@@ -211,6 +212,46 @@ export type Repo = {
    * moderation took out of view.
    */
   forkLorebook(id: string): Promise<Lorebook | null>;
+
+  /**
+   * **Save** on `/preset/create` (`preset/create.md`): the write is `presetWriteSchema`-shaped and
+   * parsed here, so the form's gate and the stored row are one rule. The page hands the *write*,
+   * never a row — the adapter owns `id`, `author`, `verified: false`, the clock, the empty
+   * `tagline`, no tags and zero engagement. `null` on a failed parse.
+   *
+   * `settings` is stored exactly as written: a preset has no entries and no derived field.
+   */
+  addPreset(input: PresetWrite): Promise<Preset | null>;
+
+  /**
+   * **Save** on `/preset/[id]/edit` — **author only**, `null` for anyone else. `id`, `author`,
+   * `createdAt`, `isPublic` and the engagement counts are kept; `updatedAt` moves and `verified`
+   * clears, because *any edit clears the cached scan*. `settings` is replaced wholesale by the write.
+   *
+   * A running session keeps the copy it started from (`edit.md` → *A running session keeps its own
+   * copy*), so nothing here reaches into a session row.
+   */
+  updatePreset(id: string, input: PresetWrite): Promise<Preset | null>;
+
+  /**
+   * **Delete** on `/preset/[id]/edit` — **author only**, immediate. The preset row, its comment
+   * thread, its votes and bookmarks go together. There is no entries cascade: a preset has none
+   * (`edit.md` names no further consequence beyond the row itself).
+   *
+   * `false` when the row is missing or another account's.
+   */
+  deletePreset(id: string): Promise<boolean>;
+
+  /**
+   * **Fork / copy** (`preset/detail.md`): a new preset owned by the viewer carrying **every setting
+   * as shown, the NSFW flag included** — the spec is explicit that a fork starts from all of those
+   * values, not from a diff against a baseline. Engagement, bookmarks and comments start at zero,
+   * and the fork is unverified until it is scanned.
+   *
+   * `null` when the source is missing or private: a copy of a privated preset would republish what
+   * moderation took out of view.
+   */
+  forkPreset(id: string): Promise<Preset | null>;
 
   /**
    * The lorebooks the picker may offer (`character/create.md` → *From a picker*): **the author's own
