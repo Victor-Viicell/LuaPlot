@@ -180,8 +180,11 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       `jevPayloadSchema`/`jevRequestSchema` in `schema.ts`, `mockJevAnswers` for the preview, and
       `addReport` now scans once per item change: act + notify with no case, or escale with the
       verdict on the case. A certain violation on a post escalates until T-28B gives it a status.
-- [ ] **T-28 Moderation surfaces on detail pages.** Owner notice (report, reasons, measures),
-      Awaiting re-verification, Request public again.
+- [x] **T-28 Moderation surfaces on detail pages.** Owner notice (report, reasons, measures),
+      Awaiting re-verification, Request public again. — `moderationNoticeSchema` (one row per measure,
+      keyed by target) + `repo.moderationNotice(kind,id)` (newest of that row and the case that hid the
+      item) + `repo.requestRepublication(kind,id)` (runs `classify()` at once, owner-only); the three
+      authored detail pages draw the notice, the gate (`updatedAt > notice.at`) and the three states.
 - [ ] **T-28B A post can be removed.** `postSchema` grows `status: "visible" | "removed"`, and with
       it: fixtures, `ratioOf`, bookmarks (`item: null`), the feed, the composer's *my posts* view,
       and the cascade that takes the post's thread. Until then a clear violation on a post is

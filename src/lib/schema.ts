@@ -1147,6 +1147,47 @@ export const reportSchema = z
     }
   });
 
+/* --- What an immediate action leaves behind (T-28) ----------------------------------------------- */
+
+/**
+ * `systems/jev.md` → *Privacy and republication* is two sentences that pull in opposite directions:
+ * *a clear violation is applied at once and opens no case*, and *the owner sees the report, the
+ * reasons, and the measures taken on the content page itself*. A case cannot carry it (there is
+ * none) and `/moderation` must not list it (it never enters the queue), so the measure gets its own
+ * row, **keyed by target** and readable by the owner's page.
+ *
+ * Decided in T-28 over the alternative of folding it into the creator's `moderation` notification:
+ * the notification is an **inbox** row, aggregated by kind and cleared by reading it, while the
+ * notice is a **record** that has to survive the notification being read, deleted, or aggregated
+ * away. One row per measure taken, so a second action on the same item is a second record.
+ */
+export const moderationNoticeSchema = z.strictObject({
+  id: z.uuid(),
+  target: reportTargetSchema,
+  /** The measure JEV applied. A post cannot be made private, so it never appears on one. */
+  measure: z.enum(["made-private", "removed", "avatar-removed"]),
+  /** Every reason on file against this target when the measure was applied. */
+  reasons: z.array(reportEntrySchema).min(1),
+  /** The judgment behind the measure, stored — never recomputed for the owner's page. */
+  jev: jevVerdictSchema,
+  /** A moderator's own words, present only when a human concluded the case that hid the item. */
+  decisionReason: z.string().min(1).optional(),
+  at: isoSchema,
+});
+
+/**
+ * `systems/jev.md` → *Verification*: *a republication request runs the same check: when it passes,
+ * the flag is set and the content returns to public.* The answer is this and nothing more — a
+ * `verified` field never leaves the adapter (`the verified flag is internal`), so the page learns
+ * the outcome as visibility plus the model's one sentence.
+ */
+export const republicationOutcomeSchema = z.strictObject({
+  state: z.enum(["public", "private"]),
+  /** The JEV note, for the owner's copy — `jevPolicy.ts` wrote it, the page only prints it. */
+  note: z.string().min(1),
+  at: isoSchema,
+});
+
 /* ------------------------------------------------------------------------------------------------
  * Sessions
  * ---------------------------------------------------------------------------------------------- */

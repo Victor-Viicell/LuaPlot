@@ -4,6 +4,22 @@ Append-only. Newest first. Every entry: ticket, what changed, what was verified 
 could not be verified.
 
 
+## T-28 — the owner's side of a moderation outcome (2026-10-31)
+
+- **Changed:** `moderationNoticeSchema` + `republicationOutcomeSchema` in `schema.ts` (types via
+  `z.infer`); an immediate action now writes **one notice row per measure** beside the creator's
+  notification, so T-27's case-less hide finally has a record; `repo.moderationNotice(kind,id)` answers
+  the newest of that row and the case that hid the item (one call, two sources, decided in the
+  adapter); `repo.requestRepublication(kind,id)` runs `classify()` at once, owner-only, authored kinds
+  only, and sets `verified`+`isPublic` only on a clean answer. `character-detail`, `lorebook-detail`
+  and `preset-detail` replaced their `listReports` scan with that one call and gained *Request public
+  again* (gated on `updatedAt > notice.at`, with a sentence saying why it is closed), *Awaiting
+  re-verification* (skeleton lines, never a spinner) and *Verified and public again* (clears itself
+  after 3.6s). Decisions written in `docs/DESIGN.md` + `docs/ARCHITECTURE.md`.
+- **Verified:** `scripts/check.sh` GREEN (build, 30 routes, schema section).
+- **Not verified:** the live render of the three states — the adapter calls were exercised through the
+  pages' own code paths only by the typecheck; a browser walk of a request is owed to the next tick.
+
 ## T-27 — the JEV adapter, and a queue that now means something (2026-10-31)
 
 - **Changed:** `lib/llm/jev.ts` is transport only — `POST https://openrouter.ai/api/alpha/decisions`,

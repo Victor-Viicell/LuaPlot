@@ -108,6 +108,16 @@ Shapes, decided in T-03 (change them here before changing them in the code):
   `status: "removed"` with its body gone and its replies intact, and a **post has no status field
   yet**, so its removal is recorded on the case alone — the gap is logged in `docs/NEXT.md`. It also writes the
   creator's moderation notification in the same step; the reporter is never written a row.
+- **An immediate action's record (T-28)** is a `moderationNotice` row, not a case:
+  `systems/jev.md` says a clear violation is applied at once **and opens no case**, while the owner must
+  still see the reasons and the measure. So `addReport`'s immediate branch writes the creator's
+  `moderation` notification (the inbox) **and** one `moderationNoticeSchema` row per measure (the
+  record), and `repo.moderationNotice(kind, id)` answers the newest of that row and *the case that hid
+  the item* as one shape — a dismissed case, or one concluded `public`, is no notice at all. The page
+  asks once; the adapter owns which source answered. `requestRepublication(kind, id)` is the owner's
+  one recovery: authored kinds only, the viewer must be the author (the adapter's check, because RLS
+  will be the same check), the item must be private, and it runs `classify()` **at once** — `verified`
+  + `isPublic` on a clean answer, `private` otherwise. `verified` never leaves the adapter.
 - **Counts are derived** in the adapter, never authored in a fixture: `commentCount` and
   `replyCount` are recomputed from the thread on load, and `ratio` is a function (`ratioOf`), never
   a stored field.

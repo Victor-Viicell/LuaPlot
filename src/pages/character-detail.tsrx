@@ -72,6 +72,8 @@ export function CharacterDetail() @{
   const comments = track(0);
   const nsfw = track(false);
   const isPublic = track(true);
+  /** When the row was last saved — the republication gate reads it (T-28). */
+  const updatedAt = track("");
 
   const attachments = track<Attachment[]>([]);
   const bookmarked = track(false);
@@ -82,6 +84,40 @@ export function CharacterDetail() @{
   const noticeSummary = track("");
   const noticeMeasure = track("");
   const noticeReasons = track<ReasonRow[]>([]);
+  /** When the measure was applied — the owner's edit has to be newer than this. */
+  const noticeAt = track("");
+
+  /**
+   * **Request public again** (T-28). `systems/jev.md` → *Verification* makes the shape three phases:
+   * `awaiting` covers both the check that is running (*the item stays private until that check
+   * returns*) and the refusal that followed it, `republished` is the one-line confirmation that
+   * clears itself into the ordinary public view, and `error` is a request that never reached the
+   * adapter.
+   */
+  const requestPhase = track<"none" | "awaiting" | "republished" | "error">("none");
+  const requestNote = track("");
+  const requestBusy = track(false);
+  /**
+   * The gate, decided in T-28: the spec asks for a request *once every reason has been patched*, and
+   * keeps **no per-reason record**, so the only checkable form of that sentence is *the item was
+   * edited since the measure*. `updatedAt` clears on every save; `noticeAt` is the measure's clock,
+   * and a refused request resets it, so the next attempt needs a newer edit.
+   */
+  const canRequest = track(
+    () =>
+      owner.value &&
+      phase.value === "ready" &&
+      !isPublic.value &&
+      updatedAt.value !== "" &&
+      noticeAt.value !== "" &&
+      updatedAt.value > noticeAt.value,
+  );
+  /** The line under the button: it says why the control is closed instead of leaving a dead button. */
+  const requestHint = track(() =>
+    canRequest.value
+      ? "A request covers the saved version, so JEV re-checks the whole character."
+      : "Nothing has changed since moderation hid it. Edit and save this character first — a request covers the saved version.",
+  );
 
   const menuOpen = track(false);
   /**
@@ -133,6 +169,10 @@ export function CharacterDetail() @{
     failure.value = "";
     missing.value = false;
     hasNotice.value = false;
+    noticeAt.value = "";
+    requestPhase.value = "none";
+    requestNote.value = "";
+    requestBusy.value = false;
     attachments.value = [];
     revealed.value = false;
     sessionId.value = "";
@@ -167,6 +207,7 @@ export function CharacterDetail() @{
         comments.value = item.commentCount;
         nsfw.value = item.nsfw;
         isPublic.value = item.isPublic;
+        updatedAt.value = item.updatedAt;
         phase.value = "ready";
 
         loadAttachments(item.lorebookIds);
@@ -233,43 +274,84 @@ export function CharacterDetail() @{
   }
 
   /**
-   * The owner's moderation notice: the case, its reasons, and the measure JEV applied.
+   * The owner's moderation notice: the reasons, the measure, and when it was applied.
    *
-   * `listReports` is the only report read the adapter has, so the page takes one page of cases and
-   * picks its own target. A character has one case per item (`systems/jev.md` → *one case per item,
-   * its own reasons kept*), so the first match is the case.
+   * **One call** (T-28). `repo.moderationNotice` answers the newest record for this target whether
+   * an immediate action wrote it or a moderator's conclusion did — this page must not know which,
+   * and must not bolt a second lookup (the case list) beside the first. That is why the notice is
+   * non-empty for the exact content T-27 hides without a case.
    */
   function loadNotice(targetId: string): void {
-    repo.listReports({ status: "all" }).then(
-      (listing) => {
-        const row =
-          listing.items.find(
-            (entry) => entry.target.kind === "character" && entry.target.id === targetId,
-          ) ?? null;
-
-        if (!row) {
+    repo.moderationNotice("character", targetId).then(
+      (record) => {
+        if (!record) {
           hasNotice.value = false;
+          noticeAt.value = "";
           return;
         }
 
-        const count = row.reasons.length;
-        noticeSummary.value = `${count} ${count === 1 ? "report" : "reports"} on this case. It stays out of the catalog while it is private.`;
+        const count = record.reasons.length;
+        noticeSummary.value = `${count} ${count === 1 ? "report" : "reports"} on this character. It stays out of the catalog while it is private.`;
         noticeMeasure.value =
-          row.jev.action === "made-private"
-            ? "JEV found the body reproduced another character and made this private. Editing it is the only way to request a review."
-            : "JEV has not concluded this case yet, so it stays private until it does.";
-        noticeReasons.value = row.reasons.map((entry, index) => ({
+          record.measure === "made-private"
+            ? `JEV made this private: ${record.jev.note ?? "the body fell outside the terms."}`
+            : `The measure taken: ${record.measure}.`;
+        noticeReasons.value = record.reasons.map((entry, index) => ({
           key: `${index}-${entry.at}`,
           parts: entry.parts.join(" + "),
           reasons: entry.reasons.join(" + "),
           details: entry.details ?? "",
         }));
+        noticeAt.value = record.at;
         hasNotice.value = true;
       },
       () => {
         hasNotice.value = false;
       },
     );
+  }
+
+  /**
+   * **Request public again** — the owner's one recovery from an immediate action
+   * (`systems/jev.md` → *Privacy and republication*). The adapter runs the check, applies the answer,
+   * and returns the outcome; the page only waits and then draws it. `isPublic` is taken from the
+   * answer, so the item redraws as an ordinary public page without a reload — the memory adapter's
+   * runtime rows survive, which is the whole reason this never touches `location`.
+   */
+  async function requestPublic(): Promise<void> {
+    if (!canRequest.value || requestBusy.value) return;
+
+    requestBusy.value = true;
+    requestPhase.value = "awaiting";
+    requestNote.value = "JEV is checking this character now. It stays private until the answer lands.";
+
+    const outcome = await repo.requestRepublication("character", id).catch(() => null);
+    requestBusy.value = false;
+
+    if (!outcome) {
+      requestPhase.value = "error";
+      requestNote.value = "That request didn't go through. Nothing changed — try again.";
+      return;
+    }
+
+    requestNote.value = outcome.note;
+
+    if (outcome.state === "public") {
+      isPublic.value = true;
+      requestPhase.value = "republished";
+      // The confirmation is one line, then the ordinary public view takes over.
+      setTimeout(() => {
+        if (requestPhase.value !== "republished") return;
+        hasNotice.value = false;
+        requestPhase.value = "none";
+      }, 3600);
+      return;
+    }
+
+    // Still private: the gate closes again, because the request covered the whole item and JEV read
+    // it the same way it did the first time. A newer edit is what opens the next attempt.
+    noticeAt.value = outcome.at;
+    requestPhase.value = "awaiting";
   }
 
   /** One vote per viewer, and a switch replaces the previous one — the adapter owns that rule. */
@@ -769,6 +851,36 @@ export function CharacterDetail() @{
         line-height: 1.7;
       }
 
+      .notice-title.is-verified {
+        color: var(--color-success);
+      }
+
+      /* The republication block: the one control the notice carries, plus what it is waiting on. */
+      .review {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--color-border);
+      }
+
+      .review-status {
+        margin: 0;
+        color: var(--color-text);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.6;
+      }
+
+      .review-hint {
+        margin: 0;
+        color: var(--color-text-subtle);
+        font-size: 12px;
+        line-height: 1.6;
+        max-width: 62ch;
+      }
+
       .reasons {
         display: flex;
         flex-direction: column;
@@ -960,20 +1072,55 @@ export function CharacterDetail() @{
 
           @if (hasNotice.value) {
             <section class="notice" aria-label="Moderation notice">
-              <p class="notice-title">This character was made private by moderation.</p>
-              <p class="notice-body">{noticeSummary.value}</p>
-              <ul class="reasons">
-                @for (const row of noticeReasons.value; key row.key) {
-                  <li class="reason">
-                    <span class="reason-tag">{row.parts}</span>
-                    <span>{row.reasons}</span>
-                    @if (row.details.length > 0) {
-                      <span>{`— ${row.details}`}</span>
+              @if (requestPhase.value === "republished") {
+                <>
+                  <p class="notice-title is-verified" role="status">Verified and public again.</p>
+                  <p class="notice-body">{requestNote.value}</p>
+                </>
+              } @else {
+                <>
+                  <p class="notice-title">This character was made private by moderation.</p>
+                  <p class="notice-body">{noticeSummary.value}</p>
+                  <ul class="reasons">
+                    @for (const row of noticeReasons.value; key row.key) {
+                      <li class="reason">
+                        <span class="reason-tag">{row.parts}</span>
+                        <span>{row.reasons}</span>
+                        @if (row.details.length > 0) {
+                          <span>{`— ${row.details}`}</span>
+                        }
+                      </li>
                     }
-                  </li>
-                }
-              </ul>
-              <p class="notice-body">{noticeMeasure.value}</p>
+                  </ul>
+                  <p class="notice-body">{noticeMeasure.value}</p>
+
+                  <div class="review">
+                    @if (requestBusy.value) {
+                      <>
+                        <p class="review-status" role="status">{requestNote.value}</p>
+                        <Skeleton variant="lines" lines={2} />
+                      </>
+                    } @else if (requestPhase.value === "awaiting") {
+                      <>
+                        <p class="review-status" role="status">Awaiting re-verification — it stays private until JEV passes it.</p>
+                        <p class="notice-body">{requestNote.value}</p>
+                        <Button variant="secondary" onClick={requestPublic} disabled={!canRequest.value}>Request public again</Button>
+                        <p class="review-hint">{requestHint.value}</p>
+                      </>
+                    } @else if (requestPhase.value === "error") {
+                      <>
+                        <p class="review-status" role="alert">{requestNote.value}</p>
+                        <Button variant="secondary" onClick={requestPublic} disabled={!canRequest.value}>Try again</Button>
+                      </>
+                    } @else {
+                      <>
+                        <Button variant="secondary" onClick={requestPublic} disabled={!canRequest.value}>Request public again</Button>
+                        <p class="review-hint">{requestHint.value}</p>
+                      </>
+                    }
+                  </div>
+                </>
+              }
             </section>
           }
 

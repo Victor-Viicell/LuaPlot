@@ -1242,6 +1242,36 @@ these are the drawings.
   concluded. The creator has been told.* — which is who is told. A dismissal's toast says *Nothing
   changed visibility*, because it did not.
 
+## Owner's moderation notice and republication (decided in T-28, do not re-invent)
+
+Spec: `character/detail.md` → *Data* → *Moderation notice*, *Actions* → *Request public again*, *States*
+(*Privated by moderation*, *Awaiting re-verification*); the same sections in `lorebook/detail.md` and
+`preset/detail.md`; `systems/jev.md` → *Privacy and republication*, *Verification*.
+
+- **An immediate action leaves a record, not a case.** The spec is two sentences that pull apart —
+  *a clear violation is applied at once and opens no case* and *the owner sees the report, the reasons,
+  and the measures taken* — so T-27's notification is joined by **one `moderationNotice` row per
+  measure**, keyed by target. Chosen over folding it into the notification because a notification is
+  an **inbox** row: aggregated by kind, cleared by reading it, and not something a page can quote as
+  a history. Chosen over a concluded case because the spec forbids the row entering `/moderation`.
+  `repo.moderationNotice(kind, id)` answers the newest of *that row* and *the case that hid the item*
+  (JEV's `made-private`, or a decision whose outcome is `private`) as one shape, so no page asks twice.
+- **`verified` still never renders.** The notice prints the reasons, the measure, and JEV's own note;
+  nothing prints the flag.
+- **The gate for *Request public again* is an edit, not a checklist.** *Once every reason has been
+  patched* has no per-reason record to check, so the checkable form is `item.updatedAt > notice.at`.
+  The button is always present while the owner is looking at a private item, `disabled` until that is
+  true, with one `12px` line saying why — a dead control with no sentence reads as a bug. A refused
+  request rewrites `notice.at` with its own clock, so the next attempt needs a **newer** edit; that is
+  the only reading of *the request covers the item as a whole* that the data can enforce.
+- **Three states, one region.** `awaiting` is the live region while the check runs (**skeleton lines,
+  never a spinner**) and stays for a refusal (the model's note under *Awaiting re-verification*);
+  `republished` is a single success line in `--color-success` that clears itself after 3.6s into the
+  ordinary public view; `error` is *That request didn't go through. Nothing changed.* + **Try again**.
+  The item's visibility comes from the adapter's answer, never from the page's optimism.
+- **`comment` and `post` have nothing.** Removal is final (`systems/jev.md`), so no notice and no
+  control is drawn for them anywhere — `moderationNotice` answers `null` for a non-authored kind.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

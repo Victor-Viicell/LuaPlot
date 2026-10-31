@@ -61,6 +61,8 @@ import type {
   presetSettingsSchema,
   presetWriteSchema,
   reportOutcomeSchema,
+  moderationNoticeSchema,
+  republicationOutcomeSchema,
   reportPartSchema,
   reportReasonCodeSchema,
   reportEntrySchema,
@@ -174,6 +176,14 @@ export type ReportStatus = z.infer<typeof reportStatusSchema>;
 /** The queue's filter (`pages/moderation/queue.md`): one status, or both. */
 export type ReportFilter = z.infer<typeof reportFilterSchema>;
 export type Report = z.infer<typeof reportSchema>;
+/**
+ * What an immediate action left behind (`moderationNoticeSchema`): the reasons, the measure and the
+ * judgment, readable by the owner's page. Distinct from a case on purpose — an immediate action
+ * opens none.
+ */
+export type ModerationNotice = z.infer<typeof moderationNoticeSchema>;
+/** What a republication request answers: public or still private, plus the model's note. */
+export type RepublicationOutcome = z.infer<typeof republicationOutcomeSchema>;
 /** One arrow in a case's flat audit trail — an admin's note or a state change, never a thread. */
 export type CaseEvent = z.infer<typeof caseEventSchema>;
 export type CaseEventKind = z.infer<typeof caseEventKindSchema>;

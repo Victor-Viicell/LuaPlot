@@ -37,12 +37,14 @@ import {
   lorebookEntrySchema,
   lorebookSchema,
   lorebookWriteSchema,
+  moderationNoticeSchema,
   normaliseHandle,
   notificationSchema,
   profileWriteSchema,
   jevContentStateSchema,
   reportOutcomeSchema,
   reportEntrySchema,
+  republicationOutcomeSchema,
   postSchema,
   postWriteSchema,
   presetSchema,
@@ -81,6 +83,7 @@ import {
   type Handle,
   type ItemKind,
   type Lorebook,
+  type ModerationNotice,
   type Persona,
   type Notification,
   type Post,
@@ -225,6 +228,14 @@ const bookmarks = new Map<string, string>(
  * already-verified content is deliberately never opened, so a scan would miss it).
  */
 const myReports = new Map<string, ReportEntry>();
+
+/**
+ * **What an immediate action leaves behind** (`systems/jev.md` → *Privacy and republication*, T-28).
+ * An immediate action opens no case, so this is where its reasons and measure live — one row per
+ * measure taken, keyed by target, never a second copy of the case list. Runtime-only, like the vote
+ * and report maps: it describes something that happened in this session, not seed data.
+ */
+const moderationNotices: ModerationNotice[] = [];
 
 /**
  * Preferences are per **account**, so this is keyed by handle and not by device — the bug the
@@ -702,6 +713,31 @@ function notifyModeration(target: ReportTarget, measure: Notification["measure"]
       ...(measure === undefined ? {} : { measure }),
       read: false,
       createdAt: nowIso(),
+    }),
+  );
+}
+
+/**
+ * The owner's record of an immediate action (T-28). Written in the same step as the creator's
+ * notification, from the same verdict — the notification is the inbox row, this is the part that
+ * survives it being read. Parsed through `moderationNoticeSchema` before it is stored, so what the
+ * owner's page reads back is the shape the schema promised.
+ */
+function recordNotice(
+  target: ReportTarget,
+  measure: Notification["measure"],
+  reason: ReportEntry,
+  jev: JevVerdict,
+): void {
+  if (measure === undefined) return;
+  moderationNotices.push(
+    moderationNoticeSchema.parse({
+      id: freshId(),
+      target,
+      measure,
+      reasons: [reason],
+      jev,
+      at: jev.at,
     }),
   );
 }
@@ -1772,8 +1808,10 @@ export const memoryRepo: Repo = {
 
       if (jev.action === "made-private" || jev.action === "removed") {
         // *An immediate action opens no case and never enters `/moderation`* — the creator's
-        // notification and the reasons on the content page are the record.
-        notifyModeration(write.target, applyJevAction(write.target, row, jev.action));
+        // notification is the inbox row and the notice is the record its content page reads.
+        const measure = applyJevAction(write.target, row, jev.action);
+        notifyModeration(write.target, measure);
+        recordNotice(write.target, measure, reason, { ...jev, at: scannedAt });
         return reportOutcomeSchema.parse({ state: "submitted", at });
       }
 
@@ -1805,6 +1843,93 @@ export const memoryRepo: Repo = {
 
   async myReport(kind, id) {
     return myReports.get(voteKey(kind, id)) ?? null;
+  },
+
+  /**
+   * The owner's record behind a private authored item (T-28) — **one answer from two sources**.
+   *
+   * An immediate action writes a `moderationNotices` row and opens no case; a human's conclusion
+   * leaves the closed case. The owner's page asks one question (*why is this private?*) and must not
+   * care which of the two answered, so the newest of the two wins here rather than in three pages.
+   * A case counts only when it is what hid the item: JEV's `made-private`, or a decision whose
+   * outcome is `private` — a case dismissed, or concluded `public`, left the item visible and is no
+   * notice at all.
+   */
+  async moderationNotice(kind, id) {
+    if (kind !== "character" && kind !== "lorebook" && kind !== "preset") return null;
+
+    const recorded =
+      moderationNotices
+        .filter((row) => row.target.kind === kind && row.target.id === id)
+        .sort((left, right) => right.at.localeCompare(left.at))[0] ?? null;
+
+    const caseRow =
+      store.reports
+        .filter((row) => row.target.kind === kind && row.target.id === id)
+        .filter((row) => row.jev.action === "made-private" || row.decision?.outcome === "private")
+        .sort((left, right) =>
+          (right.decision?.at ?? right.jev.at).localeCompare(left.decision?.at ?? left.jev.at),
+        )[0] ?? null;
+
+    const fromCase =
+      caseRow === null
+        ? null
+        : moderationNoticeSchema.parse({
+            id: caseRow.id,
+            target: caseRow.target,
+            measure: "made-private",
+            reasons: caseRow.reasons,
+            jev: caseRow.jev,
+            ...(caseRow.decision === undefined ? {} : { decisionReason: caseRow.decision.reason }),
+            at: caseRow.decision?.at ?? caseRow.jev.at,
+          });
+
+    if (recorded === null) return fromCase;
+    if (fromCase === null) return recorded;
+    return recorded.at >= fromCase.at ? recorded : fromCase;
+  },
+
+  /**
+   * **Request public again** (`character/detail.md` → *Actions*; `systems/jev.md` → *Verification*,
+   * T-28). One call, no queue: *a republication request starts its check at once*, so the scan runs
+   * here rather than waiting behind other work, and the item stays private until it answers.
+   *
+   * A clean answer is the spec's *when it passes, the flag is set and the content returns to public*;
+   * anything else (a violation, an unsure verdict, a model that never answered) leaves the item
+   * private — a republication request may never publish what the policy would hide.
+   */
+  async requestRepublication(kind, id) {
+    const row = rowFor(kind, id);
+    if (!row) return null;
+    // Authored kinds only: `a removed post or comment has no recovery at all` (`systems/jev.md`).
+    if (!("verified" in row) || !("isPublic" in row)) return null;
+
+    const authored = row as Character | Lorebook | Preset;
+    // Being the author is the whole permission, and the adapter owns it (`VIEWER` is `auth.uid()`).
+    if (authored.author !== VIEWER) return null;
+    if (authored.isPublic) return null;
+
+    const jev = await classify({
+      kind,
+      content: jevStateFor(kind, row),
+      claim: "none",
+      imageOnly: false,
+    });
+    const at = nowIso();
+
+    if (jev.action === "none") {
+      authored.verified = true;
+      authored.isPublic = true;
+    } else {
+      // A refused version is not verified — the next edit is what makes it eligible again.
+      authored.verified = false;
+    }
+
+    return republicationOutcomeSchema.parse({
+      state: jev.action === "none" ? "public" : "private",
+      note: jev.note ?? "JEV did not answer, so it stays private.",
+      at,
+    });
   },
 
   async getComment(id) {

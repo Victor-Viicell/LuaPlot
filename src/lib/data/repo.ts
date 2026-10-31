@@ -31,6 +31,7 @@ import type {
   ItemKind,
   Lorebook,
   LorebookWrite,
+  ModerationNotice,
   Notification,
   Persona,
   PersonaWrite,
@@ -43,6 +44,7 @@ import type {
   ProfileEdit,
   Report,
   ReportOutcome,
+  RepublicationOutcome,
   ReportEntry,
   ReportFilter,
   ReportStatus,
@@ -478,6 +480,37 @@ export type Repo = {
    * reporter is not shown the verdict, the queue position or who acted.
    */
   myReport(kind: ReportTarget["kind"], id: string): Promise<ReportEntry | null>;
+
+  /**
+   * The record behind a private authored item (`systems/jev.md` → *Privacy and republication*; T-28).
+   * **One lookup, two sources, decided here**: an immediate action leaves a `moderationNotice` row
+   * (`a clear violation is applied at once and opens no case`), a human's conclusion leaves the
+   * closed case, and the owner's page must not care which. So the adapter answers the newest of the
+   * two as one shape, and the page never bolts a second read beside the first.
+   *
+   * Authored kinds only — a removed post or comment has no recovery (`removal is final`), so asking
+   * about one answers `null` and no page can draw a republication control for it.
+   */
+  moderationNotice(
+    kind: ItemKind,
+    id: string,
+  ): Promise<ModerationNotice | null>;
+
+  /**
+   * **Request public again** (`character/detail.md` → *Actions*, owner only while private). One
+   * operation: flags the item for re-verification, runs `classify()` against its current text at
+   * once (`Verification`: *a republication request starts its check at once*), and on a clean answer
+   * sets `verified` and `isPublic`. Anything else leaves the item private and answers `private`,
+   * which is the owner's *Awaiting re-verification*.
+   *
+   * The adapter refuses (`null`) when the item is not authored, is gone, is already public, or the
+   * viewer is not its author — being signed in as the owner is the whole permission, and it is the
+   * adapter's to check, never a page's.
+   */
+  requestRepublication(
+    kind: ItemKind,
+    id: string,
+  ): Promise<RepublicationOutcome | null>;
 
   /**
    * Close a case with a visibility outcome (`pages/moderation/detail.md` → *Actions*, T-26B). One
