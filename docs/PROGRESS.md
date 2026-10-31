@@ -3,6 +3,18 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## Card middle: tags get their own row (2026-10-31)
+
+- **Changed:** on the owner's call the card's middle split in two — `avatar | tagline` on the first row, the
+  **tag row across the full card width** on the second, directly above the footer's separator (the
+  separation before the author and the ratio). The veil wraps both rows so a Blur still covers the tags,
+  the tagline's clamp went 2 → 3 lines, and `.card-top .card-body` is the only child that grows.
+- **Verified:** live at 390 the tag row is 308 wide and *The Lamplighter's Widow* shows all five tags with
+  no counter; at 1280 (card 225, row 195) it shows `ghost · harbor · +3`, still one 26px line, always above
+  the footer, inside `.card-veil`, tagline 62px (three lines). No horizontal scroll either width.
+- **Note:** the change was swept into the rotation's commit `ee171af` (it was in the tree when that tick
+  committed); this entry and the spec/DESIGN lines are the documentation half.
+
 ## T-38 — the twelve journeys, walked in one scripted session (2026-10-31)
 
 - **Changed:** `scripts/smoke.mjs` — a dependency-free CDP walk (Node's global `WebSocket` plus

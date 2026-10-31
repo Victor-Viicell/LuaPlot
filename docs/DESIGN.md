@@ -323,6 +323,12 @@ list, so the decisions below are the ones they inherit.
   link strip and not the `Tabs` primitive: these are three routes, not three views of one page, so
   middle-click, back/forward and a shared URL all have to keep working. Placement is directly under the
   page's top edge and above the header, so it is reachable without scrolling on a phone.
+- **The card's middle is two rows** (owner's call, after the tag row landed in the text column and read
+  tight): `avatar | tagline` on the first, the **tag row across the full card width** on the second,
+  sitting directly above the footer's separator. The veil wraps both — a cover has to blur the tags too —
+  and the tagline's clamp went 2 → 3 lines with the space the tags no longer take beside it.
+  Measured at 390: the tag row is 308 wide and all five of a five-tag card fit with no counter; at 1280
+  the card is 225 and the row 195, so `ghost · harbor · +3`.
 - **The tags row is one line** (owner's call): the chips never wrap, so the row is `nowrap` + clipped and
   `Card` decides how many whole tags fit, reserving ~42px for the counter. The extras become a `+N` chip
   that opens `.card-menu` — `position: fixed` (a card's overflow would clip an absolute child), rung
