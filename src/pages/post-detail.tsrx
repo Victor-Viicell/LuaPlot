@@ -415,13 +415,15 @@ export function PostDetail() @{
       }
 
       @media (min-width: 900px) {
+        /* The aside is a sidebar, not a peer: 240px, so the post keeps ~430 of the 794 column. At
+           300 it was taking 42% of an A4 page and the body read like a phone. */
         .layout {
-          grid-template-columns: minmax(0, 1fr) 300px;
+          grid-template-columns: minmax(0, 1fr) 240px;
           grid-template-areas:
             "card aside"
             "comments aside";
           align-items: start;
-          column-gap: 32px;
+          column-gap: 24px;
         }
 
         .post-wrap {

@@ -463,6 +463,9 @@ export function Bookmarks() @{
         }
 
 
+        /* Two rows: the search across, then the sort in its fixed column with the count beside it.
+           The sort used to inherit `grid-column: 1 / -1` from the base rule and spanned the row on
+           its own, which is why the desktop toolbar read as three ragged lines. */
         .toolbar {
           grid-template-columns: minmax(0, 1fr) 220px;
           align-items: end;
@@ -471,6 +474,17 @@ export function Bookmarks() @{
 
         .search {
           grid-column: 1 / -1;
+        }
+
+        .sort {
+          grid-column: 2;
+          grid-row: 2;
+        }
+
+        .meta {
+          grid-column: 1;
+          grid-row: 2;
+          align-self: end;
         }
 
         .pager {
@@ -490,6 +504,12 @@ export function Bookmarks() @{
 
         .search {
           grid-column: 1;
+          grid-row: 1;
+        }
+
+        .sort {
+          grid-column: 2;
+          grid-row: 1;
         }
 
         .meta {

@@ -315,22 +315,17 @@ export function PostThread() @{
         /* One row from `sm`: sort keeps a column, the chip and the switches take the middle, the
            button ends the row. */
         .controls {
-          grid-template-columns: 200px auto minmax(0, 1fr) auto;
+          grid-template-columns: 200px minmax(0, 1fr) auto;
           align-items: end;
-          gap: 16px;
+          gap: 24px;
         }
 
         .sort {
           grid-column: 1;
         }
 
-        .filter {
-          grid-column: 2;
-          align-self: center;
-        }
-
         .prefs {
-          grid-column: 3;
+          grid-column: 2;
           flex-direction: row;
           align-items: center;
           gap: 24px;
@@ -338,7 +333,7 @@ export function PostThread() @{
         }
 
         .create {
-          grid-column: 4;
+          grid-column: 3;
         }
 
         .feed {
@@ -349,6 +344,20 @@ export function PostThread() @{
           width: auto;
           min-width: 200px;
           margin: 0 auto;
+        }
+      }
+
+
+      /* Under `md` the four-across row squeezed both switches to 115px. Two rows instead: sort and
+         Create on top, the pair across the width beneath. */
+      @media (min-width: 640px) and (max-width: 899px) {
+        .prefs {
+          grid-column: 1 / -1;
+          grid-row: 2;
+        }
+
+        .create {
+          grid-row: 1;
         }
       }
 
@@ -374,11 +383,6 @@ export function PostThread() @{
             options={SORT_OPTIONS}
             onChange={chooseSort}
           />
-        </div>
-
-        <div class="filter">
-          <p class="filter-label">Filter</p>
-          <span class="filter-chip" title="Post tags are not decided yet">All</span>
         </div>
 
         <div class="prefs">

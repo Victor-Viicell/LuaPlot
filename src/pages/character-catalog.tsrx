@@ -351,11 +351,13 @@ export function CharacterCatalog() @{
         }
 
 
-        /* The two text fields keep the full width; sort and the switches share the row beneath. */
+        /* The two text fields keep the full width; sort takes a fixed 220px column and the two
+           switches get everything else — side by side in a half column they were 139px each, both
+           labels wrapped, and the tracks landed at different heights. */
         .toolbar {
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          grid-template-columns: 220px minmax(0, 1fr);
           align-items: end;
-          gap: 12px 16px;
+          gap: 12px 24px;
         }
 
         .sort {
@@ -379,13 +381,23 @@ export function CharacterCatalog() @{
         }
       }
 
+
+      /* Between `sm` and `md` the row is not wide enough for both switches beside a 220px sort: at
+         640 they came out 148px each and both labels wrapped. The pair drops to its own full-width
+         row there, and only shares the row once the outlet is one A4 page wide. */
+      @media (min-width: 640px) and (max-width: 899px) {
+        .prefs {
+          grid-column: 1 / -1;
+        }
+      }
+
       @media (min-width: 900px) {
         .toolbar {
-          grid-template-columns: minmax(0, 1fr) 220px minmax(0, 1fr);
+          grid-template-columns: 220px minmax(0, 1fr);
         }
 
         .search {
-          grid-column: 1 / 3;
+          grid-column: 1 / -1;
         }
 
         .tags {
@@ -393,11 +405,11 @@ export function CharacterCatalog() @{
         }
 
         .sort {
-          grid-column: 2;
+          grid-column: 1;
         }
 
         .prefs {
-          grid-column: 3;
+          grid-column: 2;
         }
       }
 

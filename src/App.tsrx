@@ -683,8 +683,10 @@ export function App() @{
           display: inline;
         }
 
+        /* The A4 cap is the page's width at every breakpoint (owner's call): the old 1120px here
+           overrode it and every desktop page was laid out 940 wide by accident, which is what made
+           the toolbars and switch rows read as compressed. */
         .outlet {
-          max-width: 1120px;
           padding: 32px 40px 56px;
         }
       }

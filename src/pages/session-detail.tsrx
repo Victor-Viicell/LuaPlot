@@ -1045,10 +1045,14 @@ export function SessionDetail() @{
            leave a 324px reading column: a transcript is prose, so it keeps the full outlet there and
            the copies stay the one collapsed row they are on a phone. DOM order is the phone order,
            so the wide layout is a grid placement — not a second tree. */
+        /* The transcript column is one A4 page wide even here: the pair is centred in the immersive
+           viewport, so the prose line stays 794 and the copies sit beside it instead of the page
+           stretching to the monitor. */
         .layout {
-          grid-template-columns: minmax(0, 1fr) 300px;
+          grid-template-columns: minmax(0, 794px) 300px;
           gap: 32px;
           align-items: start;
+          justify-content: center;
         }
 
         .main {

@@ -544,7 +544,7 @@ export function CharacterDetail() @{
         .identity-text {
           grid-column: 2;
           grid-row: 1;
-          align-self: end;
+          align-self: start;
         }
 
         .menu-btn {
@@ -586,7 +586,7 @@ export function CharacterDetail() @{
         justify-content: center;
         width: 44px;
         height: 44px;
-        margin: -10px -10px 0 0;
+        margin: 0;
         padding: 0;
         border: 1px solid transparent;
         border-radius: 2px;

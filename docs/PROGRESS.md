@@ -3,6 +3,30 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## Desktop audit — the A4 cap that never applied (2026-10-31)
+
+- **Root cause:** the owner reported the NSFW rows looking compressed and misaligned on desktop. The
+  switches were part of it, but the real fault was `App.tsrx`'s `@media (min-width: 1200px) .outlet
+  { max-width: 1120px }`, which overrode the A4 cap added in T-15 — every desktop page was laid out
+  940 wide instead of 794, so controls designed for a 794 column were stretched or squeezed at random.
+- **Changed:** the 1120 override is gone (794 is the cap at every width, one owner); the three catalogs'
+  toolbars are `220px + 1fr` with the switches sharing the wide column (332px each at 1280, was 139);
+  between 640–899 the switch pair drops to its own full-width row (270 each at 640, was 148 and both
+  labels wrapped); the thread's controls lost the inert `Filter: All` chip and went to `200px + 1fr +
+  auto` (199 each, no wrap); bookmarks' toolbar finally places its sort in its own column instead of
+  spanning a row of its own (it inherited `grid-column: 1 / -1`); character/lorebook/preset detail
+  heads top-align the identity (`align-self: start`) and the settings button lost its `-10px` margins
+  that hanging it above the head; the session's wide layout is centred on a 794 column; post detail's
+  aside is 240px (was 300, leaving a 382px body); the card grid stops at three columns (was four at
+  1200 → 163px cards).
+- **Verified:** build clean; measured at 640/700/900/1280 on the three catalogs and the thread: switches
+  270/270 at 640 and 219–227 above 900, labels single-line everywhere, no horizontal scroll, outlet
+  exactly 794 above `sm` on every page walked (catalog, thread, bookmarks, notifications, all three
+  detail pages, forms, session, moderation, profile, persona, terms, onboarding, auth), card grid 2/3/3
+  with cards 278/233/225. The report sheet is 520 wide centred with 478px choices.
+- **Not verified:** real desktop browsers (Firefox/Safari) — Chromium at 1× only; the `md` rail's
+  interaction with the 794 column was measured but not compared against a designed target.
+
 ## Copy pass — the interface stops explaining itself (2026-10-31)
 
 - **Changed:** on the owner's call (*too much text on the users' faces … no one will read*), the copy law is

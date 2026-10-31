@@ -1192,8 +1192,11 @@ a.post-time:hover {
 }
 
 @media (min-width: 1200px) {
+    /* Three, not four: the outlet is one A4 page wide (794px), so a fourth column would draw 163px
+       cards with a 54px thumbnail — the grid stops growing with the viewport because the column
+       does. */
     .card-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 20px;
     }
 }

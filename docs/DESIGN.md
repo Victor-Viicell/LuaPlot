@@ -78,8 +78,10 @@ scrolls under the bar with `padding-bottom: env(safe-area-inset-bottom)`.
 
 `md` 900–1199: sidebar rail appears (icon + label), bottom bar goes.
 
-`lg` 1200+: fixed 240px sidebar, content max-width 1120, detail pages become two columns
-(main + 320px aside for author/engagement/attached items).
+`lg` 1200+: fixed 240px sidebar, content still **one A4 page wide (794px)**, detail pages become two
+columns (main + aside for author/engagement/attached items). **The column stops growing with the
+viewport** — a 1280 monitor draws the same 794px page as a 1024 one, which is what keeps a paragraph
+at a readable measure and a toolbar from stretching into a thin strip.
 
 Every listing: toolbar (search, filter, sort, NSFW toggles) → grid → `Load more`. `Load more` is
 a button, never infinite scroll. Paging lives in component state, filters in the query string.
@@ -102,7 +104,9 @@ blur = middle covered, footer numbers visible, per-item Reveal.
   at `md` is 84px icon-over-label.
 - Overflow menu (top right) holds Bookmarks, Moderation, Terms — app-level destinations that are
   not in the tab bar. It is a 6px sheet with the one sanctioned shadow; the scrim is invisible.
-- Content outlet: 16/24/32 gutters, capped at 720px until `lg`, then 1120px.
+- Content outlet: 16/24/32/40 gutters, capped at **794px at every width** (A4 at 96dpi). One owner —
+  `App.tsrx`; no page sets a second width. *(The old cap of 720 → 1120 at `lg` is gone: it was the
+  reason desktop pages were laid out 940 wide by accident.)*
 - Placeholder pages (until their ticket lands): spec path as a 12px kicker, 26/34px title, the
   spec's one-line summary, a hairline rule, then `Not built yet.` in `--color-text-subtle`.
 - Icons: 20px, 1.5 stroke, `currentColor`, `stroke-linecap: round`, declared once as `.ico` in
@@ -1334,6 +1338,28 @@ it in cascade*); `pages/post/detail.md` → *States* → *Removed by JEV*; `page
 `POSTS[6]` (orin's two-seat hauler) is seeded `removed`: it has no comments, no bookmark and no
 report, so nothing else in the seed contradicts it, and `/post/<its id>` proves the state without
 walking a report first.
+
+## Desktop audit (owner's call: "desktop is being neglected")
+
+The phone was designed first and the wide layouts inherited half-finished breakpoints. Fixed in this
+pass, and the rules they leave behind:
+
+- **One width, 794px, at every width above `sm`.** A page that lays out against the viewport instead
+  of the column will look correct at 360 and wrong at 1280 — that is exactly what the 1120 override
+  did to every desktop page.
+- **A select keeps a fixed 220px column; the switches take the rest.** A `Select` is 66px tall (label +
+  44px control) and a `Toggle` is 44px: put them in a row with `align-items: end` so their bottoms
+  line up, never `center`.
+- **A switch row needs ~200px per toggle.** Two toggles in a 470px area are 219 each and read fine;
+  in a 296px half-column they are 148 and both labels wrap. Between 640 and 899 the pair therefore
+  takes its own full-width row instead of sharing one with the sort.
+- **A detail head is a three-column grid**: cover (320) · identity · actions, `align-self: start` on
+  the identity so the name sits at the cover's top, and **no negative margins on the settings button**
+  (it hung 10px above the head). The same block is shared by character, lorebook and preset pages.
+- **Cards stop at three columns**, because the column they live in stops at 794: a fourth column drew
+  163px cards with a 54px thumbnail. Ladder: 1 / 2 / 3 / 3.
+- **An aside is a sidebar, not a peer**: 240px on a 794 column (a 300px aside left the post body 382
+  wide — a phone measure on a desktop).
 
 ## Copy law (owner's call, applies to every page)
 
