@@ -734,6 +734,208 @@ a.card-author:hover {
     font-variant-numeric: tabular-nums;
 }
 
+/* Post card (T-13) — the timeline's own card. It shares `.card`'s box and nothing else: a post has
+   no `name` and no `tagline`, so it cannot be a catalogue card with the title slot empty. Header
+   (poster + time) and footer (likes, dislikes, comment count) stay crisp; only the body and its
+   attachment are what Blur covers, reusing the card's `--card-blur` / `--card-scrim`. */
+.post {
+    gap: 10px;
+}
+
+.post-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.post-avatar {
+    display: flex;
+    flex: none;
+    text-decoration: none;
+}
+
+.post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    min-width: 0;
+}
+
+.post-author {
+    overflow: hidden;
+    color: var(--color-text);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.post-author:hover,
+a.post-time:hover {
+    color: var(--color-accent);
+}
+
+/* The timestamp is the second way into the post, so a post with no comments is still reachable. */
+.post-time {
+    color: var(--color-text-subtle);
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.post-middle {
+    position: relative;
+    min-width: 0;
+}
+
+.post-veil {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+.post.is-covered .post-veil {
+    filter: blur(var(--card-blur));
+}
+
+.post-body {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 15px;
+    line-height: 1.65;
+    text-wrap: pretty;
+}
+
+.post-attach {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background-color: var(--color-bg-sunken);
+    text-decoration: none;
+}
+
+.post-attach:hover {
+    border-color: var(--color-border-strong);
+}
+
+.post-attach-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.post-attach-name {
+    color: var(--color-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.post-attach-note {
+    overflow: hidden;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.post-cut {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-left: 2px solid var(--color-accent);
+    border-radius: 4px;
+    background-color: var(--color-bg-sunken);
+}
+
+.cut-turn {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.cut-who {
+    margin: 0;
+    color: var(--color-text-subtle);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+    text-transform: uppercase;
+}
+
+.cut-text {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    text-wrap: pretty;
+}
+
+.cut-more {
+    display: flex;
+}
+
+.post-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-subtle);
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+.post-counts {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.post-count {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+}
+
+.post-count-label {
+    color: var(--color-text-subtle);
+}
+
+.post-count-value {
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The permalink. 44px tall so the count is a real tap target, not a 12px word. */
+.post-comments {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 2px;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+}
+
+.post-comments:hover {
+    color: var(--color-accent);
+}
+
 /* Card grid (T-08) — gutter grid, cards keep their own 1px border and 6px radius:
    1-up at 360, 2-up at sm (640), 3-up at md (900), 4-up at lg (1200). */
 .card-grid {

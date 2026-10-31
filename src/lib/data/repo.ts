@@ -41,8 +41,14 @@ import { memoryRepo } from "./memory.ts";
 /** One page of a listing — the spec's explicit **Load more** step. */
 export const PAGE_SIZE = 24;
 
-/** `newest` sorts on `createdAt` descending; `ratio` on the derived ratio, high first. */
-export type SortOrder = "newest" | "oldest" | "ratio" | "name";
+/**
+ * `newest` sorts on `createdAt` descending; `ratio` on the derived ratio, high first; `discussed` and
+ * `liked` are the thread's two engagement orders (T-13) — comment count and likes, both high first,
+ * with `createdAt` as the tie-break so a zero-engagement feed is still reverse-chronological. They are
+ * declared on the shared union so every listing names a real order, but only a listing whose adapter
+ * accessors carry the counts can honour them; the rest fall back to `newest`.
+ */
+export type SortOrder = "newest" | "oldest" | "ratio" | "name" | "discussed" | "liked";
 
 export type ListOptions = {
   /** Matched against the title/name and the tagline, case-insensitive. Debounced by the page. */

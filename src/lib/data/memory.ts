@@ -264,7 +264,15 @@ type Accessors<T> = {
   name: (row: T) => string;
   /** Absent for personas: they carry no engagement, so `ratio` is not a meaningful sort there. */
   ratio?: (row: T) => number;
+  /** `discussed` — the comment count (T-13). Without it the order falls back to `newest`. */
+  comments?: (row: T) => number;
+  /** `liked` — the like count (T-13). Without it the order falls back to `newest`. */
+  likes?: (row: T) => number;
 };
+
+function newestFirst<T>(rows: T[], access: Accessors<T>): T[] {
+  return rows.sort((a, b) => access.createdAt(b).localeCompare(access.createdAt(a)));
+}
 
 function order<T>(rows: T[], sort: SortOrder = "newest", access: Accessors<T>): T[] {
   const sorted = [...rows];
@@ -278,11 +286,30 @@ function order<T>(rows: T[], sort: SortOrder = "newest", access: Accessors<T>): 
     case "ratio": {
       const ratio = access.ratio;
       if (ratio) sorted.sort((a, b) => ratio(b) - ratio(a));
-      else sorted.sort((a, b) => access.createdAt(b).localeCompare(access.createdAt(a)));
+      else newestFirst(sorted, access);
+      break;
+    }
+    /** Ties fall to `newest`: a feed of equal counts must still read as a feed. */
+    case "discussed": {
+      const count = access.comments;
+      if (count)
+        sorted.sort(
+          (a, b) => count(b) - count(a) || access.createdAt(b).localeCompare(access.createdAt(a)),
+        );
+      else newestFirst(sorted, access);
+      break;
+    }
+    case "liked": {
+      const likes = access.likes;
+      if (likes)
+        sorted.sort(
+          (a, b) => likes(b) - likes(a) || access.createdAt(b).localeCompare(access.createdAt(a)),
+        );
+      else newestFirst(sorted, access);
       break;
     }
     default:
-      sorted.sort((a, b) => access.createdAt(b).localeCompare(access.createdAt(a)));
+      newestFirst(sorted, access);
   }
   return sorted;
 }
@@ -305,6 +332,8 @@ const ENGAGED: Accessors<Character | Lorebook | Preset | Post> = {
   createdAt: (row) => row.createdAt,
   name: (row) => ("name" in row ? row.name : row.body),
   ratio: (row) => ratioOf(row),
+  comments: (row) => row.commentCount,
+  likes: (row) => row.likes,
 };
 
 const PERSONA_ACCESS: Accessors<Persona> = {

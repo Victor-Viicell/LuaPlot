@@ -267,6 +267,9 @@ instead of inventing a second answer.
 flag, and draws the three parts it always had. Five later tickets are this component in another
 list, so the decisions below are the ones they inherit.
 
+- **Posts do not ride this card.** The union stays `AuthoredItem`; a post has no `name`/`tagline` and
+  gets its own `PostCard` (T-13, `DESIGN.md` → *Thread*). A card whose title slot is empty is a card
+  that reads broken, and a post branch here would put the timeline's shape inside the catalogue's.
 - **The prop is the item, not eight fields.** `name`, `tagline`, `tags`, `avatar.initials`,
   `author` and the counts all come from the schema, so the card renders `ratioOf(item)` and can never
   be handed a stored percentage. Title link is `href('/<kind>/<id>')` (via `href()`), author link is
@@ -546,6 +549,50 @@ same dialog by mounting it, not by a second flow**; a post's attachment has no p
   and the secondaries left. The primary is the only accent fill; *Submitting…* is its disabled label.
 - **Failure** is one line in `--color-danger` under the last stop (*That report couldn't be filed.*) and
   the form keeps everything typed. Loading is a two-line `Skeleton` while `myReport` answers.
+
+## Thread (decided in T-13, do not re-invent)
+
+`/post/thread` is the first feed of **posts**, and it is where the post card lives. `thread.md` fixes
+the card's parts and the loads; these are the choices the spec left open.
+
+- **Posts are not catalogue cards.** `PostCard` shares `.card`'s box — border, radius, surface — and
+  nothing else: a post has no `name` and no `tagline`, so a `Card` with an empty title slot would read
+  as broken. `Card` takes the `AuthoredItem` union and **must not grow a post branch**; T-14's detail
+  page and T-30's profile reuse `PostCard` instead. The two cards share `--card-blur` / `--card-scrim`
+  so a covered post and a covered character blur by the same amount.
+- **The control row is one row from `sm` and three on a phone**: sort, then the filter chip beside
+  **Create**, then the two switches. A labelled `Select` (~66px tall), a chip, two switches and a
+  button cannot share 328px, and an `auto` column sized by a long caption starves its neighbours
+  (T-09's search box). The `sm` grid is `200px auto 1fr auto`; `md` widens the sort to 220px.
+- **The filter is a chip, not a `Select`.** `All` is the only value the taxonomy allows
+  (`repo.listTags("post")` answers `[]`), so the control is drawn at 13px in a 1px border and is not
+  focusable: a one-option select is a dropdown that cannot change anything. When posts gain tags, the
+  chip becomes the catalogue's `TagPicker` and this bullet is rewritten.
+- **Sort is a discrete choice, so it is a history entry** (`pushState`), and `newest` is written out
+  of the URL: `/post/thread?sort=discussed`. Load more never touches the URL.
+- **Show off removes a post from the feed; Blur covers it.** They are independent and Show on + Blur on
+  is legal. Measured on the fixtures: Show off → 11 of 12 rows, the flagged one absent, nothing
+  covered even with Blur on; Show on + Blur on → 12 rows, one `.is-covered` whose `.post-veil` carries
+  `blur(6px)` while `.post-foot` stays `filter: none` (*the numbers are never hidden*). Because a
+  fetched slice can be entirely hidden, the page pulls the next page rather than draw an empty feed
+  (the catalogue's `fillIfBlank`).
+- **The comment count is the permalink, and the timestamp is the second way in.** The feed renders no
+  comment at all (`thread.md` → *Layout*), so the count is an anchor to `/post/[id]` at 44px, and the
+  `<time>` in the header is the conventional link that keeps a zero-comment post reachable.
+- **A cut folds at two messages** — one user turn, one character turn, since a cut alternates — behind
+  **Show more**, which expands **in place** from per-card state. The feed's scroll and the URL survive;
+  the permalink is where the whole cut is read.
+- **A character attachment is the author's own item, drawn as a bordered row**: 40px avatar, name, and
+  the tagline on one ellipsised line. The listing resolves those characters **once per answer** and
+  hands the record in live; a card that fetched its own attachment would be an N+1 the Supabase
+  adapter would inherit, and a card handed `people[id]` would keep the `null` it saw before the
+  lookup answered (a prop expression is evaluated once — the same trap as T-08's `blur`).
+- **A post's image is not drawn.** The spec's *body with its inline images* has no field on
+  `postSchema` yet; nothing invents one, and a body-only card is not a broken card.
+- **End of feed** is a centred 12px line, drawn whenever `hasMore` is false and the feed has rows —
+  including page 1, because the fixtures hold 12 posts. Load more is therefore **unreachable in the
+  preview**: the control is mounted from `hasMore` and its append path is unverified until the
+  fixtures grow past 24.
 
 ## Do not
 

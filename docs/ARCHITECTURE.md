@@ -77,6 +77,11 @@ Shapes, decided in T-03 (change them here before changing them in the code):
 
 - **Listings** take `{ query?, sort?, page }` and return `{ items, hasMore }` with a page size of
   24. `page` is 1-based and lives in component state; `query`/`sort` live in the query string.
+  `SortOrder` is `newest | oldest | ratio | name | discussed | liked` (T-13 added the last two): a
+  sort is honoured only where the adapter's accessors carry the count, and **falls back to `newest`
+  everywhere else**, so no listing has to know which orders are meaningful for it. `discussed` sorts
+  on `commentCount`, `liked` on `likes`, both high first with `createdAt` as the tie-break — a feed of
+  equal counts still reads as a feed.
 - **Lookups** return the entity or `null`. A missing item is a *not-found state* the page renders,
   not an error — `getSession` returns `null` for "not a participant" too, because the spec gives
   that the same message.
