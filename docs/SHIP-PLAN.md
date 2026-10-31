@@ -179,16 +179,18 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       failure), `lib/llm/jevPolicy.ts` (thresholds + claim reading + action table, no I/O),
       `jevPayloadSchema`/`jevRequestSchema` in `schema.ts`, `mockJevAnswers` for the preview, and
       `addReport` now scans once per item change: act + notify with no case, or escale with the
-      verdict on the case. A certain violation on a post escalates until T-28B gives it a status.
+      verdict on the case. T-28B gave a post a status, so a certain violation now removes it.
 - [x] **T-28 Moderation surfaces on detail pages.** Owner notice (report, reasons, measures),
       Awaiting re-verification, Request public again. — `moderationNoticeSchema` (one row per measure,
       keyed by target) + `repo.moderationNotice(kind,id)` (newest of that row and the case that hid the
       item) + `repo.requestRepublication(kind,id)` (runs `classify()` at once, owner-only); the three
       authored detail pages draw the notice, the gate (`updatedAt > notice.at`) and the three states.
-- [ ] **T-28B A post can be removed.** `postSchema` grows `status: "visible" | "removed"`, and with
-      it: fixtures, `ratioOf`, bookmarks (`item: null`), the feed, the composer's *my posts* view,
-      and the cascade that takes the post's thread. Until then a clear violation on a post is
-      recorded as `escalated` and the row stays visible — see `docs/JEV.md` → *Limits of this build*.
+- [x] **T-28B A post can be removed.** `postSchema` grew `status: "visible" | "removed"` (T-28B) —
+      fixtures (post 6 seeded `removed`), `clearAction("post")` answers `removed`, `applyJevAction` and
+      `concludeReport` share `removePost` (row kept, thread deleted in cascade, vote dropped), every
+      listing drops the row (`livePost`) while `getPost` still answers it by id, the bookmarks tab reads
+      it as a dead card, and `/post/[id]` draws the spec's *Removed by JEV* sentence plus one
+      consequence line for the author.
 
 ## P4 — Real backend
 

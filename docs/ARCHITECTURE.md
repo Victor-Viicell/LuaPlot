@@ -105,8 +105,10 @@ Shapes, decided in T-03 (change them here before changing them in the code):
   refines the pair, so a concluded case without its decision (or an open one with one) fails at
   parse. `concludeReport` applies the outcome the *target* allows — authored items go
   `public`/`private` (removal is refused: moderation never deletes authored content), a comment gets
-  `status: "removed"` with its body gone and its replies intact, and a **post has no status field
-  yet**, so its removal is recorded on the case alone — the gap is logged in `docs/NEXT.md`. It also writes the
+  `status: "removed"` with its body gone and its replies intact, and a post gets
+  `status: "removed"` with its whole thread deleted in cascade (T-28B, `removePost` — the same write
+  JEV's immediate action makes, so the row stays, every listing drops it and `getPost` still answers
+  it by id). It also writes the
   creator's moderation notification in the same step; the reporter is never written a row.
 - **An immediate action's record (T-28)** is a `moderationNotice` row, not a case:
   `systems/jev.md` says a clear violation is applied at once **and opens no case**, while the owner must

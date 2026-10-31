@@ -475,9 +475,23 @@ export const postAttachmentSchema = z.discriminatedUnion("kind", [
 ]);
 
 /**
+ * `systems/jev.md` → *Rules*: *JEV removes a post or comment as soon as the violation is clear* —
+ * and *Posts and comments cannot be made private. Their only enforcement is removal.* A post
+ * therefore has **two** states, not the comment's three: there is no author-deleted placeholder row,
+ * because a creator's **Delete** removes the row outright (`deletePost`). No fourth value may stand
+ * for *pending*: an unsure JEV verdict leaves a post visible (`Rules`: *an unsure verdict leaves it
+ * public*), so there is nothing to store.
+ */
+export const postStatusSchema = z.enum(["visible", "removed"]);
+
+/**
  * `luaplot-pages.md` → *A post is written once: no edit route exists.* Hence no `updatedAt`, which
  * is also why the shape cannot gain one later without a spec change. `nsfw` is its own flag; the
  * post's `kind` does not exist, so body-alone and body-plus-attachment are the same shape.
+ *
+ * `status` is moderation's, never the author's: only JEV's immediate action or a moderator's
+ * conclusion writes `removed`, and every listing drops the row while `getPost` still answers it by id
+ * (the author and a moderator open it; a viewer gets the unavailable state).
  */
 export const postSchema = z.strictObject({
   id: z.uuid(),
@@ -487,6 +501,7 @@ export const postSchema = z.strictObject({
   nsfw: z.boolean(),
   attachment: postAttachmentSchema.nullable(),
   verified: z.boolean(),
+  status: postStatusSchema,
   ...engagementSchema.shape,
 });
 

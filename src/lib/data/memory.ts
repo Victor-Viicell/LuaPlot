@@ -550,6 +550,17 @@ function listed(item: { isPublic: boolean }): boolean {
   return item.isPublic;
 }
 
+/**
+ * Is a post still on every listing? The post analogue of `listed()`, and the **one** rule for it:
+ * a post has no visibility, so removal is its only hidden state (`systems/jev.md` → *Privacy and
+ * republication*: *Posts and comments cannot be made private. Their only enforcement is removal.*).
+ * The row stays in the store and answers by id — the author and a moderator open it — so every
+ * listing has to ask, rather than testing `status` where it happens to remember.
+ */
+function livePost(item: Post): boolean {
+  return item.status === "visible";
+}
+
 /** Case-insensitive substring match over the fields a listing can search. */
 function matches(haystack: (string | undefined)[], query: string | undefined): boolean {
   const needle = query?.trim().toLowerCase();
@@ -820,9 +831,31 @@ function claimedText(id: string): string {
 }
 
 /**
+ * Remove one post — **the one write** that both JEV's immediate action and a moderator's conclusion
+ * make, so the two paths cannot disagree.
+ *
+ * `status` flips and the row **stays**: `getPost` still answers it by id, which is how its author and
+ * a moderator open it while every listing drops it (`livePost`). The thread goes with it in cascade —
+ * `systems/jev.md` → *Privacy and republication*: *Removing a post, or a creator deleting a post,
+ * character, lorebook, or preset, takes the whole comment thread with it in cascade — the comments
+ * are deleted with their item, never left orphaned.* That is also why a post has no placeholder row
+ * to keep: unlike a comment, nothing beneath it survives to hang on one.
+ */
+function removePost(post: Post): void {
+  Object.assign(post, postSchema.parse({ ...post, status: "removed" }));
+
+  for (const comment of store.comments) {
+    if (comment.itemId === post.id) votes.delete(voteKey("comment", comment.id));
+  }
+  store.comments = store.comments.filter((entry) => entry.itemId !== post.id);
+  votes.delete(voteKey("post", post.id));
+  recount(store);
+}
+
+/**
  * Apply what JEV decided, on the adapter's own terms: an authored item is made private and never
- * deleted, a comment keeps its placeholder, and a post has nothing to change until `postSchema`
- * grows a status. Returns the measure the creator's notification names, if any.
+ * deleted, a comment keeps its placeholder, and a post is removed with its thread. Returns the
+ * measure the creator's notification names, if any.
  */
 function applyJevAction(
   target: ReportTarget,
@@ -852,8 +885,13 @@ function applyJevAction(
     return "removed";
   }
 
-  // A `post` row has no status field (logged in `docs/NEXT.md`): the policy escalates instead of
-  // claiming a removal the row cannot hold.
+  // A `post` row is **removed**, never privatized (`systems/jev.md` → *Decisions*): the row stays,
+  // every listing drops it, and its thread goes with it.
+  if (action === "removed" && target.kind === "post") {
+    removePost(row as Post);
+    return "removed";
+  }
+
   return undefined;
 }
 
@@ -892,7 +930,10 @@ export const memoryRepo: Repo = {
   },
 
   async listPosts(options) {
-    const rows = store.posts.filter((row) => matches([row.body], options?.query));
+    // A removed post is on no listing (`livePost`): the feed is what other people read.
+    const rows = store.posts.filter(
+      (row) => livePost(row) && matches([row.body], options?.query),
+    );
     return pageOf(order(rows, options?.sort, ENGAGED), options);
   },
 
@@ -968,6 +1009,8 @@ export const memoryRepo: Repo = {
       nsfw: write.nsfw,
       attachment: write.attachment,
       verified: false,
+      /** A new post is public until moderation removes it: there is no private state to start in. */
+      status: "visible",
       likes: 0,
       dislikes: 0,
       bookmarks: 0,
@@ -1990,9 +2033,11 @@ export const memoryRepo: Repo = {
       comment.dislikes = 0;
       votes.delete(voteKey("comment", comment.id));
       recount(store);
+    } else {
+      // A `post` concluded `removed` — the outcome `detail.md` → *Actions* already offered. Same
+      // write as JEV's immediate action (`removePost`), so the two paths leave one state.
+      removePost(row as Post);
     }
-    // A `post` row has no status field yet, so a post removal is recorded on the case only. The gap
-    // is logged in `docs/NEXT.md`: nothing can hide a removed post until `postSchema` grows one.
 
     const decision = caseDecisionSchema.parse({
       kind: "concluded",
@@ -2150,9 +2195,11 @@ export const memoryRepo: Repo = {
 
       const id = key.slice(colon + 1);
       const found = sharedRowFor(kind, id);
-      // A bookmarked row that moderation made private is gone from this listing, as it is from a
-      // catalog: the bookmark keeps its card, and the card says the item does not exist.
-      const item = found && (!("isPublic" in found) || listed(found)) ? found : null;
+      // A bookmarked row that moderation made private — or a post it removed — is gone from this
+      // listing, as it is from a catalog: the bookmark keeps its card, and the card says the item
+      // does not exist. `sharedRowFor` answers all four kinds, so the post rule is named here.
+      const dead = found === null || ("status" in found && !livePost(found)) || ("isPublic" in found && !listed(found));
+      const item = dead ? null : found;
 
       const parsed = bookmarkRowSchema.safeParse({ kind, id, savedAt, item });
       // A key that cannot be shaped is dropped rather than drawn half: the id is not a uuid, which
@@ -2429,8 +2476,9 @@ export const memoryRepo: Repo = {
   async profilePosts(handle, options) {
     const key = handleSchema.parse(handle);
     // A post has no `isPublic`: `listed()` would read a field the shape does not carry, and
-    // moderation removes a post rather than hiding it.
-    const rows = store.posts.filter((row) => row.author === key);
+    // moderation **removes** a post rather than hiding it — `livePost` is that rule, and the
+    // author's own timeline drops the row too, because a removed post is gone for everyone.
+    const rows = store.posts.filter((row) => row.author === key && livePost(row));
     return pageOf(order(rows, options?.sort ?? "newest", ENGAGED), options);
   },
 

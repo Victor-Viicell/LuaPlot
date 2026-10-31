@@ -4,6 +4,31 @@ Append-only. Newest first. Every entry: ticket, what changed, what was verified 
 could not be verified.
 
 
+## T-28B — a post can be removed (2026-10-31)
+
+- **Changed:** `postSchema` grew `status: z.enum(["visible","removed"])` (one new `postStatusSchema`,
+  type by `z.infer`); fixtures give every post a status and seed **post 6 as `removed`**;
+  `clearAction("post")` in `jevPolicy.ts` answers `removed` again (the escalation branch and its
+  sentence are gone, `docs/JEV.md` → *Limits* updated); `removePost()` in the adapter is the one write
+  both `applyJevAction` and `concludeReport` make — status flipped, thread deleted in cascade, vote
+  dropped, row kept; `livePost()` filters `listPosts` and `profilePosts`, the bookmarks tab draws a
+  removed post as a dead card, and `getPost` still answers it by id; `/post/[id]` gained the
+  *Removed by JEV* state (spec sentence *This post doesn't exist anymore.*, no counts/actions/thread,
+  plus one finality line for the author). `deletePost`'s cascade is unchanged.
+- **Verified:** `scripts/check.sh` GREEN (build, 30 routes, schema: 22 comments); live `200` on the
+  published build; in the browser `/post/90570000-…-0006` draws the removed state and the feed does
+  not list it; in-app a moderator concluded open case `REPORT(2)` as **removed** and the case closed
+  with *Concluded · removed*. Headless walks against the memory adapter: post 6 absent from the feed
+  and from orin's timeline, 11 visible posts on the feed; concluding REPORT(2) removed post 7, took
+  its comment with it, dropped it from the feed and sable's timeline, and refused a second
+  conclusion; a saved removed post is `item: null`; and a post the preview reads as a certain
+  violation is **removed at once** by `addReport` (no case opened, notification names `removed`, no
+  republication notice).
+- **Not verified:** the bookmarks tab was checked at the adapter (`item: null`) but not walked in the
+  browser; and the case page's *THE ITEM* panel still prints a removed post's body until it is
+  reloaded (there is no re-render after *Conclude*), which the specs neither require nor forbid.
+
+
 ## T-28 — the owner's side of a moderation outcome (2026-10-31)
 
 - **Changed:** `moderationNoticeSchema` + `republicationOutcomeSchema` in `schema.ts` (types via

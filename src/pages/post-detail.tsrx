@@ -33,10 +33,13 @@ import { toast } from "../lib/toast.ts";
  * - **One column on a phone, two from `md`** — card and comments in the reading column, counts and
  *   actions in a 300px aside. The DOM order (card → aside → comments) *is* the phone order, so the
  *   wide layout is a grid-area change and not a second tree.
- * - **Not-found, deleted and removed share one state.** The adapter answers `null` for all three and
- *   cannot tell them apart, so the page prints the spec's not-found sentence; the two messages the
- *   spec lists for a deleted and a removed post exist so neither is privatized, not so the page can
- *   guess which one happened.
+ * - **Not-found, deleted and removed share one sentence but not one state.** A deleted post is gone
+ *   (the adapter answers `null`); a **removed** post still answers by id (`getPost`), because its
+ *   author and a moderator open it, and `post/detail.md` → *States* fixes its copy as the same
+ *   sentence as a deleted post's. The page draws *This post doesn't exist anymore.* for it and
+ *   nothing else — no vote, no bookmark, no composer, no thread (a removal takes the thread in
+ *   cascade, `systems/jev.md` → *Privacy and republication*), and the author alone is told the
+ *   removal is final, because *its author can only publish again*.
  * - **A cut has no link back to its session.** It is text; the card draws it as text and the page
  *   adds nothing.
  *
@@ -56,6 +59,8 @@ export function PostDetail() @{
   const phase = track<Phase>("loading");
   const failure = track("");
   const missing = track(false);
+  /** The row exists and moderation removed it: `post/detail.md` → *States* → *Removed by JEV*. */
+  const removed = track(false);
 
   const author = track("");
   const body = track("");
@@ -101,6 +106,7 @@ export function PostDetail() @{
     phase.value = "loading";
     failure.value = "";
     missing.value = false;
+    removed.value = false;
 
     Promise.all([repo.getPost(id), repo.isBookmarked("post", id), repo.myVote("post", id)]).then(
       ([item, saved, vote]) => {
@@ -116,6 +122,16 @@ export function PostDetail() @{
         }
 
         author.value = item.author;
+
+        // A removed post answers by id, and that is all it answers: the body, its engagement and its
+        // attachment are not drawn (`detail.md` → *Removed by JEV*). The author is read first so the
+        // page can tell them the removal is final.
+        if (item.status === "removed") {
+          removed.value = true;
+          phase.value = "ready";
+          return;
+        }
+
         body.value = item.body;
         createdAt.value = item.createdAt;
         nsfw.value = item.nsfw;
@@ -242,6 +258,22 @@ export function PostDetail() @{
         display: flex;
         flex-direction: column;
         gap: 12px;
+      }
+
+      /* A removed post is one sentence and, for its author, one line of consequence. No card, no
+         counts, no actions: nothing here is an engagement surface any more. */
+      .removed {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 46ch;
+      }
+
+      .removed-note {
+        margin: 0;
+        color: var(--color-text-subtle);
+        font-size: 13px;
+        line-height: 1.5;
       }
 
       .counts {
@@ -449,6 +481,20 @@ export function PostDetail() @{
           actionLabel="Back to the thread"
           href={href("/post/thread")}
         />
+      } @else if (removed.value) {
+        <div class="removed">
+          <EmptyState
+            message="This post doesn't exist anymore."
+            actionLabel="Back to the thread"
+            href={href("/post/thread")}
+          />
+          @if (owner.value) {
+            <p class="removed-note">
+              Removal by moderation is final: the post can't be restored or republished. Its comments
+              went with it. You can write a new post.
+            </p>
+          }
+        </div>
       } @else {
         <div class="layout">
           <div class="post-wrap">
@@ -461,6 +507,7 @@ export function PostDetail() @{
                 nsfw: nsfw.value,
                 attachment: attachment.value,
                 verified: verified.value,
+                status: "visible",
                 likes: likes.value,
                 dislikes: dislikes.value,
                 bookmarks: bookmarks.value,

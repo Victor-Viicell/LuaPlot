@@ -66,15 +66,14 @@ export function claimOf(reasons: readonly ReportReasonCode[], source?: string): 
 
 /**
  * The action a clear violation earns (`systems/jev.md` → *Decisions*): authored content is made
- * private — never deleted — and a comment is removed. **A post has no status field yet** (filed as
- * its own ticket), so a certain violation on a post cannot be applied: it is recorded as
- * `escalated` with the reason in the note rather than claiming a removal the adapter did not make.
- * The moment `postSchema` grows `status`, this branch becomes `removed` and nothing else changes.
+ * private — never deleted — and a post or a comment is **removed**. Both of the latter are final
+ * (`Privacy and republication`: *a removed post or comment has no recovery at all*), which is why
+ * nothing here returns `escalated` for a clear violation: the escalation branch existed only while
+ * `postSchema` had no `status` to write.
  */
 function clearAction(kind: VotableKind): JevDecision["action"] {
   if (kind === "character" || kind === "lorebook" || kind === "preset") return "made-private";
-  if (kind === "comment") return "removed";
-  return "escalated";
+  return "removed";
 }
 
 /** The severity line's own words, for a note that says why rather than repeating a number. */
@@ -169,15 +168,11 @@ export function decide(input: {
   }
 
   if (judgment.unflagged_nsfw >= JEV_CLEAR_VIOLATION) {
-    const action = clearAction(kind);
     return {
       verdict: "violation",
       confidence: judgment.unflagged_nsfw,
-      action,
-      note:
-        action === "escalated"
-          ? "Flag missing and the violation is clear, but a post cannot be removed until it carries a status: escalated."
-          : `Flag missing and the violation is clear (${SEVERITY_WORDS[2]}).`,
+      action: clearAction(kind),
+      note: `Flag missing and the violation is clear (${SEVERITY_WORDS[2]}).`,
     };
   }
 

@@ -115,10 +115,10 @@ The client holds `VITE_JEV_ENDPOINT` (a public address) and nothing else. The `j
   `jevPolicy.ts` escalates a report whose only surface is an image (`imageOnly`). Asking a text
   model to judge a picture it cannot see would produce a confident number with no evidence behind
   it — the one thing a moderation verdict must never be.
-- **A certain violation on a post escalates instead of removing.** `postSchema` has no `status`, so
-  the adapter has nothing to write: the verdict is stored as `violation` with the reason in the
-  note and the case is queued. Filed as T-28B; the branch in `clearAction()` becomes `removed`
-  the moment the row can hold it.
+- **A certain violation on a post removes it.** `postSchema` carries `status: "visible" | "removed"`
+  (T-28B), so `clearAction("post")` answers `removed` and the adapter flips the row, drops its thread
+  in cascade and keeps everything else. The verdict is stored as `violation`, the creator gets the
+  notification, and an immediate action still opens no case.
 - **Comments have no `verified` flag** and never will (a comment is never edited), so a report on a
   comment always scans.
 

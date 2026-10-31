@@ -10,6 +10,11 @@ import { at, CHARACTER, COMMENT, LOREBOOK, POST } from "./ids.ts";
  *
  * `commentCount` and every `replyCount` are 0 here: the adapter derives both from `COMMENTS`, so a
  * fixture and its thread can never disagree.
+ *
+ * **Post 6 is `status: "removed"`** (T-28B): removal is otherwise reachable only by reporting a post
+ * and waiting for JEV, and a state no fixture can show is a state the preview never proves. It has no
+ * comments, no bookmark and no report — a removed row is absent from every listing (`listPosts`,
+ * `profilePosts`, the bookmarks tab reads it as a dead card) and answers only by id.
  */
 export const POSTS: Post[] = [
   {
@@ -20,6 +25,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: { kind: "character", characterId: CHARACTER(1) },
     verified: true,
+    status: "visible",
     likes: 46,
     dislikes: 1,
     bookmarks: 12,
@@ -33,6 +39,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: { kind: "character", characterId: CHARACTER(2) },
     verified: true,
+    status: "visible",
     likes: 71,
     dislikes: 3,
     bookmarks: 19,
@@ -70,6 +77,7 @@ export const POSTS: Post[] = [
       ],
     },
     verified: true,
+    status: "visible",
     likes: 133,
     dislikes: 2,
     bookmarks: 58,
@@ -83,6 +91,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: null,
     verified: true,
+    status: "visible",
     likes: 88,
     dislikes: 24,
     bookmarks: 31,
@@ -96,6 +105,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: null,
     verified: true,
+    status: "visible",
     likes: 52,
     dislikes: 0,
     bookmarks: 14,
@@ -109,6 +119,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: null,
     verified: true,
+    status: "removed",
     likes: 29,
     dislikes: 2,
     bookmarks: 5,
@@ -122,6 +133,7 @@ export const POSTS: Post[] = [
     nsfw: true,
     attachment: null,
     verified: false,
+    status: "visible",
     likes: 17,
     dislikes: 6,
     bookmarks: 3,
@@ -135,6 +147,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: null,
     verified: false,
+    status: "visible",
     likes: 64,
     dislikes: 5,
     bookmarks: 22,
@@ -148,6 +161,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: null,
     verified: true,
+    status: "visible",
     likes: 38,
     dislikes: 1,
     bookmarks: 9,
@@ -161,6 +175,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: null,
     verified: true,
+    status: "visible",
     likes: 41,
     dislikes: 3,
     bookmarks: 7,
@@ -174,6 +189,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: null,
     verified: true,
+    status: "visible",
     likes: 23,
     dislikes: 8,
     bookmarks: 4,
@@ -187,6 +203,7 @@ export const POSTS: Post[] = [
     nsfw: false,
     attachment: null,
     verified: true,
+    status: "visible",
     likes: 95,
     dislikes: 2,
     bookmarks: 27,

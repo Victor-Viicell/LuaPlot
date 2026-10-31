@@ -638,9 +638,9 @@ not its frame. These are the choices.
   label says so when the post has comments.
 - **Signed out is read-only**, and every action leads to `/authentification` rather than being hidden:
   a visitor can see the controls exist (`detail.md` → States → *Signed out — read only*).
-- **Not-found, deleted and removed are one state.** The adapter answers `null` for all three; the page
-  prints *This post doesn't exist.* and offers the thread. The spec's two sentences for a deleted and
-  a removed post exist so neither is *privatized*, not so the page can guess which happened.
+- **Not-found and deleted are one state; a removed post is a third** (T-28B, below). A deleted post is
+  gone and the adapter answers `null`; a removed one still answers by id, and the page draws the
+  spec's *Removed by JEV* sentence for it. Neither is ever *privatized*.
 - **The composer is one column, and the sections are hairline labels, not nested cards.** At `md` it
   becomes the reading column (body) with a 340px attachment column beside it — a composer that stays
   328px at 1440 is a stretched phone.
@@ -1271,6 +1271,40 @@ Spec: `character/detail.md` → *Data* → *Moderation notice*, *Actions* → *R
   The item's visibility comes from the adapter's answer, never from the page's optimism.
 - **`comment` and `post` have nothing.** Removal is final (`systems/jev.md`), so no notice and no
   control is drawn for them anywhere — `moderationNotice` answers `null` for a non-authored kind.
+
+## Post removal (decided in T-28B, do not re-invent)
+
+Spec: `systems/jev.md` → *Rules*, *Privacy and republication* (*Posts and comments cannot be made
+private. Their only enforcement is removal* and *Removing a post … takes the whole comment thread with
+it in cascade*); `pages/post/detail.md` → *States* → *Removed by JEV*; `pages/moderation/detail.md` →
+*Actions*.
+
+- **A post carries `status: "visible" | "removed"` and nothing else.** No private state (the spec
+  forbids it) and no pending state (an unsure verdict leaves a post visible, so there is nothing to
+  store). The comment's three-value enum is *not* reused: a post has no author-deleted placeholder,
+  because a creator's **Delete** removes the row.
+- **Removal cascades the thread and keeps no placeholder.** The rule for a comment (*a placeholder
+  keeps its replies*) exists because something survives beneath it; nothing survives a post, so its
+  comments are deleted with it — the same write `deletePost` makes. One adapter function, `removePost`,
+  serves JEV's immediate action and a moderator's conclusion, so the two paths cannot diverge.
+- **The row stays and answers by id; every listing drops it.** `getPost` returns it (the author opens
+  it, and a case page resolves it), while `listPosts`, `profilePosts` and the bookmarks tab treat it as
+  absent — a saved post becomes a dead card (*This post doesn't exist anymore.*), never a
+  zero-engagement row.
+- **One sentence, and one line of consequence for the author.** `post/detail.md` says a removed post
+  takes the same message as a deleted one — removal cannot be privatized, so there is nothing to
+  explain to a viewer. The T-28B ticket proposed *This post was removed by moderation.*; the spec
+  wins. The author alone gets a second line under it (*removal is final … you can write a new post*),
+  which is the only recovery the spec grants them.
+- **The case can now conclude `removed` on a post.** It was refused before only because the row had no
+  field to write; the dismissal path still changes no visibility, and a removed post is never counted
+  as an open case (the queue reads open cases, not post status).
+
+## Post removal — fixtures
+
+`POSTS[6]` (orin's two-seat hauler) is seeded `removed`: it has no comments, no bookmark and no
+report, so nothing else in the seed contradicts it, and `/post/<its id>` proves the state without
+walking a report first.
 
 ## Do not
 
