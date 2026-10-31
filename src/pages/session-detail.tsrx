@@ -13,7 +13,7 @@ import type { Persona, Session, Turn } from "../lib/data/types.ts";
 import { clockTime, initialsOf } from "../lib/format.ts";
 import { turnWriteSchema } from "../lib/schema.ts";
 import { currentUser } from "../lib/state/session.ts";
-import { replyTo } from "../lib/llm/chat.ts";
+import { previewMode, replyTo } from "../lib/llm/chat.ts";
 import { toast } from "../lib/toast.ts";
 
 /**
@@ -37,9 +37,11 @@ import { toast } from "../lib/toast.ts";
  * - **One scrollbar.** The shell scrolls the page; the composer sits in flow after the transcript, so
  *   there is no fixed bar for a phone keyboard to cover and no second scroller. From `md` the copies
  *   move to a 300px aside so the page stops being a stretched phone.
- * - **Send appends one user turn** through `repo.appendTurn` and asks `lib/llm/chat.ts` for a reply.
- *   That seam answers `null` today — T-16 owns the model — so the page says so in a line instead of
- *   inventing a character's answer.
+ * - **Send appends one user turn** through `repo.appendTurn`, then asks `lib/llm/chat.ts` for a reply
+ *   while the transcript draws the character's row as a two-line skeleton (*Awaiting model
+ *   response*). The reply comes back through `repo.appendReply`, so a model turn is stored exactly
+ *   like a typed one. A configured provider answers through `lib/llm/provider.ts`; with none, the
+ *   deterministic mock answers and the dock says **Preview mode** — the page never pretends.
  * - **Not-found and not-a-participant are one state** (the adapter answers `null` for both):
  *   `This session doesn't exist.`
  */
@@ -135,7 +137,8 @@ export function SessionDetail() @{
   const draft = track("");
   const sendError = track("");
   const sending = track(false);
-  const note = track("");
+  /** True while the mock is answering — the page draws the `Preview mode` chip from it. */
+  const preview = track(previewMode());
 
   const settingsOpen = track(false);
   const confirmDelete = track(false);
@@ -261,7 +264,6 @@ export function SessionDetail() @{
     }
 
     sendError.value = "";
-    note.value = "";
     sending.value = true;
     const next = await repo.appendTurn(id, parsed.data).catch(() => null);
 
@@ -280,15 +282,32 @@ export function SessionDetail() @{
     }
     applySession(next);
 
-    // The seam T-16 fills. `null` today: nothing is invented, and the page says so once.
+    // *Awaiting model response*: `sending` is still true, so the transcript draws the character's row
+    // as a skeleton until this resolves. The mock paints a real frame before it answers.
     const reply = await replyTo({
       sessionId: id,
       turns: next.turns,
       message: parsed.data.text,
     }).catch(() => null);
 
+    if (!reply) {
+      // *Send failed*: the turn is stored (the transcript is append-only), so this is a line under the
+      // composer, never a rollback of what the user said.
+      sending.value = false;
+      sendError.value = "The model didn't answer. Your message is saved.";
+      return;
+    }
+
+    // The reply is a write like any other: through the adapter, with its role, id and clock.
+    const answered = await repo.appendReply(id, reply.text).catch(() => null);
     sending.value = false;
-    note.value = reply ? "" : "No model is connected in the preview, so there is no reply.";
+
+    if (!answered) {
+      sendError.value = "The reply couldn't be saved.";
+      return;
+    }
+
+    applySession(answered);
   }
 
   // ---- Session settings ------------------------------------------------------------------------
@@ -633,6 +652,13 @@ export function SessionDetail() @{
         background-color: var(--color-surface);
       }
 
+      /* *Awaiting model response*: the character's row in the shape of the answer that is coming, so
+         the transcript does not jump when the reply lands. No entrance — a skeleton that slides in and
+         is then replaced reads as two events. */
+      .turn.is-awaiting {
+        animation: none;
+      }
+
       .empty-line {
         margin: 0;
         padding: 24px 0;
@@ -736,11 +762,17 @@ export function SessionDetail() @{
         color: var(--color-text-muted);
       }
 
-      .note {
-        margin: 0;
+      /* Not a control, like the thread's filter chip: it states which provider is answering, so it is
+         drawn, not operated — a span, never a button, and it never takes focus. */
+      .preview-chip {
+        padding: 6px 9px;
+        border: 1px solid var(--color-border-strong);
+        border-radius: 2px;
         color: var(--color-text-subtle);
         font-size: 12px;
-        line-height: 1.6;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
       }
 
       .alert {
@@ -1198,7 +1230,7 @@ export function SessionDetail() @{
                   Nothing has been said yet. Write the first line and the scene starts here.
                 </p>
               } @else {
-                <ol class="turns">
+                <ol class="turns" aria-busy={sending.value ? "true" : "false"}>
                   @for (const turn of turns.value; key turn.id) {
                     <li class={turn.role === "character" ? "turn is-character" : "turn is-user"}>
                       <div class="turn-head">
@@ -1208,6 +1240,15 @@ export function SessionDetail() @{
                         <time class="when" datetime={turn.at}>{clockTime(turn.at)}</time>
                       </div>
                       <p class="turn-text">{turn.text}</p>
+                    </li>
+                  }
+
+                  @if (sending.value) {
+                    <li class="turn is-character is-awaiting">
+                      <div class="turn-head">
+                        <span class="who">{speaker.value}</span>
+                      </div>
+                      <Skeleton variant="lines" lines={2} lineHeight={14} />
                     </li>
                   }
                 </ol>
@@ -1253,8 +1294,10 @@ export function SessionDetail() @{
 
             <div class="dock-meta">
               <button class="cut" type="button" onClick={openPublish}>Publish a cut</button>
-              @if (note.value) {
-                <p class="note" role="status">{note.value}</p>
+              @if (preview.value) {
+                <span class="preview-chip" title="No model is connected: every reply is written locally from your transcript.">
+                  Preview mode
+                </span>
               }
             </div>
           </div>

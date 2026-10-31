@@ -3,6 +3,29 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-16 — the model seam answers, and says that it is a preview (2026-10-31)
+
+- **Changed:** `lib/llm/chat.ts` now routes — `provider.ts` posts to `VITE_CHAT_ENDPOINT` (a URL; the
+  key stays in `supabase/functions/chat/`) and `mock.ts` answers deterministically from the transcript
+  length and the in-session name, after a fixed 180ms so the awaiting state paints. Every payload goes
+  through the new `chatReplySchema` (`safeParse`, strictObject, trimmed, `TURN_MAX`). The reply is
+  written by `repo.appendReply(id, text)` — same `turnWriteSchema`, same adapter clock, role
+  `character` — so there is still one write path. The session page draws *Awaiting model response* as
+  a two-line `Skeleton` under the in-session name (`aria-busy` on the list, Send disabled) and
+  *Send failed* as a line under the composer; `null` from the seam now means the provider failed, not
+  "no model". A `Preview mode` chip (12px subtle, 1px border, a span) sits in the composer's meta line.
+- **Verified:** `scripts/check.sh` → GREEN (build, 30 routes, schema). On a real Chromium at
+  **360×740** against `vite preview`: the chip renders, the transcript's 8 fixture turns show, no
+  horizontal scroll. Typing and clicking Send produced `turns 8→11`, an `.is-awaiting` row with **2
+  skeleton lines** and `aria-busy=true` while in flight, then a `character` turn appended and the
+  skeleton gone. With `VITE_CHAT_ENDPOINT` pointed at a dead port the chip disappeared, the user turn
+  was still stored and the alert read *The model didn't answer. Your message is saved.* At 1200 the
+  dock/meta sit at 198–992 (the A4 cap) with no overflow.
+- **Not verified:** a real DeepSeek/OpenRouter reply end to end — no `supabase/functions/chat` is
+  deployed and `VITE_CHAT_ENDPOINT` is unset, so the provider path was proven only by its failure
+  branch. Determinism is proven by construction (no clock, no `Math.random`), not by a fixture test —
+  `schema:check` does not assert a mock sentence yet.
+
 ## T-15 follow-up — the session gets its own chrome (2026-10-31)
 
 - **Changed:** on the owner's call, `/session/[id]` is no longer a page inside the shell: one predicate in

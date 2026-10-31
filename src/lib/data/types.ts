@@ -21,6 +21,7 @@ import type {
   authoredItemSchema,
   avatarSchema,
   characterSchema,
+  chatReplySchema,
   commentSchema,
   commentWriteSchema,
   cutMessageSchema,
@@ -125,6 +126,8 @@ export type PresetCopy = Extract<SessionCopy, { kind: "preset" }>;
 export type Turn = z.infer<typeof turnSchema>;
 /** One typed message (`turnWriteSchema`) — trimmed and non-empty before it reaches the adapter. */
 export type TurnWrite = z.infer<typeof turnWriteSchema>;
+/** One model reply (`chatReplySchema`) — the only shape that crosses the LLM seam. */
+export type ChatReply = z.infer<typeof chatReplySchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type User = z.infer<typeof userSchema>;
 export type AccountPreferences = z.infer<typeof accountPreferencesSchema>;

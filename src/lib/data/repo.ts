@@ -149,6 +149,18 @@ export type Repo = {
   appendTurn(id: string, input: TurnWrite): Promise<Session | null>;
 
   /**
+   * The **reply** half of **Send message** (`session/detail.md` → *States* → *Awaiting model
+   * response* / *Send failed*): one `character` turn appended to the same transcript, with the same
+   * `turnWriteSchema` trimming rule and the same adapter-owned id and clock as `appendTurn` — so a
+   * reply cannot be stored in a shape a user's turn would be refused in.
+   *
+   * It is a second method rather than a `role` argument because the role is the adapter's, exactly as
+   * the id and the time are: a page never chooses who is speaking, it chooses which write to make.
+   * `lib/llm/chat.ts` produces the text; nothing here knows about a model.
+   */
+  appendReply(id: string, text: string): Promise<Session | null>;
+
+  /**
    * Delete a session — **participant only** — taking its transcript and its copies with it
    * (`session/detail.md`: *it removes the transcript and the session's copies, while a cut already
    * published stays*). A published cut is a post, so nothing cascades into `posts`: it is text that

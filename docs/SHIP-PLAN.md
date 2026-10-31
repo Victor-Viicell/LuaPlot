@@ -120,9 +120,16 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       the copy running, publish-a-cut via a two-step sheet around the extracted
       `components/PostComposer.tsrx`. **Not done:** `Edit session copy` (needs a copy write schema +
       form) and the *Awaiting model response* state (T-16's, nothing to draw it for yet).
-- [ ] **T-16 LLM seam + mock turns.** `lib/llm/chat.ts` + `mock.ts` + `Preview mode` chip; a turn
+- [x] **T-16 LLM seam + mock turns.** `lib/llm/chat.ts` + `mock.ts` + `Preview mode` chip; a turn
       appends to the transcript with the character's in-session name. Accept: in preview mode a
-      sent message produces a deterministic reply after the awaiting state.
+      sent message produces a deterministic reply after the awaiting state. Landed: `chat.ts` splits
+      into `provider.ts` (a `VITE_CHAT_ENDPOINT` URL and no key — the function holds it) and a pure
+      `mock.ts` (reply = f(transcript length, in-session name), fixed 180ms so the state paints);
+      `repo.appendReply` is the one model write path, through `turnWriteSchema`; `chatReplySchema`
+      is the one payload shape, `safeParse`d on both transports. The page draws *Awaiting model
+      response* as a two-line skeleton under the in-session name and *Send failed* under the
+      composer (`null` now means the provider failed, never "no model"). The `Preview mode` chip
+      sits in the composer's meta line, because the session route hides the shell's top bar.
 
 ## P2 — Authoring, collections, people
 

@@ -682,6 +682,28 @@ export const sessionSchema = z.strictObject({
 });
 
 /* ------------------------------------------------------------------------------------------------
+ * The model boundary
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * The **only** shape that crosses the model seam (`docs/ARCHITECTURE.md` → *Validation*: *every
+ * JEV/LLM payload is `safeParse`d before any code reads a field*). A reply is one string — the role,
+ * the id and the time belong to the adapter, exactly as they do for the user's own turn — trimmed
+ * here so neither a provider nor the mock can hand a page `"  "`, and capped at `TURN_MAX` because a
+ * reply is stored as a turn and a longer one could never be stored.
+ *
+ * `strictObject`, like every other shape: a provider that answers `{text, finish_reason}` fails here
+ * instead of leaking a field into the transcript.
+ */
+export const CHAT_REPLY_EMPTY = "The model answered with nothing.";
+export const chatReplySchema = z.strictObject({
+  text: z
+    .string()
+    .transform((value) => value.trim())
+    .pipe(z.string().min(1, CHAT_REPLY_EMPTY).max(TURN_MAX, "That reply is too long to store.")),
+});
+
+/* ------------------------------------------------------------------------------------------------
  * The account
  * ---------------------------------------------------------------------------------------------- */
 

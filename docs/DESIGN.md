@@ -721,10 +721,25 @@ consumer of `Session` before P2.
   composer with a private copy of the rules. The panel drops the picker's character list and the
   `md` two-column split, since a sheet has no second column.
 - **Send is local, the reply is a seam.** `repo.appendTurn` writes the user's turn (`turnWriteSchema`
-  trims and refuses an empty message) and `lib/llm/chat.ts → replyTo()` answers `null` today, so the
-  page prints *No model is connected in the preview, so there is no reply.* and invents nothing.
-  T-16 fills that function; the page does not change. **`Awaiting model response` is not drawn** —
-  there is no pending call to draw it for.
+  trims and refuses an empty message); `repo.appendReply` writes the model's, through the same
+  schema and the same adapter-owned id and clock, so a reply is a turn and there is one write path.
+  `lib/llm/chat.ts → replyTo()` answers from `provider.ts` when `VITE_CHAT_ENDPOINT` is configured
+  and from the deterministic `mock.ts` otherwise; `null` now means *the provider failed*, which the
+  page draws as **Send failed** under the composer (*The model didn't answer. Your message is
+  saved.*) because the transcript is append-only — a failure is a line, never a rollback.
+- **`Awaiting model response` is the character's row as a two-line `Skeleton`**, inside the same
+  `<ol>` as the turns and under its in-session name, with `aria-busy` on the list and Send disabled
+  while it is in flight; it carries no entrance animation, because a skeleton that slides in and is
+  then replaced reads as two events. The mock holds a fixed 180ms so the state paints a real frame
+  instead of flashing past on the microtask that stored the user's turn.
+- **`Preview mode` is a chip in the composer's meta line, not in the shell.** The session route is
+  immersive — it hides the shell's top bar and tab bar — so the shell has nowhere to put it, and the
+  honest place is beside *Publish a cut* at the foot of the transcript, where the reply itself lands:
+  12px `--color-text-subtle`, 1px `--color-border-strong`, 2px radius, a `<span>` and never a button
+  (the thread's filter chip, same rule: a state is drawn, not operated). It is drawn from
+  `previewMode()` in the seam, so the chip and the mock's own sentence cannot disagree. At 360 the
+  meta line reads `Publish a cut` … `Preview mode` at 16–344 of 328, and at 1200 the two sit at the
+  ends of the same 794 A4 cap.
 - **Not-found and not-a-participant are one state** (`This session doesn't exist.`), because
   `getSession` answers `null` for both; signed out is a sign-in `EmptyState`, not a spinner, because
   the route's `access` is `signed-in` and a page that waits forever on a signed-out viewer is a

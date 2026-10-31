@@ -679,6 +679,32 @@ export const memoryRepo: Repo = {
   },
 
   /**
+   * The model's side of the same transcript. Same shape, same `turnWriteSchema` trim, same adapter
+   * clock — only the role differs, and the role is not the page's to choose (`lib/llm/chat.ts` hands
+   * this method text and nothing else).
+   */
+  async appendReply(id, text) {
+    const row = store.sessions.find((entry) => entry.id === id) ?? null;
+    if (!row || row.owner !== VIEWER) return null;
+
+    const parsed = turnWriteSchema.safeParse({ text });
+    if (!parsed.success) return null;
+
+    const at = nowIso();
+    const next = sessionSchema.parse({
+      ...row,
+      turns: [
+        ...row.turns,
+        { id: freshId(), role: "character", text: parsed.data.text, at },
+      ],
+      updatedAt: at,
+    });
+
+    Object.assign(row, next);
+    return next;
+  },
+
+  /**
    * Delete a session — participant only — with its transcript and copies. Published cuts survive:
    * a cut is a post, stamped as text at publish time, so there is nothing to cascade into.
    */
