@@ -139,6 +139,11 @@ export function PersonaCollection() @{
   /**
    * **Set as default** — one adapter write; the page then moves the mark on the two rows it knows
    * about (the previous holder and this one) instead of refetching the list it already has.
+   *
+   * The `@for` key carries the mark (`id:default` / `id:plain`), because **a keyed block is reused
+   * and a prop expression is evaluated once** (T-08/T-18): with a plain `id` key the card kept the
+   * `isDefault` it was first drawn with and the mark never moved — caught on the live build in T-20.
+   * Re-keying remounts that one card, which is cheap and stateless here (no reveal, no draft).
    */
   async function setDefault(id: string): Promise<void> {
     if (busyId.value !== "") return;
@@ -225,13 +230,9 @@ export function PersonaCollection() @{
         </p>
       } @else {
         <ul class="card-grid" aria-label="Your personas">
-          @for (const row of items.value; key row.id) {
+          @for (const row of items.value; key `${row.id}:${row.isDefault ? "default" : "plain"}`) {
             <li class="card-cell">
-              <PersonaCard
-                persona={row}
-                busy={busyId.value !== ""}
-                onSetDefault={(id) => setDefault(id)}
-              />
+              <PersonaCard persona={row} onSetDefault={(id) => setDefault(id)} />
             </li>
           }
         </ul>

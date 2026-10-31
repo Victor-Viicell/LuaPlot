@@ -28,12 +28,9 @@ import type { Persona } from "../lib/data/types.ts";
  */
 export function PersonaCard({
   persona,
-  busy = false,
   onSetDefault,
 }: {
   persona: Persona;
-  /** One write at a time across the grid — the page owns it. */
-  busy?: boolean;
   onSetDefault?: (id: string) => void;
 }) {
   const path = `/persona/${persona.id}`;
@@ -57,7 +54,7 @@ export function PersonaCard({
       <div class="persona-card-foot">
         <Button
           variant="secondary"
-          disabled={persona.isDefault || busy}
+          disabled={persona.isDefault}
           onClick={() => onSetDefault?.(persona.id)}
         >
           {persona.isDefault ? "Default persona" : "Set as default"}
