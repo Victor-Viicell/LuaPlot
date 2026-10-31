@@ -871,6 +871,107 @@ export const jevVerdictSchema = z.strictObject({
   at: isoSchema,
 });
 
+/* --- JEV, the model payload (T-27) -------------------------------------------------------------- */
+
+/**
+ * `docs/JEV.md` → *Response*: a System One answer is **one object per primitive**, and the fields
+ * present differ per primitive — a `noul` has `noul` and **no `confidence`**, a `score` has
+ * `score`/`confidence`/`legend`/`probabilities`, a `choice` has `choice` and its distribution.
+ * The payload is third-party, so the objects are **loose**: the provider may add fields (and it
+ * does — `legend`, `usage`, `id`) and dropping them is fine; what must be *there* is typed, and
+ * `provider` is a `z.literal` on purpose. A response that answered through a chat model instead
+ * (the `typesafe/jev-router` trap) fails the parse instead of being read as a verdict.
+ */
+export const jevNoulAnswerSchema = z.looseObject({
+  type: z.literal("noul"),
+  noul: z.number().min(0).max(1),
+});
+
+export const jevScoreAnswerSchema = z.looseObject({
+  type: z.literal("score"),
+  score: z.number().min(0),
+  confidence: z.number().min(0).max(1),
+});
+
+export const jevChoiceAnswerSchema = z.looseObject({
+  type: z.literal("choice"),
+  choice: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+});
+
+export const jevAnswerSchema = z.discriminatedUnion("type", [
+  jevNoulAnswerSchema,
+  jevScoreAnswerSchema,
+  jevChoiceAnswerSchema,
+]);
+
+export type JevAnswer = z.infer<typeof jevAnswerSchema>;
+
+export const jevPayloadSchema = z.looseObject({
+  model: z.string().min(1),
+  /** The only proof the answer came from a decisions model; anything else is a service failure. */
+  provider: z.literal("TypeSafe"),
+  answers: z.record(z.string(), jevAnswerSchema),
+});
+
+export type JevPayload = z.infer<typeof jevPayloadSchema>;
+
+/**
+ * The state JEV is asked about (`docs/JEV.md` → *State per content kind*) and the question set that
+ * goes with it. Both are **sent**, never stored, so they are the one place the request is checked
+ * against `docs/JEV.md`: an ordered `criteria` array for `score` (a map fails the API with
+ * `expected array`), instructions-only for `noul`.
+ */
+export const jevAssetSchema = z.strictObject({
+  role: z.enum(["avatar", "image", "gif"]),
+  /** What the vision pass saw. Empty when nothing described it — JEV is not asked to guess pixels. */
+  description: z.string(),
+});
+
+export const jevContentStateSchema = z.strictObject({
+  kind: z.enum(["character", "lorebook", "preset", "post", "comment"]),
+  nsfw_flag: z.boolean(),
+  text: z.string(),
+  assets: z.array(jevAssetSchema),
+  item: z.strictObject({ author_handle: z.string() }).optional(),
+});
+
+export const jevCopyStateSchema = z.strictObject({
+  claim: z.strictObject({
+    source_kind: z.string().min(1),
+    claimed_source: z.string().min(1),
+  }),
+  original: z.strictObject({ text: z.string(), assets: z.array(jevAssetSchema) }),
+  candidate: z.strictObject({ text: z.string(), assets: z.array(jevAssetSchema) }),
+});
+
+export const jevNoulQuestionSchema = z.strictObject({
+  type: z.literal("noul"),
+  instructions: z.string().min(1),
+});
+
+export const jevScoreQuestionSchema = z.strictObject({
+  type: z.literal("score"),
+  instructions: z.string().min(1),
+  /** Ordered, 2–10 concrete level descriptions. Never a map. */
+  criteria: z.array(z.string().min(1)).min(2).max(10),
+});
+
+export const jevQuestionSchema = z.discriminatedUnion("type", [
+  jevNoulQuestionSchema,
+  jevScoreQuestionSchema,
+]);
+
+export const jevRequestSchema = z.strictObject({
+  model: z.string().min(1),
+  state: z.union([jevContentStateSchema, jevCopyStateSchema]),
+  questions: z.record(z.string(), jevQuestionSchema),
+});
+
+export type JevRequest = z.infer<typeof jevRequestSchema>;
+export type JevContentState = z.infer<typeof jevContentStateSchema>;
+export type JevCopyState = z.infer<typeof jevCopyStateSchema>;
+
 export const reportStatusSchema = z.enum(["open", "concluded"]);
 
 /**

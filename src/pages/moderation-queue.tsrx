@@ -8,6 +8,7 @@ import type { Listing, ReportFilter } from "../lib/data/repo.ts";
 import type { Report, ReportReasonCode } from "../lib/data/types.ts";
 import { relativeAge } from "../lib/format.ts";
 import { reportFilterSchema, reportSourceIsExternal } from "../lib/schema.ts";
+import { previewMode } from "../lib/llm/jev.ts";
 import { currentUser } from "../lib/state/session.ts";
 import { href, navigate, useQuery } from "../router.ts";
 
@@ -161,6 +162,9 @@ export function ModerationQueue() @{
   const parsedFilter = reportFilterSchema.safeParse(useQuery().get("status") ?? "open");
   const filter = track<ReportFilter>(parsedFilter.success ? parsedFilter.data : "open");
 
+  /** A verdict on this page is the mock's when no model is connected; the chip says so. */
+  const preview = track(previewMode());
+
   const phase = track<Phase>(admin ? "loading" : "forbidden");
   const failure = track("");
   const rows = track<Row[]>([]);
@@ -274,6 +278,18 @@ export function ModerationQueue() @{
         font-size: 14px;
         line-height: 1.7;
         text-wrap: pretty;
+      }
+
+      .preview-chip {
+        align-self: flex-start;
+        margin: 0;
+        padding: 6px 9px;
+        border: 1px solid var(--color-border-strong);
+        border-radius: 2px;
+        color: var(--color-text-subtle);
+        font-size: 12px;
+        line-height: 1;
+        letter-spacing: 0.02em;
       }
 
       /* Counts on the left, the one filter on the right, one hairline under both. */
@@ -575,6 +591,11 @@ export function ModerationQueue() @{
           Most reported first, because a pile-on outranks a single allegation. Every decision happens
           on the case itself — this page carries no content, only the paperwork.
         </p>
+        @if (preview.value) {
+          <p class="preview-chip" title="No model is connected: every verdict below was classified locally from the reported text.">
+            Preview mode
+          </p>
+        }
       </header>
 
       @if (phase.value === "forbidden") {

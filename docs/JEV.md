@@ -61,6 +61,12 @@ Asked together, in one request, whenever the content kind allows it.
 Not asked: personas (outside JEV), character/lorebook/preset text for `illegal_harm` (the spec
 forbids it), and anything about engagement or quality.
 
+**`copy_claim_type` is not sent (T-27).** The report itself already says which claim it makes: the
+reason code is `copied-image` or `copied-text`, and a copy claim must name a source, so
+`reportSourceIsExternal()` decides *internal* versus *external*. A question whose answer is a field
+of the input is not a judgment — `claimOf()` in `lib/llm/jevPolicy.ts` reads it, and the queue's
+*why is this here* line reads the same two facts.
+
 A second request is only made when code needs new evidence — the copy claim, after the internal
 source is fetched.
 
@@ -89,6 +95,32 @@ severity                           -> queue weight only (never a verdict on its 
   and adds weight without a second call.
 - Model failure (5xx/timeout): treat as *unsure* → stays public, escalate, log. Never invent a
   violation, never fail open into a removal.
+
+## Where it lives (T-27)
+
+| Piece | What it owns |
+| --- | --- |
+| `lib/llm/jev.ts` | The one round trip: `jevRequestSchema` before the fetch, `jevPayloadSchema` after it, `provider === "TypeSafe"` mandatory, `null` on any failure. Also the second request (`same_text`) when an internal copy claim's source was fetched. |
+| `lib/llm/jevPolicy.ts` | The thresholds (`JEV_CLEAR_VIOLATION`, `JEV_UNSURE`, `JEV_MINOR_ESCALATION`, `JEV_SAME_TEXT`), the claim reading, the action table, and `decide()` — no fetch, no clock, no repo. |
+| `lib/llm/mock.ts` → `mockJevAnswers` | The preview's answers, deterministic from an FNV hash of kind + text: one clear, one clean, three escalated buckets, so a report reaches every state the queue can draw. |
+| `memory.ts` → `addReport` | One scan per item change: the report that opens a case scans; a report that joins an open case adds weight and does not scan; an immediate action opens no case and notifies the creator. |
+
+The client holds `VITE_JEV_ENDPOINT` (a public address) and nothing else. The `jev` Edge Function
+(T-32) is what reads `OPENROUTER_API_KEY`.
+
+## Limits of this build
+
+- **No vision pass, so no asset description.** `assets[].description` is the vision model's output
+  and it is server-side; until it exists the adapter sends an empty `assets: []` and
+  `jevPolicy.ts` escalates a report whose only surface is an image (`imageOnly`). Asking a text
+  model to judge a picture it cannot see would produce a confident number with no evidence behind
+  it — the one thing a moderation verdict must never be.
+- **A certain violation on a post escalates instead of removing.** `postSchema` has no `status`, so
+  the adapter has nothing to write: the verdict is stored as `violation` with the reason in the
+  note and the case is queued. Filed as T-28B; the branch in `clearAction()` becomes `removed`
+  the moment the row can hold it.
+- **Comments have no `verified` flag** and never will (a comment is never edited), so a report on a
+  comment always scans.
 
 ## Mock mode
 

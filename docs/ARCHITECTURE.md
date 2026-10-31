@@ -29,7 +29,7 @@ src/
     validate.ts         onboarding field readings over those schemas
     data/               types.ts (z.infer only), repo.ts (interface), memory.ts, supabase.ts
     fixtures/           seed data shared by memory adapter and tests
-    llm/                chat.ts, jev.ts, mock.ts
+    llm/                chat.ts, jev.ts, jevPolicy.ts, mock.ts, provider.ts
     native.ts           Tauri plugin bridge + browser fallback
     format.ts           percent() today; relativeTime when a card shows "2h"
     state/              session.ts, prefs.ts (NSFW) — plain subscribe/notify stores
@@ -163,6 +163,11 @@ hand-rolled mini-validator anywhere). Read this before adding a shape, a form, o
 - **The gate proves it**: `bun run schema:check` is section 5 of `scripts/check.sh` — every fixture
   collection parses, three negative cases (bad handle, missing `nsfw`, unknown key) must fail, and
   the recursive `commentBranchSchema` must be a real type, not `any`.
+- **A third-party payload gets loose objects, a literal and a reader that returns `null`**
+  (T-27, `jevPayloadSchema`): the provider adds fields we do not read, so the object is loose, but
+  `provider` is `z.literal("TypeSafe")` because a chat fallback must fail the parse rather than
+  answer, and every reader of an answer returns `undefined` when the field is missing — a missing
+  answer becomes *unsure*, never a zero.
 
 ## Session
 

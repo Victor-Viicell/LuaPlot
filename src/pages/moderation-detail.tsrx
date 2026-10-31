@@ -16,6 +16,7 @@ import type {
   ReportReasonCode,
 } from "../lib/data/types.ts";
 import { percent, relativeAge } from "../lib/format.ts";
+import { previewMode } from "../lib/llm/jev.ts";
 import {
   CASE_TERMS_REQUIRED,
   TERMS_RULES,
@@ -269,6 +270,9 @@ export function ModerationDetail() @{
   const statusWord = track("");
   const weightLine = track("");
   const lastLine = track("");
+
+  /** True while the mock classified: the JEV section says so rather than passing a mock for a model. */
+  const preview = track(previewMode());
 
   const jevVerdict = track("");
   const jevConfidence = track("");
@@ -737,6 +741,16 @@ export function ModerationDetail() @{
         font-style: italic;
       }
 
+      .preview-chip {
+        padding: 5px 8px;
+        border: 1px solid var(--color-border-strong);
+        border-radius: 2px;
+        color: var(--color-text-subtle);
+        font-size: 11px;
+        line-height: 1;
+        letter-spacing: 0.02em;
+      }
+
       /* JEV: a ledger row, not a banner. Two words and a sentence. */
       .jev {
         display: flex;
@@ -1152,6 +1166,11 @@ export function ModerationDetail() @{
               <div class="section-head">
                 <h2 class="section-title" id="jev-heading">JEV</h2>
                 <p class="section-note">{`${jevConfidence.value} confident`}</p>
+                @if (preview.value) {
+                  <span class="preview-chip" title="No model is connected: this verdict was classified locally from the reported text.">
+                    Preview mode
+                  </span>
+                }
               </div>
               <div class="jev">
                 <p class="jev-line">

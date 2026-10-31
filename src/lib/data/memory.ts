@@ -40,6 +40,7 @@ import {
   normaliseHandle,
   notificationSchema,
   profileWriteSchema,
+  jevContentStateSchema,
   reportOutcomeSchema,
   reportEntrySchema,
   postSchema,
@@ -60,6 +61,8 @@ import {
   type SeedCollection,
 } from "../schema.ts";
 import { z } from "zod";
+import { claimOf, classify } from "../llm/jev.ts";
+import type { JevContentState } from "../schema.ts";
 import { PAGE_SIZE } from "./repo.ts";
 import type { Listing, ListOptions, ReportFilter, Repo, SortOrder } from "./repo.ts";
 import {
@@ -86,8 +89,10 @@ import {
   type ProfileCreationType,
   type Session,
   type SessionCopy,
+  type JevVerdict,
   type Report,
   type ReportEntry,
+  type ReportTarget,
   type User,
   type VoteDirection,
   type VotableKind,
@@ -687,22 +692,23 @@ function measureOf(decision: CaseDecision): Notification["measure"] {
  *
  * A dismissal writes nothing here: it changes no visibility, so there is no measure to announce.
  */
-function notifyCreator(report: Report, measure: Notification["measure"]): void {
+function notifyModeration(target: ReportTarget, measure: Notification["measure"]): void {
   store.notifications.push(
     notificationSchema.parse({
       id: freshId(),
       kind: "moderation",
-      target: {
-        kind: report.target.kind,
-        id: report.target.id,
-        label: report.target.label,
-      },
+      target: { kind: target.kind, id: target.id, label: target.label },
       count: 1,
       ...(measure === undefined ? {} : { measure }),
       read: false,
       createdAt: nowIso(),
     }),
   );
+}
+
+/** The same row, named from a case. */
+function notifyCreator(report: Report, measure: Notification["measure"]): void {
+  notifyModeration(report.target, measure);
 }
 
 /**
@@ -715,6 +721,104 @@ function sharedRowFor(
 ): Character | Lorebook | Preset | Post | null {
   const row = rowFor(kind, id);
   return row && "bookmarks" in row ? row : null;
+}
+
+/**
+ * The text JEV reads for one item (`docs/JEV.md` → *State per content kind*). Fields the model
+ * cannot see are not sent as if they were content: a character's tagline and description are its
+ * prose, a post's body is its text, and a lorebook's entries are its text.
+ *
+ * **Assets are empty on purpose.** `assets[].description` is the vision pass's output, and that pass
+ * is server-side and not part of this build — so an image-only report escalates
+ * (`jevPolicy.ts` → `imageOnly`) instead of asking a text model to guess at pixels.
+ */
+function jevText(kind: VotableKind, row: Character | Lorebook | Preset | Post | Comment): string {
+  switch (kind) {
+    case "character": {
+      const item = row as Character;
+      return [item.name, item.tagline, item.description].filter((part) => part !== "").join("\n");
+    }
+    case "lorebook": {
+      const item = row as Lorebook;
+      return [item.name, item.description, ...item.entries.map((entry) => entry.content)]
+        .filter((part) => part !== "")
+        .join("\n");
+    }
+    case "preset": {
+      const item = row as Preset;
+      return [item.name, item.description].filter((part) => part !== "").join("\n");
+    }
+    case "post":
+      return (row as Post).body;
+    case "comment":
+      return (row as Comment).body;
+  }
+}
+
+/** The state one scan is asked about. `nsfw_flag` is the row's own, never inherited. */
+function jevStateFor(
+  kind: VotableKind,
+  row: Character | Lorebook | Preset | Post | Comment,
+): JevContentState {
+  return jevContentStateSchema.parse({
+    kind,
+    nsfw_flag: row.nsfw,
+    text: jevText(kind, row),
+    assets: [],
+    item: { author_handle: row.author ?? VIEWER },
+  });
+}
+
+/**
+ * The claimed original, when a copy claim names an item **inside** LuaPlot (`systems/jev.md` →
+ * *Scope*). Any kind can be the source, so every collection is searched by id; a source that
+ * resolves to nothing answers `""`, and `decide()` turns that into *unsure* rather than a clean
+ * bill — *JEV may never act without the second item*.
+ */
+function claimedText(id: string): string {
+  for (const kind of ["character", "lorebook", "preset", "post", "comment"] as const) {
+    const row = rowFor(kind, id);
+    if (row) return jevText(kind, row);
+  }
+  return "";
+}
+
+/**
+ * Apply what JEV decided, on the adapter's own terms: an authored item is made private and never
+ * deleted, a comment keeps its placeholder, and a post has nothing to change until `postSchema`
+ * grows a status. Returns the measure the creator's notification names, if any.
+ */
+function applyJevAction(
+  target: ReportTarget,
+  row: Character | Lorebook | Preset | Post | Comment,
+  action: JevVerdict["action"],
+): Notification["measure"] {
+  if (action === "made-private") {
+    if (target.kind === "character" || target.kind === "lorebook" || target.kind === "preset") {
+      (row as Character | Lorebook | Preset).isPublic = false;
+      return "made-private";
+    }
+    return undefined;
+  }
+
+  if (action === "removed" && target.kind === "comment") {
+    const comment = row as Comment;
+    const next = commentSchema.parse({
+      ...comment,
+      status: "removed",
+      body: "",
+      likes: 0,
+      dislikes: 0,
+    });
+    Object.assign(comment, next);
+    votes.delete(voteKey("comment", comment.id));
+    recount(store);
+    return "removed";
+  }
+
+  // A `post` row has no status field (logged in `docs/NEXT.md`): the policy escalates instead of
+  // claiming a removal the row cannot hold.
+  return undefined;
 }
 
 export const memoryRepo: Repo = {
@@ -1647,6 +1751,38 @@ export const memoryRepo: Repo = {
       open.weight += 1;
       open.lastReportAt = at;
     } else {
+      /**
+       * **One item, one scan** (`systems/jev.md` → *Verification*): a report that opens a case is
+       * the only thing that calls JEV, and it calls it now. What comes back is policy, not intent —
+       * a clear violation is applied and **opens no case**, an unsure one or a copy claim JEV will
+       * not judge is recorded on the case and leaves the content as it was (`jevPolicy.ts`).
+       */
+      const claim = claimOf(write.reasons, write.source);
+      const originalText =
+        claim === "internal" && write.source !== undefined ? claimedText(write.source) : "";
+      const jev = await classify({
+        kind: write.target.kind,
+        content: jevStateFor(write.target.kind, row),
+        claim,
+        ...(write.source === undefined ? {} : { source: write.source }),
+        ...(originalText === "" ? {} : { originalText }),
+        imageOnly: !write.parts.includes("text"),
+      });
+      const scannedAt = nowIso();
+
+      if (jev.action === "made-private" || jev.action === "removed") {
+        // *An immediate action opens no case and never enters `/moderation`* — the creator's
+        // notification and the reasons on the content page are the record.
+        notifyModeration(write.target, applyJevAction(write.target, row, jev.action));
+        return reportOutcomeSchema.parse({ state: "submitted", at });
+      }
+
+      if (jev.action === "none") {
+        // A clean scan is a **positive** result: the flag is set, and no case exists to queue.
+        if ("verified" in row) row.verified = true;
+        return reportOutcomeSchema.parse({ state: "submitted", at });
+      }
+
       store.reports.push(
         reportSchema.parse({
           id: freshId(),
@@ -1654,18 +1790,10 @@ export const memoryRepo: Repo = {
           reasons: [reason],
           weight: 1,
           status: "open",
-          /**
-           * A case opens *before* a scan: nothing has been judged and nothing has been applied, so
-           * the verdict is `unsure` at 0.5 — the schema's own reading of "no idea", not a guess —
-           * and `action: none`. The dialog never reads this; `/moderation` does.
-           */
-          jev: {
-            verdict: "unsure",
-            confidence: 0.5,
-            action: "none",
-            note: "Queued for a first scan; the reasons are the reporter's, not a judgment.",
-            at,
-          },
+          /** JEV's judgment, stored as history — no page recomputes it (`detail.md` → *Data*). */
+          jev: { ...jev, at: scannedAt },
+          /** No moderator has touched it yet; the audit trail starts empty. */
+          history: [],
           createdAt: at,
           lastReportAt: at,
         }),

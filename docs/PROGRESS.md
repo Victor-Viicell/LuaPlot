@@ -4,6 +4,35 @@ Append-only. Newest first. Every entry: ticket, what changed, what was verified 
 could not be verified.
 
 
+## T-27 — the JEV adapter, and a queue that now means something (2026-10-31)
+
+- **Changed:** `lib/llm/jev.ts` is transport only — `POST https://openrouter.ai/api/alpha/decisions`,
+  `typesafe/jev-1.14`, `{model,state,questions}`, `jevRequestSchema` before the fetch and
+  `jevPayloadSchema` after it with `provider: "TypeSafe"` a literal, so a chat-model fallback fails
+  the parse instead of answering; `null` on any failure and a second `same_text` request only when
+  an internal copy claim's source was fetched. `lib/llm/jevPolicy.ts` holds the four thresholds (each
+  cited), `claimOf()` (the report names its claim, so the model is not asked a fact the payload has),
+  `decide()` and the action table; a post's certain violation escalates because `postSchema` has no
+  status. `schema.ts` gained the answer/request shapes; `mock.ts` gained deterministic
+  `mockJevAnswers`/`mockSameText`; `addReport` runs **one scan per item change** — act + notify the
+  creator with no case, clean + set `verified`, or escalate with the verdict stored on the case — and
+  a new case now carries `history: []`. Queue and case page print a `Preview mode` chip from
+  `previewMode()`.
+- **Verified:** `scripts/check.sh` GREEN (build, 30 routes, schema section). Policy exercised by a
+  probe over 13 cases (failure→unsure, clear→removed/made-private, post→escalated, borderline→
+  escalated, clean→none, image/external→escalated, internal same→violation, internal different→
+  clean, internal unfetched→unsure, minor→escalated, image-only→escalated) plus the payload gate
+  (extra fields parse, `provider: "OpenAI"` rejected, `criteria` map rejected). Adapter exercised
+  against the memory store: a held report on verified content scans nothing, a report that opens a
+  case stores `unsure/escalated`, a second report joins it (weight 6→7, verdict untouched), a
+  self-referencing internal copy claim on a comment **removed** it (placeholder body, no case,
+  creator notified `removed`), the same on a character made it **private** (`made-private`), and a
+  copy claim without a source is refused. Live `200` on the published build.
+- **Not verified:** no real OpenRouter call from this box — `VITE_JEV_ENDPOINT` is unset, so every
+  tick above took the mock path; the decisions response was checked against the shape recorded in
+  `references/openrouter-decisions-api.md`, not against a live key. No vision pass exists, so image
+  surfaces escalate by design.
+
 ## T-26B — the case itself, and the decision it closes with (2026-10-31)
 
 - **Changed:** `pages/moderation-detail.tsrx` replaces the placeholder — the case is drawn as

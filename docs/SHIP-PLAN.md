@@ -169,14 +169,23 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       — `pages/moderation-detail.tsrx` draws the case read-only above its paperwork; `repo` gained
       `concludeReport` / `dismissReport` / `addCaseComment` / `getComment`, `reportSchema` gained
       `history` + `decision`, and the conclusion writes the creator's moderation row.
-- [ ] **T-27 JEV adapter.** `lib/llm/jev.ts` posting `{model,state,questions}` to
+- [x] **T-27 JEV adapter.** `lib/llm/jev.ts` posting `{model,state,questions}` to
       `POST https://openrouter.ai/api/alpha/decisions` with `typesafe/jev-1.14` (docs/JEV.md has the
       exact question set and state shape); `lib/llm/jevPolicy.ts` holding the thresholds and the
       action table from `systems/jev.md`; clear→act, unsure→escalate, copy claims→moderator; cached
       verification flag cleared on edit. Accept: a real verdict returns for a sample item, the
       policy maps it to the spec's action, and a model failure falls through to "unsure".
+      — `lib/llm/jev.ts` (decisions transport, `provider: "TypeSafe"` required, `null` on every
+      failure), `lib/llm/jevPolicy.ts` (thresholds + claim reading + action table, no I/O),
+      `jevPayloadSchema`/`jevRequestSchema` in `schema.ts`, `mockJevAnswers` for the preview, and
+      `addReport` now scans once per item change: act + notify with no case, or escale with the
+      verdict on the case. A certain violation on a post escalates until T-28B gives it a status.
 - [ ] **T-28 Moderation surfaces on detail pages.** Owner notice (report, reasons, measures),
       Awaiting re-verification, Request public again.
+- [ ] **T-28B A post can be removed.** `postSchema` grows `status: "visible" | "removed"`, and with
+      it: fixtures, `ratioOf`, bookmarks (`item: null`), the feed, the composer's *my posts* view,
+      and the cascade that takes the post's thread. Until then a clear violation on a post is
+      recorded as `escalated` and the row stays visible — see `docs/JEV.md` → *Limits of this build*.
 
 ## P4 — Real backend
 
