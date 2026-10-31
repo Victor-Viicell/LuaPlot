@@ -12,8 +12,9 @@ import { COMMENTS, POSTS } from "./posts.ts";
 import { PRESETS } from "./presets.ts";
 import { SESSIONS } from "./sessions.ts";
 import { NOTIFICATIONS, REPORTS } from "./social.ts";
+import { FOLLOWS, PROFILES } from "./profiles.ts";
 
-export { CHARACTERS, LOREBOOKS, PERSONAS, COMMENTS, POSTS, PRESETS, SESSIONS, NOTIFICATIONS, REPORTS };
+export { CHARACTERS, LOREBOOKS, PERSONAS, COMMENTS, POSTS, PRESETS, SESSIONS, NOTIFICATIONS, REPORTS, PROFILES, FOLLOWS };
 
 export const seed = {
   characters: CHARACTERS,
@@ -25,4 +26,6 @@ export const seed = {
   notifications: NOTIFICATIONS,
   reports: REPORTS,
   sessions: SESSIONS,
+  profiles: PROFILES,
+  follows: FOLLOWS,
 };

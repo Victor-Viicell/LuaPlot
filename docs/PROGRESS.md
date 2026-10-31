@@ -3,6 +3,42 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-23 — the profile that is somebody else's page, and the account behind it (2026-10-31)
+
+- **Changed:** the account finally has a **profile entity**. `schema.ts` gained `profileSeedSchema`
+  (handle, display name, avatar, bio — trimmed, `joinedAt` ISO), `profileSchema` (the same shape plus
+  `followers` / `following`, **derived at read**, never stored), `profileEditSchema` (the edit form's
+  one write — no NSFW pair, no email, no provider), `followSeedSchema` and `profileTabSchema` /
+  `profileCreationTypeSchema`; `seedSchemas` now carries `profiles` and `follows`, so the gate parses
+  them. New `fixtures/profiles.ts`: seven rows (the handles that already author content — `you, ada,
+  mira, quill, bram, sable, orin`) and **15 follow edges**. `repo` gained `getProfile`,
+  `profileCreations(handle, { type })`, `profilePosts`, `followersOf`, `followingOf`, `isFollowing`,
+  `followUser`, `unfollowUser`, `saveProfileEdit` — the graph is a `Set` keyed `follower:followee`
+  in the memory adapter, so a count is the length of a list; follow writes answer with the updated
+  profile; `isHandleTaken` now also checks profile rows. A rename in `saveProfileEdit` moves the
+  profile row, rewrites every content row's `author`, moves the follow edges and the claimed-handle
+  set, and leaves the old handle **not-found with no alias**. Both pages replace their placeholders:
+  `user-profile.tsrx` (header with avatar/name/handle/bio/plain figures and one control, four tabs in
+  `?tab=`, type chips in `?type=` on creations only, CardGrid for creations, PostCard feed, profile
+  rows for followers/following, Load more per tab, NSFW Show/Blur honoured) and `user-edit.tsrx`
+  (own account only, display name / avatar initials / bio / username / NSFW pair, sticky footer at
+  360, forbidden state for another handle).
+- **Verified how:** `scripts/check.sh` → GREEN (typecheck, production build, 30 routes, schema check
+  with the two new fixture collections). Plus a direct harness against the memory adapter:
+  `getProfile("ada")` = 4 followers / 3 following, creations 8 across character+lorebook+preset,
+  `type: "lorebook"` = 2 and all lorebooks, `profilePosts("mira")` = 2, `followersOf("you")` = ada,
+  bram, mira, orin (4), unfollow→follow of `quill` moved his figure 3→2→3, `isHandleTaken` true for
+  `sable` and false for `zzz`, `saveProfileEdit` renamed `you`→`tester`, collapsed the display name,
+  trimmed the bio, kept 5 creations (author rewritten) and 3 following edges, and left `you` null.
+- **Not verified:** nothing on a real phone — the 360/640/900 columns were reasoned from the shell's
+  existing pages, not screenshotted. The adapter's `VIEWER` constant still names the follow/persona
+  subject after a rename, so a renamed account keeps its content but the preview's *viewer* keys
+  (votes, `VIEWER`) do not follow the new handle; T-30 owns wiring the adapter to the session.
+- **Found while working:** the ticket asked for `profileWriteSchema` to be extended with the bio, but
+  that schema is **onboarding's** write and adding a required bio would break `/onboarding`; the edit
+  form therefore has its own `profileEditSchema`. Likewise the NSFW flags stayed out of the profile
+  row entirely — the preference store already carries them, and a second copy could disagree.
+
 ## T-22 — `/notifications`, a quiet inbox and a badge that counts rows (2026-10-31)
 
 - **Changed:** `schema.ts` gained **`unreadNotificationCountSchema`** (the badge's number crosses the

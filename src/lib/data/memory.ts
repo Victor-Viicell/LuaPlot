@@ -43,6 +43,8 @@ import {
   presetWriteSchema,
   personaSchema,
   personaWriteSchema,
+  profileEditSchema,
+  profileSchema,
   reportSchema,
   reportWriteSchema,
   seedSchemas,
@@ -58,6 +60,7 @@ import type { Listing, ListOptions, ReportFilter, Repo, SortOrder } from "./repo
 import {
   ratioOf,
   type AccountPreferences,
+  type AuthoredItem,
   type BookmarkCounts,
   type BookmarkKind,
   type BookmarkRow,
@@ -70,6 +73,8 @@ import {
   type Persona,
   type Post,
   type Preset,
+  type Profile,
+  type ProfileCreationType,
   type Session,
   type SessionCopy,
   type ReportEntry,
@@ -131,6 +136,8 @@ function load(): Store {
     ),
     reports: parseCollection("reports", seedSchemas.reports, seed.reports),
     sessions: parseCollection("sessions", seedSchemas.sessions, seed.sessions),
+    profiles: parseCollection("profiles", seedSchemas.profiles, seed.profiles),
+    follows: parseCollection("follows", seedSchemas.follows, seed.follows),
   };
 
   // Derived counts. Placeholders count too: the branch beneath them still exists.
@@ -233,6 +240,66 @@ const CLAIMED_HANDLES = new Set(
     ...seed.posts.map((row) => row.author),
   ].map(normaliseHandle),
 );
+
+/**
+ * The follow graph: one key per edge, `follower:followee` (`pages/user/profile.md` → *Data*).
+ *
+ * A `Set` of edges rather than a pair of counts, because **a count is the length of a list** — the
+ * same rule `bookmarkCounts()` and `unreadNotificationCount()` keep. Following is idempotent
+ * (adding an existing key changes nothing) and unfollowing a stranger is a no-op, so a double tap
+ * cannot invent a follower.
+ */
+const follows = new Set<string>(store.follows.map((row) => `${row.follower}:${row.followee}`));
+
+function edgeOf(follower: Handle, followee: Handle): string {
+  return `${follower}:${followee}`;
+}
+
+/**
+ * One stored profile row → the page's shape, with both figures read off the graph **at this
+ * moment**. Parsed through `profileSchema`, so the counts can never be a number the row invented.
+ */
+function profileOf(row: Omit<Profile, "followers" | "following">): Profile {
+  let followers = 0;
+  let following = 0;
+  for (const key of follows) {
+    const [follower, followee] = key.split(":");
+    if (followee === row.handle) followers += 1;
+    if (follower === row.handle) following += 1;
+  }
+  return profileSchema.parse({ ...row, followers, following });
+}
+
+/** The profile row an account owns, by handle — the edit page's and the graph's anchor. */
+function profileRow(handle: Handle): Omit<Profile, "followers" | "following"> | undefined {
+  return store.profiles.find((row) => row.handle === handle);
+}
+
+/** The handle the preview's own account holds: onboarding's claim, else the fixture's `you`. */
+function ownHandle(): Handle {
+  return profile?.handle ?? VIEWER;
+}
+
+/**
+ * One side of the graph, as profile rows. Followers and following are **not** ordered by a clock —
+ * a follow edge has no timestamp in the spec — so they read alphabetically by display name, which
+ * is stable across a follow and does not reshuffle the list under the reader.
+ */
+function followProfiles(
+  side: "follower" | "followee",
+  handle: Handle,
+  options?: ListOptions,
+): Profile[] {
+  const rows = [...follows]
+    .map((key) => key.split(":"))
+    .filter(([follower, followee]) => (side === "followee" ? followee : follower) === handle)
+    .map((parts) => profileRow((side === "followee" ? parts[0] : parts[1]) as Handle))
+    .filter((row): row is Omit<Profile, "followers" | "following"> => row !== undefined)
+    .map(profileOf)
+    .filter((row) => matches([row.displayName, row.handle], options?.query));
+
+  return rows.sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
 
 
 function voteKey(kind: string, id: string): string {
@@ -1855,12 +1922,12 @@ export const memoryRepo: Repo = {
     if (!needle) return false;
 
     // The viewer's own handles are never "taken" from the viewer: the rule compares accounts, and
-    // typing the handle you already hold is a no-op, not a collision. `VIEWER` is the mock
-    // account's current handle; `profile.handle` is the one onboarding has drafted or claimed.
-    if (needle === normaliseHandle(VIEWER)) return false;
-    if (profile && normaliseHandle(profile.handle) === needle) return false;
+    // typing the handle you already hold is a no-op, not a collision. The account's own handle is
+    // whichever one it holds now — `VIEWER` until onboarding claims another.
+    if (needle === normaliseHandle(ownHandle())) return false;
 
-    return CLAIMED_HANDLES.has(needle);
+    // Another account's profile row claims it, and so does an author who only signs fixture content.
+    return profileRow(needle as Handle) !== undefined || CLAIMED_HANDLES.has(needle);
   },
 
   async saveProfile(patch) {
@@ -1876,5 +1943,145 @@ export const memoryRepo: Repo = {
     });
     profile = next;
     return { ...next };
+  },
+
+  /* ----------------------------------------------------------------------------------------------
+   * Profiles and the follow graph
+   * -------------------------------------------------------------------------------------------- */
+
+  async getProfile(handle) {
+    const key = handleSchema.safeParse(handle);
+    if (!key.success) return null;
+
+    const row = profileRow(key.data);
+    // No row is the page's *This user doesn't exist.* — a state, never an error.
+    return row ? profileOf(row) : null;
+  },
+
+  async profileCreations(handle, options) {
+    const key = handleSchema.parse(handle);
+    const wanted: ProfileCreationType = options?.type ?? "all";
+
+    // One listing over the three authored types, filtered — not three listings stitched together,
+    // so *All* sorts across the grid and a page of 24 is a page of 24 cards.
+    const rows: AuthoredItem[] = [
+      ...store.characters,
+      ...store.lorebooks,
+      ...store.presets,
+    ].filter(
+      (row) =>
+        row.author === key &&
+        listed(row) &&
+        (wanted === "all" || row.kind === wanted) &&
+        matches([row.name, row.tagline], options?.query),
+    ) as AuthoredItem[];
+
+    return pageOf(order(rows, options?.sort ?? "newest", ENGAGED), options);
+  },
+
+  async profilePosts(handle, options) {
+    const key = handleSchema.parse(handle);
+    // A post has no `isPublic`: `listed()` would read a field the shape does not carry, and
+    // moderation removes a post rather than hiding it.
+    const rows = store.posts.filter((row) => row.author === key);
+    return pageOf(order(rows, options?.sort ?? "newest", ENGAGED), options);
+  },
+
+  async followersOf(handle, options) {
+    const key = handleSchema.parse(handle);
+    return pageOf(followProfiles("followee", key, options), options);
+  },
+
+  async followingOf(handle, options) {
+    const key = handleSchema.parse(handle);
+    return pageOf(followProfiles("follower", key, options), options);
+  },
+
+  async isFollowing(handle) {
+    const key = handleSchema.safeParse(handle);
+    if (!key.success) return false;
+    // You do not follow yourself; the page never draws the control on your own profile, and the
+    // graph agrees rather than special-casing the button.
+    if (key.data === ownHandle()) return false;
+    return follows.has(edgeOf(ownHandle(), key.data));
+  },
+
+  async followUser(handle) {
+    const key = handleSchema.safeParse(handle);
+    if (!key.success) return null;
+
+    const target = profileRow(key.data);
+    if (!target || key.data === ownHandle()) return null;
+
+    follows.add(edgeOf(ownHandle(), key.data));
+    return profileOf(target);
+  },
+
+  async unfollowUser(handle) {
+    const key = handleSchema.safeParse(handle);
+    if (!key.success) return null;
+
+    const target = profileRow(key.data);
+    if (!target) return null;
+
+    follows.delete(edgeOf(ownHandle(), key.data));
+    return profileOf(target);
+  },
+
+  async saveProfileEdit(input) {
+    // Both edges parsed: the form's write through `profileEditSchema` (trim, lowercase, collapse)
+    // and the merged row through the fixture shape before it is stored.
+    const parsed = profileEditSchema.safeParse(input);
+    if (!parsed.success) return null;
+    const write = parsed.data;
+
+    // Own account only: the row is the one the signed-in account holds, never a handle in the URL.
+    const old = ownHandle();
+    const row = profileRow(old);
+    if (!row) return null;
+
+    if (write.handle !== old) {
+      if (profileRow(write.handle) || CLAIMED_HANDLES.has(write.handle)) return null;
+
+      // A rename moves the row and every edge that names it. Content is addressed by id, so it
+      // keeps its rows and only its author handle follows; the old handle answers not-found with
+      // no alias (`pages/user/edit.md` → *Handle changed*).
+      for (const collection of [store.characters, store.lorebooks, store.presets, store.posts]) {
+        for (const item of collection) {
+          if (item.author === old) item.author = write.handle;
+        }
+      }
+      for (const key of [...follows]) {
+        const [follower, followee] = key.split(":");
+        if (follower !== old && followee !== old) continue;
+        follows.delete(key);
+        const moved = edgeOf(
+          follower === old ? write.handle : (follower as Handle),
+          followee === old ? write.handle : (followee as Handle),
+        );
+        // A rename never creates a self-edge: the account still follows the same people.
+        if (moved !== edgeOf(write.handle, write.handle)) follows.add(moved);
+      }
+
+      CLAIMED_HANDLES.delete(old);
+      CLAIMED_HANDLES.add(write.handle);
+      if (profile && profile.handle === old) profile = { ...profile, handle: write.handle };
+    }
+
+    const index = store.profiles.findIndex((entry) => entry.handle === old);
+    const next = {
+      handle: write.handle,
+      displayName: write.displayName,
+      avatar: write.avatar,
+      bio: write.bio,
+      joinedAt: row.joinedAt,
+    };
+    store.profiles[index] = next;
+
+    if (profile && profile.handle === write.handle) {
+      profile = { ...profile, displayName: write.displayName };
+    }
+
+    return profileOf(next);
   },
 };

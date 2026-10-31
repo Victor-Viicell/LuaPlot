@@ -46,6 +46,10 @@ import type {
   postAttachmentSchema,
   postSchema,
   postWriteSchema,
+  profileCreationTypeSchema,
+  profileEditSchema,
+  profileSchema,
+  profileTabSchema,
   presetSchema,
   presetSettingsSchema,
   presetWriteSchema,
@@ -172,6 +176,15 @@ export type ChatReply = z.infer<typeof chatReplySchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type User = z.infer<typeof userSchema>;
 export type AccountPreferences = z.infer<typeof accountPreferencesSchema>;
+
+/** One author's public profile (`pages/user/profile.md`); the two figures are derived edges. */
+export type Profile = z.infer<typeof profileSchema>;
+/** The edit form's one write — no NSFW pair, no email, no provider (`pages/user/edit.md`). */
+export type ProfileEdit = z.infer<typeof profileEditSchema>;
+/** The creations tab's filter values — a control row, never a tab. */
+export type ProfileCreationType = z.infer<typeof profileCreationTypeSchema>;
+/** The profile's four tabs (`?tab=`). */
+export type ProfileTab = z.infer<typeof profileTabSchema>;
 
 export type EntityOf<V extends VotableKind> = {
   character: Character;

@@ -14,6 +14,7 @@
  */
 import type {
   AccountPreferences,
+  AuthoredItem,
   BookmarkCounts,
   BookmarkKind,
   BookmarkRow,
@@ -33,6 +34,9 @@ import type {
   PostWrite,
   Preset,
   PresetWrite,
+  Profile,
+  ProfileCreationType,
+  ProfileEdit,
   Report,
   ReportOutcome,
   ReportEntry,
@@ -598,6 +602,60 @@ export type Repo = {
     handle: Handle,
     patch: Partial<AccountPreferences>,
   ): Promise<AccountPreferences>;
+
+  /* ----------------------------------------------------------------------------------------------
+   * Profiles and the follow graph (`pages/user/profile.md`, `pages/user/edit.md`)
+   * -------------------------------------------------------------------------------------------- */
+
+  /**
+   * One author's public profile, or `null` when no account holds the handle — the page's
+   * **This user doesn't exist.** state. `followers` / `following` are derived from the graph on
+   * every read, so a figure can never disagree with the tab that lists it.
+   */
+  getProfile(handle: Handle): Promise<Profile | null>;
+
+  /**
+   * The creations tab: this author's **public** characters, lorebooks and presets in one page,
+   * newest first. `type` is the control row's filter (*All* when absent) — a filter over one
+   * listing, never three listings. Private rows and rows under moderation are **absent**, exactly
+   * as they are absent from their catalog.
+   */
+  profileCreations(
+    handle: Handle,
+    options?: ListOptions & { type?: ProfileCreationType },
+  ): Promise<Listing<AuthoredItem>>;
+
+  /**
+   * The posts tab, newest first. A post carries no `isPublic` — moderation removes it rather than
+   * hiding it (`luaplot-pages.md` → *JEV … remove posts*) — so this is the author's whole timeline.
+   */
+  profilePosts(handle: Handle, options?: ListOptions): Promise<Listing<Post>>;
+
+  /**
+   * The followers / following tabs, as profile rows paged like every other listing. The graph is
+   * keyed `follower:followee` in the adapter, which is what stops a count and its list diverging.
+   */
+  followersOf(handle: Handle, options?: ListOptions): Promise<Listing<Profile>>;
+  followingOf(handle: Handle, options?: ListOptions): Promise<Listing<Profile>>;
+
+  /** Whether **the viewer** follows this handle. False for yourself: you do not follow yourself. */
+  isFollowing(handle: Handle): Promise<boolean>;
+
+  /**
+   * Follow / unfollow, returning the other account's updated profile so the header reads the new
+   * figure without a second lookup. `null` when the handle does not exist, or is the viewer's own.
+   */
+  followUser(handle: Handle): Promise<Profile | null>;
+  unfollowUser(handle: Handle): Promise<Profile | null>;
+
+  /**
+   * The edit form's one write (`pages/user/edit.md`): display name, avatar, bio and the username.
+   * The adapter re-parses with `profileEditSchema`, refuses a handle another account holds, and on
+   * a rename moves the profile row — its content, follows and bookmarks are addressed by id and
+   * follow the account, and the old handle answers not-found with no alias. Answers `null` for a
+   * taken handle or an unknown account.
+   */
+  saveProfileEdit(input: ProfileEdit): Promise<Profile | null>;
 };
 
 /**

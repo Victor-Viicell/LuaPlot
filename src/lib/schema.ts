@@ -998,6 +998,58 @@ export const profileWriteSchema = z.strictObject({
   displayName: displayNameSchema,
 });
 
+/**
+ * `pages/user/profile.md` → *Data*: a profile is who an author is beyond the handle they sign a row
+ * with — a display name, an avatar, a bio and a join date. It carries **no** engagement, no NSFW
+ * flag and no persona: `personas.md` says a persona is personal and is never listed.
+ *
+ * `followers` / `following` are in the shape but **derived from the follow graph at read**, never
+ * stored: a stored figure drifts from the edges that produce it, the same rule `commentCount` and
+ * `bookmarkCounts()` already follow.
+ */
+export const profileSeedSchema = z.strictObject({
+  handle: handleSchema,
+  displayName: displayNameSchema,
+  avatar: avatarSchema,
+  /** Free text; trimmed so a bio of spaces is an empty bio, never a stored whitespace row. */
+  bio: z.string().transform((value) => value.trim()),
+  joinedAt: isoSchema,
+});
+
+export const profileSchema = z.strictObject({
+  ...profileSeedSchema.shape,
+  followers: z.number().int().nonnegative(),
+  following: z.number().int().nonnegative(),
+});
+
+/**
+ * `/user/[user.username]/edit`'s one write (`pages/user/edit.md` → *Data*): display name, avatar,
+ * bio and the username. The NSFW pair is deliberately **not** here — it is the account's preference
+ * (`accountPreferencesSchema`), so the form writes it through `repo.savePreferences` and a profile
+ * row cannot hold a second copy of it. No email, no provider, no delete: identity stays with Supabase.
+ */
+export const profileEditSchema = z.strictObject({
+  handle: handleSchema,
+  displayName: displayNameSchema,
+  avatar: avatarSchema,
+  bio: z.string().transform((value) => value.trim()),
+});
+
+/**
+ * One edge of the follow graph, keyed `follower:followee` by the adapter. Seeded here so the
+ * preview's counts come from real edges rather than from hand-written figures.
+ */
+export const followSeedSchema = z.strictObject({
+  follower: handleSchema,
+  followee: handleSchema,
+});
+
+/** The creations tab's type control row — a filter, never a tab (`profile.md` → *Layout*). */
+export const profileCreationTypeSchema = z.enum(["all", "character", "lorebook", "preset"]);
+
+/** The profile's four tabs, in `?tab=` (`pages/user/profile.md` → *URL*). */
+export const profileTabSchema = z.enum(["creations", "posts", "followers", "following"]);
+
 /* ------------------------------------------------------------------------------------------------
  * Collections — what the adapter loads and what `schema:check` parses
  * ---------------------------------------------------------------------------------------------- */
@@ -1012,6 +1064,8 @@ export const seedSchemas = {
   notifications: z.array(notificationSchema),
   reports: z.array(reportSchema),
   sessions: z.array(sessionSchema),
+  profiles: z.array(profileSeedSchema),
+  follows: z.array(followSeedSchema),
 } as const;
 
 export type SeedCollection = keyof typeof seedSchemas;

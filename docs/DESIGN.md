@@ -1015,6 +1015,49 @@ and it must never look like a log. These are the page's decisions.
 - **The summary row is not built**: no fixture carries a deferred summary, so the state is drawn by
   the data's shape (`rows` are just rows) and the gap is logged in `docs/NEXT.md`.
 
+## Profile header and edit form (decided in T-23)
+
+The profile is the first page that draws **somebody else**, so the header has to read as an identity
+and not as a settings panel, and the page has to survive the viewer not being the author.
+
+- **The header is one block at 360 and one row at `sm`**: avatar (56px at 360, 72px at `sm`),
+  display name, `@handle`, bio (56ch cap, `text-wrap: pretty`), then the two figures. The action sits
+  on its own full-width row under the who-block at 360 and moves to the header's right edge at 640.
+- **The figures are plain text, not links and not a footer strip**: `4 followers · 3 following`,
+  numerals in `--color-text` 600 weight with `tabular-nums`, the words in `--color-text-subtle`. The
+  followers and following **tabs** are the only way into those lists, so a link in the header would
+  be a second door to the same room. Decided against a separate footer strip: at 360 that would push
+  the tabs below the fold for no gain.
+- **The creations type row is chips, not a second tab strip**: four 44px pill buttons
+  (`All / Characters / Lorebooks / Presets`), the pressed one in `--color-accent` on a hairline
+  border. A `Tabs` strip under the `Tabs` strip would read as two levels of tab; the spec calls it a
+  filter and the drawing says so.
+- **Profile tabs carry no counts.** `/bookmarks` counts saved *rows* because a saved row can be dead
+  and the number must still be honest; a profile's creations and posts have no derived count that is
+  cheap to read without a second listing call per tab, and the spec asks for none. `Tabs` stays
+  count-free here rather than inventing a number the adapter did not answer.
+- **A follow write never remounts the page**: `followUser` / `unfollowUser` answer with the updated
+  profile, so the figure and the button repaint in place and `?tab=` is untouched. The one exception
+  is the Followers tab, which lists the same edges the write just changed, so it re-reads its first
+  page. Nothing is written to the URL by a write.
+- **Signed out, the control is a link to `/authentification`** (`Sign in to follow`): a follow would
+  have no account to write for, and the spec's access is public read.
+- **You never follow yourself**: Follow is simply not drawn on your own page (Edit profile is the
+  control there), and the adapter answers `false` from `isFollowing` for the viewer's own handle so
+  the rule does not depend on the button being hidden.
+- **Follower and following lists read alphabetically by display name.** A follow edge carries no
+  timestamp in the spec, so there is no `newest` to sort on; alphabetical is stable across a follow
+  and does not reshuffle under the reader.
+- **`/user/[username]/edit` uses the create/edit form pattern** (`T-17`/`T-19`): 12px kicker
+  (`account`), 26/32px title (`Edit profile`), one lede paragraph, a hairline, then the fields —
+  display name, avatar initials, bio (4-row textarea), username with the onboarding rule as its help
+  line — and the NSFW pair as two real `Toggle`s under a `NSFW content` label. Actions are a sticky
+  footer at 360 (above the tab bar, `Column`-reversed so Save is nearest the thumb) and a static
+  right-aligned row at 640+. **No email, no provider, no delete**, because the spec's absence is the
+  rule: identity stays with Supabase and no route removes an account.
+- **A forbidden edit draws one sentence**, `You can't edit this account.`, with the way back to the
+  profile — not a 404, because the account exists and only the permission is missing.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.
