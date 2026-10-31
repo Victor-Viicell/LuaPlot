@@ -16,9 +16,17 @@ could not be verified.
   again* (gated on `updatedAt > notice.at`, with a sentence saying why it is closed), *Awaiting
   re-verification* (skeleton lines, never a spinner) and *Verified and public again* (clears itself
   after 3.6s). Decisions written in `docs/DESIGN.md` + `docs/ARCHITECTURE.md`.
-- **Verified:** `scripts/check.sh` GREEN (build, 30 routes, schema section).
-- **Not verified:** the live render of the three states — the adapter calls were exercised through the
-  pages' own code paths only by the typecheck; a browser walk of a request is owed to the next tick.
+- **Verified:** `scripts/check.sh` GREEN (build, 30 routes, schema section); live `200` on the
+  published build, and the whole loop walked in the browser at
+  `/character/c0a1b2c3-0000-4000-8000-00000000001c` (owner + private fixture): notice with reasons and
+  JEV's note; the button **disabled** with its sentence while `updatedAt` was older than the measure;
+  **Edit → save** in-app reopened the gate without a reload; **Request public again** showed
+  *Awaiting re-verification* with the mock verdict, closed the gate again on the refusal; a second
+  edit then returned *Verified and public again*, and the confirmation cleared itself into the public
+  view (Fork/Start back, no notice).
+- **Not verified:** the same three states on `/lorebook/[id]` and `/preset/[id]` — the block is the
+  same code in the same shape, typechecked and built, but only the character page was walked; and a
+  real (non-mock) JEV answer, since the preview has no key.
 
 ## T-27 — the JEV adapter, and a queue that now means something (2026-10-31)
 

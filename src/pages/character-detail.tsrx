@@ -116,7 +116,7 @@ export function CharacterDetail() @{
   const requestHint = track(() =>
     canRequest.value
       ? "A request covers the saved version, so JEV re-checks the whole character."
-      : "Nothing has changed since moderation hid it. Edit and save this character first — a request covers the saved version.",
+      : "Patch what the reasons name, then edit and save — a request covers the saved version.",
   );
 
   const menuOpen = track(false);

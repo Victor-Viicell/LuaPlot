@@ -1,114 +1,84 @@
 # Baton — what the next session does
 
-**Ticket: T-28 — the owner's side of a moderation outcome. P3 closes for real.**
+**Ticket: T-28B — a post can be removed, so JEV can act on one.**
 
-Spec: `src/specs/pages/character/detail.md` → *Owner*, *States*; the same sections in
-`src/specs/pages/lorebook/detail.md` and `src/specs/pages/preset/detail.md`;
-`src/specs/systems/jev.md` → *Privacy and republication* and *Verification*;
-`src/specs/components/report.md` → *What happens next*.
+Spec: `systems/jev.md` → *Rules* (the action table), *Privacy and republication* (*posts and comments
+cannot be made private. Their only enforcement is removal*), *Scope*; `pages/post/detail.md` and
+`components/post-card.md` for what a removed row must look like; `pages/moderation/detail.md` →
+*Actions* (the conclude form already offers `removed`).
 
-Why next: T-27 made JEV act. A certain violation now **makes an authored item private immediately
-and opens no case**, which means the notice `character-detail.tsrx` already draws
-(`loadNotice` → `listReports` filtered by target) has **nothing to read** for exactly the content
-that most needs it. The owner sees a private item with no report, no reasons, and no measure — the
-spec's *Privated by moderation* state without its notice. That gap, plus the two states the detail
-pages have never had (**Awaiting re-verification**, **Request public again**), is this ticket.
+Why next: two things are still untrue of the app. `postSchema` has **no `status`**, so `clearAction()`
+in `lib/llm/jevPolicy.ts` returns `escalated` for a post whose violation is certain, and `addReport`
+can only queue it; and `concludeReport` refuses `outcome: "removed"` on a post for the same reason. The
+comment path already does this correctly (`status: "removed"`, body gone, replies intact) — the post
+path is the missing half of the same rule.
 
 ## Approach
 
-1. **Decide where an immediate action's record lives** (open decision below — decide it first, in
-   writing, in `docs/DESIGN.md`, before drawing anything). The spec is explicit that an immediate
-   action *opens no case and never enters `/moderation`*, yet the owner must see *the report, the
-   reasons, and the measures taken on the content page itself*. Whatever is chosen must be readable
-   by `loadNotice` on all three detail pages and must not put the row in the open queue.
-2. **`repo.requestRepublication(id)`** — authored kinds only: flags the item for re-verification,
-   runs `classify()` from `lib/llm/jev.ts` against the item's current text, and on a clean answer
-   sets `verified: true` and `isPublic: true`; on anything else the item stays private and the
-   owner sees *Awaiting re-verification* until the answer lands. A request starts its check at once
-   (`systems/jev.md` → *Verification*), so the page's phase is `awaiting` while the call runs.
-3. **The button is owner-only and appears only while private**, next to the notice; it is absent
-   on someone else's item and on a visible one. Tap targets ≥ 44px, and it must survive the
-   in-app-navigation rule (no hard reload: the memory adapter loses runtime rows).
-4. **States on all three pages**: *Privated by moderation* (notice + reasons + measures),
-   *Awaiting re-verification* (a live region, no spinner without a skeleton), *Verified and public
-   again* (a one-line confirmation that clears itself into the ordinary public view).
-5. **Patch the same three pages only.** `comment` and `post` have no republication: removal is
-   final (`systems/jev.md` → *Privacy and republication*), so no control appears for them anywhere.
+1. **`postSchema` grows `status: z.enum(["visible", "removed"])`.** The comment's three-value enum is
+   *not* reused: a post has no author-deleted placeholder row (a creator's delete removes the row).
+   Fixtures: every post gains `status: "visible"`, and **one** fixture post becomes `removed` so the
+   state is reachable without reporting anything.
+2. **`applyJevAction` writes it**: the `removed` + `post` branch sets `status: "removed"`, and
+   `clearAction("post")` in `jevPolicy.ts` returns `removed` again — delete the escalation branch and
+   the sentence in its note, and update `docs/JEV.md` → *Limits of this build* in the same commit.
+3. **Every listing drops a removed post; `getPost` still answers it by id** (the owner and a moderator
+   open it, everyone else sees the unavailable state), exactly as `isPublic` works for authored items.
+   The filter belongs in the adapter once — the feed, `/user/[username]`'s posts tab and the
+   composer's *my posts* view all read the same listing.
+4. **The detail page draws the state**: *This post was removed by moderation.* with no vote, no
+   composer and no bookmark. **Check the thread rule before hiding anything**: `systems/jev.md` says a
+   *creator's* delete takes the thread in cascade, while a *removal* is moderation's and the row
+   stays — decide, then write it in `docs/DESIGN.md`.
+5. **The case path stays honest**: `concludeReport` may now conclude a post `removed`, and a dismissal
+   still changes no visibility. A removed post must not be counted as an open case anywhere.
 
 ## Traps
 
-- **`loadNotice` reads cases, and an immediate action has none.** Whatever record is chosen, the
-  notice loader changes with it — do not bolt a second lookup beside the first.
-- **`navigate()` writes only what you give it**; any navigation the new control adds must stay
-  in-app, never `location`.
-- **`verified` is internal** (`systems/jev.md` → *Verification*): no badge, no field. The only
-  visible effects are *awaiting* and the item coming back public.
-- **An edit already clears `verified`** in `updateCharacter` / `updateLorebook` / `updatePreset` —
-  do not add a second clearing path, and do not clear it on open.
-- **A republication request runs the model**, so the page needs Loading / Error / Success and a
-  `Preview mode` chip while `previewMode()` is true (`docs/JEV.md` → *Mock mode*).
-- **Ripple:** `@if` branch = one node; `@for` needs `const`; `effect()` is the only hook; a page's
-  scoped CSS cannot reach a primitive's internals (wrap them).
-- **Never** let a republication request touch a post or comment, and never delete anything: JEV
-  changes visibility only.
-
-## Open decisions
-
-- **What an immediate action leaves behind.** Candidates: (a) a concluded case whose decision is
-  JEV's own — gives the owner a full notice but puts the row in `/moderation?status=concluded`;
-  (b) a `moderation` notification **plus** a `noticeSchema` row keyed by target, storing the
-  reasons and the measure; (c) keep the notification only and let the notice read the creator's
-  notification rows. Pick one and record why in `docs/DESIGN.md` + `docs/ARCHITECTURE.md`; the
-  schema must own the shape whichever it is.
-- **Whether *Request public again* is gated on the reasons being patched.** The spec says the owner
-  may request *once every reason has been patched*, and that reasons are not acknowledged one by
-  one — there is no per-reason record, so the gate can only be *the item was edited since the
-  decision*. Decide and write it down.
+- **`status` on a post is not a visibility flag**: only removal exists; do not add `isPublic`.
+- **`postSchema` is parsed by the seed check, `addPost`, `PostComposer` and every fixture** — the new
+  field lands in all of them in the same commit or the gate fails at module load.
+- **`ratioOf`** reads likes/dislikes only; a removed post must be absent from a ratio listing, not
+  shown as a zero-engagement row.
+- **`/user/[username]`'s posts feed keys on `post.id`** (noted since T-20): fix it while you are in
+  that feed, it is one line.
+- **Ripple**: `@for` needs `const`, an `@if` branch is one node, `effect()` is the only hook.
+- Never invent a fourth status to express *pending*: JEV's uncertainty leaves a post visible.
 
 ## Found while working (carried forward — keep this list growing)
 
-- **T-27 is done**: `lib/llm/jev.ts` (decisions route, `provider: "TypeSafe"` required, `null` on
-  failure, second `same_text` request), `lib/llm/jevPolicy.ts` (thresholds + `claimOf` + `decide`),
-  `jevPayloadSchema` / `jevRequestSchema` / `jevContentStateSchema` in `schema.ts`,
-  `mockJevAnswers` / `mockSameText` in `mock.ts`. `addReport` is the one scan point: verified →
-  held, open case → join and add weight, otherwise one `classify()` → act-and-notify with no case,
-  clean-and-verify, or escalate with the verdict stored on the case.
-- **An immediate action files no report row at all** (T-27): the dialog is answered `submitted` and
-  nothing is stored except the creator's notification. That is why the owner's notice is empty for
-  exactly that content — see T-28's open decision.
-- **A certain violation on a post escalates, not removes** (T-27): `postSchema` has no `status`, so
-  `clearAction()` in `jevPolicy.ts` returns `escalated` for a post and the note says why. **Filed as
-  T-28B** — flip that one branch when the row can hold a removal.
-- **`assets: []` is deliberate** (T-27): there is no vision pass, so an image-only report escalates
-  (`imageOnly`) instead of asking a text model to judge a picture. A vision pass belongs with the
-  `jev` Edge Function (T-32).
-- **A new case needs `history: []`**: `reportSchema` requires it since T-26B, and `addReport` was
-  the one place that did not set it (every report that opened a case threw until T-27 fixed it).
-  Any new case-building code goes through `reportSchema.parse`, which is what caught it.
-- **`postSchema` has no status, so a post cannot be marked removed** (T-26B/T-27): the conclusion
-  is recorded on the case, the row stays where it is, and nothing hides it from a listing.
-- **"Set reason" is folded into the decision** (T-26B): the case panel's one `Reason` field is the
-  moderator's words, written by `concludeReport`/`dismissReport` as `decision.reason`.
+- **T-28 is done**: `moderationNoticeSchema` + `republicationOutcomeSchema` in `schema.ts`;
+  `repo.moderationNotice(kind, id)` answers the newest of an immediate action's **notice row** and the
+  case that hid the item (one call, two sources); `repo.requestRepublication(kind, id)` is owner-only,
+  authored-only and runs `classify()` at once; `addReport`'s immediate branch writes the creator's
+  notification **and** the notice row. The three authored detail pages draw the notice, the gate
+  (`updatedAt > notice.at`) and the three states. The whole loop was walked in the browser.
+- **The notice rows are runtime-only** in the memory adapter: report an item in the preview to create
+  one, otherwise the case-derived path answers. A fixture notice would be dead seed data.
+- **A refused republication rewrites the gate clock** (`noticeAt = outcome.at`), so the next attempt
+  needs a newer edit — the only enforceable reading of *the request covers the item as a whole*.
+- **A refused republication sets `verified: false`**: that version was not verified, and the next edit
+  is what makes it eligible.
+- **An immediate action files no report row** (T-27/T-28): the dialog answers `submitted`, and only
+  the creator's notification and the notice row are stored.
+- **`assets: []` is deliberate** (T-27): no vision pass, so an image-only report escalates
+  (`imageOnly`) instead of asking a text model to judge a picture (T-32).
+- **A new case needs `history: []`** — build cases through `reportSchema.parse`, which catches it.
+- **"Set reason" is folded into the decision** (T-26B): one `Reason` field, `decision.reason`.
 - **`event` is a DOM global**: name history helpers `historyEvent`.
-- **`@for` needs `const`**: `@for (row of rows)` crashes `tsrx-tsc` with *Cannot read properties of
-  undefined (reading '0')*. Write `@for (const row of rows; key row.id)`.
+- **`@for` needs `const`**: `@for (row of rows)` crashes `tsrx-tsc`; write `@for (const row of rows;
+  key row.id)`.
 - **An `@if` branch renders one node**: wrap a header plus a body in `<>…</>`.
-- **A gate named for the positive is a bug waiting**: name the flag for its effect
-  (`concludeOff`) and check it in the browser.
+- **A gate named for the positive is a bug waiting**: name the flag for its effect and check it in the
+  browser — `disabled={!canRequest.value}` is the shape that works with `Button`.
 - **The preview loses runtime rows on a hard reload** — every flow that writes must be walked
   **in-app**; a `goto_url` re-seed looks like a bug in the write.
-- **T-26 is done**: `pages/moderation-queue.tsrx` is the queue — page 1, `Select` filter in the URL
-  (`?status=open|concluded|all`), counts from two `listReports` calls, `forbidden` as a phase,
-  `?admin=1` the reviewer's switch; `reportFilterSchema` + `reportSourceIsExternal()` in
-  `schema.ts`; `relativeAge()` in `lib/format.ts`.
-- **Open rows on `/moderation` are the escalated cases only**: a row prints an action word only for
-  `made-private` / `removed` / `held`.
-- **T-25 is done**: `components/NsfwControl.tsrx`; a reveal's lifetime is a fetch epoch
-  (`CardGrid`'s `revealEpoch`), and any new listing that can refetch must pass it.
-- **`/user/[username]`'s posts feed still keys on `post.id`** — one line when that feed is next
-  touched.
+- **T-26 is done**: `pages/moderation-queue.tsrx` (filter in the URL, `reportFilterSchema`,
+  `relativeAge()` in `lib/format.ts`); open rows are the escalated cases only.
+- **T-25 is done**: `components/NsfwControl.tsrx`; a reveal's lifetime is `CardGrid`'s `revealEpoch`,
+  and any new listing that can refetch must pass it.
 - **`/terms` is done** (T-24): `TERMS_RULES` + `REPORT_REASON_RULE` in `schema.ts`, ids
-  `#copied-content` / `#unmarked-nsfw` / `#illegal-content`; a hash in the URL needs a mount jump.
+  `#copied-content` / `#unmarked-nsfw` / `#illegal-content`; a URL hash needs a mount jump.
 - **`<a>` and `<button>` do not nest**; **`{<Component />}` inside a fragment is a parse error**;
   **`effect()` is the only lifecycle hook**; **a component's root element cannot be styled**.
 - **`/notifications` is done** (T-22): `markNotificationRead`, `markAllNotificationsRead`,

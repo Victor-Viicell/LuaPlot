@@ -111,7 +111,7 @@ export function PresetDetail() @{
   const requestHint = track(() =>
     canRequest.value
       ? "A request covers the saved version, so JEV re-checks the whole preset."
-      : "Nothing has changed since moderation hid it. Edit and save this preset first — a request covers the saved version.",
+      : "Patch what the reasons name, then edit and save — a request covers the saved version.",
   );
 
   const menuOpen = track(false);
