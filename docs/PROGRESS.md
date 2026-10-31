@@ -3,6 +3,31 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-17 — the character form, and the first authored write (2026-10-31)
+
+- **Changed:** `characterWriteSchema` (+ `CHARACTER_NAME_REQUIRED`, `LOREBOOK_NOT_ATTACHABLE`,
+  `LOREBOOK_ID_INVALID`, `LOREBOOK_ALREADY_ATTACHED`, `lorebookIdSchema`) in `schema.ts`; `CharacterWrite`
+  in `types.ts`. `repo` gains exactly the writes the two pages call — `addCharacter`,
+  `updateCharacter` (author only), `deleteCharacter` (author only, cascading its thread, votes and
+  bookmarks, never the lorebooks), plus the attachment seam `listAttachableLorebooks` and
+  `attachableLorebook`. One form, `components/CharacterForm.tsrx` (`character: null` is create),
+  mounted by `/character/create` and `/character/[character.id]/edit`; the edit page adds the
+  in-place-confirmed Delete row and the three refusal states. `scripts/schema-check.ts` grew a T-17
+  section (whitespace name, collapse, empty in-session → absent, initials upper-cased and filled from
+  the name, dedupe, pasted id trimmed).
+- **Verified:** `scripts/check.sh` → GREEN (build, 30 routes, schema with the new cases). The adapter
+  was exercised directly under `bun` (scratch probe, not committed): create with a duplicate
+  attachment and no initials → `Test Hero`, initials `TE`, one attachment, `author: you`,
+  `verified: false`, `isPublic: true`, zero engagement; the row appears in `listCharacters({query})`;
+  update → renamed, in-session name `Tess`, initials `TH`, `createdAt` kept, `verified` cleared;
+  a private book by `quill` refused by both the write and `attachableLorebook`; updating/deleting
+  another author's character answers `null`/`false`; delete cascades the row and leaves the lorebook.
+  Published: `LIVE=https://victor-viicell.github.io/LuaPlot/` → 200 (asset 200 too).
+- **Not verified:** the form in a real browser this tick (no Chromium pass): the 360/900/1200 layout,
+  the in-place delete confirmation and the unavailable-row rendering are proven by build + code, not
+  by a screenshot. A separate `personality` field is not stored (one description field, per the spec's
+  single bullet) — filed in `NEXT.md`.
+
 ## T-16 — the model seam answers, and says that it is a preview (2026-10-31)
 
 - **Changed:** `lib/llm/chat.ts` now routes — `provider.ts` posts to `VITE_CHAT_ENDPOINT` (a URL; the

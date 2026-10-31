@@ -133,7 +133,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 
 ## P2 — Authoring, collections, people
 
-- [ ] **T-17 `/character/create` + `/edit`.** One-column form, avatar pick, SFW/NSFW toggle,
+- [x] **T-17 `/character/create` + `/edit`.** One-column form, avatar pick, SFW/NSFW toggle,
       lorebook attachments by ID and picker, unavailable rows kept. Accept: save publishes and
       lands on detail; invalid lorebook ID blocks with the spec's error.
 - [ ] **T-18 `/lorebook/*` (catalog, create, detail, edit).** Entries list, body editor.

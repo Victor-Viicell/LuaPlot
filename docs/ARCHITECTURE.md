@@ -36,7 +36,8 @@ src/
     toast.ts            the toast queue, same store shape
   components/           Button.tsrx, Field.tsrx, Card.tsrx, CardGrid.tsrx, Sheet.tsrx,
                         Tabs.tsrx, EmptyState.tsrx, Skeleton.tsrx, Avatar.tsrx,
-                        CommentThread.tsrx, ReportDialog.tsrx, NsfwToggle.tsrx, Icons.tsrx
+                        CommentThread.tsrx, ReportDialog.tsrx, NsfwToggle.tsrx, Icons.tsrx,
+                        PostComposer.tsrx, CharacterForm.tsrx (create + edit, one form)
   pages/                one file per route in src/specs/luaplot-pages.md
 supabase/
   migrations/           SQL, ordered, idempotent

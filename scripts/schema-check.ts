@@ -14,8 +14,12 @@
  *
  * Runs under `bun` so it imports the TS schemas with no build step.
  */
-import { COMMENTS, seed, CHARACTERS } from "../src/lib/fixtures/index.ts";
+import { COMMENTS, seed, CHARACTERS, LOREBOOKS } from "../src/lib/fixtures/index.ts";
 import {
+  CHARACTER_NAME_REQUIRED,
+  LOREBOOK_ID_INVALID,
+  characterWriteSchema,
+  lorebookIdSchema,
   commentBranchIsTyped,
   commentThreadSchema,
   handleSchema,
@@ -150,6 +154,70 @@ if (!paddedBody.success) bad(`postWriteSchema refused a real body (${paddedBody.
 else if (paddedBody.data.body !== "a body with air around it") {
   bad(`postWriteSchema did not trim the body ("${paddedBody.data.body}")`);
 } else ok("postWriteSchema trimmed the body it accepted");
+
+/* 2c. The character write (T-17). The same three claims the composer's gate makes, because this is
+   the first authored-item write and T-18/T-19 copy it: an empty name fails with the schema's own
+   sentence, a padded name is collapsed, an empty in-session name is *absent* (the row's optional
+   field cannot hold ""), duplicate attachments collapse in input order, and an empty avatar is
+   filled from the name — all normalisation, so the form never does any of it. */
+const nameless = characterWriteSchema.safeParse({
+  name: "   ",
+  inSessionName: "",
+  description: "",
+  nsfw: false,
+  avatar: { initials: "" },
+  lorebookIds: [],
+});
+if (nameless.success) bad("characterWriteSchema accepted a name of spaces");
+else if (nameless.error.issues[0]?.message !== CHARACTER_NAME_REQUIRED) {
+  bad(`characterWriteSchema refused an empty name for the wrong reason (${nameless.error.issues[0]?.message})`);
+} else ok("characterWriteSchema rejected a whitespace-only name");
+
+const authored = characterWriteSchema.safeParse({
+  name: "  Sonic   the   Hedgehog ",
+  inSessionName: "   ",
+  description: "  fast  ",
+  nsfw: true,
+  avatar: { initials: " so " },
+  lorebookIds: [LOREBOOKS[0].id, LOREBOOKS[0].id, LOREBOOKS[1].id],
+});
+if (!authored.success) bad(`characterWriteSchema refused a real write (${authored.error.issues[0]?.message})`);
+else {
+  const write = authored.data;
+  if (write.name !== "Sonic the Hedgehog") bad(`characterWriteSchema did not collapse the name ("${write.name}")`);
+  else ok("characterWriteSchema collapsed the name");
+  if (write.inSessionName !== undefined) bad(`characterWriteSchema kept an empty in-session name ("${write.inSessionName}")`);
+  else ok("characterWriteSchema turned an empty in-session name into absent");
+  if (write.description !== "fast") bad(`characterWriteSchema did not trim the description ("${write.description}")`);
+  else ok("characterWriteSchema trimmed the description");
+  if (write.avatar.initials !== "SO") bad(`characterWriteSchema did not upper-case the initials ("${write.avatar.initials}")`);
+  else ok("characterWriteSchema upper-cased the initials");
+  if (write.lorebookIds.length !== 2) bad(`characterWriteSchema kept ${write.lorebookIds.length} attachments, wanted 2`);
+  else ok("characterWriteSchema deduped the attachments in input order");
+}
+
+const derivedInitials = characterWriteSchema.safeParse({
+  name: "Aurelia",
+  description: "",
+  nsfw: false,
+  avatar: { initials: "" },
+  lorebookIds: [],
+});
+if (!derivedInitials.success) bad("characterWriteSchema refused a write with no initials");
+else if (derivedInitials.data.avatar.initials !== "AU") {
+  bad(`characterWriteSchema filled the initials with "${derivedInitials.data.avatar.initials}"`);
+} else ok("characterWriteSchema filled empty initials from the name");
+
+const badId = lorebookIdSchema.safeParse("not-an-id");
+if (badId.success) bad('lorebookIdSchema accepted "not-an-id"');
+else if (badId.error.issues[0]?.message !== LOREBOOK_ID_INVALID) {
+  bad(`lorebookIdSchema refused a bad id for the wrong reason (${badId.error.issues[0]?.message})`);
+} else ok("lorebookIdSchema rejected a non-uuid id with the schema's sentence");
+
+const paddedId = lorebookIdSchema.safeParse(`  ${LOREBOOKS[0].id}  `);
+if (!paddedId.success) bad(`lorebookIdSchema refused a padded id (${paddedId.error.issues[0]?.message})`);
+else if (paddedId.data !== LOREBOOKS[0].id) bad("lorebookIdSchema did not trim the id it accepted");
+else ok("lorebookIdSchema trimmed a pasted id");
 
 /* 3. The recursive shape: built from the flat rows, parsed through the lazy schema. */
 console.log("== recursive shape");

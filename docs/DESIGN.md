@@ -748,6 +748,51 @@ consumer of `Session` before P2.
   copy write schema (`sessionCopyWriteSchema`); the copy rows show state and the link actions only,
   and the ticket is in `docs/NEXT.md`.
 
+## Character create and edit (decided in T-17, do not re-invent)
+
+`character/create.md` fixes the parts of the form but not its frame, and `character/edit.md` leaves its
+*Layout* entirely *to be specified*. Both routes mount the **same** `components/CharacterForm.tsrx`
+(`character: null` is create, a row is edit), so these choices are the shape every authored-item form
+(T-18, T-19, T-20) copies.
+
+- **One column at 360, in the spec's own order**: identity (Name, In-session name) → Description /
+  personality → image and NSFW → lorebook attachments → Save / Cancel. `md` splits the ID input from
+  its **Add by ID** button onto one row; `lg` puts identity and the image in a 360px right column with
+  the definition beside it and the attachments across the full width. A form that stayed 328px at
+  1440 would be a stretched phone.
+- **Description and personality are one field.** `create.md` names them as a single bullet and
+  `characterSchema` carries a single `description`; a second write field would be a value the row
+  cannot hold. Splitting them is a schema change (row, 28 fixtures, `characterCopySchema`, the detail
+  page), filed in `docs/NEXT.md` rather than half-done.
+- **The avatar is initials, and the field says so.** There is no uploader and `avatarSchema` is
+  `{initials}`-shaped, so the form offers an **Initials** control (four characters at most) whose hint
+  states the situation. Left empty the schema fills it from the name (`initialsOf`), so the row's
+  required `initials` is never a blank and a page never upper-cases a label.
+- **NSFW is its own half of the image row**: at 360 it stacks under Initials; from `md` the two sit
+  side by side, which is where the pair reads as "how this character is shown".
+- **The attachment list is three pieces, exactly as the spec counts them**: an ID input with **Add by
+  ID**, a `Select` picker of `repo.listAttachableLorebooks()` (own lorebooks plus bookmarked ones from
+  other authors, attached ones filtered out), and the current rows beneath in one `<ul>`, each with a
+  **Remove** ghost button. The empty state is a sibling sentence, not a row. An id that no longer
+  resolves stays in the list drawn as its id plus `unavailable — the lorebook is gone or private`;
+  the write still accepts it because it is already on the row, so saving cannot erase it.
+- **The picker is narrower than the by-ID rule, on purpose**: the spec's *Data* allows *any public
+  lorebook* by id, while the picker is *own plus bookmarked*. Both live in the adapter
+  (`listAttachableLorebooks`, `attachableLorebook`) so no page compares an author handle.
+- **Delete is its own row above the form's foot**, marked by a 2px `--color-danger` left rule, and it
+  confirms **in place** (the row swaps to the sentence plus Cancel / Confirm delete) — the session
+  settings sheet's pattern, not a second dialog. The sentence names the cascade, because the spec is
+  explicit that there is no undo, no trash and no grace period.
+- **Save goes to the character's detail page** on both routes, and **Cancel** follows the spec's own
+  two targets: the catalog from create, the detail page from edit.
+- **Three refusal states on edit, one line each**: `This character doesn't exist.`,
+  `This character isn't yours to edit.` (forbidden, never a silent redirect), and a load-failure line
+  that offers the catalog. The adapter refuses the write as well, so the page check is the state, not
+  the guard.
+- **No draft state and no verification step.** *Save publishes*, so `isPublic` is true on write and
+  the row is `verified: false` until JEV or a moderator looks at it — the same rule a new post
+  follows. A tagline is not a field, so a character authored here carries `tagline: ""` and no tags.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

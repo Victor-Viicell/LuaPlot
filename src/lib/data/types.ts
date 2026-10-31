@@ -21,6 +21,7 @@ import type {
   authoredItemSchema,
   avatarSchema,
   characterSchema,
+  characterWriteSchema,
   chatReplySchema,
   commentSchema,
   commentWriteSchema,
@@ -82,6 +83,12 @@ export type Engagement = z.infer<typeof engagementSchema>;
 export type AuthoredItem = z.infer<typeof authoredItemSchema>;
 
 export type Character = z.infer<typeof characterSchema>;
+/**
+ * One authoring submission (`characterWriteSchema`): exactly the fields the author fills. The
+ * adapter owns the id, the author handle, `verified`, the clock and the empty engagement — a page
+ * never writes a row, the same way it never writes a vote count.
+ */
+export type CharacterWrite = z.infer<typeof characterWriteSchema>;
 export type LorebookEntry = z.infer<typeof lorebookEntrySchema>;
 export type Lorebook = z.infer<typeof lorebookSchema>;
 export type PresetSettings = z.infer<typeof presetSettingsSchema>;

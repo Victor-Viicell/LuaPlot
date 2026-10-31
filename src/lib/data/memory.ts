@@ -20,6 +20,7 @@ import {
   accountPreferencesSchema,
   accountPreferencesPatchSchema,
   characterSchema,
+  characterWriteSchema,
   commentSchema,
   commentWriteSchema,
   handleSchema,
@@ -223,6 +224,32 @@ function nowIso(): string {
  */
 function reachable(row: { isPublic: boolean; author: Handle }): boolean {
   return row.isPublic || row.author === VIEWER;
+}
+
+/**
+ * May the viewer attach this lorebook by id? `character/create.md` → *Data*: **the author's own
+ * lorebooks and any public lorebook authored by someone else.** One function, because the adapter's
+ * write check and the page's **Add by ID** resolution must not be two opinions.
+ */
+function attachableBook(id: string): Lorebook | null {
+  const book = store.lorebooks.find((row) => row.id === id) ?? null;
+  if (!book) return null;
+  return book.author === VIEWER || book.isPublic ? book : null;
+}
+
+/**
+ * The write's `lorebookIds`, or `null` when one of them may not be attached.
+ *
+ * `already` is the row's own current list: an attachment that no longer resolves stays allowed on
+ * the row it is already on (*an attachment that no longer resolves stays listed as unavailable*), so
+ * re-saving an edit cannot erase data the author never removed.
+ */
+function checkedLorebookIds(ids: string[], already: readonly string[]): string[] | null {
+  for (const id of ids) {
+    if (already.includes(id)) continue;
+    if (!attachableBook(id)) return null;
+  }
+  return ids;
 }
 
 /**
@@ -643,6 +670,132 @@ export const memoryRepo: Repo = {
 
     recount(store);
     return true;
+  },
+
+  /**
+   * **Save** on `/character/create`. `characterWriteSchema` is parsed here before anything is stored,
+   * and every attachment is checked against the same `attachableBook` rule the **Add by ID** control
+   * resolves through, so a hand-built write cannot attach what the picker would have refused.
+   *
+   * A new character is published (`isPublic: true` — *save publishes, there is no draft state*) and
+   * unscanned (`verified: false`); engagement starts at zero. `tagline` and `tags` stay empty: the
+   * create form names no tagline field and the tag taxonomy is undecided, so the row is honest about
+   * what the author actually wrote.
+   */
+  async addCharacter(input) {
+    const parsed = characterWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const lorebookIds = checkedLorebookIds(write.lorebookIds, []);
+    if (!lorebookIds) return null;
+
+    const at = nowIso();
+    const row = characterSchema.parse({
+      kind: "character",
+      id: freshId(),
+      name: write.name,
+      inSessionName: write.inSessionName,
+      author: VIEWER,
+      tagline: "",
+      description: write.description,
+      nsfw: write.nsfw,
+      avatar: write.avatar,
+      lorebookIds,
+      isPublic: true,
+      verified: false,
+      tags: [],
+      likes: 0,
+      dislikes: 0,
+      bookmarks: 0,
+      commentCount: 0,
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    store.characters.push(row);
+    recount(store);
+    return row;
+  },
+
+  /**
+   * **Save** on `/character/[id]/edit` — author only. Everything the author does not own on the row
+   * is kept (`id`, `author`, `createdAt`, engagement, `isPublic`); the fields the write names are
+   * replaced, `updatedAt` moves and `verified` clears, because any edit invalidates the cached scan.
+   */
+  async updateCharacter(id, input) {
+    const row = store.characters.find((entry) => entry.id === id) ?? null;
+    if (!row || row.author !== VIEWER) return null;
+
+    const parsed = characterWriteSchema.safeParse(input);
+    if (!parsed.success) return null;
+
+    const write = parsed.data;
+    const lorebookIds = checkedLorebookIds(write.lorebookIds, row.lorebookIds);
+    if (!lorebookIds) return null;
+
+    const next = characterSchema.parse({
+      ...row,
+      name: write.name,
+      inSessionName: write.inSessionName,
+      description: write.description,
+      nsfw: write.nsfw,
+      avatar: write.avatar,
+      lorebookIds,
+      verified: false,
+      updatedAt: nowIso(),
+    });
+
+    store.characters.splice(store.characters.indexOf(row), 1, next);
+    recount(store);
+    return next;
+  },
+
+  /**
+   * **Delete** — author only, immediate, with the character's whole comment thread and the votes and
+   * bookmarks on it (`edit.md`: *the character row and its comment thread go in cascade*). The
+   * lorebooks it referenced are untouched: an attachment is a reference, not a copy.
+   */
+  async deleteCharacter(id) {
+    const index = store.characters.findIndex((row) => row.id === id);
+    if (index < 0) return false;
+    if (store.characters[index].author !== VIEWER) return false;
+
+    store.characters.splice(index, 1);
+
+    const kept: Comment[] = [];
+    for (const row of store.comments) {
+      if (row.itemId !== id) {
+        kept.push(row);
+        continue;
+      }
+      votes.delete(voteKey("comment", row.id));
+      bookmarks.delete(voteKey("comment", row.id));
+    }
+    store.comments = kept;
+    votes.delete(voteKey("character", id));
+    bookmarks.delete(voteKey("character", id));
+
+    recount(store);
+    return true;
+  },
+
+  /**
+   * The picker's list: the viewer's own lorebooks (private included) plus the ones they bookmarked
+   * from other authors, by name. The by-ID control is wider — any public lorebook — and that split is
+   * the spec's, not a simplification.
+   */
+  async listAttachableLorebooks() {
+    const rows = store.lorebooks.filter(
+      (row) =>
+        reachable(row) &&
+        (row.author === VIEWER || bookmarks.has(voteKey("lorebook", row.id))),
+    );
+    return [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  async attachableLorebook(id) {
+    return attachableBook(id);
   },
 
   async listMySessions() {

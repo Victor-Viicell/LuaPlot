@@ -1,89 +1,90 @@
 # Baton — what the next session does
 
-**Ticket: T-17 — `/character/create` + `/character/[id]/edit`.**
+**Ticket: T-18 — `/lorebook/*`, all four routes.**
 
-Specs: `src/specs/pages/character/create.md` (whole file), `src/specs/pages/character/edit.md`
-(whole file — *Layout* is *To be specified*, so record the choices in `docs/DESIGN.md`),
-`src/specs/luaplot-pages.md` → *Conventions* for the cascade; `docs/ARCHITECTURE.md` → *Validation*
-for the schema; `docs/DESIGN.md` → *Post detail and composer* for the one form layout already
-adopted, and *Character detail* for what the saved row must satisfy.
+Specs: `src/specs/pages/lorebook/create.md`, `edit.md`, `detail.md`, `catalog.md` (whole files);
+`src/specs/luaplot-pages.md` → *Conventions*; `docs/ARCHITECTURE.md` → *Validation*; `docs/DESIGN.md` →
+*Character create and edit (T-17)* (the form convention this ticket copies) and *Character detail*
+(the detail page it inherits).
 
-Why next: T-16 closed P1 — the session now has a model behind the seam. T-17 opens P2 with the first
-authoring form in the app, and it is the first write the rest of P2 copies: T-18/T-19/T-20 are the
-same form with different fields, and T-21's bookmarks and T-22's notifications both reference rows
-this ticket learns how to create. Doing it first means one write shape (`characterWriteSchema`) and
-one `PostComposer`-style form convention instead of four.
+Why next: T-17 landed the first authored write (`characterWriteSchema`, `repo.addCharacter`, and the
+one-form-two-hosts pattern). T-18 is the same write for the second authored type, plus the app's first
+**entries** editor — a list of rows inside a row — and the first detail page that draws a long list.
+T-19 (presets) and T-20 (personas) copy whatever this ticket settles about row editing, and the
+character form's picker has only one real lorebook to offer until this exists.
 
 ## Approach
 
-1. **Schema first, and it goes in `src/lib/schema.ts`.** `characterWriteSchema` — `name`
-   (display-name collapse, non-empty), `inSessionName` optional (empty string normalises to
-   `undefined`, *when left empty the Name is used*), `description`, `personality`, `avatar`,
-   `nsfw` boolean (SFW by default), `lorebookIds: z.array(z.uuid())` (deduped in the transform, order
-   kept). The edit schema is the same shape; do **not** declare a second one. `repo.addCharacter`
-   turns the write into a stored `characterSchema` row: `id: crypto.randomUUID()`,
-   `author: VIEWER`, `verified: false`, `createdAt: nowIso()`, engagement zero — the same rule
-   `repo.addPost` follows.
-2. **`repo` gains three methods, one path each**: `addCharacter(input)`, `updateCharacter(id, input)`,
-   `deleteCharacter(id)`. `updateCharacter` and `deleteCharacter` are **author only** and answer
-   `null`/`false` for anyone else (the page's *Not the owner* state is *forbidden*, not a redirect).
-   `deleteCharacter` cascades its comments and its attachment references, never the lorebooks
-   themselves.
-3. **One form component, two hosts.** `components/CharacterForm.tsrx`, prop `character: Character |
-   null` — `null` is create, a value is edit (preloaded). `/character/create` and
-   `/character/[id]/edit` mount it and differ only in the header, the submit target and the Delete
-   row (edit only). Same pattern as `PostComposer`'s `cut` prop, and the same reason: two copies of a
-   form drift.
-4. **The lorebook attachment list is three pieces**: an ID input + **Add by ID** (confirm resolves
-   through `repo.getLorebook` and refuses what the author may not attach — *an ID that resolves to
-   nothing the author may attach* is a validation error), a **Pick lorebook** picker, and the current
-   rows beneath with one remove control each. An id that no longer resolves stays listed as
-   *unavailable* — never silently dropped from the array, or saving would erase data the author
-   never deleted.
-5. **Mobile first**: 360×740 one column; `md` may split identity fields into two columns; `Save` and
-   `Cancel` at the end of the form, Delete in the edit page's own row above them with an in-place
-   confirmation (the session settings sheet's pattern, not a second dialog).
+1. **Schema first, in `src/lib/schema.ts`.** `lorebookWriteSchema` beside `characterWriteSchema`:
+   `name` (the same collapse, with its own `LOREBOOK_NAME_REQUIRED`), `description`, `avatar`
+   (`{initials}`, filled from the name when empty — reuse the T-17 transform, do not re-implement
+   it), `nsfw`, `entries`. Entries already have a stored shape (`lorebookEntrySchema`: `id`,
+   `keywords` min 1, `content` min 1); add an **entry write** schema for the form's input (keywords
+   as typed text) and a transform into the stored entry — never a second copy of the row shape, and
+   never a hand type beside either.
+   `repo.addLorebook` / `updateLorebook` / `deleteLorebook` mirror `addCharacter` /
+   `updateCharacter` / `deleteCharacter` one for one: the adapter owns id, author, `verified: false`,
+   the clock, `tagline: ""`, no tags and zero engagement; update and delete are **author only** and
+   answer `null` / `false`.
+2. **`components/LorebookForm.tsrx`, two hosts**, exactly like `CharacterForm` (`lorebook: null` is
+   create, a row is edit). `/lorebook/create` and `/lorebook/[lorebook.id]/edit` mount it; the edit
+   page adds Delete in its own row at the **foot**, *set apart from the save controls so the two are
+   never adjacent* (`edit.md` → Layout), confirmed in place as T-17 did.
+3. **The entries editor is the new part.** One block per entry in one `<ul>`: keywords as one
+   `Field`, content as a `textarea`, each block carrying its own **Remove**; **Add entry** appends an
+   empty block below the list. *Reorder* is two 44px buttons per row (up / down) at 360, not a drag
+   handle — a phone drag target is 20px. The entry `id` is the author's short label (`sa-1`), **not**
+   a UUID: number it in the adapter at write time so the form cannot invent a collision.
+4. **`/lorebook/[lorebook.id]` inherits the character detail page's decisions** (`docs/DESIGN.md` →
+   *Character detail*): counts before the definition on a phone, settings `Sheet` with Fork / Bookmark
+   / Report / Edit, the owner's moderation notice, two refusal states. Its differences: the avatar is
+   the **square cover** at the top of the content column, and the **entry list** renders in the
+   author's order with its keywords visible, no collapse and no paging (`detail.md` → Data/States).
+5. **Mobile first**: 360×740 one column; the entry list *is* the page on a phone; `md` may put the
+   metadata beside the first entry block; `lg` inherits the sidebar shell. Nothing stretched.
 
 ## Traps
 
-- **`/character/create` vs `/character/[id]`**: fixed segments win over `[id]` params — check
-  `src/router.ts` already routes them in that order before adding an edit route.
-- **`repo.addCharacter` must not accept a hand-built row from the page.** The page hands the *write*
-  shape; the adapter owns id, author, `verified`, `createdAt` and the empty engagement.
+- **`Request public again`** (`detail.md` → Actions, owner while private) has no write behind it.
+  Draw it `disabled` as T-10 drew Report before T-12, or file it — never wire it to a fake success.
+- **A lorebook has no tagline field** — the card's `tagline` stays `""`, as T-17 left characters.
+- **`deleteLorebook` must not strip its id from every character's `lorebookIds`**: the spec keeps
+  those attachments and shows them as *unavailable*. The cascade is the lorebook's own entries and
+  thread.
+- **The entries list will be long** — no `max-height`, no inner scroller: it scrolls with the page.
+- **Never `split(",")` / `trim()` a keyword list in the page** and call it validation: the write
+  schema owns it, so the inline error, the gate and the adapter cannot disagree.
+- **`@if` with multiple children needs a fragment**; `@for` needs `const`; `@empty` does not parse in
+  ripple 0.4.7 — an empty list is a sibling sentence, not a row.
 - **A page's scoped `<style>` cannot touch a primitive's elements** — wrap, never reach in.
-- **Never `trim()` or `toLowerCase()` in the form.** Read the error off `characterWriteSchema`'s
-  issues (the `lib/validate.ts` pattern) so the inline error, the submit gate and the adapter say the
-  same sentence.
-- **`@if` with multiple children needs a fragment**; the attachment list's rows are `<li>`s in one
-  `<ul>`, and the empty state is a sibling of the list, not a child of a row.
-- **`@for` needs `const`**; `@empty` does not parse in ripple 0.4.7.
-- **A prop expression is evaluated once** — do not pass `lorebookIds.value` into the attachment list;
-  pass the tracked box or re-derive from the box.
-- **`localStorage`/memory adapter resets on a hard reload** — "the character saved" must be proven by
-  navigating to `/character/catalog` in-app and opening the new row, not by a reload.
-- **The avatar has no uploader.** `avatarSchema` is `{initials}`-shaped today: render the initials
-  field honestly, or file a ticket — do not invent an upload control the specs do not describe.
-- **Deleting a character leaves bookmarks that read *This character doesn't exist.*** — that state is
-  T-21's to draw, so do not add a placeholder for it here.
+- **Cancel targets differ**: create → catalog, edit → detail (`edit.md` → Actions).
+- **A prop expression is evaluated once** — pass the tracked box into the entries list, never
+  `entries.value`.
 
 ## Open decisions
 
-- **Does `/character/create` need a `verified` step?** The spec says *Save publishes* with no draft
-  state, so no — but the row is `verified: false` until JEV or a moderator looks at it (as with
-  posts). Say so in `docs/DESIGN.md` so T-18/T-19 reuse the answer.
-- **NSFW toggle on the same row as the avatar** or its own row above the attachments: decide at 360
-  first, record it.
-- **Where *Delete* lives on `/character/[id]/edit`** — its own row above Save/Cancel, or inside an
-  overflow sheet as the session does. The spec only says *with confirmation*.
+- **Keywords input**: one comma-separated field per entry, or the existing `TagPicker` chip list.
+  Decide at 360 first and record it in `docs/DESIGN.md`.
+- **Add entry appends or prepends** — append, and say so in `DESIGN.md`.
+- **Does an entries block collapse in the *form*** when there are many? Detail may not collapse it;
+  the form is a different page, so decide and record.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **Description and personality are one field** (T-17): `characterWriteSchema.description` is the one
+  stored text, because `create.md` names one bullet and `characterSchema` carries one field. Splitting
+  them is a schema change across the row, 28 fixtures, `characterCopySchema` and the detail page.
+- **A character authored by the form has `tagline: ""` and no tags** (T-17): neither is a field in
+  `create.md`, so its card shows no tagline.
+- **The avatar is initials only** (T-17): there is no uploader, so an empty control is filled from the
+  name by the schema. An image control needs storage, not a form.
 - **`Edit session copy` is not built** (T-15): it needs `sessionCopyWriteSchema` in `schema.ts` and a
-  session-scoped editor form, and the copy rows currently draw state + link actions only.
+  session-scoped editor form; the copy rows draw state + link actions only.
 - **`Restore` has no version history** (T-15): `restoreCopy` re-reads the original as it stands and
   keeps the copy's `version`; a stored snapshot is the fix and it is a schema change.
-- **`components/PostComposer.tsrx` now serves two hosts** — `/post/create` (picker) and the session's
+- **`components/PostComposer.tsrx` serves two hosts** — `/post/create` (picker) and the session's
   Publish-a-cut sheet (`cut` locked). A third host passes `cut` or not; never a second form.
+- **`components/CharacterForm.tsrx` serves create + edit** — a third host passes `character` or not.
 - **The publish-a-cut sheet is two steps** because a prop expression is evaluated once; a composer
   mounted beside live range selects keeps the range it was born with. *Change the range* is the one
   path that loses a draft.
@@ -93,8 +94,13 @@ one `PostComposer`-style form convention instead of four.
   aside leaves a 324px reading column.
 - **Load more is unverified on the thread**: 12 fixtures against a 24-row page. Growing `POSTS` past
   25 is the cheapest way to prove the append path.
-- **`postWriteSchema` and `POST_REQUIRED` exist** — the composer's gate and `repo.addPost` share them.
-  `characterWriteSchema` should follow that shape exactly (a `*_REQUIRED` constant + one schema).
+- **`postWriteSchema` / `characterWriteSchema` + their `*_REQUIRED` constants are the pattern**: one
+  schema, one normalisation, parsed by the form and again by the adapter.
+- **`repo.listAttachableLorebooks()` / `repo.attachableLorebook(id)` exist** (T-17): the picker and
+  the by-ID control resolve through the adapter, never through a page comparing author handles. The
+  picker is *own + bookmarked*; the by-ID rule is *own + any public* — both are the spec's.
+- **A character's attachments degrade, never vanish** (T-17): an id already on the row survives a
+  re-save even when it no longer resolves, so saving cannot erase what the author never removed.
 - **A cut with no messages is refused** (`postAttachmentSchema.messages.min(1)`).
 - **`repo.listMySessions()` exists** (newest `updatedAt` first).
 - **A held report opens no case** (T-12): `/moderation` has no view of held reports.
@@ -114,13 +120,16 @@ one `PostComposer`-style form convention instead of four.
 - **`repo.appendReply(id, text)` exists** — the model's write path; do not add a second one.
 - **The `Preview mode` chip lives in the session's composer meta line**, because `/session/…` hides
   the shell's top bar. Any other surface that shows a mock answer needs its own marker.
+- **The T-17 form was not seen in a browser** — no Chromium pass that tick: layout, the in-place
+  delete confirmation and the unavailable-row rendering rest on build + code alone. Confirm them
+  against the preview while T-18 is open, or the first phone review will.
 - **Counts now: characters 28 (27 public), lorebooks 6, presets 5, personas 3, posts 12, reports 5,
   comments 22, sessions 2.**
 
 ## After this
 
-**T-18** `/lorebook/*` — catalog, create, detail, edit — reusing T-17's form convention and adding the
-first *entries* editor (a list of rows inside a row).
+**T-19** `/preset/*` (catalog, create, detail, edit) — the same four routes with a generation-settings
+form instead of an entries list, copying T-18's form convention.
 
 ## When blocked
 

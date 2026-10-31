@@ -19,6 +19,7 @@
  * Every schema group cites the spec file and section its fields come from.
  */
 import { z } from "zod";
+import { initialsOf } from "./format.ts";
 
 /* ------------------------------------------------------------------------------------------------
  * Primitives
@@ -192,6 +193,66 @@ export const characterSchema = authored("character", {
   description: z.string(),
   lorebookIds: z.array(z.uuid()),
 });
+
+/**
+ * The authoring form's one shape (`character/create.md`, and `character/edit.md` *is the same form*),
+ * parsed by `CharacterForm` **and** again by `repo.addCharacter` / `repo.updateCharacter`, so the
+ * inline error, the submit gate and the stored row are one rule — the pattern `postWriteSchema`
+ * established in T-14.
+ *
+ * - **Description / personality is one field.** `create.md` names it as one bullet
+ *   (*Description / personality*) and `characterSchema` carries one `description`, so a second
+ *   `personality` field would be a write value the row cannot hold. Splitting it is a schema change
+ *   (row, every fixture, `characterCopySchema`, the detail page) and is recorded in
+ *   `docs/DESIGN.md`, not invented here.
+ * - **`inSessionName` normalises empty to absent**: *when left empty the Name is used*, and the
+ *   stored row's `inSessionName` is optional with `min(1)` — so `""` is not a value it can hold.
+ * - **`avatar.initials` is filled from the name when the field is left empty**, because
+ *   `avatarSchema.initials` is required and there is no uploader: the initials are what the `Avatar`
+ *   primitive already draws. The derivation is here so a page never upper-cases a label itself.
+ * - **`lorebookIds` is deduped in input order** — an attachment is a set of references, and the
+ *   order the author added them is the order the row keeps.
+ */
+export const CHARACTER_NAME_REQUIRED = "A character needs a name.";
+export const LOREBOOK_NOT_ATTACHABLE =
+  "That ID isn't a lorebook you can attach — use one of your own or a public one.";
+export const LOREBOOK_ID_INVALID = "A lorebook ID is a 36-character code like 3f2a…-….";
+export const LOREBOOK_ALREADY_ATTACHED = "That lorebook is already attached.";
+
+/**
+ * **Add by ID**'s input (`character/create.md` → *By ID*): a pasted id, trimmed by the schema so the
+ * form never trims anything itself. Whether the id *resolves to something the author may attach* is
+ * `repo.attachableLorebook`'s question — shape here, permission in the adapter.
+ */
+export const lorebookIdSchema = z.string().trim().pipe(z.uuid(LOREBOOK_ID_INVALID));
+
+const characterInitialsSchema = z
+  .string()
+  .transform((raw) => raw.trim().toUpperCase())
+  .pipe(z.string().max(4, "Four letters at most."));
+
+export const characterWriteSchema = z
+  .strictObject({
+    name: z
+      .string()
+      .transform(normaliseDisplayName)
+      .pipe(z.string().min(1, CHARACTER_NAME_REQUIRED)),
+    inSessionName: z
+      .string()
+      .optional()
+      .transform((raw) => {
+        const value = normaliseDisplayName(raw ?? "");
+        return value === "" ? undefined : value;
+      }),
+    description: z.string().transform((raw) => raw.trim()),
+    nsfw: z.boolean(),
+    avatar: z.strictObject({ initials: characterInitialsSchema }),
+    lorebookIds: z.array(z.uuid()).transform((ids) => [...new Set(ids)]),
+  })
+  .transform((value) => ({
+    ...value,
+    avatar: { initials: value.avatar.initials === "" ? initialsOf(value.name) : value.avatar.initials },
+  }));
 
 /**
  * `lorebook/detail.md`: entries are visible because *they are what decides when an entry is

@@ -15,6 +15,7 @@
 import type {
   AccountPreferences,
   Character,
+  CharacterWrite,
   Comment,
   CommentWrite,
   EntityOf,
@@ -130,6 +131,62 @@ export type Repo = {
    * no longer exists. `false` when the post is missing or another account's.
    */
   deletePost(id: string): Promise<boolean>;
+
+  /**
+   * **Save** on `/character/create` (`character/create.md`): the write is `characterWriteSchema`-
+   * shaped and parsed here, so the form's gate and the stored row are one rule. The page hands the
+   * *write*, never a row — the adapter owns `id`, `author`, `verified: false` (*save publishes*, but
+   * nothing has scanned it), `createdAt`/`updatedAt` and zero engagement, exactly as `addPost` does.
+   *
+   * Attachments are checked here, not only in the picker: a `lorebookIds` entry that resolves to
+   * nothing the author may attach (*one of your own, or a public one from someone else*) refuses the
+   * whole write with `null` — the spec's *validation error*, and a picker cannot be the only guard.
+   *
+   * `null` on a failed parse or a refused attachment.
+   */
+  addCharacter(input: CharacterWrite): Promise<Character | null>;
+
+  /**
+   * **Save** on `/character/[id]/edit` — **author only**, `null` for anyone else (`edit.md` →
+   * States: *Not the owner* is forbidden, not a redirect). The row the viewer does not own is
+   * refused here rather than by a page check, for the same reason `deletePost` refuses it.
+   *
+   * The write is the same `characterWriteSchema` as create — one field set, one normalisation.
+   * `id`, `author`, `createdAt` and the engagement counts are kept; `updatedAt` moves; `verified`
+   * clears, because *any edit clears the cached scan*. An attachment already on the row is allowed
+   * to stay even if it no longer resolves, so re-saving cannot erase a reference the author never
+   * removed (*an attachment that no longer resolves stays listed as unavailable*).
+   */
+  updateCharacter(id: string, input: CharacterWrite): Promise<Character | null>;
+
+  /**
+   * **Delete** on `/character/[id]/edit` — **author only**, immediate and final (`edit.md`: no undo,
+   * no trash, no grace period). The character row, its comment thread, its votes and its bookmarks
+   * go together; the lorebooks it referenced are **not** touched — an attachment is a reference.
+   * Other people's references degrade on their own: a session keeps the copy it started from, a
+   * published cut recorded its own text.
+   *
+   * `false` when the row is missing or another account's.
+   */
+  deleteCharacter(id: string): Promise<boolean>;
+
+  /**
+   * The lorebooks the picker may offer (`character/create.md` → *From a picker*): **the author's own
+   * lorebooks plus the lorebooks they have bookmarked that are not their own**, sorted by name.
+   * Unpaged on purpose — the picker is a list to choose from, not a catalog.
+   *
+   * The by-ID half of the same spec section is **wider** (*your own, or any public lorebook*) and is
+   * `attachableLorebook`'s rule; keeping them apart is what stops the picker from quietly becoming
+   * the permission.
+   */
+  listAttachableLorebooks(): Promise<Lorebook[]>;
+
+  /**
+   * The lorebook behind an id **when the viewer may attach it** (*the author's own lorebooks and any
+   * public lorebook authored by someone else*), else `null`. This is the rule **Add by ID** resolves
+   * through, so the page never compares an author handle to decide what may be attached.
+   */
+  attachableLorebook(id: string): Promise<Lorebook | null>;
 
   /**
    * The viewer's own sessions, newest first — what `post/create` offers as a **cut** source. A session
