@@ -1617,6 +1617,52 @@ a.post-time:hover {
 }
 
 /* Tabs — underline strip. The caller owns the value (the query string at page level). */
+/* The catalog switcher: three real links between the three catalogs, wearing the tab strip's
+   geometry so the app has one underline language. `aria-current` is the active mark, not a class. */
+.cat-switch {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--color-border);
+    scrollbar-width: none;
+}
+
+.cat-switch::-webkit-scrollbar {
+    display: none;
+}
+
+.cat-tab {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 12px;
+    color: var(--color-text-subtle);
+    font-size: 13px;
+    text-decoration: none;
+    transition: color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cat-tab:hover {
+    color: var(--color-text-muted);
+}
+
+.cat-tab[aria-current="page"] {
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.cat-tab[aria-current="page"]::after {
+    position: absolute;
+    right: 8px;
+    bottom: -1px;
+    left: 8px;
+    height: 2px;
+    background-color: var(--color-accent);
+    content: "";
+}
+
 .tabs {
     display: flex;
     gap: 4px;

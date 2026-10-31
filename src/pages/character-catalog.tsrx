@@ -1,3 +1,4 @@
+import { CatalogSwitch } from "../components/CatalogSwitch.tsrx";
 import { track } from "ripple";
 import { Button } from "../components/Button.tsrx";
 import { CardGrid } from "../components/CardGrid.tsrx";
@@ -421,6 +422,8 @@ export function CharacterCatalog() @{
     </style>
 
     <div class="catalog">
+      <CatalogSwitch current="characters" />
+
       <header class="head">
         <div>
           <p class="kicker">character catalog</p>

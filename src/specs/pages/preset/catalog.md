@@ -8,6 +8,7 @@ Browsable, searchable list of presets. Each item links to [`/preset/[preset.id]`
 
 ## Layout
 
+- A **catalog switcher** runs above the header: **Characters · Lorebooks · Presets**, the current one underlined, each a link to its catalog. Every catalog carries it, so none of the three is reachable only by typing a URL.
 - A toolbar holding search, the `All` filter, sort, and the [NSFW preference](../../systems/nsfw.md) toggles, above a grid of catalog cards.
 - Each card opens its preset's detail page; its author in the footer links to that author's [profile](../user/profile.md).
 - Below the grid, **Load more** appends the next page of 24 cards and is absent once the list ends.

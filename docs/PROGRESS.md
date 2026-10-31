@@ -3,6 +3,20 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-09 follow-up — the catalogs link to each other (2026-10-31)
+
+- **Changed:** the owner could only reach the character catalog: lorebooks and presets had pages but no
+  way in from the navigation. Every catalog now opens with a **catalog switcher** (`CatalogSwitch`) —
+  Characters · Lorebooks · Presets as three anchors, `aria-current="page"` on the current one, the accent
+  underline as the mark, 44px targets, styled next to `.tabs` in `styles.css`. Placement is above the
+  header so it is visible without scrolling.
+- **Verified:** build clean. On the dev server: all three routes draw the strip with the right tab marked
+  (20 character cards, 5 lorebook, 4 preset), 45px tall, full width 308 in a 360 viewport with no
+  horizontal scroll; clicking **Presets** from the character catalog navigates in-app to
+  `/preset/catalog` and the page swaps its kicker (*preset catalog*) and its button (*New preset*).
+- **Not verified:** no click-through on a touch device; the bottom tab bar still marks *Catalog* active
+  only under `/character` (its prefix is one route, and it was not part of this change).
+
 
 ## T-37 — contrast fixed at the token, and the rest measured (2026-10-31)
 

@@ -8,6 +8,7 @@ Browsable, searchable list of characters. Each item links to [`/character/[chara
 
 ## Layout
 
+- A **catalog switcher** runs above the header: **Characters · Lorebooks · Presets**, the current one underlined, each a link to its catalog. Every catalog carries it, so none of the three is reachable only by typing a URL.
 - A toolbar of four rows: **search** across the full width, a **tag** field across the full width, a **sort** selector, then the [NSFW preference](../../systems/nsfw.md) toggles. The grid follows beneath it.
 - Each card opens its character's detail page; its author in the footer links to that author's [profile](../user/profile.md).
 - Below the grid, **Load more** appends the next page of 24 cards and is absent once the list ends.

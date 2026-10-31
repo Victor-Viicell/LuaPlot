@@ -8,6 +8,7 @@ Browsable, searchable list of lorebooks. Each item links to [`/lorebook/[loreboo
 
 ## Layout
 
+- A **catalog switcher** runs above the header: **Characters · Lorebooks · Presets**, the current one underlined, each a link to its catalog. Every catalog carries it, so none of the three is reachable only by typing a URL.
 - The same structure as [`/character/catalog`](../character/catalog.md): a toolbar holding search, the `All` filter, sort, and the [NSFW preference](../../systems/nsfw.md) toggles, above a grid of catalog cards.
 - Each card opens its lorebook's [detail](detail.md); its author in the footer links to that author's [profile](../user/profile.md).
 - A lorebook card adds nothing to the shared card structure: no entry count and no keyword list.

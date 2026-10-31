@@ -113,6 +113,10 @@ Every route has its own spec under [`pages/`](pages). This file is the route ind
 - Fixed segments (`catalog`, `create`, `thread`) are matched before the ID parameter, and IDs must use a constrained format (e.g. UUID) so no real ID can collide with those words.
 - Catalog and thread state belongs in the query string, not the path, so one set of routes serves every filtered view. The same convention should be reused for the persona collection, for profile tabs, and for the bookmark tabs.
 - Catalogs and feeds page with an explicit **Load more** control that appends the next 24 items. No page numbers and no scroll-triggered fetching, and paging is not part of the URL: returning to a listing shows its first page.
+- **The three catalogs are siblings, and say so.** Characters, lorebooks and presets each carry a
+  **catalog switcher** at the top — three links, the current one underlined and marked `aria-current` —
+  because a catalog that can only be reached by typing its URL is a catalog nobody finds. It is links,
+  not tabs: they are three routes, so back/forward and a shared URL keep working.
 - **A session owns its chrome**: `/session/[id]` is the one route that hides the shell's top bar, tab bar
   and rail, because a conversation is a surface of its own — its header is the character and its composer
   is the only control. Every other page lives inside the shell.

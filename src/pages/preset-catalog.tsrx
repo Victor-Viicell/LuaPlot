@@ -1,3 +1,4 @@
+import { CatalogSwitch } from "../components/CatalogSwitch.tsrx";
 import { track } from "ripple";
 import { Button } from "../components/Button.tsrx";
 import { CardGrid } from "../components/CardGrid.tsrx";
@@ -415,6 +416,8 @@ export function PresetCatalog() @{
     </style>
 
     <div class="catalog">
+      <CatalogSwitch current="presets" />
+
       <header class="head">
         <div>
           <p class="kicker">preset catalog</p>

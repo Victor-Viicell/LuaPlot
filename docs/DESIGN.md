@@ -111,7 +111,9 @@ blur = middle covered, footer numbers visible, per-item Reveal.
 ## Primitives (decided in T-02, do not re-invent)
 
 Thirteen primitives exist: `Button, Field, Select, TagPicker, Toggle, Card, Sheet, Toast, Tabs,
-EmptyState, Skeleton, Avatar, Icons` in `src/components/`. **Their look lives in `src/styles.css`,
+EmptyState, Skeleton, Avatar, Icons` in `src/components/`, plus one **composed** component with no
+variants of its own: `CatalogSwitch` (`.cat-switch` / `.cat-tab`), the link strip between the three
+catalogs. **Their look lives in `src/styles.css`,
 not in scoped `<style>` blocks.** Reason: a scoped block cannot reach into a child component, so a page could
 never style a primitive it does not own (`.empty .btn`, `.card .avatar`, spacing the action inside
 an `EmptyState`). One stylesheet keeps the set in sync; a page's own `<style>` block is for page
@@ -311,6 +313,12 @@ list, so the decisions below are the ones they inherit.
   The page's `.head` is a grid, and **every base placement rule is declared before the `@media` block**:
   same specificity, so a base rule written after the query wins at every width — that is exactly how the
   name ended up under the cover on desktop for one tick.
+- **The catalogs are siblings, and the switcher says so** (T-09 follow-up, owner's call): every catalog
+  opens with `CatalogSwitch` — **Characters · Lorebooks · Presets** as three real anchors in the tab
+  strip's geometry, `aria-current="page"` for the active one, the accent underline as the mark. It is a
+  link strip and not the `Tabs` primitive: these are three routes, not three views of one page, so
+  middle-click, back/forward and a shared URL all have to keep working. Placement is directly under the
+  page's top edge and above the header, so it is reachable without scrolling on a phone.
 - **The thumbnail is a third of the card, square** (T-09, owner's call): `Avatar` takes
   `size="fluid"` and `.card-veil .avatar.is-fluid` gives it `width: 33%; aspect-ratio: 1/1` with a
   22px initial (18px from `md`). It is a stylesheet rule, not a `size` prop, because the box has to
