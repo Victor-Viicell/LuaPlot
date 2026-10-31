@@ -33,6 +33,7 @@ import {
   lorebookSchema,
   lorebookWriteSchema,
   normaliseHandle,
+  notificationSchema,
   profileWriteSchema,
   reportOutcomeSchema,
   reportEntrySchema,
@@ -47,6 +48,7 @@ import {
   seedSchemas,
   sessionSchema,
   turnWriteSchema,
+  unreadNotificationCountSchema,
   userSchema,
   type SeedCollection,
 } from "../schema.ts";
@@ -1415,6 +1417,40 @@ export const memoryRepo: Repo = {
   async listNotifications(options) {
     const rows = [...store.notifications].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return pageOf(rows, options);
+  },
+
+  /**
+   * One row becomes read — **open is reading** (`pages/notifications.md` → *Actions*). The answer is
+   * the row as stored (parsed on the way out, like every other adapter answer), and an already-read
+   * row is returned untouched so a second open cannot move the badge.
+   *
+   * `read` is a field on the row, not a page-local flag: the badge and the list have to agree after a
+   * remount, and only the adapter survives one.
+   */
+  async markNotificationRead(id) {
+    const row = store.notifications.find((entry) => entry.id === id);
+    if (!row) return null;
+
+    row.read = true;
+    return notificationSchema.parse(row);
+  },
+
+  /** Every unread row becomes read; the answer is how many actually changed. */
+  async markAllNotificationsRead() {
+    let changed = 0;
+    for (const row of store.notifications) {
+      if (row.read) continue;
+      row.read = true;
+      changed += 1;
+    }
+    return unreadNotificationCountSchema.parse(changed);
+  },
+
+  /** Unread **rows**, not events — the aggregate is already in `count`, not in extra rows. */
+  async unreadNotificationCount() {
+    return unreadNotificationCountSchema.parse(
+      store.notifications.filter((row) => !row.read).length,
+    );
   },
 
   async listReports(options) {

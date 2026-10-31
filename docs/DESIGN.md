@@ -971,6 +971,50 @@ lives **on the card**. The four page decisions below are that.
   the last visible row of a page pulls the next one instead of showing *Nothing saved here yet.*
   while more rows wait behind it.
 
+## Notifications (decided in T-22, do not re-invent)
+
+`/notifications` is the only listing that is **not a catalog**: no tabs, no sort, no search, no
+paging, and a row whose sentence the adapter already owns. It draws fewer rows than there are events
+and it must never look like a log. These are the page's decisions.
+
+- **A row is a sentence, not a card.** One `<ul>`, one hairline between rows, no box: 32px `Avatar`
+  (initials from the handle, `LP` for a system row), the sentence, and the age at the **end**, right
+  aligned in its own column (`12px`, tabular figures, `now` / `6h` / `2d` / `19 Oct` from
+  `relativeTime()` — a clock time is the thread's reading, not the inbox's). The target's name joins
+  the sentence after an em dash in `--color-text-subtle`, because it is the one part that came from
+  the row's data (`target.label`) and is not prose.
+- **Sentence shapes.** `@ada commented on your post — …` · `@ada and 2 others published a new
+  character — …` (`count - 1` others, singular *other* at one) · `@quill started following you` (no
+  label: the actor is the target) · `Your character was made private — …`, `was removed`, `had its
+  avatar removed`. A moderation row **never restates the reasons**, and an absent `measure` reads
+  *A moderation decision was made on your character* rather than `undefined`.
+- **Unread is a 2px accent inset on the leading edge plus 600 weight**, the persona card's mark
+  decision reused; there is no dot, no unread chip, no bold time. The row keeps its height when it
+  is read, so the list never jumps under a thumb.
+- **Opening is reading.** The row's link marks the row read through the adapter and then navigates;
+  a modified click keeps the browser's new-tab behaviour and marks nothing. The spec's **Mark read**
+  action is therefore a *button* in exactly one case: a row whose target has no route of its own (a
+  `comment` target — `notificationTargetSchema` carries the comment id and its label, not the post
+  it hangs under). That button sits above the row-covering anchor, `z-index: 1`.
+- **The whole row is the link** via a stretched `::after` on the sentence's `<a>`, so the tap target
+  is 44px+ even though the words are short; the visible text stays selectable prose.
+- **`Mark all read` is a toolbar row above the list**: *3 unread* on the left, a `ghost` button on the
+  right, drawn **disabled** (`markAllOff`) when nothing is unread — handed over as a `track()`ed
+  derived, never an inline `busy || …` expression, which would freeze at mount.
+- **The badge lives in both navigation hosts**, and it is the same component: the mobile/`md` tab
+  bar's `Alerts` item (at the icon's upper-right shoulder) and the `lg` rail (at the row's right
+  edge). It is the one sanctioned **pill** in the chrome — a status chip — 18px, accent fill,
+  `--color-accent-contrast` text, 12px, `9+` above nine, and **absent at zero**. It never animates,
+  never toasts and never increments on its own: the number is `repo.unreadNotificationCount()` read
+  through `lib/state/inbox.ts`, and it drops only when a row is read. The link carries
+  `aria-label="Alerts, 3 unread"`; the pill itself is `aria-hidden`.
+- **No paging control**: the inbox is capped by the deferral rule (10 unread, then a daily summary),
+  not by **Load more**. The page asks for page 1 once, like `/persona`.
+- **Empty copy** (the spec gives none): *Nothing waiting.* — one line, no action, because there is
+  nothing to do about it.
+- **The summary row is not built**: no fixture carries a deferred summary, so the state is drawn by
+  the data's shape (`rows` are just rows) and the gap is logged in `docs/NEXT.md`.
+
 ## Do not
 
 No emoji in UI chrome. No stock illustrations. No gradients on text. No shadows on flat cards.

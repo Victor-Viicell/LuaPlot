@@ -411,6 +411,27 @@ export type Repo = {
   /** Newest first. Rows are already aggregated by kind + target. */
   listNotifications(options?: ListOptions): Promise<Listing<Notification>>;
 
+  /**
+   * **Open is reading** (`pages/notifications.md` → *Actions*): one row becomes read and the shell's
+   * badge drops by one. The write answers the row as it now stands, parsed like every other answer,
+   * or `null` when it does not exist. Idempotent — opening an already-read row changes nothing and
+   * must not notify the badge a second time.
+   */
+  markNotificationRead(id: string): Promise<Notification | null>;
+
+  /**
+   * **Mark all read**: every unread row becomes read, answering how many rows actually changed, so
+   * the caller can tell *3 cleared* from *nothing was unread* without recounting.
+   */
+  markAllNotificationsRead(): Promise<number>;
+
+  /**
+   * The badge's number (`pages/notifications.md` → *Badge*): unread **rows**, not events. The shell
+   * asks this and never counts a slice it happens to hold, exactly as `/bookmarks` asks for its tab
+   * counts. Zero when signed out.
+   */
+  unreadNotificationCount(): Promise<number>;
+
   /** Most-reported first; equal weight falls back to the newest report. */
   listReports(options?: ListOptions & { status?: ReportFilter }): Promise<Listing<Report>>;
 

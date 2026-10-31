@@ -53,6 +53,47 @@ export function clockTime(iso: string): string {
   return clockFormat.format(date);
 }
 
+const daysFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+
+/**
+ * An inbox row's age, in the reader's zone: `now`, `12m`, `5h`, `3d`, then `24 Oct`.
+ *
+ * A notification is read as *how long ago*, not as a clock time (`shortStamp` stays the thread's
+ * reading, where two rows hours apart need their hour). Past a week the day itself is more useful
+ * than `9d`, so it falls through to a date — day and month only, because a row that old does not
+ * need its minute and the column is narrow. An unparseable value degrades to an empty string.
+ */
+export function relativeTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60_000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+
+  return daysFormat.format(date);
+}
+
+
+/** The badge's cap, fixed by `pages/notifications.md` → *Badge*: it does not scale with the nav. */
+export const BADGE_CAP = 9;
+
+/**
+ * The unread **row** count as the badge prints it: `1`…`9`, then `9+`, and nothing at zero —
+ * *hidden at zero* is the shell's `@if`, so an empty string is the value that draws no badge.
+ */
+export function badgeCount(unread: number): string {
+  const safe = Number.isFinite(unread) ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.trunc(unread))) : 0;
+  if (safe === 0) return "";
+  return safe > BADGE_CAP ? `${BADGE_CAP}+` : String(safe);
+}
+
 /**
  * The two letters a comment's `Avatar` draws from its author's handle.
  *

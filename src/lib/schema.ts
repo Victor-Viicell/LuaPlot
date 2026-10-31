@@ -692,6 +692,13 @@ export const notificationSchema = z.strictObject({
   createdAt: isoSchema,
 });
 
+/**
+ * The badge's number (`pages/notifications.md` → *Badge*): unread **rows**, never events, and
+ * never negative. It is a shape because it crosses the adapter boundary — the shell's badge is not
+ * allowed to count what it happens to hold.
+ */
+export const unreadNotificationCountSchema = z.number().int().min(0);
+
 /* ------------------------------------------------------------------------------------------------
  * Reports and JEV
  * ---------------------------------------------------------------------------------------------- */

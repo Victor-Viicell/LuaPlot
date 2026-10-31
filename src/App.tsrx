@@ -10,8 +10,10 @@ import {
   IconUser,
 } from "./components/Icons.tsrx";
 import { ToastHost } from "./components/Toast.tsrx";
+import { badgeCount } from "./lib/format.ts";
 import { currentUser, onSession, signIn, signOut } from "./lib/state/session.ts";
 import { nsfwPreference, onPrefs } from "./lib/state/prefs.ts";
+import { onInbox, refreshInbox, unreadCount } from "./lib/state/inbox.ts";
 import type { AccountPreferences, User } from "./lib/data/types.ts";
 
 /**
@@ -61,6 +63,16 @@ function isActive(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
 }
 
+/**
+ * The Alerts destination's accessible name carries the unread count, because the badge itself is
+ * decorative (`aria-hidden`): a screen reader hears *Alerts, 3 unread*, a sighted reader sees the
+ * pill. Every other destination keeps its plain label.
+ */
+function alertsLabel(tab: Destination, unread: number): string | undefined {
+  if (tab.prefix !== "/notifications" || unread === 0) return undefined;
+  return `${tab.label}, ${unread} unread`;
+}
+
 export function App() @{
   /** The render signal for "where am I". The router store owns navigation; App owns the signal. */
   const route = track<RouteState>(currentRoute());
@@ -96,6 +108,20 @@ export function App() @{
 
   /** Profile points at the signed-in handle; every other tab is fixed. */
   const tabs = track(() => tabsFor(self.value));
+
+  /**
+   * The inbox badge (`pages/notifications.md` → *Badge*): the store's unread **row** count, mirrored
+   * here because a module-scope `track()` has no owning block. `9+` is a formatting rule, so the
+   * number is capped in `lib/format.ts` and never here; zero draws nothing at all.
+   */
+  const unread = track(unreadCount());
+  onInbox((next) => {
+    unread.value = next;
+  });
+  const badge = track(() => badgeCount(unread.value));
+
+  // Seed once at boot: the badge does not reset on launch, and nothing increments per event.
+  void refreshInbox();
 
   let seq = 0;
   let lastKey = "";
@@ -340,6 +366,31 @@ export function App() @{
         line-height: 1;
       }
 
+      /*
+        The inbox badge (T-22): unread *rows*, `9+` above nine, nothing at zero. A status chip, so
+        it is the one sanctioned pill in the chrome; accent fill with contrast text, 18px tall, and
+        it sits at the icon's upper-right shoulder because the icon is the thing it annotates.
+        It never animates and never toasts — it changes only when a row is read.
+      */
+      .badge {
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        min-width: 18px;
+        height: 18px;
+        margin-left: 8px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background-color: var(--color-accent);
+        color: var(--color-accent-contrast);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        line-height: 18px;
+        text-align: center;
+        pointer-events: none;
+      }
+
       .scrim {
         position: fixed;
         inset: 0;
@@ -541,6 +592,7 @@ export function App() @{
           flex-direction: column;
           align-items: center;
           gap: 5px;
+          position: relative;
           padding: 10px 4px;
           border-radius: 2px;
           color: var(--color-text-subtle);
@@ -612,6 +664,15 @@ export function App() @{
           font-size: 13px;
         }
 
+        /* A 240px row has room: the badge leaves the icon's shoulder for the row's own right edge. */
+        .rail-item .badge {
+          top: 50%;
+          right: 12px;
+          left: auto;
+          margin-left: 0;
+          transform: translateY(-50%);
+        }
+
         .mark {
           padding: 0 8px 16px;
           font-size: 15px;
@@ -645,10 +706,14 @@ export function App() @{
               class={isActive(route.value.path, tab.prefix) ? "rail-item is-active" : "rail-item"}
               href={href(tab.to)}
               aria-current={isActive(route.value.path, tab.prefix) ? "page" : undefined}
+              aria-label={alertsLabel(tab, unread.value)}
               onClick={follow(tab.to)}
             >
               <{tab.icon} />
               <span class="rail-label">{tab.label}</span>
+              @if (tab.prefix === "/notifications" && badge.value) {
+                <span class="badge" aria-hidden="true">{badge.value}</span>
+              }
             </a>
           }
         </nav>
@@ -737,10 +802,14 @@ export function App() @{
               class={isActive(route.value.path, tab.prefix) ? "tab is-active" : "tab"}
               href={href(tab.to)}
               aria-current={isActive(route.value.path, tab.prefix) ? "page" : undefined}
+              aria-label={alertsLabel(tab, unread.value)}
               onClick={follow(tab.to)}
             >
               <{tab.icon} />
               <span class="tab-label">{tab.label}</span>
+              @if (tab.prefix === "/notifications" && badge.value) {
+                <span class="badge" aria-hidden="true">{badge.value}</span>
+              }
             </a>
           }
         </nav>

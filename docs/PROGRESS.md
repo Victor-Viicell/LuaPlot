@@ -3,6 +3,40 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-22 — `/notifications`, a quiet inbox and a badge that counts rows (2026-10-31)
+
+- **Changed:** `schema.ts` gained **`unreadNotificationCountSchema`** (the badge's number crosses the
+  adapter boundary, so it is a shape: integer, `min(0)`); `lib/format.ts` gained **`relativeTime()`**
+  (`now` / `12m` / `5h` / `3d` / `19 Oct` — the inbox's reading, where the thread keeps `shortStamp`)
+  and **`badgeCount()`** with `BADGE_CAP = 9` (`9+` above nine, empty string at zero). `repo` gained
+  **`markNotificationRead(id)`** (returns the parsed row, idempotent), **`markAllNotificationsRead()`**
+  (returns how many rows actually changed) and **`unreadNotificationCount()`**; the memory adapter
+  implements all three against `store.notifications`, parsing every answer. New
+  **`lib/state/inbox.ts`**: a subscribe/notify store in the `session`/`prefs` mould that only ever
+  *asks* the adapter — no `+1` anywhere — clearing on sign-out and re-reading on sign-in. New
+  `pages/notifications.tsrx` replaces the placeholder: one sentence per row (six shapes, `count - 1`
+  others, `measure` named and reasons never restated), unread = 2px accent inset + 600 weight, the
+  age at the row's end, a stretched row-covering link that marks read *then* navigates (modified
+  clicks fall through to the browser), a `Mark all read` toolbar drawn disabled at zero, the one
+  **Mark read** button for a target with no route of its own (`comment`), and loading / empty /
+  error / list states with skeleton rows. `App.tsrx` draws the **badge** in both hosts (tab bar's
+  `Alerts`, the `lg` rail), `aria-label="Alerts, 3 unread"`, capped text, hidden at zero; `9+` and
+  the cap live in `format.ts`, never in the shell. `docs/DESIGN.md` → *Notifications (T-22)* records
+  the eleven decisions.
+- **Verified:** `scripts/check.sh` → **GREEN** (build ok, 30 routes, schema ok). Browser pass against
+  the dev server at 360×740, 640, 900 and 1200 in a real Chromium: six rows newest first
+  (`2d` moderation down to `13 Oct`), `3 unread`, `scrollWidth === clientWidth` at every width, the
+  toolbar button 44px, the rows column capped at 720 from `md`, the `lede` hidden at 360 and shown
+  from `sm`. Interactions: clicking an unread row **navigated in-app** to `/post/…` and the badge went
+  `3 → 2`; `Mark all read` took the note to *All read*, the badge to none, and the button to
+  `disabled: true` (it was `false` before the click, and only after handing `Button` a derived —
+  see the trap below).
+- **Not verified:** the live published build (this tick's publish is claimed only if
+  `scripts/publish.sh` printed `LIVE=`; see the commit). `9+` is code-only — six fixtures cannot hold
+  ten unread rows. The **periodic summary** state and the per-row **Mark read** button have no fixture
+  (no deferred summary exists; no row targets a `comment`), so both are drawn by the same code path
+  but were not seen. Nothing was checked in the Latte flavour or at a 1200px height under 700.
+
 ## T-21 — `/bookmarks`, four tabs over saved rows and the card that outlives its item (2026-10-31)
 
 - **Changed:** `schema.ts` gained `bookmarkKindSchema`, **`bookmarkRowSchema`** (a discriminated
