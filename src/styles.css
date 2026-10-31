@@ -626,13 +626,29 @@ a.card-title:hover {
     overflow: hidden;
 }
 
+/* The middle is a column of two rows (owner's call): the thumbnail beside the tagline, then the tag
+   row across the **full card width** — it no longer shares the text column, so the tags stop being
+   squeezed and the tagline gets the width back. Both rows stay inside the veil, because the cover
+   has to blur the tags too. */
 .card-veil {
     display: flex;
     flex: 1;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    transition: filter 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card-top {
+    display: flex;
     gap: 12px;
     align-items: flex-start;
     min-width: 0;
-    transition: filter 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Only the tagline column takes the free space; the row holding the tags keeps its height. */
+.card-top .card-body {
+    flex: 1 1 auto;
 }
 
 .card.is-covered .card-veil {
@@ -707,7 +723,9 @@ a.card-title:hover {
     font-size: 13px;
     line-height: 1.6;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    /* Three lines: with the tag row out of this column the card has room, and a tagline cut at two
+       lines was the tightest thing on the card. */
+    -webkit-line-clamp: 3;
 }
 
 /* One line, always (owner's call): tags never wrap a card. The row clips, the chips that do not fit
@@ -717,6 +735,7 @@ a.card-title:hover {
     flex: none;
     flex-wrap: nowrap;
     gap: 6px;
+    width: 100%;
     overflow: hidden;
     margin: 0;
     padding: 0;

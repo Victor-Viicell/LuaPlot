@@ -135,11 +135,15 @@ export function Card({
 
     <div class="card-middle">
       <div class="card-veil" aria-hidden={covered.value ? "true" : "false"}>
-        <Avatar initials={item.avatar.initials} size="fluid" />
+        <div class="card-top">
+          <Avatar initials={item.avatar.initials} size="fluid" />
+          <div class="card-body">
+            @if (item.tagline) {
+              <p class="card-tagline">{item.tagline}</p>
+            }
+          </div>
+        </div>
         <div class="card-body">
-          @if (item.tagline) {
-            <p class="card-tagline">{item.tagline}</p>
-          }
           @if (item.tags.length > 0) {
             <>
             <ul
