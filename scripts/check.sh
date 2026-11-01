@@ -60,6 +60,19 @@ else
   FAIL=1
 fi
 
+# 6. The desktop shell's window invariants (T-33) — the one config no other section reads
+say "== tauri"
+if [[ -f src-tauri/tauri.conf.json ]]; then
+  if node scripts/tauri-config.mjs; then
+    say "   tauri ok"
+  else
+    say "   TAURI CONFIG MISMATCH"
+    FAIL=1
+  fi
+else
+  say "   SKIP (no src-tauri/)"
+fi
+
 if [[ $FAIL -eq 0 ]]; then
   say "GREEN"
   exit 0

@@ -1,12 +1,38 @@
 # Baton — what the next session does
 
-**Ticket: none is unblocked. The headless phase is finished.**
+**Ticket: T-33B — the desktop shell's session must survive a restart.**
 
-T-44 closed the last three pages a session on this box can exercise (`/dev/state`, `/dev/data`,
-`/dev/primitives`) and the walk now measures a breakpoint: **27 rows**, 360×740 for the product
-journeys and four emulated widths for the gallery. Every ticket still `[ ]` in `docs/SHIP-PLAN.md`
-needs something this machine does not have — a Supabase project, a display and `cargo`, the Android
-SDK, or a human palette decision. That register is below, and it is the whole of what is left.
+T-33 landed its window half this tick: the app opens at 1200×900 with a 360×740 floor, `check.sh`
+section 6 now asserts that config, and `bun run tauri dev` was **run on this box** for the first
+time (Hyprland window `class:"luaplot"`, captured and read). T-33's three remaining deliverables are
+T-33B, and only (a) is unblocked.
+
+## The ticket: persist the session (T-33B a)
+
+`src/lib/state/session.ts` is a memory-only store seeded **signed in** as the mock `you`. A desktop
+app that forgets who you are on every launch is not a shell. So:
+
+- Store the account in `localStorage` under one key (`luaplot.session`), read it **once at module
+  load**, and route every read through `schema.ts` — a `handleSchema.safeParse` (and the display-name
+  normaliser) on the stored value, `safeParse` not `try/catch JSON.parse`. A corrupt or stale value
+  must fall back to the seeded mock, silently, not throw and not half-apply.
+- Write on `signIn` / `signOut` / `updateProfile` only — the same three places that `emit()`. The
+  store keeps notifying exactly as it does now, so every `track()` consumer is untouched.
+- **Do not persist NSFW state or the adapter**: `systems/nsfw.md` derives NSFW from the account and
+  the adapter's rows are regenerated per load. Signing in must not replay a stale catalogue.
+- Prove it: a browser pass that signs out, reloads, and reads `signed out` again (the reverse —
+  sign in, reload, still signed in — is the interesting one). Then re-run `bash scripts/smoke.sh
+  --live`; the walk's own row 1 signs in and row 27 signs out, and a fresh profile means it starts
+  clean.
+
+Traps: (1) the seeded account is `you` **because every fixture is owned by `you`** — never let a
+restored handle change ownership logic, only the identity readout. (2) `App.tsrx` mirrors the store
+into its own `track()`; a restore that fires before the first paint is fine, one that fires *after*
+needs the notify. (3) Do not touch `lib/data/memory.ts`.
+
+**Blocked halves of T-33B, do not start them:** (b) deep link needs `tauri-plugin-deep-link`, which
+the ticket does not name — a human must name it first; (c) `Ctrl/Cmd+K` needs a **product decision**
+(`docs/DESIGN.md`), because no spec describes a command palette and the specs are the law.
 
 ## What a tick does when nothing is unblocked
 
@@ -19,6 +45,9 @@ SDK, or a human palette decision. That register is below, and it is the whole of
    `LUAPLOT_BASE=/LuaPlot/` build of `HEAD`) and change nothing else. Compare with a **base-built**
    `dist` — `check.sh` builds without a base, so its hash never matches the live one and the
    mismatch reads as a stale deploy.
+   **Before trusting this register, re-measure it** — the T-33 blocker it used to carry was stale for
+   weeks (`cargo` and the four Tauri libs had been installed the whole time). `command -v` costs a
+   second; a week of verify-only ticks costs the phase.
 2. **Do not invent product surface.** `src/specs/luaplot-pages.md` is the law; a spec that says
    *To be specified* stays unbuilt until a decision is recorded in `docs/DESIGN.md`.
 3. **Do not resolve a blocker by faking it.** No offline Supabase stub pretending to be RLS, no
@@ -35,7 +64,17 @@ capability unblocks (T-29 before T-30/31/32; T-35 before T-36; T-33 once `cargo`
   past the memory adapter until then. T-29's migration is the first thing to write after the ref
   lands — `docs/ARCHITECTURE.md` → *Data* lists every shape it must carry, including the relations
   the memory adapter derives (`commentCount`, `replyCount`, `ratio` as a function).
-- **T-33 (Tauri desktop):** needs a display (`bun run tauri dev` opens a window) and `cargo`.
+- **T-33B(b) deep link (desktop):** needs `tauri-plugin-deep-link` + a `luaplot://` scheme in the
+  bundle config — a dependency, and the contract forbids one the ticket does not name. A human names
+  it, or the item is dropped.
+- **T-33B(c) `Ctrl/Cmd+K`:** a decision, not work — no spec file describes a command palette. Record
+  it in `docs/DESIGN.md` (what it lists, what it does, what it costs at 360px) or strike it.
+- **Tauri on this box is NOT blocked (corrected 2026-11-01).** `cargo`/`rustc` 1.99.0, the four
+  system libs and a live Hyprland session are all present; only the cron env lacks `DISPLAY`. To
+  open the app: `XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1` +
+  `HYPRLAND_INSTANCE_SIGNATURE=$(ls /run/user/1000/hypr/ | head -1)`, then `bun run tauri dev`, then
+  `hyprctl clients -j | jq '.[] | select(.class=="luaplot")'` to read the window, `grim -g` to see
+  it. This launches a real window on Victor's desktop — close it (`pkill -x luaplot`) when done.
 - **T-35/T-36/T-39 (Android):** install cmdline-tools + platform 35 + NDK, the four rust android
   targets, then `tauri android init`.
 - **T-37B (palette):** a decision, not work — Latte's active tab label is 4.45:1 (`accent` on
@@ -60,6 +99,25 @@ capability unblocks (T-29 before T-30/31/32; T-35 before T-36; T-33 once `cargo`
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A `cargo build` debug binary loads `devUrl`, not `frontendDist`.** It opens a mapped window that
+  says *Could not connect to localhost: Connection refused* — the app is fine, vite is missing. The
+  accept command is `bun run tauri dev`; and `dist` must be built **without** `LUAPLOT_BASE` for
+  Tauri (the app is served from `tauri://localhost`, so `/LuaPlot/assets/…` 404s).
+- **The desktop is verifyable from cron without a display.** There is no Xvfb/weston/cage on this
+  box, but there *is* a live Hyprland session: set `XDG_RUNTIME_DIR=/run/user/1000`,
+  `WAYLAND_DISPLAY=wayland-1`, `HYPRLAND_INSTANCE_SIGNATURE=$(ls /run/user/1000/hypr/ | head -1)` and
+  the app opens on Victor's real desktop. `hyprctl clients -j` is the machine-readable proof
+  (`{class:"luaplot", title:"LuaPlot", mapped:true}`; the geometry is under `at`/`size`, **not**
+  `x`/`width` — those keys come back `null` and read like a 0×0 window), and `grim -g "x,y wxh"` plus
+  `vision_analyze` proves the webview actually painted. Kill it with `pkill -x luaplot` — a window on
+  someone's screen is not a thing to leave running.
+- **A tiling compositor overrides the configured window size.** `tauri.conf.json` asked for 1200×900
+  and Hyprland mapped it at 941×1030 (one tile on a 1080p workspace). That is the WM, not a config
+  bug — the *floor* (`minWidth`/`minHeight`) and the label are the parts the app actually controls,
+  which is why `scripts/tauri-config.mjs` asserts those and not the observed geometry.
+- **`pkill -f vite` kills the tick's own shell**, because the pattern matches the command line that
+  is running it (exit −15, no output, no explanation). Use `pkill -x luaplot` — exact-name match on
+  a process whose name is not in the command you are typing around it.
 - **Never pipe `scripts/smoke.sh` into `tail`/`head`/`grep`.** A pipeline hands back the *pager's*
   status, so a red walk exits 0, and `smoke: N/27 journeys` is the first line the pipe drops — the
   run looks green and proves nothing. Redirect to a file, then read the file and the exit code.

@@ -3,6 +3,40 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-33 (part one): the desktop shell opens, and the gate now reads its config
+
+- **The blocker was stale.** `docs/NEXT.md` had T-33 filed under *a display and `cargo`*. Measured
+  this tick: `cargo`/`rustc` 1.99.0 present, `src-tauri/` already scaffolded with a `target/` of
+  4.6G, the four Tauri system libs present (`webkit2gtk-4.1` 2.54.1, `javascriptcoregtk-4.1` 2.54.1,
+  `libsoup-3.0` 3.8.0, `gtk+-3.0` 3.24.52), and a live session to open a window on (Hyprland 0.56.2
+  on `wayland-1`, `/run/user/1000`). Only `DISPLAY`/`WAYLAND_DISPLAY` were unset, which is the cron
+  env, not the machine. The register is corrected in `NEXT.md`.
+- **Changed:** `src-tauri/tauri.conf.json` — the window opens at **1200×900** (`lg`, where the shell
+  becomes a sidebar) instead of 800×600 (below `md`), floors at **360×740** — the width and height
+  every page is designed at — is explicitly `"label": "main"` (the label the capability grants
+  permissions to), centres, and is resizable. `scripts/tauri-config.mjs` (new) asserts those three
+  decisions plus `frontendDist`, and `scripts/check.sh` grew **section 6** to run it: the one config
+  no other gate section ever read.
+- **Verified how:** `bun run tauri dev` launched against the live Hyprland session — `hyprctl clients
+  -j` reported `{class:"luaplot", title:"LuaPlot", mapped:true}` and a `grim` capture of that window
+  shows the app rendered (Mocha shell, `lg` sidebar with Home/Thread/Catalog/Alerts/Profile, the
+  `Alerts` badge at 3, home hero, `SESSION · signed in as You`, `Open profile`). This is the
+  ticket's accept criterion, measured, and it is the first time the desktop app has ever been run on
+  this box. `./scripts/check.sh` **GREEN** including `tauri ok`; the new check was proven to bite by
+  mutating the config to 800×600 / 320 floor (both FAIL lines printed, config restored);
+  `./scripts/publish.sh` → `LIVE_JS=assets/index-DpakDGV9.js`, live root 200.
+- **Not verified / deferred to T-33B:** `persistent session` (nothing to persist yet — `lib/state/
+  session.ts` seeds `you` and T-30 will replace it with Supabase auth, so persisting a mock would be
+  thrown away; still worth doing for the desktop reload), `deep-link handling` (needs
+  `tauri-plugin-deep-link`, a dependency this ticket does not name), and `Ctrl/Cmd+K` (**no spec
+  describes a command palette** — `grep -rn 'palette\|ctrl+k' src/specs/` finds nothing, and
+  `luaplot-pages.md` is the product law, so a palette needs a recorded decision first). T-33's own
+  four listed deliverables are therefore only its first one; the other three carry over.
+- **Trap for the next desktop tick:** a plain `cargo build` debug binary loads `devUrl`, not
+  `frontendDist`, so it opens a window that says *Could not connect to localhost: Connection
+  refused* — that is not a broken app, it is a missing vite. Run `bun run tauri dev`; and build
+  `dist` **without** `LUAPLOT_BASE` for Tauri (the app is served from `tauri://localhost`).
+
 ## 2026-11-01 — verify-only tick: no unblocked ticket, the tree is whole
 
 - **Changed:** `docs/NEXT.md` only — the *verify-only tick* recipe under *What a tick does when

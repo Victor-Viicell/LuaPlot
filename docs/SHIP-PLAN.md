@@ -206,8 +206,22 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 
 ## P5 — Tauri (desktop + mobile hardware)
 
-- [ ] **T-33 Tauri shell hardening.** Window sizing per breakpoint, persistent session, deep-link
+- [x] **T-33 Tauri shell hardening.** Window sizing per breakpoint, persistent session, deep-link
       handling, `Ctrl/Cmd+K`. Accept: `bun run tauri dev` opens the app on desktop.
+      — **The window half.** Opens at 1200×900 (`lg`) instead of 800×600, floors at 360×740, label
+      `main` matching the capability, and `scripts/tauri-config.mjs` puts all of it in the gate
+      (section 6). Accept measured on this box: `bun run tauri dev` under the live Hyprland session,
+      `hyprctl clients` → `{class:"luaplot", title:"LuaPlot", mapped:true}`, `grim` shows the rendered
+      `lg` shell. The other three deliverables moved to **T-33B** — they were not done, and two of
+      them cannot be done as written.
+- [ ] **T-33B Tauri shell, part two: the session, the deep link, the key.** (a) *Persistent session* —
+      the app must remember signed-in / signed-out across a restart; `lib/state/session.ts` is
+      memory-only today. Persist through `schema.ts` (a `handleSchema.safeParse` on read), never a raw
+      `JSON.parse`. (b) *Deep-link handling* — needs `tauri-plugin-deep-link` + a `luaplot://` scheme
+      registered in the bundle config; the ticket must name that dependency before it lands.
+      (c) *`Ctrl/Cmd+K`* — **blocked on a decision**: no spec file describes a command palette
+      (`src/specs/` has no `palette`, no `ctrl+k`), and `luaplot-pages.md` is product law. Either a
+      human records the palette in `docs/DESIGN.md` or (c) is struck from the ticket.
 - [x] **T-34 Native bridge.** `lib/native.ts` with haptics, share, clipboard, image picker, badge;
       browser fallbacks proven. Accept: web build has zero Tauri imports in the bundle graph.
       — `nativeResultSchema` on every call, ladder plugin → web API → `unsupported`, dynamic
