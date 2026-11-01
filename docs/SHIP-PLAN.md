@@ -222,6 +222,12 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       (c) *`Ctrl/Cmd+K`* — **blocked on a decision**: no spec file describes a command palette
       (`src/specs/` has no `palette`, no `ctrl+k`), and `luaplot-pages.md` is product law. Either a
       human records the palette in `docs/DESIGN.md` or (c) is struck from the ticket.
+      — **(a) is done (T-33B(a)):** `session.ts` keeps `{handle, displayName}` in `localStorage` under
+      `luaplot.session` through `storedSessionSchema` (no `JSON.parse` at the store, `isAdmin` never
+      persisted), proven on the live site by sign-out → reload → still signed out and sign in → reload →
+      still signed in, plus `schema:check` section 4. **(b) and (c) stay blocked** exactly as below:
+      one needs a named dependency, the other a product decision. The Tauri webview half is
+      `UNVERIFIED` — `bun run tauri dev` was not relaunched (see PROGRESS).
 - [x] **T-34 Native bridge.** `lib/native.ts` with haptics, share, clipboard, image picker, badge;
       browser fallbacks proven. Accept: web build has zero Tauri imports in the bundle graph.
       — `nativeResultSchema` on every call, ladder plugin → web API → `unsupported`, dynamic

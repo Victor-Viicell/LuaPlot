@@ -3,6 +3,34 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-33B(a): the session survives a restart
+
+- **Changed:** `src/lib/state/session.ts` keeps the account in `localStorage` under `luaplot.session`,
+  read **once at module load** and written only by `signIn` / `signOut` / `setAccount` (now through one
+  `commit()`), so the restore happens before the first component exists and every `track()` consumer
+  sees exactly the notifications it always did. `src/lib/schema.ts` grew `storedSessionSchema`, which
+  parses the **stored string** — three states, and the difference between the last two is the ticket:
+  no key = fresh install (seed the mock), `"null"` = signed out on purpose (survives a reload), a row =
+  that account. Removing the key on sign-out would have made *sign out* last until the next launch.
+  The row is `{handle, displayName}` via `profileWriteSchema`, so a restored handle is normalised by the
+  same schema the onboarding form writes; **`isAdmin` is never persisted** (a client-writable store must
+  not grant the admin mark) — the store re-attaches the seed's flag.
+- **Verified how:** `bun run schema:check` grew **section 4** (normalises a row, reads an explicit null,
+  refuses a client-written `isAdmin`, refuses corrupt/stale rows) and `./scripts/check.sh` prints GREEN.
+  A CDP pass over a fresh Chromium profile on the **live** site: sign out → `localStorage` = `"null"` →
+  reload → menu still reads *Sign in as @you* / *nsfw · off (signed out)*; sign in → row stored →
+  reload → still signed in; a corrupt row (`{`) falls back to the seed with 0 page exceptions.
+  `bash scripts/smoke.sh` 27/27 locally and `--live` 27/27.
+- **Row 1 of the walk was lying, and is fixed.** `home.tsrx`'s entry control is an `<a>` with no
+  `follow()`, so pressing *Sign in* hard-reloaded the app and the boot re-seeded the mock — the row's
+  `/user/you` assertion was the **seed bug this ticket removes**, not a sign-in (`lib/auth.ts` writes no
+  session until T-30). The row now asserts what ships: the provider button answers *cancelled* and
+  signs nobody in, then the menu's own switch signs in as `you`. It is still 27 rows.
+- **Not verified:** nothing about the Tauri webview. The proof ran in Chromium on the preview and on
+  Pages; `bun run tauri dev` was **not** re-launched this tick, so the persistence is proven for the web
+  bundle the shell loads, not for a mapping webview (same code, same `localStorage` origin). Left as
+  `UNVERIFIED` for the desktop half until a tick opens the window and signs out/back in.
+
 ## 2026-11-01 — T-33 (part one): the desktop shell opens, and the gate now reads its config
 
 - **The blocker was stale.** `docs/NEXT.md` had T-33 filed under *a display and `cargo`*. Measured

@@ -751,13 +751,21 @@ results.push(
     await click("Sign in");
     await waitUrl("/authentification");
     await waitText("Continue with Google", 8000);
+    // The provider button is a **stub** (`lib/auth.ts`: no session write until T-30), so the honest
+    // assertion is the outcome it really produces — `cancelled`, nobody signed in. This row used to
+    // pass because home's entry control is an `<a>` with no `follow()`, so pressing it hard-reloaded
+    // the app and the boot re-seeded the mock: it was asserting the seed bug T-33B removed.
     await click("Continue with Google");
-    await waitFor(`[...document.querySelectorAll("a")].some((e) => (e.getAttribute("href") || "").endsWith("/user/you"))`, "the session to reach the shell", 8000);
+    await waitText("sign-in was cancelled", 8000);
     await go("/");
+    await waitText("signed out", 8000);
+    // The one control that really does write the session in the preview: the menu's own switch.
+    await click("More");
+    await click("Sign in as @you");
     await waitText("signed in as You", 8000);
     const label = await badge();
     if (!label.startsWith("Alerts")) throw new Error("the tab bar lost its Alerts destination");
-    return "home prints \"signed in as You\" after the provider button";
+    return "the provider button answers cancelled and signs nobody in; the menu's switch signs in as You";
   }),
 );
 
