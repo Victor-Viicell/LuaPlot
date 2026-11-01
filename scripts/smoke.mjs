@@ -3,7 +3,7 @@
  * T-38 — one scripted walk of the primary journeys, against a build that ships.
  *
  * `node scripts/smoke.mjs [--url <base>]` drives a real Chromium over CDP (no dependency:
- * Node's global WebSocket plus `/json/new`), walks the nineteen journeys **in one session** with
+ * Node's global WebSocket plus `/json/new`), walks the twenty-four journeys **in one session** with
  * in-app navigation only, and prints one row per journey of `{journey, started, ended, evidence}`.
  * Exit code 1 when any row fails.
  *
@@ -20,7 +20,7 @@
  * published site). This script launches its own Chromium and kills it on exit.
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -38,6 +38,14 @@ const PROFILE = join(
   process.env.SMOKE_PROFILE_DIR || tmpdir(),
   `luaplot-smoke-${process.pid}-${Date.now()}`,
 );
+/**
+ * T-43 — the file the Pick journey hands to the page's `<input type=file>`. The module only reads
+ * `file.name`, so a one-pixel PNG is enough; it is a real file on disk, which is the whole point
+ * (a synthetic `File` would prove the handler, not the chooser).
+ */
+const PICK_NAME = "luaplot-pick.png";
+const PICK_DIR = join(tmpdir(), `luaplot-smoke-files-${process.pid}-${Date.now()}`);
+const PICK_FILE = join(PICK_DIR, PICK_NAME);
 
 const CHROME_CANDIDATES = [
   process.env.SMOKE_CHROME,
@@ -55,6 +63,14 @@ if (!chromePath) {
 }
 
 mkdirSync(PROFILE, { recursive: true });
+mkdirSync(PICK_DIR, { recursive: true });
+writeFileSync(
+  PICK_FILE,
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  ),
+);
 const chrome = spawn(
   chromePath,
   [
@@ -75,10 +91,14 @@ process.on("exit", () => {
   chrome.kill("SIGKILL");
   try {
     rmSync(PROFILE, { recursive: true, force: true });
+    rmSync(PICK_DIR, { recursive: true, force: true });
   } catch {}
 });
 process.on("SIGINT", () => {
   chrome.kill("SIGKILL");
+  try {
+    rmSync(PICK_DIR, { recursive: true, force: true });
+  } catch {}
   process.exit(130);
 });
 
@@ -106,11 +126,43 @@ await new Promise((res, rej) => {
 let nextId = 0;
 const pending = new Map();
 const pageErrors = [];
+
+/**
+ * T-43 — buffered CDP events. `Page.fileChooserOpened` can land before the journey asks for it, so
+ * a waiter that only listened going forward would lose the very event it was waiting on.
+ */
+const eventQueue = new Map();
+const eventWaiters = new Map();
+function waitEvent(method, timeout = 8000) {
+  const queued = eventQueue.get(method);
+  if (queued && queued.length) return Promise.resolve(queued.shift());
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no ${method} within ${timeout}ms`)), timeout);
+    const list = eventWaiters.get(method) ?? [];
+    list.push((params) => {
+      clearTimeout(timer);
+      resolve(params);
+    });
+    eventWaiters.set(method, list);
+  });
+}
+
 socket.onmessage = (event) => {
   const msg = JSON.parse(event.data);
   if (msg.method === "Runtime.exceptionThrown") {
     const d = msg.params?.exceptionDetails;
     pageErrors.push(d?.exception?.description || d?.text || "page exception");
+  }
+  if (msg.method && !msg.id) {
+    const list = eventWaiters.get(msg.method);
+    if (list && list.length) list.shift()(msg.params ?? {});
+    else {
+      const queued = eventQueue.get(msg.method) ?? [];
+      // Only the events someone can wait for are buffered; anything else is noise.
+      if (msg.method === "Page.fileChooserOpened") queued.push(msg.params ?? {});
+      eventQueue.set(msg.method, queued);
+    }
+    return;
   }
   if (msg.id && pending.has(msg.id)) {
     pending.get(msg.id)(msg);
@@ -221,6 +273,14 @@ async function clickSelector(selector, nth = 0) {
   if (!clicked) throw new Error(`no element ${selector}[${nth}] on ${await url()}`);
 }
 
+/** Press the pointer at a viewport point — the gesture a person makes, not a scripted `.click()`. */
+async function mouseClickAt(box) {
+  const base = { x: Math.round(box.x), y: Math.round(box.y), button: "left", clickCount: 1 };
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", ...base });
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...base });
+  await sleep(120);
+}
+
 /** Click with real mouse events at the element's centre — the way a person clicks. */
 async function realClick(selector, nth = 0) {
   const box = await js(`
@@ -231,10 +291,7 @@ async function realClick(selector, nth = 0) {
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   `);
   if (!box) throw new Error(`no element ${selector}[${nth}] on ${await url()}`);
-  const base = { x: Math.round(box.x), y: Math.round(box.y), button: "left", clickCount: 1 };
-  await send("Input.dispatchMouseEvent", { type: "mousePressed", ...base });
-  await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...base });
-  await sleep(120);
+  await mouseClickAt(box);
 }
 
 /** Try labels in order; the first that exists wins. */
@@ -374,6 +431,112 @@ const pressed = (label) =>
     const el = [...document.querySelectorAll("button")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim().toLowerCase().startsWith(${JSON.stringify(label.toLowerCase())}));
     return el ? el.getAttribute("aria-pressed") : null;
   `);
+
+/* ------------------------------------------------------------------------------------------------
+ * T-43 — `/dev/native`'s five capability rows.
+ *
+ * The page prints one answer per press (`· last <b>{read}</b>` from `readOut()`) and repeats them
+ * newest-first in *Last answers*. The assertions read the **row for that capability**, never the
+ * page's text: a page that logged the answer against the wrong capability would otherwise pass.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** JS source for the `.cap` element whose `.cap-name` is exactly `name`. */
+const capRowSource = (name) =>
+  `[...document.querySelectorAll(".cap")].find((r) => { const n = r.querySelector(".cap-name"); return n && (n.innerText || "").trim() === ${JSON.stringify(name)}; })`;
+
+/**
+ * Press a capability's button with real mouse events. `pressCap` exists rather than a
+ * `click(".cap button", { nth })` because the row's *name* is the identity and the index is not:
+ * `CAPABILITIES` can be reordered without silently pressing a different road.
+ */
+async function pressCap(name) {
+  const box = await js(`
+    const row = ${capRowSource(name)};
+    if (!row) return null;
+    const el = row.querySelector("button");
+    if (!el) return null;
+    el.scrollIntoView({ block: "center" });
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  `);
+  if (!box) throw new Error(`no /dev/native capability row named "${name}" on ${await url()}`);
+  await mouseClickAt(box);
+}
+
+/**
+ * Wait for that row's printed answer and require the exact sentence.
+ *
+ * Polls for the **value**, not for "an answer": the badge row is pressed twice in one journey, and
+ * a wait that accepted the first non-empty read would return `ok · (3) title` for the Clear press.
+ */
+async function expectCap(name, expected, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  let seen = "";
+  while (Date.now() < deadline) {
+    seen = await capAnswer(name).catch(() => "");
+    if (seen === expected) return seen;
+    await sleep(120);
+  }
+  throw new Error(`the "${name}" row reads ${JSON.stringify(seen)}, expected ${JSON.stringify(expected)}`);
+}
+
+/**
+ * Like `expectCap`, for a row whose answer a **browser engine** decides rather than the module.
+ *
+ * `haptic` is the only one: rung 2 is `navigator.vibrate(pattern) ? done(kind) : unsupported`, so
+ * whether the row reads `ok · medium` or `unsupported · this browser has no road` is the engine's
+ * answer, not the app's — T-34 measured `false` on this box's Chromium and T-43 measured truthy on
+ * the same box, months apart. Pinning either literal would turn a Chromium update into a red walk.
+ * What the walk *can* pin is the set of legal verdicts: `failed · a road existed and broke` — or no
+ * answer at all — is the defect.
+ */
+async function expectCapOneOf(name, allowed, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  let seen = "";
+  while (Date.now() < deadline) {
+    seen = await capAnswer(name).catch(() => "");
+    if (allowed.includes(seen)) return seen;
+    await sleep(120);
+  }
+  throw new Error(
+    `the "${name}" row reads ${JSON.stringify(seen)}, which is none of ${allowed.map((a) => JSON.stringify(a)).join(" / ")}`,
+  );
+}
+
+/** The `· last …` text of one capability row, or "" until the page prints one. */
+function capAnswer(name) {
+  return js(`return (() => {
+    const row = ${capRowSource(name)};
+    if (!row) return "";
+    const road = row.querySelector(".cap-road");
+    if (!road) return "";
+    const flat = (road.innerText || "").replace(/\\s+/g, " ");
+    const at = flat.lastIndexOf("· last ");
+    return at < 0 ? "" : flat.slice(at + ("· last ").length).trim();
+  })();`);
+}
+
+/**
+ * The chunk boundary, on the wire. `isNative()` is false in a browser, so `@tauri-apps/api/core`
+ * must never be requested — and a grep over `dist` cannot prove it: the literal `@tauri-apps`
+ * appears in no built file (the chunk is named `core-<hash>.js`), so a grep passes vacuously.
+ */
+async function noCoreChunk(label) {
+  const hits = await js(`
+    return performance.getEntriesByType("resource")
+      .map((e) => e.name)
+      .filter((n) => /(^|\\/)core-[A-Za-z0-9_-]+\\.js/.test(n));
+  `);
+  const names = Array.isArray(hits) ? hits : [];
+  if (names.length) throw new Error(`${label} pulled the Tauri chunk into a browser: ${names.join(", ")}`);
+  return "0 core- requests";
+}
+
+/** Enter `/dev/native` and wait for its five rows — the shape every T-43 journey starts from. */
+async function openNative() {
+  await go("/dev/native");
+  await waitFor(`document.querySelectorAll(".cap").length === 5`, "/dev/native's five capability rows", 8000);
+}
 
 const rows = [];
 const stamp = new Date().toISOString();
@@ -828,6 +991,111 @@ results.push(
   }),
 );
 
+/**
+ * T-43 — `/dev/native`, one journey per capability (five rows, not one).
+ *
+ * A single row that presses all five would prove *something answered*, never *which road ran*: the
+ * page's whole argument is that a browser gets a fallback and never a thrown error, and five
+ * answers are five different proofs. Every press uses real mouse events — T-34 found a synthetic
+ * `.click()` makes `navigator.clipboard.writeText` answer `unsupported`, so a `.click()` here would
+ * pass only by not testing the gesture. The chunk boundary is asserted **inside** each journey: the
+ * Tauri chunk must never be requested in a browser, which no `dist` grep can show.
+ */
+results.push(
+  await journey("press Vibrate on /dev/native (the engine's own answer, never failed)", async () => {
+    await openNative();
+    await pressCap("haptic");
+    // Both verdicts are the module's own ladder — `navigator.vibrate(pattern) ? done : unsupported`
+    // — and which one prints is the engine's call (this box's Chromium 155 answers truthy; T-34
+    // recorded false on an earlier one). `failed · a road existed and broke` is the only wrong one.
+    const seen = await expectCapOneOf("haptic", [
+      "ok · medium",
+      "unsupported · this browser has no road",
+    ]);
+    const chunk = await noCoreChunk("Vibrate");
+    return `haptic reads "${seen}" and never "failed"; ${chunk}`;
+  }),
+);
+
+results.push(
+  await journey("press Copy on /dev/native (a real gesture reaches the clipboard)", async () => {
+    await openNative();
+    await pressCap("copy");
+    const seen = await expectCap("copy", "ok · LuaPlot · the native bridge");
+    const chunk = await noCoreChunk("Copy");
+    return `copy reads "${seen}" through Input.dispatchMouseEvent; ${chunk}`;
+  }),
+);
+
+results.push(
+  await journey("press Share on /dev/native (no share sheet → the copy road)", async () => {
+    await openNative();
+    await pressCap("shareText");
+    // Chromium on Linux has no `navigator.share`, so the ladder falls to `copy()` and the answer
+    // names the road it actually took — "shared" here would mean a sheet this box does not have.
+    const seen = await expectCap("shareText", "ok · copied");
+    const chunk = await noCoreChunk("Share");
+    return `shareText reads "${seen}" — the fallback names its own road; ${chunk}`;
+  }),
+);
+
+results.push(
+  await journey("press Pick on /dev/native (a real file reaches the input)", async () => {
+    await openNative();
+    // The chooser must be intercepted *before* the press: in headless Chromium an unintercepted
+    // `<input type=file>` opens a dialog nobody can close, so the press never settles.
+    await send("Page.setInterceptFileChooserDialog", { enabled: true });
+    await pressCap("pickImage");
+    const opened = await waitEvent("Page.fileChooserOpened", 10000);
+    let files = opened?.backendNodeId ? { backendNodeId: opened.backendNodeId } : null;
+    if (!files) {
+      // Older builds omit the node id; the dialog's own input is still the only one on the page.
+      const doc = await send("DOM.getDocument", { depth: 1 });
+      const found = await send("DOM.querySelector", {
+        nodeId: doc.result?.root?.nodeId,
+        selector: 'input[type="file"]',
+      });
+      const nodeId = found.result?.nodeId;
+      if (!nodeId) throw new Error("the chooser opened with no node to hand a file to");
+      files = { nodeId };
+    }
+    await send("DOM.setFileInputFiles", { files: [PICK_FILE], ...files });
+    const seen = await expectCap("pickImage", `ok · ${PICK_NAME}`);
+    const chunk = await noCoreChunk("Pick");
+    return `the chooser took ${PICK_NAME} from disk and the row reads "${seen}"; ${chunk}`;
+  }),
+);
+
+results.push(
+  await journey("press Badge 3 then Clear badge on /dev/native (the title follows)", async () => {
+    await openNative();
+    // Read the title first: the shell titles every non-root route `<Title> — LuaPlot` (App.tsrx),
+    // so the badged form is derived from what the page actually carries, not from a literal.
+    const before = await js(`return document.title;`);
+    if (!before || /^\(\d+\)\s/.test(before)) throw new Error(`/dev/native opened with title ${JSON.stringify(before)}`);
+
+    await pressCap("setBadge");
+    const badged = await expectCap("setBadge", "ok · (3) title");
+    const whileBadged = await waitFor(
+      `document.title === ${JSON.stringify(`(3) ${before}`)} ? document.title : ""`,
+      "the tab title to carry the badge",
+      6000,
+    );
+
+    await realClick(".tools button");
+    const cleared = await expectCap("setBadge", "ok · title cleared");
+    const after = await waitFor(
+      `document.title === ${JSON.stringify(before)} ? document.title : ""`,
+      "the title to come back",
+      6000,
+    );
+    const chunk = await noCoreChunk("Badge");
+    // Press 3, read, Clear, read — never 3 twice: `setBadge` memoises the unbranded title, so a
+    // second 3 would prove nothing about the write.
+    return `"${before}" → "${whileBadged}" (${badged}) → "${after}" (${cleared}); ${chunk}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -851,4 +1119,4 @@ console.log(`smoke: ${passed}/${rows.length} journeys`);
 for (const row of rows) {
   console.log(`${row.ok ? "PASS" : "FAIL"} | ${row.journey} | ${row.ended - row.started}ms | ${row.evidence}`);
 }
-process.exit(passed === rows.length && rows.length === 19 ? 0 : 1);
+process.exit(passed === rows.length && rows.length === 24 ? 0 : 1);

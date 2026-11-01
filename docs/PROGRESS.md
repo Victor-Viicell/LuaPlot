@@ -3,6 +3,36 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-43 — `/dev/native`'s five presses are walked, and the walk is twenty-four rows (2026-11-01)
+
+- **Changed:** `scripts/smoke.mjs` — five journeys, one per capability, each starting with
+  `go("/dev/native")` so no row inherits another's state. New helpers: `capRowSource` /
+  `pressCap` (finds the `.cap` row by its own `.cap-name` and presses through
+  `Input.dispatchMouseEvent`, never `.click()`), `capAnswer` / `expectCap` / `expectCapOneOf` (read
+  and require the exact sentence that row prints under `· last`, polling for the **value** so the
+  badge row's second press cannot be satisfied by its first answer), `noCoreChunk` (zero `core-*.js`
+  resource entries, asserted inside every journey), `openNative`, `mouseClickAt` (extracted from
+  `realClick`), and a buffered CDP event queue plus `waitEvent` for `Page.fileChooserOpened`.
+  The Pick journey enables `Page.setInterceptFileChooserDialog`, hands a real one-pixel PNG
+  (`luaplot-pick.png`, written under `tmpdir()` and removed on exit) to the opened node with
+  `DOM.setFileInputFiles`, and reads `ok · luaplot-pick.png`. Row count and exit check 19 → 24;
+  header comments in `smoke.mjs` / `smoke.sh`.
+- **Verified how:** `bash scripts/smoke.sh` **24/24** at 360×740 against the preview build and
+  **24/24** against https://victor-viicell.github.io/LuaPlot/ — live rows read
+  `copy reads "ok · LuaPlot · the native bridge"`, `shareText reads "ok · copied"`,
+  `the chooser took luaplot-pick.png from disk and the row reads "ok · luaplot-pick.png"`,
+  `"Native — LuaPlot" → "(3) Native — LuaPlot" → "Native — LuaPlot"`, each followed by
+  `0 core- requests`. `./scripts/check.sh` **GREEN**; `scripts/publish.sh` → live 200,
+  `assets/index-DpakDGV9.js` (unchanged hash: scripts and docs only, no app source).
+- **Not verified:** the *bundled* road (a Tauri shell answering the plugin rung) — `src-tauri`
+  still registers only `opener`, so every row here is the web fallback. The **two surprises**:
+  (1) `navigator.vibrate` now answers truthy in this Chromium (155) — T-34 measured `false` — so
+  the haptic row prints `ok · medium`, and the walk asserts *one of the two legal verdicts* rather
+  than a literal (pinning it would turn a Chromium update red); (2) the baton's expected
+  `(3) LuaPlot` was wrong: `App.tsrx` titles every non-root route `<Title> — LuaPlot`, so the badge
+  reads `(3) Native — LuaPlot` and the journey derives the expected title from the pre-press value.
+  Pick's *cancel* road (dismiss the chooser) is deliberately not walked — it would be a sixth row.
+
 ## T-42 — the six refusals walked, and the walk is nineteen rows (2026-11-01)
 
 - **Changed:** `scripts/smoke.mjs` — a `refusal(message, catalogPath)` helper and three journeys

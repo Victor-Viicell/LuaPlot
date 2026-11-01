@@ -269,13 +269,29 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       all three rows because my `OTHER_*` constants omitted the trailing `/edit` — the routes then
       answered the app's 404, which is exactly the mistake the baton's bucket trap warns about; the
       failure message named the sentence and the path, so it was a one-line fix.
-- [ ] **T-43 Walk `/dev/native`'s presses.** The one dev page whose evidence is still hand-asserted in
+- [x] **T-43 Walk `/dev/native`'s presses.** The one dev page whose evidence is still hand-asserted in
       `PROGRESS` (T-34): the four `native.ts` calls, the clipboard road and the Tauri chunk boundary
       are proven by prose, not by a script. Accept: new `scripts/smoke.mjs` journeys that press each
       control with a **real** `Input.dispatchMouseEvent` (a synthetic `.click()` cannot copy — see the
       finding in `docs/NEXT.md`) and assert the parsed `nativeResultSchema` answer each press prints,
       plus zero `core-*` resource entries after every press. Why next: the only page with behaviour
       behind it that no script has ever exercised.
+      — Landed as **five journeys, 24 rows**: one per capability, because one row pressing all five
+      would prove something answered, never which road ran. Pick intercepts the chooser and hands a
+      real temp PNG to the opened node; Badge presses 3, reads, clears, reads (the title is derived
+      from the page's own pre-press title — `(3) Native — LuaPlot`, not the `(3) LuaPlot` the brief
+      guessed, because `App.tsrx` titles every non-root route). Two engine facts recorded: this
+      Chromium answers `navigator.vibrate` truthy (T-34 measured `false`), so that row asserts one of
+      the two legal verdicts instead of a literal.
+- [ ] **T-44 Walk the three remaining dev pages, and measure a breakpoint.** `/dev/state`,
+      `/dev/data` and `/dev/primitives` are the last pages a headless session can reach. Accept:
+      three `scripts/smoke.mjs` journeys (27 rows) — the NSFW/session stores read back through a
+      product page, one `/dev/data` mutation found again in `/character/catalog`, and `/dev/primitives`
+      read at 360/640/900/1200 through `Emulation.setDeviceMetricsOverride` (no document-level
+      horizontal scroll, a grid that gains columns, 44px targets at 360), cleared in a `finally`.
+      Why next: the 24 rows all run at 360×740 — the contract's mandatory desktop responsiveness has
+      never been measured by anything. Every other open ticket is blocked on hardware or a project ref
+      (register in `docs/NEXT.md`).
 
 ## Failure bank (the ways this class of product breaks)
 
