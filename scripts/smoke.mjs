@@ -3,7 +3,7 @@
  * T-38 — one scripted walk of the primary journeys, against a build that ships.
  *
  * `node scripts/smoke.mjs [--url <base>]` drives a real Chromium over CDP (no dependency:
- * Node's global WebSocket plus `/json/new`), walks the sixteen journeys **in one session** with
+ * Node's global WebSocket plus `/json/new`), walks the nineteen journeys **in one session** with
  * in-app navigation only, and prints one row per journey of `{journey, started, ended, evidence}`.
  * Exit code 1 when any row fails.
  *
@@ -323,6 +323,38 @@ const settingValue = (term) =>
     return dd ? dd.innerText.trim() : "";
   `);
 
+/**
+ * T-42 — read a refusal page: its own sentence, its road out, and the form it must not mount.
+ *
+ * Three facts, because the sentence alone would let the other two rot: an `EmptyState` with no
+ * action strands the reader, and a refusal that still mounted the form is a worse defect than a
+ * wrong sentence. `catalogPath` is matched as a **suffix** — preview serves `/character/catalog`,
+ * Pages serves `/LuaPlot/character/catalog`, and T-41 lost three rows to an `^`-anchored test.
+ */
+async function refusal(message, catalogPath) {
+  await waitText(message, 8000);
+  const read = await js(`
+    const form = document.querySelector("form");
+    const a = [...document.querySelectorAll("a")].find((e) => (e.innerText || "").trim() === "Back to catalog");
+    const href = a ? a.getAttribute("href") || "" : "";
+    return {
+      form: form !== null,
+      resolved: href ? new URL(href, location.href).pathname : "",
+    };
+  `);
+  const where = await url();
+  if (read.form) throw new Error(`the refusal at ${where} still mounted a <form>`);
+  if (!read.resolved) throw new Error(`the refusal at ${where} prints no "Back to catalog" road out`);
+  const base = new URL(BASE).pathname;
+  if (!read.resolved.startsWith(base)) {
+    throw new Error(`the road out ${read.resolved} leaves the served base ${base} (from ${where})`);
+  }
+  if (!read.resolved.endsWith(catalogPath)) {
+    throw new Error(`the road out points at ${read.resolved}, not ${catalogPath} (from ${where})`);
+  }
+  return `${message} → ${read.resolved}`;
+}
+
 /** In-app hop: exactly what `router.navigate()` does — pushState then the router's popstate. */
 async function go(path) {
   // Resolve against the served base (`/` in Tauri and preview, `/LuaPlot/` on Pages): a leading
@@ -385,6 +417,19 @@ const OWN_PRESET_EDIT = "/preset/9e5e7000-0000-4000-8000-000000000001/edit";
 const OWN_PERSONA_EDIT = "/persona/9e45014a-0000-4000-8000-000000000001/edit";
 /** An id in the persona bucket that no row uses: personas read *missing* where the others forbid. */
 const NO_PERSONA_EDIT = "/persona/9e45014a-0000-4000-8000-0000000000ff/edit";
+/**
+ * T-42 — the refusal states. Row 1 of every authored fixture is `you`; these rows belong to `ada`,
+ * so opening their edit route is the **forbidden** arm, and the `…00ff` ids below are dead ids in
+ * the **same bucket** (an id from the wrong bucket lands on the app's 404 and would prove nothing).
+ * Personas are absent on purpose: a persona has no forbidden arm, and T-41 already walks its
+ * `missing` sentence.
+ */
+const OTHER_CHARACTER_EDIT = "/character/c0a1b2c3-0000-4000-8000-000000000003/edit"; // ada
+const OTHER_LOREBOOK_EDIT = "/lorebook/10eb00c5-0000-4000-8000-000000000002/edit"; // "Ashmarket Gazetteer", ada
+const OTHER_PRESET_EDIT = "/preset/9e5e7000-0000-4000-8000-000000000002/edit"; // "Long Table", ada
+const NO_CHARACTER_EDIT = "/character/c0a1b2c3-0000-4000-8000-0000000000ff/edit";
+const NO_LOREBOOK_EDIT = "/lorebook/10eb00c5-0000-4000-8000-0000000000ff/edit";
+const NO_PRESET_EDIT = "/preset/9e5e7000-0000-4000-8000-0000000000ff/edit";
 const ownPost = `Smoke walk ${stamp.slice(11, 19)}: a body written by the walk itself.`;
 const ownComment = `Smoke reply ${stamp.slice(11, 19)}: the comment the walk types.`;
 const ownEntry = `Smoke entry ${stamp.slice(11, 19)}: a tide-mark typed into a block that did not exist.`;
@@ -660,6 +705,50 @@ results.push(
   }),
 );
 
+/**
+ * T-42 — the six refusals, three journeys of **two hops each** (19 rows, not 22).
+ *
+ * The baton left the choice open. One row per hop would double the table without adding a fact:
+ * each hop is a fresh route with a fresh page mount, so the two assertions inside a journey are
+ * already independent evidence, and the second hop's failure message names its own path. A row per
+ * *type* keeps the table readable and keeps the sign-out journey last, which matters because a
+ * signed-out viewer reads these three pages as `forbidden` too — the signed-out journey must not
+ * come first.
+ *
+ * Every hop asserts three things through `refusal()`: the page's own sentence, that no `<form>`
+ * mounted, and that the `Back to catalog` action resolves under the served base to *that type's*
+ * catalog. A refusal with no road out is a dead end, and the copy alone would let it rot.
+ */
+results.push(
+  await journey("refuse another author's character (forbidden, then missing)", async () => {
+    await go(OTHER_CHARACTER_EDIT);
+    const forbidden = await refusal("This character isn't yours to edit.", "/character/catalog");
+    await go(NO_CHARACTER_EDIT);
+    const missing = await refusal("This character doesn't exist.", "/character/catalog");
+    return `ada's row → ${forbidden} | a dead id in the same bucket → ${missing}`;
+  }),
+);
+
+results.push(
+  await journey("refuse another author's lorebook (forbidden, then missing)", async () => {
+    await go(OTHER_LOREBOOK_EDIT);
+    const forbidden = await refusal("This lorebook isn't yours to edit.", "/lorebook/catalog");
+    await go(NO_LOREBOOK_EDIT);
+    const missing = await refusal("This lorebook doesn't exist.", "/lorebook/catalog");
+    return `Ashmarket Gazetteer → ${forbidden} | a dead id in the same bucket → ${missing}`;
+  }),
+);
+
+results.push(
+  await journey("refuse another author's preset (forbidden, then missing)", async () => {
+    await go(OTHER_PRESET_EDIT);
+    const forbidden = await refusal("This preset isn't yours to edit.", "/preset/catalog");
+    await go(NO_PRESET_EDIT);
+    const missing = await refusal("This preset doesn't exist.", "/preset/catalog");
+    return `Long Table → ${forbidden} | a dead id in the same bucket → ${missing}`;
+  }),
+);
+
 results.push(
   await journey("report a post and land on the case", async () => {
     await go(POST_REPORTED);
@@ -762,4 +851,4 @@ console.log(`smoke: ${passed}/${rows.length} journeys`);
 for (const row of rows) {
   console.log(`${row.ok ? "PASS" : "FAIL"} | ${row.journey} | ${row.ended - row.started}ms | ${row.evidence}`);
 }
-process.exit(passed === rows.length && rows.length === 16 ? 0 : 1);
+process.exit(passed === rows.length && rows.length === 19 ? 0 : 1);

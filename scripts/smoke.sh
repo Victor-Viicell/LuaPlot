@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# T-38 — one command for the sixteen-journey walk: serve the build under test, walk it, tear down.
+# T-38 — one command for the nineteen-journey walk: serve the build under test, walk it, tear down.
 #
 # `scripts/smoke.sh`            → the local production build (`bun run build` then `vite preview`)
 # `scripts/smoke.sh --live`     → the published site, exactly what a reader loads
 #
-# Exit code is the walk's: 0 only when all sixteen rows pass.
+# Exit code is the walk's: 0 only when all nineteen rows pass.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 

@@ -1,80 +1,107 @@
 # Baton — what the next session does
 
-**Ticket: T-42 — the refusal states have never been walked.**
+**Ticket: T-43 — `/dev/native` is the last page whose evidence is prose.**
 
-Spec: `src/specs/pages/character/edit.md`, `lorebook/edit.md`, `preset/edit.md` → *States*
-(`Not the owner` → forbidden, `Not found` → that form's own sentence); `docs/CONTRACT.md` →
-*Engineering law* (every async surface renders Loading / Empty / Error / Success);
-`src/specs/luaplot-pages.md` (personas are personal: no "not yours" state exists for them).
+Spec: none — `/dev/native` is a dev route, absent from `src/specs/luaplot-pages.md` (and
+`scripts/spec-routes.mjs` drops `/dev/*` before comparing). The law it answers is
+`docs/ARCHITECTURE.md` → *Native boundary*; the module is `src/lib/native.ts`; the page is
+`src/pages/dev-native.tsrx`.
 
-Why next: **T-41 opened the last form nobody had opened.** Every ticket left in `docs/SHIP-PLAN.md`
-is blocked on something this box does not have:
-
-- **T-33** (`bun run tauri dev`) needs a window and a first `cargo` build of the shell.
-- **T-35 / T-36 / T-39** need the Android SDK + NDK + rust android targets, none installed.
-- **T-29…T-32** need a Supabase project ref; the connected token still cannot list projects (403).
-- **T-37B** needs a human palette decision (Latte has no darker mauve), not a hex.
-
-So the next provable work is again coverage. The walk now opens the `ready` arm of all four authored
-edit forms and has still never rendered a single **refusal**: `character-edit.tsrx`,
-`lorebook-edit.tsrx` and `preset-edit.tsrx` each declare `missing | forbidden`, and those two
-sentences are the only thing a reader ever sees when a link goes wrong. They are four lines of copy
-and four `EmptyState` actions that no session has ever read.
+Why next: **every ticket left in `docs/SHIP-PLAN.md` is blocked on something this box does not have**
+(T-33 needs a window + a `cargo` build, T-35/36/39 need the Android SDK, T-29…T-32 need a Supabase
+project ref, T-37B needs a human palette decision). T-42 closed the refusal arm of the three authored
+forms, so the walk now covers every product journey a headless session can reach. The one page left
+is `/dev/native`: five capability buttons and a title badge, whose whole argument — *a browser gets a
+fallback, a shell gets the plugin, a person never sees a thrown error* — has been asserted **by hand
+in `docs/PROGRESS.md`** (T-34) and by no script. Its own page comment says why that is not enough: a
+walk can press the buttons but a prose read cannot be re-run.
 
 ## Approach
 
-1. **Four rows, appended after the persona step**, one hop and one sentence each:
-   - `/character/<a character ada or bram owns>/edit` → `This character isn't yours to edit.`
-   - `/lorebook/10eb00c5-0000-4000-8000-000000000002/edit` (*Ashmarket Gazetteer*, `ada`) →
-     `This lorebook isn't yours to edit.`
-   - `/preset/9e5e7000-0000-4000-8000-000000000002/edit` (*Long Table*, `ada`) →
-     `This preset isn't yours to edit.`
-   - dead ids in the right buckets → each page's **own** sentence (`This character doesn't exist.`,
-     `This lorebook doesn't exist.`, `This preset doesn't exist.`). Read them off the pages first.
-2. **Assert the road out, not only the sentence.** Every refusal is an `EmptyState` with an action
-   (`Back to catalog`, `Back to personas`): a refusal that offers no destination is a dead end, and
-   asserting only the copy would let that break silently. Check the action's `href` resolves under
-   the served base.
-3. **Personas are not part of this ticket.** T-41 already walks a persona's `missing` sentence; a
-   persona has no `forbidden` arm because it is never addressed across accounts. Do not add a
-   persona row that pretends otherwise.
-4. Row count and exit check move 16 → 19 (three forbidden + three missing in three journeys, one per
-   type) or 22 if you spend a row per hop — pick one and say which in the walk's comment. The header
-   comments in `smoke.mjs` / `smoke.sh`, the exit check and every "16/16" in `docs/` move with it.
+1. **One journey per capability, not one journey for the page.** Five presses answer five different
+   roads; if a single row proves all five, one broken road hides the other four. Suggested rows
+   (each `go("/dev/native")`, then one press, then read the row the page prints for that capability):
+   - **Vibrate** → `unsupported · this browser has no road` — headless Chromium *has*
+     `navigator.vibrate` and it returns `false`, which the module reads as unsupported. Do not "fix"
+     that into `failed`.
+   - **Copy** → `ok · LuaPlot · the native bridge` — needs a **real** gesture (below).
+   - **Share** → `ok · copied` — Chromium/Linux has no `navigator.share`, so the road falls through
+     to `copy()`; the answer names the road it actually took.
+   - **Pick** → `ok · <file name>` — a chooser must be intercepted and a real temp PNG handed to it
+     (below).
+   - **Badge 3** then **Clear badge** → `ok · (3) title` and `document.title === "(3) LuaPlot"`, then
+     `ok · title cleared` and the title back to `LuaPlot`.
+2. **Press with real mouse events.** `realClick()` already exists in `smoke.mjs` (T-41 uses it for a
+   notification row). Use it here: per T-34's finding, a synthetic `.click()` gives
+   `navigator.clipboard.writeText` an `unsupported` answer and only a real `Input.dispatchMouseEvent`
+   at the button's centre gives `ok`. If the Copy row passes with `.click()`, the press was not the
+   thing being proven.
+3. **Assert the printed answer, not the button's label.** Each capability row prints
+   `· last <b>{read}</b>` from `readOut(result)`, and the *Last answers* list repeats it newest-first.
+   Read the `.cap` row for that capability (match `cap-name`), never the whole page's text — a page
+   that logged the answer for the wrong capability would otherwise pass.
+4. **Assert the chunk boundary in the same journeys.** `performance.getEntriesByType("resource")`
+   must show **zero** `core-` requests after every press: `isNative()` is false in a browser, so
+   `@tauri-apps/api/core` must never download. This is the one finding (T-34) that a `dist` grep
+   cannot prove — the literal `@tauri-apps` appears in no built file, so grep would pass vacuously.
+5. Row count and exit check move 19 → 24 (five capability journeys). Header comments in
+   `smoke.mjs` / `smoke.sh` and the "19/19" in the newest `docs/PROGRESS.md` entry are not edited
+   retroactively — the newest entry is the one that carries the live number.
 
 ## Traps
 
-- **Buckets**: characters `c0a1b2c3…`, lorebooks `10eb00c5…`, presets `9e5e7000…`, personas
-  `9e45014a…`. An id in the *wrong* bucket lands on the app's 404, not the form's own sentence, and
-  the step would prove nothing while passing.
-- **A refusal page renders no `<form>`**, so `formName()` answers `""` and `retype()` throws. Assert
-  the sentence and the action link; never a field.
-- **Path assertions must be base-agnostic** — `/\/preset\/[0-9a-f-]{36}$/`, never `^\/`. T-41 lost
-  three rows to exactly this on its first `--live` run: preview serves `/`, Pages serves `/LuaPlot/`.
-- **Run `--live` before claiming the walk.** Local 16/16 said nothing about Pages.
-- **A row owned by someone else must actually exist**: row 1 of every authored fixture is `you`, so
-  the forbidden arm has to name row 2 (lorebook, preset) or a character whose `author` is `ada` /
-  `bram` — read `src/lib/fixtures/characters.ts` rather than guessing.
-- **The signed-out arm of these pages is `forbidden` too** (`handle === ""`): a journey that signs out
-  first would walk that branch instead. Keep the refusal rows before the sign-out journey.
+- **The file chooser hangs the page.** `pickImage()` builds a hidden `<input type=file>` and clicks
+  it; in headless Chromium that opens a dialog nobody can close, so the press never settles and the
+  row times out. Enable `Page.setInterceptFileChooserDialog {enabled: true}` **before** the press,
+  listen for `Page.fileChooserOpened`, then set a real temp `.png` on that `backendNodeId` with
+  `DOM.setFileInputFiles` — which fires `change`, so the page answers `ok · <basename>`. Write the
+  PNG under the scratch dir (a byte-array PNG is enough; the module only reads `file.name`), and
+  delete it on exit. Dismissing the chooser is the *cancel* road, not the success road — if you want
+  both, that is a sixth journey and a new row count.
+- A `.click()` on **Pick** also hangs, for the same reason — interception is about the chooser, not
+  the gesture.
+- **`/dev/native` must be reached with `go()`**, like every other route: `history.pushState` with a
+  leading slash drops the `/LuaPlot/` base on Pages. The page is in the production route table
+  (`src/router.ts`), so the live walk can open it.
+- **The badge writes `document.title`**, and `setBadge` memoises the unbranded title in a module
+  variable (`baseTitle`). Within one session the memo is correct; a row that presses Badge 3 twice
+  would prove nothing about the second write. Press 3, read, Clear, read.
+- **Do not reload between presses.** A reload re-seeds the memory adapter and re-runs `baseTitle`;
+  everything after the first navigation is in-app.
 - Keep `bun run smoke` and `./scripts/check.sh` green; the gate stays browser-free.
+- **Run `--live` before claiming the walk.** Local 24/24 says nothing about Pages (T-41's lesson).
 
 ## Open decisions
 
-- **One row per type or one row per hop.** Three journeys of two hops (19) is the same evidence as
-  six journeys (22) with less wall-clock; the walk's comment should say which and why.
-- **`/dev/native` is still unwalked.** Its presses are asserted by hand in `PROGRESS` (T-34), not by
-  a script. If the refusal work lands early, that page is the next cheapest proof — it needs real
-  `Input.dispatchMouseEvent` for the clipboard, per the finding below.
+- **One row per capability or one row for the page.** Five rows is the shape recommended above; the
+  alternative is one journey that presses all five in order and asserts five answers. Pick the five:
+  a single row cannot say *which* road broke, and the pick row is slow enough that bundling it hides
+  the other four's timings.
+- **`/dev/primitives`, `/dev/data`, `/dev/state` are still unwalked** too. They are lower value —
+  no capability behind them — but if T-43 lands early, `/dev/state` is the cheapest honest check that
+  the skeleton states still render.
 - The shell still paints the previous page for one frame before the outlet's `loading` skeleton
   (measured in T-40 at ~1 frame, ~13ms). It is imperceptible and left alone; if a later ticket ever
   adds a view transition it must not make that frame visible.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **T-42 is done**: the three authored edit routes' refusal arms are walked — `/character/…0003/edit`
+  and friends read `… isn't yours to edit.`, a dead id in the **same bucket** reads the form's own
+  `… doesn't exist.`, and each refusal's `Back to catalog` resolves under the served base
+  (`/LuaPlot/character/catalog` live). The walk is **19 rows**: three journeys of two hops, one per
+  type, not six journeys — each hop is a fresh mount, so the second assertion is independent evidence
+  and a row per hop would only lengthen the table. The new `refusal(message, catalogPath)` helper
+  asserts three facts per hop (sentence, **no `<form>` mounted**, road out under the base); it is
+  the shape any future refusal row should reuse.
+- **A refusal row must carry the whole path.** The first run failed all three rows because the
+  `OTHER_*` constants omitted the trailing `/edit`: the routes answered the app's 404, which is the
+  bucket trap wearing the other hat — a path that is *almost* right proves nothing and the failure
+  reads like a copy bug. `refusal()`'s error names the sentence it waited for and the path it was on,
+  which is what made it a one-line fix.
 - **T-41 is done**: `/lorebook/…1/edit`, `/preset/…1/edit` and `/persona/…1/edit` all preload and
   save correctly — **no defect reproduced**, so the ticket bought regression coverage, not a fix.
-  The walk is **16 rows**: a fifth entry block whose body the detail page prints, a preset
+  The walk added a fifth entry block whose body the detail page prints, a preset
   `deepseek-chat → deepseek-reasoner` change that leaves the description intact, and a persona
   tagline that reaches the detail page *and* the collection card. Two helpers did the heavy lifting:
   `retype()` (select-all + `Input.insertText`, value read back and compared) and `choose()` (native
@@ -86,9 +113,6 @@ and four `EmptyState` actions that no session has ever read.
   step is not optional; suffix-match every path.
 - **Pages' cold bundle costs ~2.4s more per save step** than the preview (persona 1273ms live vs
   1156ms local, preset 658 vs 542). The 8000ms waits are already enough; do not tighten them.
-- **The walk is 16 rows** and its exit check is `rows.length === 16`; a new step must move that
-  number, both header comments and the "16/16" in `docs/PROGRESS.md`'s newest entry in the same
-  commit.
 - **T-40 is done**: the case page's *THE ITEM* chip reads the row, not the case —
   `post.status` → `Visible` / `Removed`, plus `Removed — its whole comment thread went with it.`
   The edit-form half of that ticket did **not** reproduce: `/character/[id]/edit` mounts
@@ -150,7 +174,7 @@ and four `EmptyState` actions that no session has ever read.
 - **Measure a flavour through `Emulation.setEmulatedMedia`**, never by flipping `data-theme` from JS.
 - **T-37 bundle numbers**: `dist` 1.1 MB; JS 728 KB raw / ~187 KB gz; CSS 23.8 KB gz; largest asset
   the JetBrains Mono Latin woff2 at 40,404 B. Budget 300 KB gz — met. T-34 adds a `core-*.js` chunk
-  that only a shell loads.
+  that only a shell loads. T-41/T-42 changed no app source, so the hash stayed `index-DpakDGV9.js`.
 - **T-28B is done**: `postStatusSchema` (`visible | removed`), `removePost()` (status flipped, thread
   deleted in cascade, vote dropped, row kept), `livePost()` filters `listPosts`/`profilePosts`,
   `getPost` still answers by id, `/post/[id]` draws *Removed by JEV* plus one finality line.

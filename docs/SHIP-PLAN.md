@@ -252,7 +252,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       intact, and a persona tagline that reaches both the detail page and the collection card (plus
       the *missing* sentence that replaces `forbidden` for a persona). Two read-back helpers
       (`retype`, `choose`) now make every field edit a two-read proof.
-- [ ] **T-42 The refusal states have never been walked.** Every authored edit route declares a
+- [x] **T-42 The refusal states have never been walked.** Every authored edit route declares a
       `missing` / `forbidden` / `error` union and the walk only ever opens the `ready` arm: a
       fixture owned by someone else must read *isn't yours to edit* and an unused id in the right
       bucket must read the form's own *doesn't exist* sentence. Accept: four new journeys (20 rows)
@@ -260,6 +260,22 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       (missing), each asserting the exact sentence and that the refusal offers the main action's
       destination. Why next: read-only, fixture-backed, and the only remaining coverage a headless
       session can prove.
+      — Landed as **three journeys, 19 rows** (the baton allowed 19 or 22; one row per type with two
+      hops, because each hop is a fresh mount and a fresh page read, so the second assertion is
+      independent evidence). Personas are excluded: a persona has no `forbidden` arm (T-41 walks its
+      `missing` sentence). Each hop asserts three facts through a new `refusal()` helper — the exact
+      sentence, that **no `<form>` mounted**, and that `Back to catalog` resolves under the served
+      base to that type's own catalog (`/LuaPlot/…` live). No defect reproduced. The first run failed
+      all three rows because my `OTHER_*` constants omitted the trailing `/edit` — the routes then
+      answered the app's 404, which is exactly the mistake the baton's bucket trap warns about; the
+      failure message named the sentence and the path, so it was a one-line fix.
+- [ ] **T-43 Walk `/dev/native`'s presses.** The one dev page whose evidence is still hand-asserted in
+      `PROGRESS` (T-34): the four `native.ts` calls, the clipboard road and the Tauri chunk boundary
+      are proven by prose, not by a script. Accept: new `scripts/smoke.mjs` journeys that press each
+      control with a **real** `Input.dispatchMouseEvent` (a synthetic `.click()` cannot copy — see the
+      finding in `docs/NEXT.md`) and assert the parsed `nativeResultSchema` answer each press prints,
+      plus zero `core-*` resource entries after every press. Why next: the only page with behaviour
+      behind it that no script has ever exercised.
 
 ## Failure bank (the ways this class of product breaks)
 

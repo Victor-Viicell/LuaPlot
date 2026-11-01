@@ -3,6 +3,33 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-42 — the six refusals walked, and the walk is nineteen rows (2026-11-01)
+
+- **Changed:** `scripts/smoke.mjs` — a `refusal(message, catalogPath)` helper and three journeys
+  after the persona step, each **two hops**: `/character/…0003/edit` (`ada`) →
+  `This character isn't yours to edit.`, then `/character/…00ff/edit` → `This character doesn't
+  exist.`; the same pair for `/lorebook/…0002/edit` (*Ashmarket Gazetteer*) and `/preset/…0002/edit`
+  (*Long Table*), each against a dead id in its **own** bucket. `refusal()` asserts three facts per
+  hop — the page's own sentence, that **no `<form>` mounted** (a refusal that still drew the editor
+  would be a worse defect than wrong copy), and that the `Back to catalog` action resolves **under
+  the served base** to that type's catalog. No persona row: a persona has no `forbidden` arm.
+  Row count and exit check 16 → 19, header comments in `smoke.mjs` / `smoke.sh`, `docs/NEXT.md`
+  rewritten for T-43, `docs/SHIP-PLAN.md` T-42 ticked + T-43 filed.
+- **Verified how:** `bash scripts/smoke.sh` **19/19** at 360×740 against the preview build and
+  **19/19** against https://victor-viicell.github.io/LuaPlot/ — the live rows print
+  `ada's row → This character isn't yours to edit. → /LuaPlot/character/catalog | a dead id in the
+  same bucket → This character doesn't exist. → /LuaPlot/character/catalog` (and the lorebook /
+  preset pairs), which is the base-agnostic proof the ticket wanted. `./scripts/check.sh` **GREEN**;
+  `scripts/publish.sh` → live 200, `assets/index-DpakDGV9.js` (unchanged hash: this ticket touched no
+  app source).
+- **Not verified:** no product defect found — all three pages already printed the right sentence and
+  offered the right road out, so this bought regression coverage, not a fix. The `error` arm of the
+  three phase unions is still unwalked (the memory adapter has no failing method to trigger it).
+  **A defect that was mine:** the three `OTHER_*` constants first shipped without the trailing
+  `/edit`, so the routes answered the app's 404 and all three rows failed on the first run — the
+  bucket trap in reverse; the helper's message named the sentence and the path, so it cost one line.
+  No Tauri/Android build.
+
 ## T-41 — the last three authored forms walked, and the walk is sixteen rows (2026-10-31)
 
 - **Changed:** `scripts/smoke.mjs` — three journeys after the character edit-form step.
