@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * T-38 — one scripted walk of the twelve primary journeys, against a build that ships.
+ * T-38 — one scripted walk of the primary journeys, against a build that ships.
  *
  * `node scripts/smoke.mjs [--url <base>]` drives a real Chromium over CDP (no dependency:
  * Node's global WebSocket plus `/json/new`), walks the twelve journeys **in one session** with
- * in-app navigation only, and prints twelve rows of `{journey, started, ended, evidence}`.
+ * in-app navigation only, and prints one row per journey of `{journey, started, ended, evidence}`.
  * Exit code 1 when any row fails.
  *
  * Two rules the walk exists to enforce:
@@ -147,6 +147,14 @@ const js = (template) => page(`(() => { ${template} })()`);
 const text = () => js(`return document.body.innerText.replace(/\\s+/g, " ").trim();`);
 const url = () => js(`return location.pathname + location.search;`);
 
+/** The text of the case page's *THE ITEM* section — the panel T-40 proved can lie after an action. */
+const itemPanel = () =>
+  js(`const h = [...document.querySelectorAll("h2")].find((el) => (el.innerText || "").trim().toLowerCase() === "the item"); if (!h) return ""; const s = h.closest("section"); return s ? s.innerText.replace(/\\s+/g, " ").trim() : "";`);
+
+/** The value of the first field in the mounted form — the edit pages' first row is always the name. */
+const formName = () =>
+  js(`const el = document.querySelector("form input, form textarea"); return el ? el.value : "";`);
+
 /** Poll a page expression until it is truthy. */
 async function waitFor(source, label, timeout = TIMEOUT) {
   const deadline = Date.now() + timeout;
@@ -277,7 +285,7 @@ const rows = [];
 const stamp = new Date().toISOString();
 
 /**
- * Run one journey: record the row even when it throws, so the twelve-row shape is always whole.
+ * Run one journey: record the row even when it throws, so the row shape is always whole.
  * `evidence` is the DOM fact the journey proved, not the click it made.
  */
 async function journey(name, steps) {
@@ -444,6 +452,31 @@ results.push(
 );
 
 results.push(
+  await journey("open a second edit form (the fields follow the URL)", async () => {
+    // T-40's other half. The report was "a first read sees the previously opened character's name";
+    // it does not, because `/character/[id]/edit` mounts `CharacterForm` only inside its *ready*
+    // branch — but nothing in the walk proved that, and the hypothesis was written down twice.
+    // Two own characters, an in-app hop between their edit routes, and two reads: the assertion is
+    // on identity (the name equals the URL's character), never on elapsed time.
+    await go("/character/c0a1b2c3-0000-4000-8000-000000000001/edit");
+    await waitFor(`document.querySelector("form input") !== null`, "the first edit form", 8000);
+    await waitFor(`(() => { const el = document.querySelector("form input"); return el && el.value === "Aurelia of the Tides"; })()`, "the first form to be pre-filled", 6000);
+
+    await go("/character/c0a1b2c3-0000-4000-8000-00000000001c/edit");
+    const first = await waitFor(
+      `(() => { const el = document.querySelector("form input"); return el && el.value === "Iolande, Second Ledger" ? el.value : ""; })()`,
+      "the second form to be pre-filled from its own row",
+      6000,
+    );
+    await sleep(600);
+    const second = await formName();
+    if (second !== first) throw new Error(`the name field read "${first}" then "${second}"`);
+    if (second === "Aurelia of the Tides") throw new Error("the form kept the previous character's name");
+    return `both reads on /character/…1c/edit printed "${second}"`;
+  }),
+);
+
+results.push(
   await journey("report a post and land on the case", async () => {
     await go(POST_REPORTED);
     await waitFor(`[...document.querySelectorAll("button")].some((e) => (e.innerText || "").trim() === "Report")`, "the post's actions", 8000);
@@ -481,14 +514,26 @@ results.push(
 );
 
 results.push(
-  await journey("conclude a case as removed", async () => {
+  await journey("conclude a case as removed (the item panel follows)", async () => {
     await go("/moderation/4e90047a-0000-4000-8000-000000000002?admin=1");
     await waitText("Case");
     await waitText("Removed");
+    // T-40: the panel is evidence, so it has to read what the item *is*. Before the conclusion the
+    // post is visible; reading that first is what makes the after-read a fact and not a guess.
+    const before = await itemPanel();
+    if (!before) throw new Error("the case page draws no THE ITEM panel");
+    if (/removed/i.test(before)) throw new Error(`the item panel already read "removed" before any action: ${before}`);
     await type("textarea", "Smoke walk: confirmed the copy claim.");
     await click("Conclude case");
     await waitFor(`document.body.innerText.includes("Concluded")`, "the case to read Concluded", 8000);
-    return `the case prints ${(await text()).match(/Concluded[^.]{0,24}/)?.[0] || "Concluded"}`;
+    // No reload between the two reads: a reload re-seeds the adapter and would prove nothing.
+    const after = await waitFor(
+      `(() => { const h = [...document.querySelectorAll("h2")].find((el) => (el.innerText || "").trim().toLowerCase() === "the item"); const s = h && h.closest("section"); const t = s ? s.innerText.replace(/\\s+/g, " ").trim() : ""; return /removed/i.test(t) ? t : ""; })()`,
+      "the item panel to print the removal",
+      8000,
+    );
+    if (!/thread went with it/i.test(after)) throw new Error(`the panel says the post is removed but names no consequence: ${after}`);
+    return `the panel went "${before.slice(0, 40)}…" → "${after.slice(0, 52)}…" without a reload`;
   }),
 );
 
@@ -533,4 +578,4 @@ console.log(`smoke: ${passed}/${rows.length} journeys`);
 for (const row of rows) {
   console.log(`${row.ok ? "PASS" : "FAIL"} | ${row.journey} | ${row.ended - row.started}ms | ${row.evidence}`);
 }
-process.exit(passed === rows.length && rows.length === 12 ? 0 : 1);
+process.exit(passed === rows.length && rows.length === 13 ? 0 : 1);

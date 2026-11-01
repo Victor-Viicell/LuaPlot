@@ -223,15 +223,27 @@ function itemViewOf(
 
   if (kind === "post") {
     const post = row as Post;
+    /**
+     * A post has no visibility to set, but it does have a `status` (`postStatusSchema`), and a
+     * conclusion that removes it flips that status while the row stays readable (T-28B). Reading
+     * only the body made the panel print *No visibility* over a post the moderator had just
+     * removed — the case said *Concluded · removed* while THE ITEM said nothing had happened
+     * (T-40). The chip is the fact, so it comes from the row, not from the case.
+     */
+    const removed = post.status === "removed";
     return {
       kind,
       title: label,
       author: post.author,
       initials: post.author.slice(0, 2).toUpperCase(),
-      visibility: "No visibility",
+      visibility: removed ? "Removed" : "Visible",
       flag: post.nsfw ? "NSFW" : "SFW",
       body: post.body,
-      detail: post.attachment === null ? "No attachment" : `Attachment: ${post.attachment.kind}`,
+      detail: removed
+        ? "Removed — its whole comment thread went with it."
+        : post.attachment === null
+          ? "No attachment"
+          : `Attachment: ${post.attachment.kind}`,
       available: true,
     };
   }

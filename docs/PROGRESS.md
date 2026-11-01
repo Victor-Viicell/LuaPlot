@@ -3,6 +3,28 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-40 — the case panel stops lying, and the edit form's identity is proven (2026-10-31)
+
+- **Changed:** `src/pages/moderation-detail.tsrx` — `itemViewOf()`'s post arm read a hard-coded
+  `No visibility`; it now reads the row's own `post.status` (`postStatusSchema`) and answers
+  `Visible` / `Removed`, with `Removed — its whole comment thread went with it.` as the detail line.
+  `scripts/smoke.mjs` — a thirteenth journey (*open a second edit form*) hops between two own
+  characters' edit routes and asserts the name field equals the URL's character on two reads, and
+  the *conclude* journey now reads THE ITEM panel before and after and requires the removal to
+  appear in place. `docs/DESIGN.md` — the "mount only once the row resolved" decision and the
+  "the visibility chip is the row's fact" rule, both recorded.
+- **Verified how:** `./scripts/check.sh` **GREEN** (build ok, 30 routes, schema ok);
+  `node scripts/smoke.mjs --url https://victor-viicell.github.io/LuaPlot/` **13/13**. The case step
+  prints its own evidence: panel `"…SA @sable No attachme…"` → `"…SA @sable Removed — its whole
+  com…"` with no reload. The edit step prints `both reads on /character/…1c/edit printed "Iolande,
+  Second Ledger"`. Published: `scripts/publish.sh` → `gh-pages` @ `4f7ec35`, live 200.
+- **Not verified:** the edit-form half of the ticket did **not** reproduce — a probe that reads the
+  first input at 1ms, 2ms and every frame after an in-app hop saw the previous name for exactly one
+  frame, before the outlet's own `loading` skeleton replaced it, and both post-settle reads were
+  correct. That stale frame is the shell's transition (`status` flips in a batched effect after
+  `navigate()`), not the form; it is left as is. The walk's new step is therefore a regression guard,
+  not a fix. No slower device was available to reproduce the original 1.5s report.
+
 ## T-34 — the native bridge, with the web road proven and the plugin rung inert (2026-10-31)
 
 - **Changed:** `src/lib/native.ts` — five capabilities (`haptic`, `shareText`, `copy`, `pickImage`,

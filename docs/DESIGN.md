@@ -816,6 +816,14 @@ consumer of `Session` before P2.
   its **Add by ID** button onto one row; `lg` puts identity and the image in a 360px right column with
   the definition beside it and the attachments across the full width. A form that stayed 328px at
   1440 would be a stretched phone.
+- **The form mounts only once the row has resolved** (settled in T-40): the edit pages draw their
+  `loading` skeleton — header plus two `Skeleton` blocks — and mount the form inside the `ready`
+  branch, so a field can never be created from a null row. `CharacterForm` and its siblings snapshot
+  their props into `track()` at construction, which is safe *because* the host waits: a host that
+  rendered the form beside a pending fetch would keep the first values it ever saw, since `effect()`
+  re-runs are not what initialises a control. The alternative — a keyed `<form>` remounting on id
+  change — was rejected: it buys nothing the skeleton does not, and a route hop already replaces the
+  page component.
 - **Description and personality are one field.** `create.md` names them as a single bullet and
   `characterSchema` carries a single `description`; a second write field would be a value the row
   cannot hold. Splitting them is a schema change (row, 28 fixtures, `characterCopySchema`, the detail
@@ -1254,6 +1262,12 @@ these are the drawings.
   `Model luaplot-1`, a tagline, a comment's thread state). A target whose author deleted it is a
   state, not an error: the label stays and the body reads *Its author deleted this — the case stays,
   the content does not.*
+- **The visibility chip is the row's own fact, never the case's** (T-40). Authored items read
+  `Public` / `Private` from `isPublic`; a comment and a post read `Visible` / `Removed` from their
+  `status` (a post has no visibility to set, but T-28B gave it a status). Because *Conclude* re-reads
+  `repo.getReport` **and** the target row and renders both, the panel after a conclusion prints what
+  the conclusion did — `Removed — its whole comment thread went with it.` — with no reload. The
+  earlier `No visibility` over a just-removed post was the panel saying nothing had happened.
 - **Two columns at `md`, one at 360.** `.main` is the case (JEV ledger, the item, the reports);
   `.aside` is the decision panel and the history, 340px and sticky from 900px. At 360 the aside
   flows under the reports — the moderator scrolls once, after reading the evidence. One column,
