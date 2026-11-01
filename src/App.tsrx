@@ -334,8 +334,10 @@ export function App() @{
         color: var(--color-text-muted);
       }
 
+      /* T-37B: the *label* is text and takes the text tier; the 20×2 tick below stays
+         `--color-accent` — a mark may use the mark. */
       .tab.is-active {
-        color: var(--color-accent);
+        color: var(--color-accent-text);
       }
 
       .tab.is-active::before {
@@ -596,9 +598,10 @@ export function App() @{
           color: var(--color-text-muted);
         }
 
+        /* T-37B: the label is text (text tier); the ::before bar is a mark and keeps the accent. */
         .rail-item.is-active {
           background-color: var(--color-surface);
-          color: var(--color-accent);
+          color: var(--color-accent-text);
         }
 
         .rail-label {

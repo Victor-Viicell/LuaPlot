@@ -1636,6 +1636,142 @@ results.push(
   }),
 );
 
+/* ------------------------------------------------------------------------------------------------
+ * T-37B — the accent's **text** tier clears AA in every flavour.
+ *
+ * The accent is a mark colour (fills, strokes, the tab tick, the focus ring) that also carried text:
+ * the active nav label and three link hovers. On Latte the mark measures 4.45:1 on
+ * `--color-bg-elevated` — 0.05 short — so text moved to `--color-accent-text`, which is the mark on
+ * the dark flavours and 85% of it toward `--ctp-text` on the light ones.
+ *
+ * Three things make this row honest:
+ *  - the flavour is chosen by **media emulation** (`Emulation.setEmulatedMedia`), never by writing
+ *    `data-theme`, and the row first refuses to run against a pinned attribute — otherwise the light
+ *    pass would prove Mocha against itself;
+ *  - the Maths runs **in the page** on the *computed* colours, so the numbers under test are the ones
+ *    the reader sees; a host-side table would only re-assert the tokens;
+ *  - the hovered handle is measured through `CSS.forcePseudoState`, so the pair under test is the
+ *    `:hover` rule's colour, not the resting one.
+ *
+ * The unrounded ratio is asserted (4.49 rounds to 4.5) and printed to two decimals.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** sRGB contrast, evaluated in the page: parse the computed `rgb(...)`/`rgba(...)` strings — and
+ *  `color(srgb …)`, which is what Chromium reports for a value that came out of `color-mix()`.
+ *  Reading that as 0–255 bytes would turn a 4.8:1 pair into a fake 17:1. */
+const CONTRAST_FN = `
+  const lin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const bytes = (rgb) => {
+    const s = String(rgb);
+    const nums = s.match(/[0-9.]+/g).map(Number);
+    // color(srgb 0.49 0.23 0.85) is 0-1; rgb(127, 60, 219) is 0-255.
+    return s.indexOf("color(") === 0 ? nums.slice(0, 3).map((n) => n * 255) : nums.slice(0, 3);
+  };
+  const lum = (rgb) => {
+    const m = bytes(rgb);
+    return 0.2126 * lin(m[0]) + 0.7152 * lin(m[1]) + 0.0722 * lin(m[2]);
+  };
+  const contrast = (fg, bg) => {
+    const a = lum(fg), b = lum(bg);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+`;
+
+/** A computed colour as `#rrggbb`, for evidence a human can read (`color(srgb …)` and `rgb(…)`
+ *  both arrive here — the walk measures in whichever space Chromium reports). */
+const cssHex = (value) => {
+  const s = String(value);
+  const nums = (s.match(/[0-9.]+/g) || []).map(Number);
+  const bytes = s.indexOf("color(") === 0 ? nums.map((n) => n * 255) : nums;
+  return "#" + bytes.slice(0, 3).map((n) => Math.round(n).toString(16).padStart(2, "0")).join("");
+};
+
+results.push(
+  await journey("the accent's text tier clears 4.5:1 in both flavours", async () => {
+    await go("/character/catalog");
+    await waitFor(`!!document.querySelector(".tabbar .tab.is-active .tab-label")`, "an active tab label", 8000);
+    await waitFor(`!!document.querySelector(".card a.card-author")`, "a catalog card's author link", 8000);
+
+    // A pinned attribute makes `prefers-color-scheme` inert (`:root:not([data-theme])`), and the light
+    // pass would then measure Mocha. Only /dev/primitives' switch writes it, and no row presses that.
+    const pinned = await js(`return document.documentElement.getAttribute("data-theme");`);
+    if (pinned) {
+      throw new Error(`<html data-theme="${pinned}"> is pinned, so media emulation cannot choose a flavour — reload before measuring`);
+    }
+
+    await send("DOM.enable");
+    await send("CSS.enable");
+    const doc = await send("DOM.getDocument", { depth: 1 });
+    const author = await send("DOM.querySelector", { nodeId: doc.result.root.nodeId, selector: ".card a.card-author" });
+    if (!author.result || !author.result.nodeId) throw new Error("could not resolve a card's author link to a DOM node");
+
+    const seen = [];
+    const flavours = [
+      { scheme: "dark", flavour: "Mocha", base: "#1e1e2e" },
+      { scheme: "light", flavour: "Latte", base: "#eff1f5" },
+    ];
+    try {
+      for (const want of flavours) {
+        await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: want.scheme }] });
+        await sleep(240);
+        // Forced, so the pair is the `:hover` rule's colour rather than the resting `--color-text`.
+        await send("CSS.forcePseudoState", { nodeId: author.result.nodeId, forcedPseudoClasses: ["hover"] });
+        const read = await js(`
+          const label = document.querySelector(".tabbar .tab.is-active .tab-label");
+          const tab = label.closest(".tab");
+          const plate = tab.closest(".tabbar");
+          const link = document.querySelector(".card a.card-author");
+          const card = link.closest(".card");
+          const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
+          return {
+            text: label.innerText.trim(),
+            label: cs(label).color,
+            plate: cs(plate).backgroundColor,
+            mark: cs(tab, "::before").backgroundColor,
+            author: cs(link).color,
+            cardBg: cs(card).backgroundColor,
+            base: getComputedStyle(document.documentElement).getPropertyValue("--ctp-base").trim(),
+            scheme: getComputedStyle(document.documentElement).colorScheme,
+          };
+        `);
+        const ratios = await js(`${CONTRAST_FN}
+          return {
+            tab: contrast(${JSON.stringify(read.label)}, ${JSON.stringify(read.plate)}),
+            hover: contrast(${JSON.stringify(read.author)}, ${JSON.stringify(read.cardBg)}),
+          };
+        `);
+
+        // The flavour actually landed (a green row against the wrong palette would prove nothing).
+        if (read.base.toLowerCase() !== want.base) {
+          throw new Error(`the ${want.scheme} emulation landed on --ctp-base ${read.base}, not ${want.base} (${want.flavour}): the flavour did not switch`);
+        }
+        if (read.scheme !== want.scheme) {
+          throw new Error(`the ${want.scheme} emulation asserts color-scheme ${read.scheme}`);
+        }
+        if (!(ratios.tab >= 4.5)) {
+          throw new Error(`${want.flavour}'s active tab label "${read.text}" measures ${ratios.tab.toFixed(2)}:1 (${read.label} on ${read.plate}), under AA 4.5`);
+        }
+        if (!(ratios.hover >= 4.5)) {
+          throw new Error(`${want.flavour}'s hovered card author measures ${ratios.hover.toFixed(2)}:1 (${read.author} on ${read.cardBg}), under AA 4.5`);
+        }
+        // The mark must not follow the text. On the dark flavours the two tiers are the same value by
+        // design (the mark already reads as text), so the direction only has to be proved where they
+        // differ: on light the label must sit **darker** than the tick it belongs to.
+        if (want.scheme === "light" && read.mark === read.label) {
+          throw new Error(`${want.flavour}: the tab tick and the label are the same colour (${read.mark}) — the text tier did not diverge from the mark`);
+        }
+        seen.push(`${want.flavour} ${read.base} "${read.text}" ${ratios.tab.toFixed(2)}:1 (label ${cssHex(read.label)}, tick ${cssHex(read.mark)}), hovered @author ${ratios.hover.toFixed(2)}:1`);
+        await send("CSS.forcePseudoState", { nodeId: author.result.nodeId, forcedPseudoClasses: [] });
+      }
+    } finally {
+      // A leaked media emulation is the same trap as a leaked viewport override.
+      await send("Emulation.setEmulatedMedia", { features: [] });
+      await sleep(240);
+    }
+    return seen.join(" · ");
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -1657,9 +1793,9 @@ chrome.kill("SIGKILL");
  * The walk's own arithmetic: **every** row has to exist and pass. Keeping the count explicit (rather
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
- * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30).
+ * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31).
  */
-const EXPECTED_ROWS = 30;
+const EXPECTED_ROWS = 31;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

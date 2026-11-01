@@ -19,7 +19,8 @@ semantic aliases only.** Flavours: Mocha (default dark), Latte, Frappé, Macchia
 `data-theme` on `<html>`; with no attribute the app follows `prefers-color-scheme`.
 
 - Accent (`--ctp-mauve`) is for the one primary action per screen, active nav, and focus. Never
-  for decoration.
+  for decoration. **Dark flavours only, the same token is text; the light flavours use
+  `--color-accent-text` for text and keep `--color-accent` for marks** (see *Contrast*).
 - Surfaces: `--color-bg` page, `--color-bg-elevated` panels, `--color-surface` inputs and cards.
 - Danger is `--ctp-red` and is only for destructive actions, moderation states, and errors.
 
@@ -40,9 +41,24 @@ WCAG AA wants **4.5:1** for text under 18.66px — which is all of this app's ty
   **4.09:1 on Latte** with crust. base gives 8.07 / 4.79 / 5.60 / 6.84 across the four flavours.
 - `--color-avatar-text` (`muted`, `--ctp-text` in light flavours) exists because initials are text
   on `--color-surface` where the muted tier measured 4.05:1 on Latte.
-- **Known gap, filed as T-37B:** Latte's active tab label (`--color-accent` on
-  `--color-bg-elevated`) is **4.45:1**, 0.05 short, and Latte has no darker mauve. Nothing else in
-  the default (Mocha) flavour fails: a full six-page walk at 360×740 finds **0** failing text pairs.
+- **`--color-accent-text` (T-37B) is the accent's text tier.** The accent is a *mark* colour — fills,
+  strokes, the 20×2 tab tick, the 2px rail bar, the focus ring — and it also carries text. On the
+  light flavours the mark is too close to the surface under it, so text takes a derived tier: the
+  mark itself on Mocha/Frappé/Macchiato, and `color-mix(in srgb, var(--ctp-mauve) 85%,
+  var(--ctp-text))` on Latte = `#7f3cdb`, **4.83:1** on `--color-bg-elevated` and **5.20:1** on the
+  page, where the raw mark measured **4.45:1**. Measured in the page by smoke row 31, per flavour,
+  through `Emulation.setEmulatedMedia`:
+  `Mocha #cba6f7 8.64:1 · Latte #7f3cdb 4.83:1`.
+  - **Mix toward `--ctp-text`, never toward `--ctp-crust`.** Crust is the *lightest* Latte step, so a
+    mix toward it lightens the accent and *loses* contrast (3.82:1) — the inverse of the same move on
+    a dark flavour.
+  - Text uses `--color-accent-text`; **nothing that is a fill may**. A darker mauve behind
+    `--color-accent-contrast` drops the primary button's label to ~2:1.
+  - **Two pairs still short, measured and recorded rather than hidden:** at `md` the active rail row
+    paints `--color-surface` behind its label, where even the text tier is **3.81:1** on Latte (the
+    fill is the md indicator, so the fix is a filled-row decision, not a token); and the base
+    `a { color: var(--color-accent) }` rule — every link that has no class of its own — still paints
+    the mark at **4.45:1**, with `a:hover` (lavender) at **2.62:1**. Filed as T-37C.
 
 ## Type
 

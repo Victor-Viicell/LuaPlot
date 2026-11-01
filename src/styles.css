@@ -53,6 +53,14 @@
     --color-text-subtle: var(--color-text-muted);
     --color-accent: var(--ctp-mauve);
     --color-accent-hover: var(--ctp-lavender);
+    /* T-37B: the accent is a **mark** colour that also carried text (the active nav label, three
+       link hovers). On the light flavours the mark is too close to the surface it sits on, so text
+       has its own tier: identical to the mark on the three dark flavours, one step darker on the
+       light ones (see the `latte` block and the `prefers-color-scheme: light` block below, where
+       it is a `color-mix` **toward `--ctp-text`** — mixing toward `--ctp-crust` in a light flavour
+       *lightens* it and loses contrast, which is the inverse of the same edit on dark).
+       Text uses this token; fills, strokes, the tab tick and the focus ring keep `--color-accent`. */
+    --color-accent-text: var(--ctp-mauve);
     /* T-37: crust on mauve measured 4.09:1 on Latte (the primary button's label).
        base is the same step every flavour already draws the button on: 8.07 / 4.79 / 5.60 / 6.84. */
     --color-accent-contrast: var(--ctp-base);
@@ -107,6 +115,10 @@
            short (4.05) — recorded in docs/PROGRESS.md, not faked with a hex. */
         --color-text-muted: var(--ctp-subtext-1);
         --color-avatar-text: var(--ctp-text);
+        /* T-37B: mauve on this flavour's --color-bg-elevated measures 4.45:1 — 0.05 short of AA, and
+           there is no darker mauve in the palette. 85/15 toward --ctp-text keeps the hue and lands
+           #7f3cdb: 4.83:1 on bg-elevated, 5.20:1 on the page. */
+        --color-accent-text: color-mix(in srgb, var(--ctp-mauve) 85%, var(--ctp-text));
     }
 }
 
@@ -144,6 +156,9 @@
        short (4.05) — recorded in docs/PROGRESS.md, not faked with a hex. */
     --color-text-muted: var(--ctp-subtext-1);
     --color-avatar-text: var(--ctp-text);
+    /* T-37B: the same mix as the `prefers-color-scheme: light` block — this is the same flavour
+       stated twice, so the two blocks must never disagree. */
+    --color-accent-text: color-mix(in srgb, var(--ctp-mauve) 85%, var(--ctp-text));
 }
 
 :root[data-theme="frappe"] {
@@ -178,6 +193,9 @@
     /* T-37: subtext-0 measured 4.26:1 on this flavour's card surface, so the prose tier
        takes subtext-1 (6.75 page / 5.19 card) and the label tier follows it. */
     --color-text-muted: var(--ctp-subtext-1);
+    /* T-37B: dark flavours already read the mark as text (8.64:1 on Mocha's bg-elevated), so the
+       text tier is the mark itself — declared here so every flavour states its own answer. */
+    --color-accent-text: var(--ctp-mauve);
 }
 
 :root[data-theme="macchiato"] {
@@ -208,6 +226,7 @@
     --ctp-blue: #8aadf4;
     --ctp-lavender: #b7bdf8;
     color-scheme: dark;
+    --color-accent-text: var(--ctp-mauve);
 }
 
 :root[data-theme="mocha"] {
@@ -238,6 +257,7 @@
     --ctp-blue: #89b4fa;
     --ctp-lavender: #b4befe;
     color-scheme: dark;
+    --color-accent-text: var(--ctp-mauve);
 }
 
 *,
@@ -849,8 +869,10 @@ a.card-title:hover {
     white-space: nowrap;
 }
 
+/* T-37B: a hovered handle is text, so it takes the text tier — on Latte the mark measured 4.45:1
+   on this card's backplate. */
 a.card-author:hover {
-    color: var(--color-accent);
+    color: var(--color-accent-text);
 }
 
 .card-ratio {
@@ -1102,9 +1124,10 @@ a.persona-card-open:hover {
     white-space: nowrap;
 }
 
+/* T-37B: both are text on a card's backplate, so both take the text tier. */
 .post-author:hover,
 a.post-time:hover {
-    color: var(--color-accent);
+    color: var(--color-accent-text);
 }
 
 /* The timestamp is the second way into the post, so a post with no comments is still reachable. */

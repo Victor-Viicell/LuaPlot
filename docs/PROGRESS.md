@@ -3,6 +3,31 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-37B: the accent gets a text tier, and the light flavour clears AA
+
+- **Changed:** `--color-accent-text` is declared in all six blocks of `src/styles.css` (the dark
+  default, Frappé, Macchiato, Mocha = the mark; the `prefers-color-scheme: light` block and `latte`
+  = `color-mix(in srgb, var(--ctp-mauve) 85%, var(--ctp-text))`, `#7f3cdb`). The active nav **label**
+  (`.tab.is-active`, `.rail-item.is-active` in `App.tsrx`) and three text hovers
+  (`a.card-author:hover`, `.post-author:hover`, `a.post-time:hover`) use it; every mark — the tab
+  tick, the rail bar, `.btn-primary`'s fill, the focus ring — keeps `--color-accent`. `DESIGN.md` →
+  *Tokens* + *Contrast* carry the token and the measured pairs, `SHIP-PLAN` ticks T-37B,
+  `scripts/smoke.mjs` grows row 31 (`EXPECTED_ROWS = 31`).
+- **Verified how:** `./scripts/check.sh` GREEN. Local walk **31/31**; row 31 prints
+  `Mocha #1e1e2e "Catalog" 8.64:1 (label #cba6f7, tick #cba6f7), hovered @author 8.64:1 · Latte
+  #eff1f5 "Catalog" 4.83:1 (label #7f3cdb, tick #8839ef), hovered @author 4.83:1`. Proved **red**
+  first: with the tier set back to `var(--ctp-mauve)` the row failed `Latte's active tab label
+  "Catalog" measures 4.45:1 (rgb(136, 57, 239) on rgb(230, 233, 239)), under AA 4.5` — the ticket's
+  own number, reproduced from the page. The mix was chosen against a computed table, not by eye:
+  88/12 gives 4.74 and 85/15 gives 4.83, while **mixing toward `--ctp-crust` lightens** a light
+  flavour (3.82) and would have made it worse.
+- **Not verified:** two pairs in the same tier stay short and are recorded, not fixed — the `md` rail
+  label on `--color-surface` (3.81:1 on Latte; needs a filled-row decision) and the base
+  `a { color: var(--color-accent) }` rule (4.45:1, `a:hover` 2.62:1) — filed as T-37C. The
+  `color(srgb …)` form Chromium reports for a `color-mix()` value is parsed explicitly in
+  `CONTRAST_FN`; reading it as bytes produced a fake **17.23:1** on the first run and that is why the
+  row asserts the unrounded ratio from the page, not a table.
+
 ## 2026-11-01 — T-47: every target inside a card reaches 44px
 
 - **Changed:** `.card-foot` is a 44px band (`min-height`, `padding-top` removed — the band *is* the

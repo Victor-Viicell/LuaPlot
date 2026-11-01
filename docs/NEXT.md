@@ -1,68 +1,78 @@
 # Baton — what the next session does
 
-**T-37B is the one ticket.** T-47 closed the last measured defect on the board that needed no
-backend, no toolchain and no dependency: every target inside a card is 44px and the drawing stayed
-the same size. What remains is either blocked (Supabase, Android, a plugin dependency) or a design
-decision. **T-37B is the one decision that is now cheap to take**, because the fix is a token, the
-accept is a number, and the walk can measure it — the same shape as T-47.
+**T-37C is the one ticket.** T-37B built the accent's text tier and moved the nav label and three
+hovers onto it: the tab label now measures **4.83:1** on Latte where it measured 4.45, proved by
+smoke row 31 in the page, per flavour. That gave the tier a home — and, while measuring, it found
+**two more pairs that are still short on the same tier**. T-37C finishes the sweep. It needs no
+backend, no toolchain and no dependency, and the walk can measure both halves.
 
-## T-37B — the light flavours' accent text clears 4.5:1
+## T-37C — the rest of the accent's text joins the tier
 
-**Why it is next.** It is the only unchecked item in P6 that is neither backend nor toolchain, and it
-is the last known WCAG failure in the app. `docs/DESIGN.md` → *Contrast* records it as 0.05 short:
-Latte's active tab label is `--color-accent` (`--ctp-mauve`) on `--color-bg-elevated`, which measures
-**4.45:1** where AA wants 4.5. Every other pair in every flavour measures clean (T-37 walked six
-pages at 360×740 and found 0 failing pairs in Mocha).
+**Why it is next.** It is the last unchecked item in P6 that is neither backend nor toolchain, and it
+is the same defect T-37B just fixed, one surface over. Two measured failures are already recorded in
+`docs/DESIGN.md` → *Contrast*:
 
-**What is wrong.** The accent is a *mark* colour used as a *text* colour. On dark flavours
-`--ctp-mauve` is light enough to read; on Latte the same token is dark-on-light and lands 0.05 short —
-which is the one place the palette's design (an accent for strokes and fills) meets this app's
-decision (accent also carries the active label, `DESIGN.md` → *Tokens*).
+- **The base link rule.** `src/styles.css`: `a { color: var(--color-accent) }` — every link that has
+  no class of its own — paints the **mark** as text: **4.45:1** on Latte's `--color-bg-elevated` and
+  **3.51:1** on `--color-surface`. Its hover, `a:hover { color: var(--color-accent-hover) }`
+  (lavender), is **2.62:1** on bg-elevated — the worst pair in the app.
+- **The `md` rail label.** `.rail-item.is-active` paints `--color-surface` behind the label. Even the
+  new tier measures **3.81:1** there on Latte (the mark was 3.51), so this one is **not** a token
+  swap: the fill is the row's only `md` indicator (the 2px bar appears at `lg`), and a light-filled
+  row cannot carry accent text at 4.5 with this palette.
 
-**The decision (take it, do not re-open it in the baton).** Add a **derived, flavour-specific text
-tier** rather than a hex: `--color-accent-text`, defined as `--ctp-mauve` in the three dark flavours
-and as `color-mix(in srgb, var(--ctp-mauve) 88%, var(--ctp-crust))` (or whatever mix measures ≥ 4.6)
-in Latte. Then:
+**The decision (take it, do not re-open it in the baton).**
 
-- the **label** of the active nav destination (tab bar, `md` rail, `lg` sidebar) uses
-  `--color-accent-text`;
-- the **marks** keep `--color-accent` unchanged — the 20×2px tick above the icon, the 2px left bar at
-  `lg`, the `CatalogSwitch` underline, the `.btn-primary` fill, the focus ring. Nothing about the
-  accent's job changes, only which tier text may use.
-- `--color-accent-text` also covers the two `:hover` colours that currently paint text in
-  `--color-accent` (`a.card-author:hover`, `.post-author:hover`, `.post-time:hover`) — they are text
-  and they carry the same 4.45 problem on Latte's card surface.
+1. **Text** goes to `--color-accent-text`: `a`, and a hover that is text. The hover needs a tier of
+   its own — do **not** point `a:hover` at `--color-accent-hover` (lavender is 2.62:1 on Latte and
+   8.1:1 on Mocha, so it cannot be one value). Declare `--color-accent-hover-text` beside
+   `--color-accent-text` in every flavour block: the mark's hover value on dark, and a mix toward
+   `--ctp-text` on Latte that measures ≥ 4.6 on **both** `--color-bg-elevated` and `--color-surface`
+   (that is what "a link on a card" means). Compute the mix, do not guess: 85/15 landed 4.83 / 3.81,
+   so this hover needs roughly **55/45** to clear a card backplate — check the number before shipping
+   and if the hue goes muddy, say so in DESIGN and ship the surface change instead.
+2. **The `md` rail** stops filling. Either drop the `--color-surface` backplate on light flavours or
+   move the active indicator to a **mark** (a left bar, as `lg` already draws) so the label sits on
+   `--color-bg-elevated` (4.83). Record whichever in `docs/DESIGN.md` → *Layout law*, because it is a
+   design decision, not a token.
+3. **Every remaining `color: var(--color-accent)` is text.** Sweep them in the same commit:
+   `.persona-card-mark`, `a.persona-card-open:hover`, `.post-comments:hover`,
+   `.tab-pill[aria-selected="true"] .tab-count`. Nothing that is a **fill** moves —
+   `.btn-primary`, `.toggle-track`, `.cat-tab::after`, `.tab-pill::after`, the input focus borders,
+   the tab tick, the rail bar and the focus ring all keep `--color-accent`.
 
 **Approach**
 
-1. Declare the token in every flavour block in `src/styles.css` (Mocha, Macchiato, Frappé, Latte and
-   the `prefers-color-scheme` default), never a hex in a page. `docs/DESIGN.md` → *Token*s and
-   *Contrast* get the token and the measured number in the same commit.
-2. Sweep the label usage: `.tab.is-active`, `.rail-link.is-active`, `.nav-link.is-active` (whatever
-   the shell calls them — read `App.tsrx`) and the three hover rules above. **Do not** touch
-   `--color-accent` on any mark.
-3. Add **walk row 31**: for each flavour (`Emulation.setEmulatedMedia` with
-   `prefers-color-scheme: light` for Latte, dark for Mocha — the same mechanism the T-37 audit used),
-   read `getComputedStyle` of the active tab label's `color` and the tab backplate's
-   `background-color`, compute the contrast ratio **in the page** and assert ≥ 4.5; print the ratio per
-   flavour as the evidence. Bump `EXPECTED_ROWS` to 31.
-4. Nothing else: no layout change, no dependency, no second font.
+1. `src/styles.css` + `src/App.tsrx`: the two tokens in all six blocks, then the sweep above.
+2. **Extend smoke row 31** (do not add a row — the row already owns the flavoured contrast proof):
+   measure `a` and `a:hover` with `CSS.forcePseudoState`, on `/character/catalog` where a printed
+   link sits on a card, and assert ≥ 4.5 per flavour. Extend the `md` half with
+   `Emulation.setDeviceMetricsOverride` at 900 **inside the same `try`/`finally`** as the media
+   emulation, and assert the rail label clears 4.5 after your fill decision. Keep `EXPECTED_ROWS`
+   at 31 — a row that grows is a row, a row that multiplies is a trap.
+3. `docs/DESIGN.md` → *Contrast* carries the new pairs and the measured numbers in the same commit.
 
 **Traps**
 
-- **A flavour is measured through `Emulation.setEmulatedMedia`**, never by writing `data-theme` from
-  JS (failure bank: T-37). If a flavour is only settable by `data-theme`, say so and use the dev
-  gallery's switch — but the walk's proof must be a media emulation.
-- **`--color-accent-text` must not be used for a fill.** A darker mauve behind `--color-accent-contrast`
-  text drops that pair to ~2:1; the primary button keeps `--color-accent`.
-- **The contrast maths must live in the page expression**, not in the walk's host side: the numbers
-  under test are the *computed* colours, and a host-side table would only re-assert the tokens.
-- **A ratio of 4.49 rounds to 4.5** — assert the unrounded value and print two decimals.
-- **Latte is not the only light flavour under `prefers-color-scheme: light`** — check which flavour
-  the media query actually lands on before asserting, or the row proves Mocha against itself.
+- **`color-mix()` computes to `color(srgb 0.49 0.23 0.85)`**, 0–1 floats, not `rgb(…)`. Parsing that
+  as bytes turned 4.83:1 into a fake **17.23:1** on T-37B's first run — `CONTRAST_FN` in
+  `scripts/smoke.mjs` now handles both forms; reuse it, never re-roll it.
+- **Mix toward `--ctp-text`, never `--ctp-crust`,** to darken a light flavour. Crust is the lightest
+  Latte step: mixing toward it *lightens* the accent (88/12 → 3.82:1) and makes the pair worse.
+- **`CSS.forcePseudoState` is the honest way to measure `:hover`** and needs both `DOM.enable` and
+  `CSS.enable` first; resolve the node with `DOM.getDocument` + `DOM.querySelector`. Release it with
+  `forcedPseudoClasses: []` or the next row inherits a hovered element.
+- **Assert the flavour actually landed** (`--ctp-base` is `#1e1e2e` dark / `#eff1f5` light) before
+  trusting a ratio: a light pass that never switched measures Mocha against itself.
+- **A red walk first.** T-37B set the tier back to `var(--ctp-mauve)` and watched row 31 read
+  `4.45:1` before restoring — do the same for the new pairs, and remember a `replace` across the
+  whole stylesheet hits the **dark** blocks too (that mistake made the dark flavour print `9.09:1`
+  with `#cbadf7`: the fix is context-anchored, not a global swap).
+- **No regex escapes inside the `CONTRAST_FN` template literal** — one `\\` inside a template string
+  is a double-escaping trap; `s.indexOf("color(") === 0` is what shipped.
 
 **Accept:** `./scripts/check.sh` GREEN, walk **31/31** locally **and** `--live`, row 31 printing the
-ratio per flavour at ≥ 4.5, `publish.sh` prints `LIVE`, `curl` 200.
+`a`/`a:hover`/rail ratios per flavour at ≥ 4.5, `publish.sh` prints `LIVE`, `curl` 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -118,23 +128,46 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   from the log before comparing. Do not pin a character id.
 - **The breakpoint row owns a CDP override.** Anything added after it must assume the session is back
   at 360×740; the row asserts that it cleared (`window.innerWidth === restore`) rather than trusting
-  the `finally`. T-47's row 30 takes its own 360×740 override and clears it for the same reason.
+  the `finally`. T-47's row 30 takes its own 360×740 override and clears it for the same reason, and
+  T-37B's row 31 owns a **media** emulation with the same discipline (`features: []` in `finally`).
 - **`follow()` drops the fragment on purpose** — a `/terms#anchor` link must stay a real document
   navigation (or gain scroll handling nothing needs yet). `ARCHITECTURE.md` → Router carries the rule
   and the three exemptions `scripts/link-check.mjs` encodes (fragment, `target=`, external).
 - **A card's ratio rounds to whole percent**, so a one-vote change can leave the printed number
   identical (96% → 96%). A journey proving an engagement write must read a count (the detail page's
   Likes/Dislikes cells), never a card's percentage.
-- **Row count is 30 (T-47).** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a row
-  that stops running is a red walk — bump it in the same commit as the row (31 when T-37B adds one).
+- **Row count is 31 (T-37B).** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a row
+  that stops running is a red walk — bump it in the same commit as the row, and **extend** an
+  existing row rather than adding a near-copy of it.
 - **A 44px band is `line-height`/`min-height`, not `padding`.** Vertical padding on an inline `<a>` is
   hit-testable but invisible to layout, so a row that measures `getBoundingClientRect()` would pass
   while the row still collapsed; a flex item with `line-height: 44px` is the band the walk can see.
   A band that only hugs its text is still a small target: `flex: 1 1 auto` is what makes it 44 **wide**
   (T-47's first run failed at 36px wide on `@you`).
+- **A token tier has a *surface* limit, not just a flavour limit.** `--color-accent-text` clears AA on
+  `--color-bg` (5.20) and `--color-bg-elevated` (4.83) in Latte, and does **not** on
+  `--color-surface` (3.81) — the same surface where `--color-text-muted` already fails (4.05). Latte's
+  `surface-0` (`#ccd0da`) is the app's worst backplate; text above it should move to a fill-free
+  layout rather than a darker token.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A `color-mix()` value computes to `color(srgb 0.49 0.23 0.85)`** — 0–1 floats. A contrast helper
+  that assumes 0–255 bytes reads it as near-black and reports a fake **17.23:1**. `CONTRAST_FN` in
+  `scripts/smoke.mjs` branches on `indexOf("color(") === 0`; a regex escape inside that template
+  literal is a double-escaping trap that produced exactly this bug twice.
+- **`CSS.forcePseudoState` (`DOM.enable` + `CSS.enable` + `DOM.querySelector`) measures a `:hover`
+  pair without a synthetic mouse** — the only honest way to assert a hover colour, and it must be
+  released (`forcedPseudoClasses: []`) before the next measurement.
+- **`Emulation.setEmulatedMedia { features: [{ name: "prefers-color-scheme", value }] }` is the
+  flavour switch**; `features: []` clears it. Assert `--ctp-base` (`#1e1e2e` / `#eff1f5`) plus
+  `color-scheme` to prove the pass really changed palette — a pinned `<html data-theme>` makes the
+  media query inert and the row refuses to run against one.
+- **Mixing toward `--ctp-crust` lightens a light flavour.** The mark's text tier darkens by mixing
+  toward `--ctp-text`; the inverse reads like progress and measures worse (3.82 vs 4.83).
+- **A global `s.replace` across `src/styles.css` hits the dark blocks too.** Restoring "the raw
+  declaration" everywhere put the mix on Mocha and printed `9.09:1` with `#cbadf7` — anchor the
+  replace on surrounding context (the flavour's `--ctp-lavender` line) or by line number.
 - **A URL assertion cannot see a re-boot.** `waitUrl` is a substring match and a fresh document loads
   the same route; T-45 proves a push with **document identity** (`window` marker +
   `performance.timeOrigin`), and `performance.getEntriesByType("navigation")[0].type` is `navigate`
@@ -143,11 +176,12 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   row 28 with all 28 green still exited 1. It is `EXPECTED_ROWS` now — bump it with the row.
 - **A red walk proves the assertion; a green one does not.** T-45 removed the `onClick`, rebuilt, and
   watched row 1 fail with the document dump before restoring it; T-47 set the band back to
-  `line-height: 1.3` and watched row 30 read `16px tall` before restoring `44px`. Do that for any new
-  invariant — and restore the exact bytes that passed, so the green run stays the proof.
+  `line-height: 1.3` and watched row 30 read `16px tall`; T-37B put Latte's tier back on the mark and
+  watched row 31 read `4.45:1`. Do that for any new invariant — and restore the exact bytes that
+  passed, so the green run stays the proof.
 - **Bare anchors are gone (T-46):** 52 internal anchors pair `href` with `follow`, `EmptyState` takes
   a **path** (`to=`) so its call sites cannot regress, and gate section 7 fails on a new one.
-  The static check is the guard the walk cannot be: 30 rows cannot visit every page.
+  The static check is the guard the walk cannot be: 31 rows cannot visit every page.
 - **The webview stores `luaplot.session` as UTF-16LE in a SQLite table** (`localstorage/
   http_localhost_1420.localstorage`, `ItemTable`), so `quote(value)` returns hex — decode before
   comparing, or a correct proof reads as a corrupt one. On Pages the same key lives in the browser
@@ -166,15 +200,13 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   accept command is `bun run tauri dev`; and `dist` must be built **without** `LUAPLOT_BASE` for Tauri
   (the app is served from `tauri://localhost`, so `/LuaPlot/assets/…` 404s).
 - **The desktop is drivable from cron without a display** — see *Driving the desktop window* above.
-  `hyprctl clients -j` is the machine-readable proof (`{class:"luaplot", mapped:true}`; geometry is
-  `at`/`size`, **not** `x`/`width`, which come back `null` and read like a 0×0 window).
 - **A tiling compositor overrides the configured window size.** `tauri.conf.json` asks for 1200×900 and
   Hyprland maps it at 941×1030. That is the WM, not a config bug — the *floor* (`minWidth`/`minHeight`)
   and the label are the parts the app controls, which is why `scripts/tauri-config.mjs` asserts those.
 - **`pkill -f vite` kills the tick's own shell**, because the pattern matches the command line that is
   running it. Kill a preview by port: `lsof -ti:4321 | xargs -r kill`. Use `pkill -x luaplot` for the app.
 - **Never pipe `scripts/smoke.sh` into `tail`/`head`/`grep`.** A pipeline hands back the *pager's*
-  status, so a red walk exits 0, and `smoke: N/30 journeys` is the first line the pipe drops — the run
+  status, so a red walk exits 0, and `smoke: N/31 journeys` is the first line the pipe drops — the run
   looks green and proves nothing. Redirect to a file, then read the file and the exit code.
 - **T-44's walk helpers are the ones to reuse**: `setToggle(label, want)` / `toggleState` (press a
   `button.toggle`, then **poll the rendered `aria-pressed`**), `storeCell(label)`, `coveredCards()`,

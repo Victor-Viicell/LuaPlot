@@ -247,10 +247,10 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 
 - [x] **T-37 Accessibility + perf pass.** Focus order, labels, contrast ≥ 4.5, bundle < 300KB gz,
       no layout shift on fonts.
-- [ ] **T-37B Light-flavour contrast.** Latte's active tab label is 4.45:1 (`accent` on
-      `bg-elevated`) and its `--color-surface` cannot carry the prose tier (4.05); dark flavours
-      measure clean. Needs a decision — a darker light-mode accent ramp, or a lighter surface —
-      not a hex in a page.
+- [x] **T-37B Light-flavour contrast.** `--color-accent-text` is the accent's text tier — the mark on
+      dark flavours, `color-mix(… 85%, --ctp-text)` on Latte (`#7f3cdb`) — used by the active nav
+      label and three link hovers; marks keep `--color-accent`. Smoke row 31 measures the tab pair in
+      the page per flavour via media emulation: Mocha 8.64:1, Latte 4.83:1 (was 4.45).
 - [x] **T-38 End-to-end smoke.** Scripted walk of the 12 primary journeys against the Pages build.
       — `scripts/smoke.mjs` (+ `scripts/smoke.sh`, `bun run smoke`) walks all twelve in one session at
       360×740 and asserts on the DOM at every step; 12/12, ~7s; `--live` walks the published URL.
