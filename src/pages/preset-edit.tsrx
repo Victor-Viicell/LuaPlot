@@ -3,7 +3,7 @@ import { PresetForm } from "../components/PresetForm.tsrx";
 import { Button } from "../components/Button.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Preset } from "../lib/data/types.ts";
 import { currentUser } from "../lib/state/session.ts";
@@ -102,19 +102,19 @@ export function PresetEdit() @{
       <EmptyState
         message="This preset doesn't exist."
         actionLabel="Back to catalog"
-        href={href("/preset/catalog")}
+        to="/preset/catalog"
       />
     } @else if (phase.value === "forbidden") {
       <EmptyState
         message="This preset isn't yours to edit."
         actionLabel="Back to catalog"
-        href={href("/preset/catalog")}
+        to="/preset/catalog"
       />
     } @else if (phase.value === "error") {
       <EmptyState
         message="This preset couldn't be loaded. Try again from the catalog."
         actionLabel="Back to catalog"
-        href={href("/preset/catalog")}
+        to="/preset/catalog"
       />
     } @else {
       <>

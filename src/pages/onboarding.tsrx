@@ -3,7 +3,7 @@ import { Button } from "../components/Button.tsrx";
 import { Field } from "../components/Field.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
 import { Toggle } from "../components/Toggle.tsrx";
-import { href, navigate } from "../router.ts";
+import { follow, href, navigate } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import { currentUser, setAccount } from "../lib/state/session.ts";
 import { nsfwPreference, onPrefs, setBlurNsfw, setShowNsfw } from "../lib/state/prefs.ts";
@@ -492,7 +492,7 @@ export function Onboarding() @{
               {busy.value ? "Saving…" : "Finish"}
             </Button>
             <p class="note">
-              By finishing you accept the <a href={href("/terms")}>terms of use</a>. Both
+              By finishing you accept the <a href={href("/terms")} onClick={follow("/terms")}>terms of use</a>. Both
               preferences can be changed later in account settings; only the handle and the name are
               required.
             </p>

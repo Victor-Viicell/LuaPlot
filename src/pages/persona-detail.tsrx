@@ -5,7 +5,7 @@ import { DeleteRow } from "../components/DeleteRow.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Sheet } from "../components/Sheet.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { follow, href, navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Character, Persona } from "../lib/data/types.ts";
 import { currentUser } from "../lib/state/session.ts";
@@ -154,12 +154,12 @@ export function PersonaDetail() @{
         <EmptyState
           message="This persona doesn't exist in your collection."
           actionLabel="Back to personas"
-          href={href("/persona")}
+          to="/persona"
         />
       } @else if (phase.value === "error") {
         <div class="alert" role="alert">
           <p class="alert-text">This persona couldn't be loaded.</p>
-          <a class="btn btn-secondary" href={href("/persona")}>Back to personas</a>
+          <a class="btn btn-secondary" href={href("/persona")} onClick={follow("/persona")}>Back to personas</a>
         </div>
       } @else {
         <>
@@ -219,7 +219,7 @@ export function PersonaDetail() @{
 
           @if (choices.value.length === 0) {
             <p class="picker-note">
-              No characters yet. <a class="picker-link" href={href("/character/create")}>Create one</a>.
+              No characters yet. <a class="picker-link" href={href("/character/create")} onClick={follow("/character/create")}>Create one</a>.
             </p>
           } @else {
             <ul class="picker-list">

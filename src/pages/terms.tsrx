@@ -1,6 +1,6 @@
 import { effect } from "ripple";
 import { currentUser } from "../lib/state/session.ts";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import { TERMS_RULES } from "../lib/schema.ts";
 
 /**
@@ -375,7 +375,7 @@ export function Terms() @{
           <p class="note-body">
             {`The flag is what makes the viewer's own `}
             @if (settingsPath !== "") {
-              <><a href={href(settingsPath)}>NSFW preference</a></>
+              <><a href={href(settingsPath)} onClick={follow(settingsPath)}>NSFW preference</a></>
             } @else {
               <><span>NSFW preference</span></>
             }
@@ -397,7 +397,7 @@ export function Terms() @{
         <section class="note" id="accepting-the-terms">
           <h2 class="note-title">Accepting the terms</h2>
           <p class="note-body">
-            Finishing <a href={href("/onboarding")}>onboarding</a> is the acceptance: that page
+            Finishing <a href={href("/onboarding")} onClick={follow("/onboarding")}>onboarding</a> is the acceptance: that page
             states, beside <strong>Finish</strong>, that continuing accepts these terms, and links
             here. No separate acceptance record is kept and there is no version to accept, so a
             change to the rules is never re-asked — the text as it stands is what applies to

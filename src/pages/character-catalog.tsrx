@@ -501,7 +501,7 @@ export function CharacterCatalog() @{
         <EmptyState
           message="No characters yet."
           actionLabel="Create a character"
-          href={href("/character/create")}
+          to="/character/create"
         />
       } @else {
         <>

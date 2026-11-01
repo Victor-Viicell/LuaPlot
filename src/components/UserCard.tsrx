@@ -1,5 +1,5 @@
 import { Avatar } from "./Avatar.tsrx";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import type { Profile } from "../lib/data/types.ts";
 
 /**
@@ -19,10 +19,10 @@ export function UserCard({ person }: { person: Profile }) @{
 
   <article class="card">
     <div class="card-head">
-      <a class="card-title" href={href(to)}>{person.displayName}</a>
+      <a class="card-title" href={href(to)} onClick={follow(to)}>{person.displayName}</a>
     </div>
 
-    <a class="card-handle" href={href(to)}>{`@${person.handle}`}</a>
+    <a class="card-handle" href={href(to)} onClick={follow(to)}>{`@${person.handle}`}</a>
 
     <div class="card-middle">
       <div class="card-veil">

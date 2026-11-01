@@ -1,6 +1,6 @@
 import { PresetForm } from "../components/PresetForm.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
-import { href, navigate } from "../router.ts";
+import { navigate } from "../router.ts";
 import { currentUser } from "../lib/state/session.ts";
 
 /**
@@ -30,7 +30,7 @@ export function PresetCreate() @{
       <EmptyState
         message="Sign in to create a preset."
         actionLabel="Sign in"
-        href={href("/authentification")}
+        to="/authentification"
       />
     } @else {
       <PresetForm

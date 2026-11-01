@@ -5,7 +5,7 @@ import { EmptyState } from "../components/EmptyState.tsrx";
 import { PostCard } from "../components/PostCard.tsrx";
 import { ReportDialog } from "../components/ReportDialog.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { follow, href, navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import {
   ratioOf,
@@ -463,7 +463,7 @@ export function PostDetail() @{
 
     <div class="detail">
       <header class="head">
-        <a class="back" href={href("/post/thread")}>{"← Thread"}</a>
+        <a class="back" href={href("/post/thread")} onClick={follow("/post/thread")}>{"← Thread"}</a>
       </header>
 
       @if (phase.value === "loading") {
@@ -481,14 +481,14 @@ export function PostDetail() @{
         <EmptyState
           message="This post doesn't exist."
           actionLabel="Back to the thread"
-          href={href("/post/thread")}
+          to="/post/thread"
         />
       } @else if (removed.value) {
         <div class="removed">
           <EmptyState
             message="This post doesn't exist anymore."
             actionLabel="Back to the thread"
-            href={href("/post/thread")}
+            to="/post/thread"
           />
           @if (owner.value) {
             <p class="removed-note">

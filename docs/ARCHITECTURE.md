@@ -56,6 +56,23 @@ query string carries filter/sort state. `base` comes from `import.meta.env.BASE_
 on Pages and `/` in Tauri both work (`href()` prefixes every in-app link). No history rewriting
 beyond `pushState`; `publish.sh` copies `index.html` to `404.html` so deep links resolve on Pages.
 
+**Every in-app anchor is a push (T-46).** An `<a>` carries `href={href(path)}` — a real link, so
+middle-click, back/forward, a crawler and a no-JS visit all work — **and** `onClick={follow(path)}`,
+so a plain press is `pushState` and the running app survives it. A bare anchor is a *document load*:
+the memory adapter re-seeds (half-written form state and the walk's own fixture writes vanish), the
+shell repaints from scratch, and on Pages the reader sees a white flash. Three rules follow:
+
+- **`follow()` takes the app path, never `href(path)`.** `navigate()` adds the base itself, so
+  `follow(href(x))` doubles it (`/LuaPlot/LuaPlot/x`); the preview base `/` hides that completely and
+  only the `--live` walk sees it.
+- **A fragment link stays bare.** `follow()` drops the fragment, so `/terms#rule-2` (the contents
+  list, `ReportDialog`'s *What this asserts*, `moderation-detail`'s rule links) keeps a real
+  navigation and its in-page jump. A component that hands out a link (`EmptyState`) takes the
+  **path** (`to=`), not a finished href, and owns the `href`+`follow` pair itself.
+- **`scripts/link-check.mjs` enforces it** (gate section 7): any `<a>` whose href is dynamic or an
+  internal path without `onClick=` fails the check, except one containing `#`, one with `target=`
+  (a new tab is a document on purpose) and an external `http(s):` destination.
+
 State is a **plain subscribe/notify store** (`currentRoute()`, `onRouteChange()`, `useQuery()`),
 not a tracked value: `track()` must be created inside a component in this Ripple version — a
 module-scope tracked has no owning block and every write to it throws. `App.tsrx` mirrors the store

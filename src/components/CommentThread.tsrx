@@ -8,7 +8,7 @@ import { resolveRepo } from "../lib/data/repo.ts";
 import { read } from "../lib/reactive.ts";
 import { commentWriteSchema } from "../lib/schema.ts";
 import { initialsOf, shortStamp } from "../lib/format.ts";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import { nsfwPreference, onPrefs } from "../lib/state/prefs.ts";
 import { toast } from "../lib/toast.ts";
 import type { Comment, VoteDirection } from "../lib/data/types.ts";
@@ -735,7 +735,7 @@ export function CommentThread({
     <div class="thread">
       @if (!signedIn.value) {
         <p class="signin">
-          <a href={href("/authentification")}>Sign in</a>
+          <a href={href("/authentification")} onClick={follow("/authentification")}>Sign in</a>
           {" to comment, vote or reply."}
         </p>
       } @else {

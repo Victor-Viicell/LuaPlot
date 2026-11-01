@@ -496,7 +496,7 @@ export function LorebookCatalog() @{
         <EmptyState
           message="No lorebooks yet."
           actionLabel="Create a lorebook"
-          href={href("/lorebook/create")}
+          to="/lorebook/create"
         />
       } @else {
         <>

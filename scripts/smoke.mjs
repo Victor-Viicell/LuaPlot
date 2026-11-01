@@ -875,6 +875,38 @@ results.push(
   }),
 );
 
+/**
+ * T-46 — the app-wide half of T-45's lesson, walked from the page a session actually lands on.
+ *
+ * *Edit profile* is the only **primary** action left that was a bare `<a href>`: pressing it
+ * re-booted the app, so the mock re-seeded and any half-written form state vanished. The assertion
+ * is document identity (`expectNoReload`), because `expectPath` alone cannot see a load — a fresh
+ * document at the same path reads green (the T-45 failure bank entry).
+ */
+results.push(
+  await journey("press Edit profile on /user/you (a push, not a load)", async () => {
+    await go("/user/you");
+    await waitText("Edit profile", 8000);
+    const link = await js(`
+      const el = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Edit profile");
+      return el ? { href: el.getAttribute("href") || "" } : null;
+    `);
+    if (!link) throw new Error("/user/you has no Edit profile action");
+    if (!/\/user\/you\/edit$/.test(link.href)) throw new Error(`Edit profile points at ${link.href}`);
+    const mark = await markDocument("profile-edit");
+    await click("Edit profile");
+    await expectPath("/user/you/edit", "Edit profile");
+    await waitText("Edit profile", 8000);
+    await waitFor(
+      `document.querySelector('input[name="displayName"]') !== null`,
+      "the account form's Display name field",
+      8000,
+    );
+    const kept = await expectNoReload(mark, "Edit profile");
+    return `Edit profile pushes to /user/you/edit and mounts the account form; ${kept}`;
+  }),
+);
+
 results.push(
   await journey("publish a post from /post/create", async () => {
     await click("Thread");
@@ -1542,10 +1574,10 @@ chrome.kill("SIGKILL");
 /**
  * The walk's own arithmetic: **every** row has to exist and pass. Keeping the count explicit (rather
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
- * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in the
- * commit that adds or removes a row (T-45: 27 → 28).
+ * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
+ * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29).
  */
-const EXPECTED_ROWS = 28;
+const EXPECTED_ROWS = 29;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

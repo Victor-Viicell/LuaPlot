@@ -413,7 +413,7 @@ export function PostThread() @{
         <EmptyState
           message="No posts yet."
           actionLabel="Write the first one"
-          href={href("/post/create")}
+          to="/post/create"
         />
       } @else {
         <>

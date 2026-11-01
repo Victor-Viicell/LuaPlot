@@ -584,7 +584,7 @@ export function ModerationQueue() @{
         <EmptyState
           message="Only a moderator can open the queue."
           actionLabel="Go home"
-          href={href("/")}
+          to="/"
         />
       } @else if (phase.value === "loading") {
         <ul class="rows" aria-busy="true" aria-label="Loading cases">

@@ -2,7 +2,7 @@ import { track, type Derived } from "ripple";
 import { ratioOf, type AuthoredItem } from "../lib/data/types.ts";
 import { percent } from "../lib/format.ts";
 import { read } from "../lib/reactive.ts";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import { Avatar } from "./Avatar.tsrx";
 import { Button } from "./Button.tsrx";
 
@@ -215,7 +215,7 @@ export function Card({
     }
 
     <div class="card-foot">
-      <a class="card-author" href={href(`/user/${item.author}`)}>{`@${item.author}`}</a>
+      <a class="card-author" href={href(`/user/${item.author}`)} onClick={follow(`/user/${item.author}`)}>{`@${item.author}`}</a>
       <span class="card-ratio">{percent(ratioOf(item))}</span>
     </div>
   </article>

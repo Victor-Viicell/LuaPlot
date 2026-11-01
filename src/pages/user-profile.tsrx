@@ -8,7 +8,7 @@ import { Skeleton } from "../components/Skeleton.tsrx";
 import { PersonaSheet } from "../components/PersonaSheet.tsrx";
 import { Tabs } from "../components/Tabs.tsrx";
 import { UserCard } from "../components/UserCard.tsrx";
-import { href, useParams, useQuery } from "../router.ts";
+import { follow, href, useParams, useQuery } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type {
   AuthoredItem,
@@ -658,10 +658,10 @@ export function UserProfile() @{
                 <button class="btn btn-secondary" type="button" onClick={() => (personasOpen.value = true)}>
                   Personas
                 </button>
-                <a class="btn btn-secondary" href={href(`/user/${handle}/edit`)}>Edit profile</a>
+                <a class="btn btn-secondary" href={href(`/user/${handle}/edit`)} onClick={follow(`/user/${handle}/edit`)}>Edit profile</a>
               </div>
             } @else if (myHandle === "") {
-              <a class="btn btn-primary" href={href("/authentification")}>Sign in to follow</a>
+              <a class="btn btn-primary" href={href("/authentification")} onClick={follow("/authentification")}>Sign in to follow</a>
             } @else {
               <Button
                 variant={following.value ? "secondary" : "primary"}

@@ -3,7 +3,7 @@ import { DeleteRow } from "../components/DeleteRow.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { PersonaForm } from "../components/PersonaForm.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Persona } from "../lib/data/types.ts";
 import { currentUser } from "../lib/state/session.ts";
@@ -84,13 +84,13 @@ export function PersonaEdit() @{
       <EmptyState
         message="This persona doesn't exist in your collection."
         actionLabel="Back to personas"
-        href={href("/persona")}
+        to="/persona"
       />
     } @else if (phase.value === "error") {
       <EmptyState
         message="This persona couldn't be loaded. Try again from your personas."
         actionLabel="Back to personas"
-        href={href("/persona")}
+        to="/persona"
       />
     } @else {
       <>

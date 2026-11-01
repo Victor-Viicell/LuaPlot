@@ -1,6 +1,6 @@
 import { Button } from "./Button.tsrx";
 import { Avatar } from "./Avatar.tsrx";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import type { Persona } from "../lib/data/types.ts";
 
 /**
@@ -44,7 +44,7 @@ export function PersonaCard({
       <div class="persona-card-body">
         <Avatar initials={persona.avatar.initials} size={56} />
         <div class="persona-card-text">
-          <a class="persona-card-name" href={href(path)}>{persona.name}</a>
+          <a class="persona-card-name" href={href(path)} onClick={follow(path)}>{persona.name}</a>
           @if (persona.tagline) {
             <p class="persona-card-tagline">{persona.tagline}</p>
           }
@@ -59,7 +59,7 @@ export function PersonaCard({
         >
           {persona.isDefault ? "Default persona" : "Set as default"}
         </Button>
-        <a class="persona-card-open" href={href(path)}>Open</a>
+        <a class="persona-card-open" href={href(path)} onClick={follow(path)}>Open</a>
       </div>
     </article>
   );

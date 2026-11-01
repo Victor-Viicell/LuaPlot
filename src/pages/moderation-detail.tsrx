@@ -1119,7 +1119,7 @@ export function ModerationDetail() @{
         <EmptyState
           message="Only a moderator can open a case."
           actionLabel="Go home"
-          href={href("/")}
+          to="/"
         />
         </>
       } @else if (phase.value === "notfound") {
@@ -1131,7 +1131,7 @@ export function ModerationDetail() @{
         <EmptyState
           message="This report doesn't exist."
           actionLabel="Back to the queue"
-          href={href(queueHref)}
+          to={queueHref}
         />
         </>
       } @else if (phase.value === "loading") {

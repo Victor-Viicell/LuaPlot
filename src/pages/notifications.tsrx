@@ -463,7 +463,7 @@ export function Notifications() @{
         <EmptyState
           message="Sign in to read your notifications."
           actionLabel="Sign in"
-          href={href("/authentification")}
+          to="/authentification"
         />
       } @else {
         <>

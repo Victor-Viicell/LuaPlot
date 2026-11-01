@@ -3,6 +3,28 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-46: every in-app anchor is a push, not a document load
+
+- **Changed:** all 53 internal anchors now carry `onClick={follow(path)}` beside their real
+  `href={href(path)}` (`Card` author, `UserCard` name/handle, `PersonaCard` name/Open, `PostCard`
+  avatar/author/time/comments/attachment, `user-profile`'s *Edit profile* and *Sign in to follow*,
+  the four catalogs' *Create*, the create/edit pages' back rows, `CommentThread`, `persona-collection`,
+  `bookmarks`, `onboarding`, `authentification`, `terms`, the dev pages, `session-detail`'s speaker and
+  copy rows). `EmptyState` now takes the **app path** (`to=`) and owns the `href`+`follow` pair, so its
+  39 call sites cannot regress; `PostCard` keeps `permalinkPath`/`attach.path` as paths. The three
+  page-local `openLink()` copies of `follow()`'s modifier check are deleted. New
+  `scripts/link-check.mjs` is `check.sh` section 7; `docs/ARCHITECTURE.md` → Router records the rule
+  (app path, never `href(...)`; fragments stay bare; `target=`/external exempt). `EXPECTED_ROWS` 29.
+- **Verified how:** `./scripts/check.sh` GREEN (7 sections, `53 internal anchors are pushes`); the new
+  section was **proved red** first — a scratch `src/pages/fake.tsrx` with one single-line and one
+  multi-line bare anchor exited 1 naming both, while its fragment link and its paired anchor passed.
+  `bash scripts/smoke.sh` **29/29** and `bash scripts/smoke.sh --live` **29/29** on Pages, row 29
+  printing `document kept profile-edit (…, nav navigate)`; `publish.sh` printed `LIVE=`, `curl` 200.
+- **Not verified / found:** row 29's first run failed on `document.querySelector("form")` — the account
+  page draws `.form` as a `div` of `Field`s, not a `<form>` — so the row asserts the `Display name`
+  input by `name`. The walk still cannot see a bare anchor on a page it never visits: `link-check` is
+  the static half and the two together are the guard.
+
 ## 2026-11-01 — T-45: home's entry control pushes instead of re-booting the app
 
 - **Changed:** `src/router.ts` now exports **`follow(to)`** — the one click seam — and `App.tsrx`

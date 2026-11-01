@@ -335,7 +335,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       use it too), the walk proves document identity rather than a URL, and the live walk caught the
       ticket's real trap — `follow(href(x))` doubled the base on Pages. `EXPECTED_ROWS` is now explicit so
       a vanished row is a red walk instead of a green one.
-- [ ] **T-46 Every in-app link is a push, not a load.** T-45 gave the app one seam (`follow()` in
+- [x] **T-46 Every in-app link is a push, not a load.** T-45 gave the app one seam (`follow()` in
       `router.ts`) and converted home; ~30 anchors remain bare — *Edit profile* on your own profile,
       the catalogs' *Create* buttons, the signed-out *Sign in* buttons on the create pages, and the
       card title/handle/author links. Each is a document load: the mock re-seeds and the shell
@@ -345,6 +345,12 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       proved red against a broken copy, and walk row 29 presses *Edit profile* and proves no reload.
       Why next: it is the same defect class T-45 just made cheap to fix, and the work is mechanical.
       Brief: `docs/NEXT.md` → T-46.
+      — **Done** (T-46): 53 internal anchors now pair `href={href(path)}` with `onClick={follow(path)}`;
+      `EmptyState` takes the **path** (`to=`) and owns the pair itself, so its 39 call sites cannot
+      regress; the three page-local `openLink()` copies of `follow()`'s modifier check are gone.
+      `scripts/link-check.mjs` is gate section 7 and was proved red on a broken copy (single-line and
+      multi-line tags, fragment and `target="_blank"` exempt). Row 29 presses *Edit profile* and proves
+      document identity; 29/29 local and `--live`.
 
 ## Failure bank (the ways this class of product breaks)
 

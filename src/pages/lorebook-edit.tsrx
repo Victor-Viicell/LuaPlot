@@ -3,7 +3,7 @@ import { LorebookForm } from "../components/LorebookForm.tsrx";
 import { Button } from "../components/Button.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Lorebook } from "../lib/data/types.ts";
 import { currentUser } from "../lib/state/session.ts";
@@ -100,19 +100,19 @@ export function LorebookEdit() @{
       <EmptyState
         message="This lorebook doesn't exist."
         actionLabel="Back to catalog"
-        href={href("/lorebook/catalog")}
+        to="/lorebook/catalog"
       />
     } @else if (phase.value === "forbidden") {
       <EmptyState
         message="This lorebook isn't yours to edit."
         actionLabel="Back to catalog"
-        href={href("/lorebook/catalog")}
+        to="/lorebook/catalog"
       />
     } @else if (phase.value === "error") {
       <EmptyState
         message="This lorebook couldn't be loaded. Try again from the catalog."
         actionLabel="Back to catalog"
-        href={href("/lorebook/catalog")}
+        to="/lorebook/catalog"
       />
     } @else {
       <>

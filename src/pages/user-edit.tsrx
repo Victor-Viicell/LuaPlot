@@ -4,7 +4,7 @@ import { EmptyState } from "../components/EmptyState.tsrx";
 import { Field } from "../components/Field.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
 import { Toggle } from "../components/Toggle.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Profile } from "../lib/data/types.ts";
 import { handleSchema, profileEditSchema } from "../lib/schema.ts";
@@ -372,7 +372,7 @@ export function UserEdit() @{
       <EmptyState
         message="You can't edit this account."
         actionLabel="Back to your profile"
-        href={href(`/user/${myHandle || urlHandle}`)}
+        to={`/user/${myHandle || urlHandle}`}
       />
     } @else if (phase.value === "error") {
       <div class="slab" role="alert">

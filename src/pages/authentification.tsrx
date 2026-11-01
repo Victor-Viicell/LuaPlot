@@ -1,7 +1,7 @@
 import { track } from "ripple";
 import { Button } from "../components/Button.tsrx";
 import { Toggle } from "../components/Toggle.tsrx";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import { PROVIDERS, PROVIDER_NAMES, signInWithProvider, type Provider } from "../lib/auth.ts";
 import { requestShowNsfw, showRequested } from "../lib/state/prefs.ts";
 import { currentUser, onSession } from "../lib/state/session.ts";
@@ -387,7 +387,7 @@ export function Authentification() @{
 
         <div class="tail">
           <p class="note">Preview — no provider is contacted.</p>
-          <p class="next">New account? <a href={href("/onboarding")}>Continue to onboarding</a></p>
+          <p class="next">New account? <a href={href("/onboarding")} onClick={follow("/onboarding")}>Continue to onboarding</a></p>
         </div>
       </div>
     </div>

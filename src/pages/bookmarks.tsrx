@@ -532,7 +532,7 @@ export function Bookmarks() @{
         <EmptyState
           message="Sign in to see what you have saved."
           actionLabel="Sign in"
-          href={href("/authentification")}
+          to="/authentification"
         />
       } @else {
         <>
@@ -592,7 +592,7 @@ export function Bookmarks() @{
             <EmptyState
               message="Everything saved here is hidden by your NSFW preference."
               actionLabel="Account settings"
-              href={href("/onboarding")}
+              to="/onboarding"
             />
           } @else if (visible.value.length === 0) {
             <EmptyState message="Nothing saved here yet." />

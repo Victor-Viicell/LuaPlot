@@ -1,6 +1,6 @@
 import { track } from "ripple";
 import { Button } from "../components/Button.tsrx";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import {
   CAPABILITIES,
   copy,
@@ -440,9 +440,9 @@ export function DevNative() @{
           <p class="sec-note">The other dev seams; none of them is in the spec index.</p>
         </div>
         <p class="note">
-          <a class="link" href={href("/dev/data")}>/dev/data</a> · fixtures and mutations ·
-          <a class="link" href={href("/dev/state")}>/dev/state</a> · session and NSFW pair ·
-          <a class="link" href={href("/dev/primitives")}>/dev/primitives</a> · primitives at four
+          <a class="link" href={href("/dev/data")} onClick={follow("/dev/data")}>/dev/data</a> · fixtures and mutations ·
+          <a class="link" href={href("/dev/state")} onClick={follow("/dev/state")}>/dev/state</a> · session and NSFW pair ·
+          <a class="link" href={href("/dev/primitives")} onClick={follow("/dev/primitives")}>/dev/primitives</a> · primitives at four
           widths
         </p>
       </section>

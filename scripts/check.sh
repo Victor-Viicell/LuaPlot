@@ -73,6 +73,15 @@ else
   say "   SKIP (no src-tauri/)"
 fi
 
+# 7. Every in-app anchor is a push, not a document load (T-46)
+say "== links"
+if node scripts/link-check.mjs; then
+  say "   links ok"
+else
+  say "   BARE ANCHOR — a press would re-boot the app"
+  FAIL=1
+fi
+
 if [[ $FAIL -eq 0 ]]; then
   say "GREEN"
   exit 0

@@ -1,6 +1,6 @@
 import { PersonaForm } from "../components/PersonaForm.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
-import { href, navigate } from "../router.ts";
+import { navigate } from "../router.ts";
 import { currentUser } from "../lib/state/session.ts";
 
 /**
@@ -28,7 +28,7 @@ export function PersonaCreate() @{
       <EmptyState
         message="Sign in to create a persona."
         actionLabel="Sign in"
-        href={href("/authentification")}
+        to="/authentification"
       />
     } @else {
       <PersonaForm

@@ -495,7 +495,7 @@ export function PresetCatalog() @{
         <EmptyState
           message="No presets yet."
           actionLabel="Create a preset"
-          href={href("/preset/create")}
+          to="/preset/create"
         />
       } @else {
         <>

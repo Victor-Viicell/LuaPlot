@@ -7,7 +7,7 @@ import { IconMore } from "../components/Icons.tsrx";
 import { ReportDialog } from "../components/ReportDialog.tsrx";
 import { Sheet } from "../components/Sheet.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { follow, href, navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import { ratioOf, type User, type VoteDirection } from "../lib/data/types.ts";
 import { percent } from "../lib/format.ts";
@@ -330,13 +330,6 @@ export function PresetDetail() @{
   function openReport(): void {
     menuOpen.value = false;
     reportOpen.value = true;
-  }
-
-  /** The title/author links are real anchors; this keeps a plain click in-app. */
-  function openLink(event: MouseEvent, path: string): void {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-    event.preventDefault();
-    navigate(path);
   }
 
   /** **Fork / copy**: all the settings as shown, the NSFW flag included, into the viewer's account. */
@@ -879,13 +872,13 @@ export function PresetDetail() @{
         <EmptyState
           message="This preset doesn't exist."
           actionLabel="Back to the catalog"
-          href={href("/preset/catalog")}
+          to="/preset/catalog"
         />
       } @else if (unavailable.value) {
         <EmptyState
           message="This preset isn't available."
           actionLabel="Back to the catalog"
-          href={href("/preset/catalog")}
+          to="/preset/catalog"
         />
       } @else {
         <>
@@ -912,7 +905,7 @@ export function PresetDetail() @{
           <p class="byline">
             <a
               href={href(`/user/${author.value}`)}
-              onClick={(event) => openLink(event, `/user/${author.value}`)}
+              onClick={follow(`/user/${author.value}`)}
             >
               {`@${author.value}`}
             </a>

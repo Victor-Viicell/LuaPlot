@@ -1,7 +1,7 @@
 import { track } from "ripple";
 import { Button } from "../components/Button.tsrx";
 import { Toggle } from "../components/Toggle.tsrx";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import { currentUser, onSession, sessionNotifications, signIn, signOut } from "../lib/state/session.ts";
 import {
   nsfwPreference,
@@ -287,6 +287,7 @@ export function DevState() @{
           <a
             class="btn btn-secondary"
             href={href(user.value ? `/user/${user.value.handle}` : "/authentification")}
+            onClick={follow(user.value ? `/user/${user.value.handle}` : "/authentification")}
           >
             {user.value ? "Open profile" : "Sign-in page"}
           </a>
@@ -370,8 +371,8 @@ export function DevState() @{
           </p>
         </div>
         <p class="note">
-          <a class="link" href={href("/dev/data")}>/dev/data</a> · counts, fixtures, mutation ·
-          <a class="link" href={href("/dev/primitives")}>/dev/primitives</a> · every primitive at four
+          <a class="link" href={href("/dev/data")} onClick={follow("/dev/data")}>/dev/data</a> · counts, fixtures, mutation ·
+          <a class="link" href={href("/dev/primitives")} onClick={follow("/dev/primitives")}>/dev/primitives</a> · every primitive at four
           widths
         </p>
       </section>

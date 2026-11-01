@@ -2,7 +2,7 @@ import { track, type Derived } from "ripple";
 import type { Character, Post } from "../lib/data/types.ts";
 import { initialsOf, shortStamp } from "../lib/format.ts";
 import { read } from "../lib/reactive.ts";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import { Avatar } from "./Avatar.tsrx";
 import { Button } from "./Button.tsrx";
 
@@ -56,14 +56,15 @@ export function PostCard({
   const revealed = track(false);
   const expanded = track(false);
   const covered = track(() => post.nsfw && read(blur) && !revealed.value);
-  const permalink = href(`/post/${post.id}`);
+  const permalinkPath = `/post/${post.id}`;
+  const permalink = href(permalinkPath);
 
   /**
    * The character attachment, flattened to plain strings. A derived that returns `null` cannot be
    * narrowed across a template block, so it always answers an object and `shown` decides the draw.
    */
   const attach = track(() => {
-    const none = { shown: false, href: "", initials: "", name: "", note: "" };
+    const none = { shown: false, path: "", href: "", initials: "", name: "", note: "" };
     const attachment = post.attachment;
     if (attachment?.kind !== "character") return none;
 
@@ -72,6 +73,7 @@ export function PostCard({
 
     return {
       shown: true,
+      path: `/character/${person.id}`,
       href: href(`/character/${person.id}`),
       initials: person.avatar.initials,
       name: person.name,
@@ -87,12 +89,12 @@ export function PostCard({
 
   <article class={covered.value ? "card post is-covered" : "card post"}>
     <header class="post-head">
-      <a class="post-avatar" href={href(`/user/${post.author}`)} aria-label={`@${post.author}`}>
+      <a class="post-avatar" href={href(`/user/${post.author}`)} aria-label={`@${post.author}`} onClick={follow(`/user/${post.author}`)}>
         <Avatar initials={initialsOf(post.author)} size={36} />
       </a>
       <div class="post-meta">
-        <a class="post-author" href={href(`/user/${post.author}`)}>{`@${post.author}`}</a>
-        <a class="post-time" href={permalink}>
+        <a class="post-author" href={href(`/user/${post.author}`)} onClick={follow(`/user/${post.author}`)}>{`@${post.author}`}</a>
+        <a class="post-time" href={permalink} onClick={follow(permalinkPath)}>
           <time datetime={post.createdAt}>{shortStamp(post.createdAt)}</time>
         </a>
       </div>
@@ -103,7 +105,7 @@ export function PostCard({
         <p class="post-body">{post.body}</p>
 
         @if (attach.value.shown) {
-          <a class="post-attach" href={attach.value.href}>
+          <a class="post-attach" href={href(attach.value.path)} onClick={follow(attach.value.path)}>
             <Avatar initials={attach.value.initials} size={40} />
             <span class="post-attach-text">
               <span class="post-attach-name">{attach.value.name}</span>
@@ -152,7 +154,12 @@ export function PostCard({
             <span class="post-count-value">{post.dislikes}</span>
           </li>
         </ul>
-        <a class="post-comments" href={permalink} aria-label={`${post.commentCount} comments`}>
+        <a
+          class="post-comments"
+          href={permalink}
+          onClick={follow(permalinkPath)}
+          aria-label={`${post.commentCount} comments`}
+        >
           {`${post.commentCount} ${post.commentCount === 1 ? "comment" : "comments"}`}
         </a>
       </footer>

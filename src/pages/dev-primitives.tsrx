@@ -464,7 +464,7 @@ export function DevPrimitives() @{
             <EmptyState
               message="Nothing here yet. Characters you create show up on this tab."
               actionLabel="Create a character"
-              href="#primitives"
+              to="/character/catalog"
             />
           </section>
 

@@ -4,7 +4,7 @@ import { Field } from "../components/Field.tsrx";
 import { PersonaCard } from "../components/PersonaCard.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, useQuery } from "../router.ts";
+import { follow, href, useQuery } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Persona } from "../lib/data/types.ts";
 import { currentUser } from "../lib/state/session.ts";
@@ -173,7 +173,7 @@ export function PersonaCollection() @{
       <EmptyState
         message="Sign in to see your personas."
         actionLabel="Sign in"
-        href={href("/authentification")}
+        to="/authentification"
       />
     } @else {
       <>
@@ -192,7 +192,7 @@ export function PersonaCollection() @{
           <Select label="Sort" name="sort" value={sort.value} options={SORT_OPTIONS} onChange={chooseSort} />
         </div>
         <div class="create">
-          <a class="btn btn-primary" href={href("/persona/create")}>Create</a>
+          <a class="btn btn-primary" href={href("/persona/create")} onClick={follow("/persona/create")}>Create</a>
         </div>
       </div>
 
@@ -217,12 +217,12 @@ export function PersonaCollection() @{
         <EmptyState
           message="You have no personas yet. The first one you save becomes your default."
           actionLabel="Create a persona"
-          href={href("/persona/create")}
+          to="/persona/create"
         />
       } @else if (items.value.length === 0) {
         <p class="no-results" role="status">
           No persona matches that name.{" "}
-          <a class="no-results-link" href={href("/persona/create")}>Create one</a> if it is not here yet.
+          <a class="no-results-link" href={href("/persona/create")} onClick={follow("/persona/create")}>Create one</a> if it is not here yet.
         </p>
       } @else {
         <ul class="card-grid" aria-label="Your personas">

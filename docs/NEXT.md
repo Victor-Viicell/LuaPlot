@@ -1,75 +1,59 @@
 # Baton — what the next session does
 
-**T-46 is the one ticket.** T-45 closed home's entry control, and in doing it proved *how* that
-defect class fails: a bare `<a href>` is a document load, it re-boots the app, and a walk that only
-reads a URL cannot see it. The app still has **~30 of them**, including a primary action
-(*Edit profile* on your own profile) and the four catalogs' *Create* buttons. Everything else on the
-board still needs Supabase, Android tooling or a decision (bottom of this file). T-33B(a) is closed
-on both halves — do not spend a tick re-proving it.
+**T-47 is the one ticket.** T-46 closed the last defect class that was neither blocked nor cosmetic:
+every in-app anchor is now a push (`follow()`), gate section 7 fails on a new bare one, and row 29
+proves it on the page a session lands on. What is left on the board needs Supabase, Android tooling, a
+dependency or a decision (bottom of this file). The one unblocked defect with a **spec-backed** answer
+is the card's touch targets, carried in the failure bank since T-44.
 
-## T-46 — every in-app link is a push, not a load
+## T-47 — the card's links reach the 44px floor
 
-**Why it is next.** T-45 made the *seam* real (`follow()` in `router.ts`, used by the shell, the
-catalog switch and now home) but converted one control. The rest of the app still discards the
-running app on a press: the mock re-seeds (so half-written form state and the walk's fixture writes
-disappear), the shell repaints from scratch, and on Pages the reader sees a white flash. It is
-mechanical work with a proven helper, and the remaining risk is *which* links must stay bare.
+**Why it is next.** It is the only remaining open item that needs no backend, no dependency and no
+decision: T-44 measured it, the failure bank records it, and WCAG 2.2's `2.5.8` is what says it is
+allowed today rather than what makes it good. A catalogue card is the product's most-touched surface
+and its author line is a 16px-high text run.
 
-**What is wrong.** `grep -n 'href={href(' src/**/*.tsrx` — every hit without a sibling `onClick=`
-is a full document load. The ones that matter most:
+**What is wrong.** Measured at 360×740 in T-44 and unchanged since:
 
-- `src/pages/user-profile.tsrx` → `Edit profile` (`.btn btn-secondary`, line ~661) — a primary
-  action on the only page a signed-in reader lands on.
-- `src/pages/{character,lorebook,preset}-catalog.tsrx` → the *Create* buttons (two states each:
-  the empty state and the toolbar).
-- `src/pages/{character,lorebook,preset,persona}-create.tsrx` → the *Sign in* button shown when the
-  viewer is signed out.
-- `src/components/{Card,UserCard,PostCard,PersonaCard}.tsrx` → the title/handle/author links (the
-  card's `.card-title` already takes `onOpen`; the author/handle links do not).
-- `src/pages/{character,lorebook,preset,session,post}-detail.tsrx`, `-edit.tsrx`, `moderation-*`,
-  `bookmarks`, `notifications`, `persona-collection`, `onboarding`, `authentification`, `terms`,
-  `dev-native` → back links, "Create one", the cross-page prose links.
+- `.card-foot`'s author link (`a.card-author`, `@handle`) is a text run with no vertical padding —
+  well under 44 and under the 24×24 AA floor as well, once line-height is subtracted.
+- `PostCard`'s avatar link (`.post-avatar`) is a **36×36** box (`Avatar size={36}`), under 44.
+- `a.card-handle` on `UserCard` duplicates the title's destination — two links, one target, both small.
 
 **Approach**
 
-1. Read `.agents/skills/ripple-ts/SKILL.md` again (`.tsrx`, `class` not `className`).
-2. Import `follow` from `router.ts` (or `../router.ts`) beside `href` and pair every internal
-   anchor: `href={href(path)} onClick={follow(path)}` — **`follow()` takes an app path, never
-   `href(...)`** (T-45's live-only bug: it doubled the base and landed on the not-found page).
-   Where the target is a tracked value, pass the path through and let `follow` read it at render
-   time, exactly as `home.tsrx` does.
-3. **Hash links stay bare.** `follow()` pushes the path and `readLocation()` ignores the fragment,
-   so `/terms#rule-2` would lose its in-page jump. Leave `terms.tsrx`'s contents list,
-   `ReportDialog`'s "What this asserts" and `moderation-detail`'s rule links **without** `onClick`,
-   and say so in a comment (`docs/ARCHITECTURE.md` → Router is the place for the rule).
-4. Add the enforcement so the class cannot come back: a `scripts/link-check.mjs` (same shape as
-   `scripts/spec-routes.mjs`, no dependency) that reads every `.tsrx`, finds each `<a …>` element
-   (attributes span lines — the tab bar's `href` and `onClick` are on different lines), and fails
-   when an anchor carries `href={href(` or `href={\`…\`}` **without** an `onClick=`, unless the href
-   contains a `#`. Wire it into `scripts/check.sh` as its own section and print its count.
-5. Add **one** walk row (29): from `/user/you`, press *Edit profile*, `expectPath("/user/you/edit")`,
-   wait for the account form, and assert `expectNoReload(...)` — the `markDocument` /
-   `expectNoReload` / `expectPath` helpers from T-45 are in `scripts/smoke.mjs`. Bump
-   `EXPECTED_ROWS` to 29 in the same commit.
+1. Treat the **whole card footer row** as the author's target: give `.card-foot` the author link as its
+   only interactive child and let it stretch to a 44px band (`min-height: 44px`, the ratio stays
+   plain text on the right). Keep the underline/colour exactly as `docs/DESIGN.md` → *Card* draws it —
+   this is a hit-area change, not a typography change.
+2. `PostCard`: give `.post-avatar` a 44×44 box around the existing 36px `Avatar` (padding, not a
+   bigger avatar — the drawing stays). Same for `.post-author`, whose `@handle` is the second way in.
+3. `UserCard`: make `.card-handle` non-interactive (`<p>` with the same type) since the title already
+   goes to the profile; one destination, one target, and the row stops being a small link.
+4. Record the rule in `docs/DESIGN.md` → *Card*: *every interactive element inside a card carries a
+   44px hit box; the drawing does not grow.* Add the measured numbers after the change.
+5. Add **one** walk row (30): at 360×740, on `/character/catalog`, assert the first card's author link
+   box is ≥ 44px tall and the document still does not scroll horizontally; then on `/post/thread` the
+   first post's avatar link box is ≥ 44. Reuse the box reader the breakpoint row already uses
+   (`getBoundingClientRect`), and bump `EXPECTED_ROWS` to 30.
+6. Nothing else: no new class names in the pages, no colour, no dependency. `.card-foot` and
+   `.post-avatar` are shell C-S-S/`styles.css` rules, not a page's.
 
 **Traps**
 
-- **`follow(href(x))` is the bug**, not the fix: `navigate()` adds the base. Preview (base `/`)
-  hides it completely; only `--live` sees it.
-- **A `<a>` whose `href` is a template literal** (`/user/${app}`) needs the *path* built, not the
-  href: keep one variable for the path and wrap it with `href()` only in the attribute.
-- `expectPath` compares the **whole** pathname — use it for every new assertion, not `waitUrl`
-  (a substring match reads a doubled base as correct).
-- Do not convert `<button onClick={navigate(...)}>` controls or the `Button` component's callers —
-  they are already pushes and have no `href`.
-- The prose links inside `terms.tsx`/`onboarding.tsx` body copy are still anchors; converting them
-  is fine when they carry no fragment, but keep the copy identical.
-- Never pipe `scripts/smoke.sh` into `head`/`tail`/`grep`: redirect to a file and read the file, or
-  a red walk exits 0 and looks green.
+- **`percent()` and the ratio cell must not move.** The ratio is plain text on the right; widening the
+  author's band must not turn it into a target or shift the grid.
+- **A 44px band changes the card's height**, and the breakpoint row asserts `outlet`/`grid` tracks, not
+  height — so re-run that row before claiming the layout is unchanged; if the grid count moves, the
+  padding leaked into the track math.
+- **`Avatar`'s `size={36}` prop is the drawing.** Do not pass 44 to it: the box grows, the circle does
+  not (`docs/DESIGN.md` → *Card*: the avatar is 36 in the foot of a post card).
+- **A card is not a link.** The title is the link (T-46 paired it with `follow`); do not wrap the whole
+  card in an anchor — the footer's author link and the title must stay separate destinations.
 
-**Accept:** `./scripts/check.sh` GREEN **including the new link section** (and the section must fail
-on a deliberately broken copy before you commit — prove it), `scripts/smoke.sh` 29/29 locally and
-`--live`, `LIVE` printed by `publish.sh`.
+**Accept:** `./scripts/check.sh` GREEN (including section 7 — a new anchor without `follow` fails),
+`scripts/smoke.sh` **30/30** locally and `--live`, measured boxes printed in the row's evidence,
+`LIVE` printed by `publish.sh`.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -130,13 +114,13 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   at 360×740; the row asserts that it cleared (`window.innerWidth === restore`) rather than trusting
   the `finally`.
 - **`follow()` drops the fragment on purpose** — a `/terms#anchor` link must stay a real document
-  navigation (or gain scroll handling nothing needs yet). T-46 records the rule in
-  `ARCHITECTURE.md` → Router.
+  navigation (or gain scroll handling nothing needs yet). `ARCHITECTURE.md` → Router carries the rule
+  and the three exemptions `scripts/link-check.mjs` encodes (fragment, `target=`, external).
 - **A card's ratio rounds to whole percent**, so a one-vote change can leave the printed number
   identical (96% → 96%). A journey proving an engagement write must read a count (the detail page's
   Likes/Dislikes cells), never a card's percentage.
-- **Row count is 28 today and becomes 29 with T-46.** `scripts/smoke.mjs` keeps it in an explicit
-  `EXPECTED_ROWS`, so a row that stops running is a red walk — bump it in the same commit as the row.
+- **Row count is 29 (T-46).** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a row
+  that stops running is a red walk — bump it in the same commit as the row (30 when T-47 adds one).
 
 ## Found while working (carried forward — keep this list growing)
 
@@ -148,7 +132,9 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   row 28 with all 28 green still exited 1. It is `EXPECTED_ROWS` now — bump it with the row.
 - **A red walk proves the assertion; a green one does not.** T-45 removed the `onClick`, rebuilt, and
   watched row 1 fail with the document dump before restoring it. Do that for any new invariant.
-- Home's entry control is fixed (T-45); **~30 bare `<a href>` anchors remain** — that is T-46 above.
+- **Bare anchors are gone (T-46):** 53 internal anchors pair `href` with `follow`, `EmptyState` takes
+  a **path** (`to=`) so its 39 call sites cannot regress, and gate section 7 fails on a new one.
+  The static check is the guard the walk cannot be: 29 rows cannot visit every page.
 - **The webview stores `luaplot.session` as UTF-16LE in a SQLite table** (`localstorage/
   http_localhost_1420.localstorage`, `ItemTable`), so `quote(value)` returns hex — decode before
   comparing, or a correct proof reads as a corrupt one. On Pages the same key lives in the browser
@@ -210,6 +196,14 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **A synthetic `.click()` cannot copy**: `navigator.clipboard.writeText` needs a trusted gesture.
 - **T-38 is done**: `scripts/smoke.sh` builds + previews + walks + tears down; `--live` walks the Pages
   URL. **It is not in `check.sh`** — the gate stays browser-free.
+- **The account page is not a `<form>`.** `user-edit.tsrx` draws `.form` as a `div` of `Field`s, so a
+  row must assert an input by `name` (`input[name="displayName"]`), never `querySelector("form")`.
+- **A component that hands out a link must take the path, not the href.** `EmptyState` took a finished
+  `href` and drew a bare anchor; 39 call sites were one attribute away from the exploit. Ownership of
+  the `href`+`follow` pair inside the component is what stopped it — apply that to any new one.
+- **`link-check.mjs` reads tags, not lines.** Attributes span lines (the tab bar and the dev pages do),
+  so the scanner walks from `<a` to the matching `>` counting braces, quotes and backticks; a
+  line-based grep would miss exactly the multi-line cases it exists for.
 - **The report journey needs POST(8)**: the preview classifier buckets on `hash("jev:post:" + body) % 5`
   and only buckets 2/3/4 escalate.
 - **A shared Chromium profile makes the walk flake** — profiles are unique per run and removed on exit.

@@ -2,7 +2,7 @@ import { effect, track } from "ripple";
 import { Card } from "../components/Card.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import { PAGE_SIZE, resolveRepo } from "../lib/data/repo.ts";
 import { ratioOf, type Character } from "../lib/data/types.ts";
 import { percent } from "../lib/format.ts";
@@ -483,7 +483,7 @@ export function DevData() @{
           </div>
           <div class="rows">
             @for (const row of group.rows; key row.id) {
-              <a class="row" href={href(row.path)}>
+              <a class="row" href={href(row.path)} onClick={follow(row.path)}>
                 <span class="row-label">{row.label}</span>
                 @if (row.flag) {
                   <span class="card-tag">{row.flag}</span>

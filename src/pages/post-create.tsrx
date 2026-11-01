@@ -1,6 +1,6 @@
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { PostComposer } from "../components/PostComposer.tsrx";
-import { href, navigate } from "../router.ts";
+import { navigate } from "../router.ts";
 import { currentUser } from "../lib/state/session.ts";
 
 /**
@@ -55,7 +55,7 @@ export function PostCreate() @{
         <EmptyState
           message="Sign in to publish a post."
           actionLabel="Sign in"
-          href={href("/authentification")}
+          to="/authentification"
         />
       } @else {
         <PostComposer

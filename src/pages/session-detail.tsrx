@@ -8,7 +8,7 @@ import { PostComposer } from "../components/PostComposer.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Sheet } from "../components/Sheet.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { follow, href, navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Persona, Session, Turn } from "../lib/data/types.ts";
 import { clockTime, initialsOf } from "../lib/format.ts";
@@ -1096,7 +1096,7 @@ export function SessionDetail() @{
         <EmptyState
           message="Sign in to open a session."
           actionLabel="Sign in"
-          href={href("/authentification")}
+          to="/authentification"
         />
       } @else if (phase.value === "loading") {
         <div class="skel" aria-busy="true" aria-label="Loading session">
@@ -1113,7 +1113,7 @@ export function SessionDetail() @{
         <EmptyState
           message="This session doesn't exist."
           actionLabel="Back to the catalog"
-          href={href("/character/catalog")}
+          to="/character/catalog"
         />
       } @else {
         <>
@@ -1122,11 +1122,11 @@ export function SessionDetail() @{
               <IconBack />
             </button>
             <div class="who">
-              <a class="who-avatar" href={href(`/character/${sourceId.value}`)} aria-hidden="true">
+              <a class="who-avatar" href={href(`/character/${sourceId.value}`)} aria-hidden="true" onClick={follow(`/character/${sourceId.value}`)}>
                 <Avatar initials={initials.value} label={speaker.value} size={32} />
               </a>
               <div class="who-text">
-                <a class="who-name" href={href(`/character/${sourceId.value}`)}>{speaker.value}</a>
+                <a class="who-name" href={href(`/character/${sourceId.value}`)} onClick={follow(`/character/${sourceId.value}`)}>{speaker.value}</a>
                 <button class="who-sub" type="button" onClick={openPersona}>
                   {`${userSide.value} · ${presetName.value}`}
                 </button>
@@ -1171,8 +1171,7 @@ export function SessionDetail() @{
                         @if (!row.unlinked) {
                           <a
                             class="copy-link"
-                            href={href(`/${row.kind}/${row.sourceId}`)}
-                          >
+                            href={href(`/${row.kind}/${row.sourceId}`)} onClick={follow(`/${row.kind}/${row.sourceId}`)}>
                             Open the original
                           </a>
                         }

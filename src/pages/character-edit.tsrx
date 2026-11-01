@@ -3,7 +3,7 @@ import { CharacterForm } from "../components/CharacterForm.tsrx";
 import { Button } from "../components/Button.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useParams } from "../router.ts";
+import { navigate, useParams } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Character } from "../lib/data/types.ts";
 import { currentUser } from "../lib/state/session.ts";
@@ -100,19 +100,19 @@ export function CharacterEdit() @{
       <EmptyState
         message="This character doesn't exist."
         actionLabel="Back to catalog"
-        href={href("/character/catalog")}
+        to="/character/catalog"
       />
     } @else if (phase.value === "forbidden") {
       <EmptyState
         message="This character isn't yours to edit."
         actionLabel="Back to catalog"
-        href={href("/character/catalog")}
+        to="/character/catalog"
       />
     } @else if (phase.value === "error") {
       <EmptyState
         message="This character couldn't be loaded. Try again from the catalog."
         actionLabel="Back to catalog"
-        href={href("/character/catalog")}
+        to="/character/catalog"
       />
     } @else {
       <>
