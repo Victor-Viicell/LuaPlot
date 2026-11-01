@@ -334,12 +334,12 @@ export function PostDetail() @{
 
       .act:hover:not(:disabled) {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        color: var(--color-accent-hover-text);
       }
 
       .act[aria-pressed="true"] {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        color: var(--color-accent-text);
         background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
       }
 

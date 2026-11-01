@@ -340,7 +340,7 @@ export function ReportDialog({
       position: absolute;
       top: 12px;
       right: 12px;
-      color: var(--color-accent);
+      color: var(--color-text);
       font-size: 14px;
       line-height: 1;
     }
@@ -402,7 +402,7 @@ export function ReportDialog({
     }
 
     .rules-link:hover {
-      color: var(--color-accent-hover);
+      color: var(--color-accent-hover-text);
       text-decoration-color: currentColor;
     }
 

@@ -3,6 +3,39 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-48: the tier becomes a gate, and it immediately found 26 sites
+
+- **Changed:** `scripts/tier-check.mjs` (node stdlib only) is **section 8** of `scripts/check.sh`. It
+  strips `/* … */`, extracts the `<style>` blocks of every `src/**/*.tsrx` (masking everything else
+  with spaces so offsets and line numbers survive), then walks `{`→`}` counting depth; a declaration
+  whose property is exactly `color` (split at the first colon, never a substring `color:` test) fails
+  on `var(--color-accent)` / `var(--color-accent-hover)`. Custom properties and the
+  `--color-accent-contrast` exemption pass by construction; it prints `file:line — <selector> paints
+  text with <token>` and exits 1. It accepts file arguments so the red proof runs against copies.
+  **The ticket's premise was wrong:** the tree was not byte-identical to what passed row 31 — T-37C
+  swept `src/styles.css` only, and section 8's first run named **26** declarations in 15 `.tsrx`
+  files. Closed them: links/static accent text → `--color-accent-text`, `:hover` →
+  `--color-accent-hover-text`, `dev-native`'s dead `var(--color-success, …)` fallback →
+  `--color-accent-text`, the report dialog's `::after` "✓" on a surface → `--color-text` (the accent
+  border carries the state), and the three `.vote`/`.save` `[aria-pressed="true"]` pills — whose own
+  `background-color` is `--color-surface`, where no static accent tier clears AA in Latte — became an
+  accent **fill** with `--color-accent-contrast`. `src/styles.css` was not touched; `DESIGN.md` →
+  *Contrast* carries both rules, `SHIP-PLAN` records the corrected premise.
+- **Verified how:** `./scripts/check.sh` GREEN with `== tiers` printing `5822 declarations across 46
+  stylesheet region(s); no text takes the mark`. Scanner proved **red and green** from four fixtures:
+  a `styles.css` copy + `a:hover { color: var(--color-accent); }` exits 1 naming `a.css:2026`; a copy
+  with a fill + `--color-accent-contrast` + both text tiers + the banned value in prose exits 0; a
+  `.tsrx` copy with a wrapped selector list inside its own `<style>` exits 1 naming
+  `.probe-title:hover, .probe-sub:hover`; a copy that only *defines* the tokens exits 0. Walk
+  **31/31** after the colour changes, row 31 unmoved (`Mocha 8.64 → 9.81 · Latte 4.83 → 5.91 (4.66 on
+  surface)`, rail 4.83 no fill). `publish.sh` printed `LIVE`, `curl` 200 on the page and on
+  `assets/index-CoLZ-Hl6.js`.
+- **Not verified:** the new sites' contrast is arithmetic, not a browser measurement — no walk row
+  reads `.fold-btn`, `.pmark.is-on`, `.chip.is-on`, `.signin a` or the pressed pills. Every static one
+  sits on `--color-bg-elevated`/`--color-bg` (4.83/5.20 in Latte) and the fills reuse the primary
+  button's documented 4.79+ pair, but a row that measures them does not exist. Session-detail's
+  `var(--keyboard-inset)` is read by the composer and written by nothing — that is T-36(a), next.
+
 ## 2026-11-01 — T-37C: the rest of the accent's text joins the tier, and the rail stops filling
 
 - **Changed:** `--color-accent-hover-text` is a new token in all six blocks of `src/styles.css`

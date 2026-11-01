@@ -241,7 +241,7 @@ export function DevNative() @{
       }
 
       .entry-verdict[data-ok="true"] {
-        color: var(--color-success, var(--color-accent));
+        color: var(--color-success, var(--color-accent-text));
       }
 
       .entry-read {

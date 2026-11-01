@@ -703,7 +703,8 @@ export function CharacterDetail() @{
       .vote[aria-pressed="true"],
       .save[aria-pressed="true"] {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        background-color: var(--color-accent);
+        color: var(--color-accent-contrast);
       }
 
       .vote:disabled,
@@ -791,7 +792,7 @@ export function CharacterDetail() @{
       }
 
       .attached-link:hover {
-        color: var(--color-accent);
+        color: var(--color-accent-hover-text);
         text-decoration: underline;
       }
 
@@ -923,7 +924,7 @@ export function CharacterDetail() @{
       }
 
       .menu-item:hover:not(:disabled) {
-        color: var(--color-accent);
+        color: var(--color-accent-hover-text);
       }
 
       .menu-item:disabled {

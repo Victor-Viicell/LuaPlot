@@ -371,13 +371,19 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       handle. `.post-avatar` grew by `margin: -4px` so the drawing did not move. Row 30 prints
       `catalog author 244×44 in a 45px foot … thread avatar link 44×44 around a 36px drawing`, and was
       proved red (16px) with the band removed. 30/30 local and `--live`.
-- [ ] **T-48 A static guard for the accent's text tier.** `--color-accent` / `--color-accent-hover` may
+- [x] **T-48 A static guard for the accent's text tier.** `--color-accent` / `--color-accent-hover` may
       paint `background-color`, `border-*`, `outline`, `box-shadow`, `fill`, `stroke` and
       `accent-color` — never the `color` property. Accept: `scripts/tier-check.mjs` scans
       `src/styles.css` and every `src/**/*.tsrx` `<style>` block, `check.sh` grows section 8 and still
       prints `GREEN`, the scanner is proved red on an injected `a:hover { color: var(--color-accent) }`
       (naming `file:line`), and no colour changes in the commit. Why next: it is the only way the tier
       survives a page nobody walked — T-37C's sweep is a list in a doc today. Brief: `docs/NEXT.md`.
+      **Done, with one premise corrected:** the tree was *not* byte-identical to what passed row 31 —
+      T-37C's sweep reached `src/styles.css` only, and the `.tsrx` `<style>` blocks still had **26**
+      declarations painting text with the mark. Section 8 found them on its first run; they took the
+      text/hover tiers, and the three `.vote`/`.save` pressed pills (own `--color-surface`, where no
+      static accent tier clears AA in Latte) became an accent fill with `--color-accent-contrast`. The
+      walk stayed 31/31 with row 31 unmoved, so `styles.css` was not touched at all.
 
 ## Failure bank (the ways this class of product breaks)
 

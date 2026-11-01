@@ -69,6 +69,18 @@ WCAG AA wants **4.5:1** for text under 18.66px — which is all of this app's ty
   previously the raw mark on every classless link, **4.45:1** on Latte's card and **3.51:1** on
   `--color-surface`, with a lavender hover at 2.62:1. Both of the two pairs T-37B filed are closed
   by measurement, not by eye: the classless link reads 4.83 / 5.91 on a card in Latte in row 31.
+- **The mark may not paint text, and the gate says so (T-48).** `scripts/tier-check.mjs` is section 8:
+  a `color:` whose value is `var(--color-accent)` or `var(--color-accent-hover)` fails `check.sh`, in
+  `src/styles.css` **and** in every `.tsrx` `<style>` block. That is how the 26 sites T-37C's sweep
+  never reached (the `.tsrx` half) were found and closed in T-48: links and static accent text take
+  `--color-accent-text`, a `:hover` takes `--color-accent-hover-text`, and the fill is untouched.
+- **A pressed control that paints its own `--color-surface` becomes an accent fill (T-48).** No static
+  accent text tier clears that backplate in Latte (`-text` 3.81, `-hover-text` 4.66 but that token is
+  a hover's). So `.vote` / `.save` at `[aria-pressed="true"]` swap `color` for
+  `background-color: var(--color-accent)` + `color: var(--color-accent-contrast)` — the primary
+  button's pair, 4.79 Latte and up — and the accent border stays. Same move for any future "on"
+  control with a surface under it. A **glyph** on a surface loses the accent instead of borrowing a
+  tier: the report dialog's `::after` "✓" is `--color-text` and the accent border carries the state.
 
 ## Type
 

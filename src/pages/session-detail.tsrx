@@ -906,7 +906,7 @@ export function SessionDetail() @{
 
       .copy-action:hover:not(:disabled) {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        color: var(--color-accent-hover-text);
       }
 
       .copy-action:disabled {

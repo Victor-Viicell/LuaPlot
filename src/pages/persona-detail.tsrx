@@ -315,7 +315,7 @@ export function PersonaDetail() @{
 
       .mark {
         margin: 4px 0 0;
-        color: var(--color-accent);
+        color: var(--color-accent-text);
         font-size: 11px;
         letter-spacing: 0.1em;
         line-height: 1.4;
@@ -375,7 +375,7 @@ export function PersonaDetail() @{
       }
 
       .picker-link {
-        color: var(--color-accent);
+        color: var(--color-accent-text);
       }
 
       .picker-list {

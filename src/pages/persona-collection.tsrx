@@ -290,7 +290,7 @@ export function PersonaCollection() @{
       }
 
       .no-results-link {
-        color: var(--color-accent);
+        color: var(--color-accent-text);
       }
 
       .skel-card {

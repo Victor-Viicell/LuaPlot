@@ -336,7 +336,7 @@ export function PersonaSheet({
 
       .pmark.is-on {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        color: var(--color-accent-text);
       }
 
       .pmeta {
@@ -368,7 +368,7 @@ export function PersonaSheet({
       }
 
       .puse {
-        color: var(--color-accent);
+        color: var(--color-accent-text);
         font-weight: 600;
       }
 

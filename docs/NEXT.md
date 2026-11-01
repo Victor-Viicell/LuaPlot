@@ -1,62 +1,69 @@
 # Baton — what the next session does
 
-**T-48 is the one ticket.** T-37C finished the accent's text sweep by hand: `a`, its hover and seven
-component hovers moved onto `--color-accent-text` / the new `--color-accent-hover-text`, and the `md`
-rail stopped filling so its label sits on `--color-bg-elevated`. Smoke row 31 now measures all of it
-per flavour — Mocha 8.64 → 9.81, Latte 4.83 → 5.91 (4.66 on `--color-surface`), rail 4.83 with a
-2px bar and no fill. What holds that invariant today is **a list in a doc**. A new
-`.thing { color: var(--color-accent) }` in `styles.css` or any `.tsrx` `<style>` block reopens the
-defect three ticks just closed, and no walk row would see it: 31 rows cannot visit every page. T-48
-turns the list into gate section 8 — the way T-46 turned "every link is a push" into
-`scripts/link-check.mjs`.
+**T-36(a) is the one ticket.** T-48 landed the static guard: `scripts/tier-check.mjs` is gate section 8,
+it proved red on four fixtures, and on its first run it named **26** declarations that were still
+painting text with the mark — all in `.tsrx` `<style>` blocks, the half T-37C's hand sweep never
+reached. Those are closed and the walk is 31/31. What is left in P5/P6 is blocked (*Blocked*), so the
+rotation moves to the one mobile defect that is provable in a browser without an Android toolchain:
+**the composer's keyboard lift is a variable nothing writes.**
 
-## T-48 — a static guard: `color:` may not paint the mark
+## T-36(a) — `--keyboard-inset` must be written by something
 
-**Why it is next.** It protects the invariant the last three ticks established, needs no backend, no
-toolchain and no dependency (node stdlib only), and copies a pattern already in the gate
-(section 7, `scripts/link-check.mjs`, proved red against a broken copy). Nothing else in P6 is
-unblocked — see *Blocked*.
-
-**The rule (from `docs/DESIGN.md` → *Contrast*, settled — do not re-open it).**
-
-- The accent is a **mark** colour. `--color-accent` and `--color-accent-hover` may paint
-  `background-color`, `border-*`, `outline`, `box-shadow`, `fill`, `stroke`, `accent-color` — never
-  the `color` property.
-- Text that is accent-coloured uses `--color-accent-text`; a **hover** that is text uses
-  `--color-accent-hover-text`.
-- The one exemption is `color: var(--color-accent-contrast)` on an accent **fill** (the primary
-  button's label): that token is a fill's foreground, not text on a surface.
+**Why it is next.** `src/pages/session-detail.tsrx:677` docks the composer with
+`padding: 8px 16px calc(8px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px))`, and
+`grep -rn visualViewport src/` returns **nothing**: the token is read by the one surface that needs it
+and written by no code on any page. On a phone the on-screen keyboard opens and the dock stays exactly
+where it was, under the keyboard — the input is unusable, which is the first thing T-36's accept line
+tests ("no clipped input"). It needs no dependency, no backend and no device: the mechanism is
+`visualViewport`, which Chromium exposes headlessly.
 
 **Approach**
 
-1. `scripts/tier-check.mjs`: scan `src/styles.css` and every `src/**/*.tsrx` (their `<style>` blocks
-   are real CSS — the rail, the tab bar and half the shell live there). For each declaration whose
-   property is exactly `color`, flag a value of `var(--color-accent)` or `var(--color-accent-hover)`.
-   Print `file:line — <selector> paints text with <token>` and exit 1.
-2. Wire it as section 8 of `scripts/check.sh`, after the link check. `check.sh` still prints `GREEN`.
-3. Prove it **red inside this tick**: copy `styles.css`, add `a:hover { color: var(--color-accent); }`
-   to the copy, run the scanner against the copy, watch it fail naming the line, delete the copy. A
-   scanner that cannot fail is a decoration.
+1. `src/lib/viewport.ts` — one writer for the token:
+   `inset = Math.max(0, Math.min(400, Math.round(window.innerHeight - vv.height - vv.offsetTop)))`;
+   write it as `document.documentElement.style.setProperty("--keyboard-inset", inset + "px")`.
+   Subscribe to `resize` **and** `scroll` on `window.visualViewport`, coalesce with `requestAnimationFrame`
+   (never `setTimeout` — the dock must not lag the keyboard), and return a teardown. No
+   `window.visualViewport` (old webview) → write `0px` once and do not subscribe; the CSS fallback is
+   already `0px`, so that branch is honest, not a silent failure.
+2. Install it **once** in the shell (`src/App.tsrx`), not per page: `--keyboard-inset` is a document
+   property, and two writers on one page fight over the last frame. Session detail, the thread composer
+   and `user-edit`'s save bar all read it.
+3. Row 32 in `scripts/smoke.mjs` (bump `EXPECTED_ROWS` to 32 — a genuinely new assertion, not a
+   near-copy): open a session, then shadow the box with
+   `Object.defineProperty(window.visualViewport, "height", { configurable: true, value: <h - 320> })`,
+   dispatch a `resize` **on `window.visualViewport`**, and poll `getComputedStyle(document.documentElement)
+   .getPropertyValue("--keyboard-inset")` for `320px`; assert the dock's bottom padding grew by the same
+   320 and `documentElement.scrollWidth` did not grow. Then `delete window.visualViewport.height`,
+   dispatch again, assert `0px` and the original padding — **both restores in `finally`**, like every
+   other override in the walk.
 
 **Traps**
 
-- **`grep "color:"` matches three properties.** `background-color:` and `border-color:` end in
-  `color:`; a substring test flags every fill and the gate goes red on a correct tree. Anchor on the
-  property name (`/^\s*color\s*:/`) or split the declaration at its first colon.
-- **Custom properties are not declarations.** `--color-accent: var(--ctp-mauve)` inside a flavour
-  block starts with `--`; it defines a token, it does not paint text. The anchored test excludes it.
-- **Blocks span lines and nest.** Selector lists wrap (`a.post-author:hover,`), comments contain the
-  word `color` in prose, and `@media` nests. Strip `/* … */` first, then walk from `{` to the matching
-  `}` counting depth — that is what `link-check.mjs` does for tags, and a line-based grep is exactly
-  what misses the multi-line cases this exists for.
-- **`.tsrx` only.** No `.tsx`/`.js` stylesheets exist; do not widen the scan into TS string literals
-  where `color:` appears inside style objects that never reach CSS.
+- **`visualViewport.height` is read-only**, so the row shadows it with `defineProperty` on the
+  *instance* (`configurable: true`) and deletes it afterwards. A leaked shadow poisons every later row's
+  layout reading; the restore belongs in `finally` beside the metrics clear.
+- **`innerHeight` does not change when an Android keyboard opens** — the layout viewport stays put and
+  only the visual viewport shrinks. That is exactly why the math is `innerHeight - vv.height - vv.offsetTop`
+  and not a delta of `innerHeight`.
+- **Clamp upward too.** A URL-bar collapse can make the visual viewport *taller* than `innerHeight`; the
+  negative result must clamp to 0, and a pinch-zoom can report a nonsense 2000 — hence the 400 cap.
+- **`resize` on `window` is not the event.** The keyboard fires `resize` on `visualViewport`; a
+  `window.addEventListener("resize")` handler never sees it.
+- **Ripple lifecycle:** use the shell's existing mount/cleanup idiom (`src/lib/reactive.ts`, the same
+  `onMount`-style teardown `App.tsrx` already uses for its scroll listener) — never leave the listener
+  attached across a route change.
+- **`100dvh` does not follow the token.** Home and `authentification` size themselves with `100dvh`;
+  `--keyboard-inset` only pads a docked surface. Do not re-tune those numbers in this ticket.
 
-**Accept:** `./scripts/check.sh` GREEN with section 8 present; the scanner exits 1 on the injected
-violation and names `file:line`; the shipped tree is byte-identical to the CSS that passed row 31 in
-T-37C (this is a gate, not an edit — no colour changes). `publish.sh` prints `LIVE`, `curl` 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **32/32** locally and **32/32 `--live`**; row 32 proved
+**red** by returning a no-op teardown from `viewport.ts` (token stays `0px`, the row fails naming the
+padding it read) and green again with the real writer; `publish.sh` prints `LIVE` and `curl` 200. If the
+shadowed-`visualViewport` trick cannot be made to drive the real handler, stop and file the row as
+`UNVERIFIED` in `PROGRESS` with what a device must run — do not assert the padding from the CSS.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
+
 
 The webview half of T-33B(a) is verified; this is how, so a later ticket does not rediscover it.
 
@@ -100,9 +107,11 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **T-33B(c) `Ctrl/Cmd+K`:** a decision, not work — no spec file describes a command palette, and
   `luaplot-pages.md` is product law, so nothing may invent it. The owner must either record it in
   `docs/DESIGN.md` (what it lists, what it does, what it costs at 360px) or strike it from the ticket.
-- **T-35/T-36/T-39 (Android + release):** install cmdline-tools + platform 35 + NDK, the four rust
+- **T-35/T-39 (Android + release):** install cmdline-tools + platform 35 + NDK, the four rust
   android targets, then `tauri android init`. T-39 also needs a signing key and a `v0.1.0` tag, so it
-  follows T-35/T-36 rather than any CSS tick.
+  follows T-35. **T-36 is split:** (a) is the keyboard inset, doable and provable in Chromium (this
+  baton); the rest of T-36 — no clipped input **on a real APK**, hardware back-button mapping, 60fps
+  transcript scroll on device — still needs the toolchain above and stays blocked.
 - **Tauri on this box is NOT blocked — and the webview session proof is done.** `bun run tauri dev`
   opens, the account survives a restart in both directions, and the recipe above reproduces it.
 
@@ -141,7 +150,34 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
+- **Row count is 32 after T-36(a).** Row 32 shadows `visualViewport.height`; anything added after it
+  must assume the shadow is gone (`delete`s in `finally`) and the token is back to `0px`.
+- **The pressed-pill fill is a rule, not a one-off (T-48).** A control whose own background is
+  `--color-surface` cannot hold static accent text in Latte; pressed means accent **fill** +
+  `--color-accent-contrast`. `DESIGN.md` → *Contrast* carries it.
+
 ## Found while working (carried forward — keep this list growing)
+
+- **A hand sweep is a list; the gate is the guard (T-48).** T-37C moved every accent-text site it could
+  see in `src/styles.css` and reported the tree clean — `scripts/tier-check.mjs` then found **26** more
+  in `.tsrx` `<style>` blocks on its first run, including `.vote`/`.save` pressed pills on three pages.
+  When a rule can be checked mechanically, the sweep is not done until the check exists.
+- **A mark token in a *fallback* is still the mark.** `color: var(--color-success, var(--color-accent))`
+  paints accent text whenever the first token is missing; the fix is the text tier in the fallback, not
+  an exemption in the scanner.
+- **Mask, don't skip, when extracting CSS from a `.tsrx`.** Replacing non-`<style>` characters with
+  spaces (newlines kept) means an offset in the mask is an offset in the source, so `file:line` is the
+  file's own line — no remapping pass to get wrong.
+- **A scanner that takes file arguments can be proved red without touching the tree.** `node
+  scripts/tier-check.mjs $TMPDIR/x.css` on a copy is the whole proof; copy that shape for the next
+  static guard. An injected `<style>` must land *inside* the real block, or the tag text becomes part
+  of the preceding selector and the message reads oddly.
+- **`--color-accent-hover-text` clears `--color-surface` (4.66 Latte), but it is a hover's token.** There
+  is no *static* accent text tier that clears that backplate, so a static site there is a design
+  decision (fill, or drop the accent) — never a borrowed tier.
+- **Cron's shell blocks `bash -c` / `node -e` and `execute_code`.** A sweep like T-48's is a `.py` file
+  under `$TMPDIR` run with `python3`, and it must apply edits bottom-up per file so the line numbers it
+  read stay valid.
 
 - **A backtick inside a `js(…)` template literal ends the string.** A comment in row 31's page
   expression quoted `--color-surface` in backticks and node reported `Invalid left-hand side

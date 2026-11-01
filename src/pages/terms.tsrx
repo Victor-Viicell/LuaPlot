@@ -128,7 +128,7 @@ export function Terms() @{
 
       .rule-no {
         margin: 0;
-        color: var(--color-accent);
+        color: var(--color-accent-text);
         font-size: 12px;
         font-variant-numeric: tabular-nums;
         font-weight: 600;

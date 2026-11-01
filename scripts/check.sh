@@ -82,6 +82,16 @@ else
   FAIL=1
 fi
 
+# 8. The accent is a mark colour; it never paints text (T-48). Text takes --color-accent-text, a
+# text hover --color-accent-hover-text. src/styles.css AND every .tsrx <style> block are scanned.
+say "== tiers"
+if node scripts/tier-check.mjs; then
+  say "   tiers ok"
+else
+  say "   MARK PAINTING TEXT — text takes --color-accent-text / --color-accent-hover-text"
+  FAIL=1
+fi
+
 if [[ $FAIL -eq 0 ]]; then
   say "GREEN"
   exit 0

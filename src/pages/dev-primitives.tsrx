@@ -204,7 +204,7 @@ export function DevPrimitives() @{
 
       .chip.is-on {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        color: var(--color-accent-text);
       }
 
       .g-pan {

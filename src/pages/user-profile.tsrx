@@ -474,7 +474,7 @@ export function UserProfile() @{
 
       .type-chip.is-on {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        color: var(--color-accent-text);
       }
 
       .people {
@@ -609,7 +609,7 @@ export function UserProfile() @{
         }
 
         .person-link:hover .person-name {
-          color: var(--color-accent);
+          color: var(--color-accent-hover-text);
         }
       }
     </style>

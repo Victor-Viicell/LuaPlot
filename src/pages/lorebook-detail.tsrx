@@ -561,7 +561,8 @@ export function LorebookDetail() @{
       .vote[aria-pressed="true"],
       .save[aria-pressed="true"] {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        background-color: var(--color-accent);
+        color: var(--color-accent-contrast);
       }
 
       .vote:disabled,
@@ -776,7 +777,7 @@ export function LorebookDetail() @{
       }
 
       .menu-item:hover:not(:disabled) {
-        color: var(--color-accent);
+        color: var(--color-accent-hover-text);
       }
 
       .menu-item:disabled {

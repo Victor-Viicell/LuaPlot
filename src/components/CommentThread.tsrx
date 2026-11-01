@@ -516,7 +516,7 @@ export function CommentThread({
       }
 
       .signin a {
-        color: var(--color-accent);
+        color: var(--color-accent-text);
         text-decoration: underline;
         text-underline-offset: 3px;
       }
@@ -660,7 +660,7 @@ export function CommentThread({
 
       .act[aria-pressed="true"] {
         border-color: var(--color-accent);
-        color: var(--color-accent);
+        color: var(--color-accent-text);
       }
 
       .act:disabled {
@@ -695,14 +695,14 @@ export function CommentThread({
         border: 0;
         border-radius: 2px;
         background: none;
-        color: var(--color-accent);
+        color: var(--color-accent-text);
         font: inherit;
         font-size: 12px;
         cursor: pointer;
       }
 
       .fold-btn:hover {
-        color: var(--color-accent-hover);
+        color: var(--color-accent-hover-text);
         text-decoration: underline;
         text-underline-offset: 3px;
       }
