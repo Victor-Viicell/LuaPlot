@@ -3,6 +3,38 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-44 — the three dev pages walked, and the first breakpoint measured: 27 rows (2026-11-01)
+
+- **Changed:** `scripts/smoke.mjs` — three journeys (one per dev page) plus helpers `toggleSource` /
+  `toggleState` / `setToggle` (press the page's own `button.toggle`, then poll the rendered
+  `aria-pressed` for the value), `storeCell` (a `.count` cell by its `.count-label`),
+  `coveredCards`, `measureAt` (one `Emulation.setDeviceMetricsOverride` read) and the `BREAKPOINTS`
+  table. Row count and exit check 24 → 27; header comments in `smoke.mjs` / `smoke.sh`.
+  `/dev/state` flips Show+Blur through the page, reads the store back as `on · blur`, then proves
+  the *catalog* obeys it (4 `.card.is-covered`, then 0 after restoring the seed pair it recorded on
+  entry). `/dev/data` votes like on the first character and finds the write on
+  `/character/catalog` (the card ratio equals the adapter's answer) and on the character page's
+  Likes cell. `/dev/primitives` measures 360/640/900/1200 in a `try/finally` that clears the
+  override, asserting no document-level horizontal scroll, Button ≥ 44 at every width, the card
+  grid's track count, the Field gallery's columns, the rail/tab-bar swap at `md` and a 794px
+  reading column at 1200 (not the 360 layout stretched).
+- **Verified how:** `bash scripts/smoke.sh` **27/27** against the preview build and **27/27** with
+  `--live` against https://victor-viicell.github.io/LuaPlot/ (the dev routes resolve under
+  `/LuaPlot/`). Measured ladder, from the live row: `360:1col/field1/rail0/btn44/outlet340 ·
+  640:2col/field2/rail0/btn44/outlet620 · 900:3col/field2/rail84/btn44/outlet794 ·
+  1200:3col/field2/rail240/btn44/outlet794 — no horizontal scroll at any width`.
+  `./scripts/check.sh` **GREEN**; `scripts/publish.sh` → live 200, `assets/index-DpakDGV9.js`
+  (unchanged hash: scripts and docs only, no app source).
+- **Not verified / found:** (1) **the card grid is 1 / 2 / 3 / 3, not 1 / 2 / 3 / 4** — `styles.css`
+  stops at three columns at `lg` on purpose (a fourth would draw 163px cards in the 794px column),
+  so `docs/DESIGN.md`'s "1 / 2 / 3 / 4" was stale and is corrected in this commit; the row asserts
+  the stylesheet, not the old doc. (2) `.count-label` carries `text-transform: uppercase`, so
+  `innerText` returns `SHOW`/`LIKES` — a case-sensitive label match finds nothing and reads as a
+  missing cell; `storeCell` compares lowercased. (3) A vote on this fixture set moved the ratio
+  **96% → 96%** (rounding), which is why the `/dev/data` row also reads the character page's Likes
+  cell (97) instead of trusting the percentage alone. Not verified at all: the **bundled** Tauri
+  road and every Android/desktop ticket — still blocked (register at the bottom of `docs/NEXT.md`).
+
 ## T-43 — `/dev/native`'s five presses are walked, and the walk is twenty-four rows (2026-11-01)
 
 - **Changed:** `scripts/smoke.mjs` — five journeys, one per capability, each starting with

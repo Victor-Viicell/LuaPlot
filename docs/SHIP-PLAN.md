@@ -283,7 +283,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       guessed, because `App.tsrx` titles every non-root route). Two engine facts recorded: this
       Chromium answers `navigator.vibrate` truthy (T-34 measured `false`), so that row asserts one of
       the two legal verdicts instead of a literal.
-- [ ] **T-44 Walk the three remaining dev pages, and measure a breakpoint.** `/dev/state`,
+- [x] **T-44 Walk the three remaining dev pages, and measure a breakpoint.** `/dev/state`,
       `/dev/data` and `/dev/primitives` are the last pages a headless session can reach. Accept:
       three `scripts/smoke.mjs` journeys (27 rows) — the NSFW/session stores read back through a
       product page, one `/dev/data` mutation found again in `/character/catalog`, and `/dev/primitives`
@@ -292,6 +292,14 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Why next: the 24 rows all run at 360×740 — the contract's mandatory desktop responsiveness has
       never been measured by anything. Every other open ticket is blocked on hardware or a project ref
       (register in `docs/NEXT.md`).
+      — Landed as **27 rows**. The ladder as measured, live:
+      `360:1col/field1/rail0/btn44/outlet340 · 640:2col/field2/rail0/btn44/outlet620 ·
+      900:3col/field2/rail84/btn44/outlet794 · 1200:3col/field2/rail240/btn44/outlet794`.
+      The accept line's "a grid that gains columns" holds at `sm`/`md` and **stops at `lg`**: the
+      stylesheet keeps three columns because the reading column is 794px, so `DESIGN.md`'s
+      "1 / 2 / 3 / 4" was stale and was corrected here. `/dev/data` is proved by a round trip to
+      `/character/catalog` *and* the character page's Likes cell, because the card's ratio rounds
+      (96% → 96% on this fixture set).
 
 ## Failure bank (the ways this class of product breaks)
 

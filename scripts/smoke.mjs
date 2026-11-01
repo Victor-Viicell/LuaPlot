@@ -3,7 +3,7 @@
  * T-38 — one scripted walk of the primary journeys, against a build that ships.
  *
  * `node scripts/smoke.mjs [--url <base>]` drives a real Chromium over CDP (no dependency:
- * Node's global WebSocket plus `/json/new`), walks the twenty-four journeys **in one session** with
+ * Node's global WebSocket plus `/json/new`), walks the twenty-seven journeys **in one session** with
  * in-app navigation only, and prints one row per journey of `{journey, started, ended, evidence}`.
  * Exit code 1 when any row fails.
  *
@@ -537,6 +537,135 @@ async function openNative() {
   await go("/dev/native");
   await waitFor(`document.querySelectorAll(".cap").length === 5`, "/dev/native's five capability rows", 8000);
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * T-44 — `/dev/state`, `/dev/data`, and the first breakpoint the walk has ever measured.
+ *
+ * The dev pages print their state with stable class hooks (`.toggle` + `.toggle-label`,
+ * `.count` + `.count-label`, `.log`, `.cards .card`), so every assertion reads the *named* row
+ * rather than a text position. The breakpoint row is the first one that does not run at 360×740:
+ * it overrides the device metrics per width and **must** clear the override in a `finally`, or a
+ * throw mid-loop leaves every later row laid out at 1200 and the failures read as layout bugs.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** JS source for the `/dev/state` toggle whose `.toggle-label` is exactly `label`. */
+const toggleSource = (label) =>
+  `[...document.querySelectorAll("button.toggle")].find((e) => { const l = e.querySelector(".toggle-label"); return l && (l.innerText || "").trim() === ${JSON.stringify(label)}; })`;
+
+/** The `aria-pressed` of that toggle — the render, and therefore what a reader sees. */
+const toggleState = (label) =>
+  js(`const el = ${toggleSource(label)}; return el ? el.getAttribute("aria-pressed") : "";`);
+
+/**
+ * Drive a toggle to a known state through the page's own control, then poll the *rendered*
+ * `aria-pressed` for the value. The store's emit is a microtask after the press, so a single read
+ * right after `click()` can still see the old state — polling for the value is what makes the
+ * write proof rather than a race.
+ */
+async function setToggle(label, want) {
+  const target = want ? "true" : "false";
+  if ((await toggleState(label)) === target) return target;
+  const pressed = await js(`
+    const el = ${toggleSource(label)};
+    if (!el) return "";
+    el.scrollIntoView({ block: "center" });
+    el.click();
+    return el.getAttribute("aria-pressed");
+  `);
+  if (!pressed) throw new Error(`no toggle labelled ${JSON.stringify(label)} on ${await url()}`);
+  return waitFor(
+    `(() => { const el = ${toggleSource(label)}; const v = el ? el.getAttribute("aria-pressed") : ""; return v === ${JSON.stringify(target)} ? v : ""; })()`,
+    `the "${label}" toggle to read ${target}`,
+    6000,
+  );
+}
+
+/**
+ * One `.count` cell of the dev pages' counts strip, by its `.count-label`.
+ *
+ * The comparison is case-insensitive on purpose: `.count-label` carries `text-transform: uppercase`,
+ * and `innerText` returns the **rendered** text ("SHOW", "LIKES"), not the source ("Show", "Likes").
+ * A case-sensitive match finds nothing and reads as a missing cell rather than a casing difference.
+ */
+const storeCell = (label) =>
+  js(`
+    const wanted = ${JSON.stringify(label.toLowerCase())};
+    const cell = [...document.querySelectorAll(".count")].find((c) => {
+      const l = c.querySelector(".count-label");
+      return l && (l.innerText || "").trim().toLowerCase() === wanted;
+    });
+    if (!cell) return "";
+    const v = cell.querySelector(".count-value");
+    return v ? v.innerText.trim() : "";
+  `);
+
+/** How many cards on this listing draw the cover — the only DOM fact the Blur preference has. */
+async function coveredCards() {
+  await waitFor(`document.querySelector(".card-grid") !== null`, "the card grid", 8000);
+  await sleep(200);
+  return js(`return document.querySelectorAll(".card.is-covered").length;`);
+}
+
+/**
+ * Read one breakpoint. `Emulation.setDeviceMetricsOverride` is the only honest way to change the
+ * viewport in this session (a CSS `data-theme`-style JS flip would change nothing; a window resize
+ * would kill the profile's one browser). `mobile: false` keeps the desktop layout ladder — the
+ * walk is measuring `sm`/`md`/`lg`, not a phone emulation.
+ */
+async function measureAt(width) {
+  await send("Emulation.setDeviceMetricsOverride", {
+    width,
+    height: 740,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  // Two frames for the media queries to settle: the ladder is CSS, and `getComputedStyle` reads
+  // the winning rule, not a value that animates in.
+  await sleep(260);
+  return js(`
+    const trackCount = (el) => {
+      if (!el) return -1;
+      const tracks = getComputedStyle(el).gridTemplateColumns.split(" ").filter((t) => t.trim() !== "");
+      return tracks.length;
+    };
+    const section = (name) => [...document.querySelectorAll(".g-sec")].find((s) => {
+      const h = s.querySelector(".g-sec-title");
+      return h && (h.innerText || "").trim().toLowerCase() === name;
+    });
+    const buttonSec = section("button");
+    const fieldSec = section("field");
+    const heights = buttonSec ? [...buttonSec.querySelectorAll(".btn")].map((b) => b.getBoundingClientRect().height) : [];
+    const rail = document.querySelector(".rail");
+    const outlet = document.querySelector(".outlet");
+    const tabbar = document.querySelector(".tabbar");
+    return {
+      viewport: window.innerWidth,
+      scroll: document.documentElement.scrollWidth,
+      minButton: heights.length ? Math.round(Math.min(...heights)) : -1,
+      grid: trackCount(document.querySelector(".card-grid")),
+      fields: fieldSec ? trackCount(fieldSec.querySelector(".g-grid")) : -1,
+      rail: rail ? Math.round(rail.getBoundingClientRect().width) : -1,
+      outlet: outlet ? Math.round(outlet.getBoundingClientRect().width) : -1,
+      tabbar: tabbar ? getComputedStyle(tabbar).display : "",
+    };
+  `);
+}
+
+/**
+ * The ladder the stylesheet actually fixes: 1/2/3/3 card columns, one Field column then two, no
+ * bottom bar at `md`, a rail that widens at `lg`.
+ *
+ * **The grid stops at three, on purpose** (`styles.css`, `.card-grid` @1200): the outlet is one A4
+ * page wide (794px), so a fourth column would draw 163px cards with a 54px thumbnail. `DESIGN.md`
+ * still claimed "1 / 2 / 3 / 4" until T-44 measured it and found three; the row asserts the
+ * stylesheet's decision, and the docs line was corrected in the same commit.
+ */
+const BREAKPOINTS = [
+  { width: 360, grid: 1, fields: 1, rail: 0 },
+  { width: 640, grid: 2, fields: 2, rail: 0 },
+  { width: 900, grid: 3, fields: 2, rail: 1 },
+  { width: 1200, grid: 3, fields: 2, rail: 1 },
+];
 
 const rows = [];
 const stamp = new Date().toISOString();
@@ -1096,6 +1225,189 @@ results.push(
   }),
 );
 
+/**
+ * T-44 — the three dev pages that never had a row, one journey each.
+ *
+ * `/dev/state` is the store seam: the row flips the NSFW pair **through the page's own control**
+ * and then reads the catalog, because the whole argument of a module-scope store is that a page
+ * that re-read it into local state would drift. `/dev/data` is a mutation seam, so it is proved by
+ * a round trip to a product page, never by the dev page's own log line. `/dev/primitives` is the
+ * gallery, and it carries the walk's first breakpoint measurement.
+ */
+
+results.push(
+  await journey("read the stores on /dev/state (the catalog obeys the same pair)", async () => {
+    await go("/dev/state");
+    await waitFor(`document.querySelectorAll("button.toggle").length === 2`, "/dev/state's two toggles", 8000);
+    const badges = await js(`const b = document.querySelector(".badges"); return b ? b.innerText.replace(/\\s+/g, " ").trim() : "";`);
+    if (!/signed in/.test(badges) || !/@you/.test(badges)) throw new Error(`the session badges read ${JSON.stringify(badges)}`);
+
+    // The pair as this session found it — recorded, never assumed. The row restores exactly this,
+    // so the rows before it and after it read the catalog the way they were written to.
+    const seedShow = (await toggleState("Show NSFW content")) === "true";
+    const seedBlur = (await toggleState("Blur NSFW content")) === "true";
+
+    await setToggle("Show NSFW content", true);
+    await setToggle("Blur NSFW content", true);
+    const on = await storeCell("Show");
+    if (on !== "on · blur") throw new Error(`the counts strip reads Show "${on}" after both toggles went on`);
+
+    await go("/character/catalog");
+    const coveredOn = await coveredCards();
+    if (coveredOn < 1) throw new Error("the catalog drew no cover with Show + Blur on — the listing is not reading the store");
+
+    await go("/dev/state");
+    await waitFor(`document.querySelectorAll("button.toggle").length === 2`, "/dev/state's two toggles after the hop", 8000);
+    await setToggle("Show NSFW content", seedShow);
+    await setToggle("Blur NSFW content", seedBlur);
+    const restored = `${await storeCell("Show")}/${await storeCell("Blur")}`;
+
+    await go("/character/catalog");
+    const coveredBack = await coveredCards();
+    const expectedBack = seedShow && seedBlur ? coveredOn : 0;
+    if (coveredBack !== expectedBack) {
+      throw new Error(`after restoring Show ${seedShow} / Blur ${seedBlur} the catalog drew ${coveredBack} covers, not ${expectedBack}`);
+    }
+    return `session "${badges}" · Show+Blur on → ${coveredOn} covered cards · restored to ${restored} → ${coveredBack}`;
+  }),
+);
+
+results.push(
+  await journey("mutate on /dev/data (the write reaches the catalog, one round trip)", async () => {
+    await go("/dev/data");
+    await waitFor(`document.querySelectorAll(".cards .card").length > 0`, "the dev page's character cards", 10000);
+    // The dev page's own counter, and the first character's row. `characters[0]` is the adapter's
+    // newest, which is also the catalog's first card under the default sort — that is what makes
+    // the second read comparable at all.
+    const countsBefore = await storeCell("Characters");
+    const first = await js(`
+      const card = document.querySelector(".cards .card");
+      if (!card) return null;
+      const link = card.querySelector("a.card-title");
+      const ratio = card.querySelector(".card-ratio");
+      return {
+        name: link ? link.innerText.trim() : "",
+        path: link ? new URL(link.getAttribute("href"), location.href).pathname : "",
+        ratio: ratio ? ratio.innerText.trim() : "",
+      };
+    `);
+    if (!first || !first.name || !first.path) throw new Error("/dev/data drew a card with no title link");
+
+    await click("Vote like", { exact: true });
+    const log = await waitFor(
+      `(() => { const el = document.querySelector(".log"); const t = el ? el.innerText.replace(/\\s+/g, " ").trim() : ""; return /became/.test(t) ? t : ""; })()`,
+      "the mutation log to print the vote",
+      8000,
+    );
+    const claim = log.match(/^vote like on (.+?): (\d+)\/(\d+) became (\d+)\/(\d+), ratio (\d+)%\./);
+    if (!claim) throw new Error(`the log line reads ${JSON.stringify(log)}`);
+    const [, votedName, likesBefore, , likesAfter, , logRatio] = claim;
+    if (votedName !== first.name) throw new Error(`the log voted on "${votedName}", the first card is "${first.name}"`);
+    if (Number(likesAfter) !== Number(likesBefore) + 1) {
+      throw new Error(`the adapter's own answer went ${likesBefore} → ${likesAfter} likes; one vote is one like`);
+    }
+    // A vote is not an append, so the count strip must not move: captured here for the evidence
+    // line, not asserted as a delta — the ticket's warning about a non-idempotent mutation applies
+    // to a write that adds a row, and this one is deliberately a toggle-shaped write.
+    const countsAfter = await storeCell("Characters");
+
+    // The path the card links to, rebased on the served base (`/LuaPlot/` on Pages).
+    const basePath = new URL(BASE).pathname;
+    const cardPath = first.path.startsWith(basePath) ? first.path.slice(basePath.length - 1) : first.path;
+
+    await go("/character/catalog");
+    await waitFor(`document.querySelectorAll(".card").length > 0`, "the catalog grid", 10000);
+    const cardRatio = await waitFor(
+      `(() => {
+        const card = [...document.querySelectorAll(".card")].find((c) => {
+          const a = c.querySelector("a.card-title");
+          return a && a.innerText.trim() === ${JSON.stringify(first.name)};
+        });
+        const r = card ? card.querySelector(".card-ratio") : null;
+        return r ? r.innerText.trim() : "";
+      })()`,
+      `the catalog card for "${first.name}"`,
+      10000,
+    );
+    if (cardRatio !== `${logRatio}%`) {
+      throw new Error(`the catalog card reads ${cardRatio}, the adapter answered ${logRatio}% (it read ${first.ratio} before the vote)`);
+    }
+
+    await go(cardPath);
+    const likesCell = await waitFor(
+      `(() => {
+        const ul = document.querySelector('ul.counts[aria-label="Engagement"]');
+        if (!ul) return -1;
+        const cell = [...ul.querySelectorAll("li.count")].find((c) => {
+          const l = c.querySelector(".count-label");
+          return l && l.innerText.trim().toLowerCase() === "likes";
+        });
+        const v = cell ? cell.querySelector(".count-value") : null;
+        return v ? Number(v.innerText.trim()) : -1;
+      })()`,
+      "the character's Likes cell",
+      8000,
+    );
+    if (likesCell !== Number(likesAfter)) {
+      throw new Error(`the character page reads ${likesCell} likes, the adapter answered ${likesAfter}`);
+    }
+    return `Characters ${countsBefore} → ${countsAfter} · ${log} · catalog ${first.ratio} → ${cardRatio}, page Likes ${likesCell}`;
+  }),
+);
+
+results.push(
+  await journey("measure /dev/primitives at 360/640/900/1200 (a reflow, not a stretched phone)", async () => {
+    await go("/dev/primitives");
+    await waitFor(
+      `document.querySelector(".card-grid") !== null && document.querySelector(".g-stage") !== null`,
+      "the gallery and its card grid",
+      10000,
+    );
+    const restore = await js(`return window.innerWidth;`);
+    const seen = [];
+    try {
+      for (const step of BREAKPOINTS) {
+        const m = await measureAt(step.width);
+        if (m.viewport !== step.width) {
+          throw new Error(`the metrics override asked for ${step.width}px and the page measured ${m.viewport}px`);
+        }
+        if (m.scroll - m.viewport > 0) {
+          throw new Error(`at ${step.width}px the document scrolls horizontally: scrollWidth ${m.scroll} > innerWidth ${m.viewport}`);
+        }
+        if (m.minButton < 44) {
+          throw new Error(`at ${step.width}px a Button is ${m.minButton}px tall, under the 44px floor`);
+        }
+        if (m.grid !== step.grid) {
+          throw new Error(`at ${step.width}px the card grid has ${m.grid} tracks, not ${step.grid}`);
+        }
+        if (m.fields !== step.fields) {
+          throw new Error(`at ${step.width}px the Field gallery has ${m.fields} columns, not ${step.fields}`);
+        }
+        if (step.rail === 0 ? m.rail !== 0 : m.rail <= 0) {
+          throw new Error(`at ${step.width}px the shell's rail measures ${m.rail}px (expected ${step.rail === 0 ? "hidden" : "visible"})`);
+        }
+        if (step.rail === 0 && m.tabbar === "none") {
+          throw new Error(`at ${step.width}px the bottom tab bar is already gone: that is the md layout at a phone width`);
+        }
+        if (step.rail === 1 && m.tabbar !== "none") {
+          throw new Error(`at ${step.width}px the bottom tab bar survives beside the rail: the rail layout is a stretched phone`);
+        }
+        if (step.width === 1200 && m.outlet >= m.viewport - 200) {
+          throw new Error(`at 1200px the reading column is ${m.outlet}px wide in a ${m.viewport}px viewport — the 360 layout, stretched`);
+        }
+        seen.push(`${step.width}:${m.grid}col/field${m.fields}/rail${m.rail}/btn${m.minButton}/outlet${m.outlet}`);
+      }
+    } finally {
+      // A leaked override is the trap: every later row would run at 1200 and read as a layout bug.
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const back = await js(`return window.innerWidth;`);
+    if (back !== restore) throw new Error(`the override cleared to ${back}px, but the session runs at ${restore}px`);
+    return `${seen.join(" · ")} — no horizontal scroll at any width`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -1119,4 +1431,4 @@ console.log(`smoke: ${passed}/${rows.length} journeys`);
 for (const row of rows) {
   console.log(`${row.ok ? "PASS" : "FAIL"} | ${row.journey} | ${row.ended - row.started}ms | ${row.evidence}`);
 }
-process.exit(passed === rows.length && rows.length === 24 ? 0 : 1);
+process.exit(passed === rows.length && rows.length === 27 ? 0 : 1);

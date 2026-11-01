@@ -370,8 +370,12 @@ list, so the decisions below are the ones they inherit.
   extra Tab from its title, and the Reveal is never inside the blur.
 - **Grid: a gutter grid, not the 1px-gap count strip.** `CardGrid` is a `<ul class="card-grid">` of
   `li.card-cell`, cards keep their own 1px border and 6px radius: gap 12px at 360, 16px from `sm`,
-  20px at `lg`; columns 1 / 2 / 3 / 4 at 360 / 640 / 900 / 1200. The count-strip gesture needs square
-  corners and the design law keeps cards at 6px, so it was rejected. Cells stretch to equal height
+  20px at `lg`; columns **1 / 2 / 3 / 3** at 360 / 640 / 900 / 1200. The fourth column was dropped
+  when the reading column became one A4 page wide (794px): 794 minus three 20px gaps leaves 163px
+  cards with a 54px thumbnail, so the grid stops growing with the viewport because the column does.
+  T-44 measured this in the walk and corrected the stale "1 / 2 / 3 / 4" that stood here. The
+  count-strip gesture needs square corners and the design law keeps cards at 6px, so it was
+  rejected. Cells stretch to equal height
   (`li` flex, `.card` flex: 1) so a two-line tagline does not leave a ragged grid.
 - **The grid owns the pref, the card owns the drawing.** `CardGrid` takes `blurNsfw` (the account's
   Blur preference, read by the page from the store) and ANDs it with each item's own flag. With Blur
