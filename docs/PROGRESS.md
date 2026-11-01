@@ -3,6 +3,34 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-34 — the native bridge, with the web road proven and the plugin rung inert (2026-10-31)
+
+- **Changed:** `src/lib/native.ts` — five capabilities (`haptic`, `shareText`, `copy`, `pickImage`,
+  `setBadge`) over one ladder: `invoke("plugin:<name>|<command>")` → the web API → `unsupported`.
+  `isNative()` reads `window.__TAURI_INTERNALS__` at runtime; every Tauri import is dynamic inside
+  that branch, memoised, and a rejected `invoke` is *absent* rather than *failed*, so the web road
+  runs even though `src-tauri` registers no haptics/badge/clipboard/dialog plugin yet (installing
+  one is one string in `COMMANDS`). Added `nativeResultSchema` (`{ok,value?}|{ok:false,reason}`,
+  `reason` = `unsupported|cancelled|failed`), `hapticKindSchema`, `sharePayloadSchema`,
+  `clipboardTextSchema`, `badgeCountSchema` to `schema.ts`, and `/dev/native` — five rows whose
+  "road" column is imported from the module, a 44px button each, and a six-deep log of the parsed
+  answers.
+- **Verified how:** `./scripts/check.sh` GREEN (30 routes, schema ok, build ok); `bun run smoke`
+  **12/12** after the router change. In Chromium against `preview :4321`: `copy` on a *synthetic*
+  click answered `unsupported` (clipboard needs a trusted gesture, and `execCommand` needs one too)
+  and on a **real CDP click** answered `ok · LuaPlot · the native bridge` — the gesture rule is now
+  measured, not asserted; `shareText` answered `ok · copied` (no `navigator.share` here, so it fell
+  to the clipboard); `haptic` answered `unsupported` (`navigator.vibrate` exists but returns false —
+  no motor); `setBadge(3)` wrote `(3) 🐴 Native — LuaPlot` and `setBadge(0)` restored the title
+  with no double prefix; dismissing the picker answered `cancelled` and removed its input. Bundle:
+  `dist/assets/index-*.js` has **zero** `@tauri-apps` strings and `performance.getEntries` shows
+  **zero** `core-*.js` requests in the browser — the chunk exists (`core-CwBWH9_g.js`) and is only
+  referenced by a dynamic `import()` in the dev-native chunk. Widths 360/640/900/1200: no
+  horizontal overflow, buttons 44px.
+- **Not verified:** the shell side — `bun run tauri dev` was not run (no window in this session), so
+  rung 1 is untested by construction; the badge on a real home screen and haptics on a device are
+  T-36's acceptance, not this ticket's.
+
 ## Profile cards, personas as a component, and the scoped-CSS bug behind the missing gap (2026-10-31)
 
 - **Found the cause of "no gap for the creation tabs":** `user-profile.tsrx` had its `<style>` block

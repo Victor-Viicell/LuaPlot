@@ -167,6 +167,12 @@ sanctioned sub-44 target, because a token chip is a label with a corner, not a s
   a wired one look identical otherwise). Same chrome as `/dev/data` — kicker, 26px title, lede,
   badge row, 1px-gap count strip — because a dev page that invents its own look stops being
   evidence.
+- **Native page.** `/dev/native` (T-34) is the fourth: five capability rows, each with the road
+  imported from `lib/native.ts` (so the page cannot drift), one 44px `Button` per row, and a
+  six-deep log of the **parsed** `nativeResultSchema` answers. A row's last answer prints inline
+  under its roads. It is the only place a hardware fallback is visible at all: a fallback that ran
+  and a capability that was never wired look identical on a product screen, which is exactly why
+  the log shows `{ok,value}` or `{ok,reason}` rather than "done".
 - **Dev block in the overflow menu.** The menu keeps its three product destinations, then a hairline
   and a **Preview only · not a product control** block: the sign-in/sign-out switch, one line of
   NSFW state read as a sentence (*listed, blurred* / *hidden from listings* / *off (signed out)*),

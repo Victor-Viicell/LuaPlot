@@ -208,8 +208,11 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 
 - [ ] **T-33 Tauri shell hardening.** Window sizing per breakpoint, persistent session, deep-link
       handling, `Ctrl/Cmd+K`. Accept: `bun run tauri dev` opens the app on desktop.
-- [ ] **T-34 Native bridge.** `lib/native.ts` with haptics, share, clipboard, image picker, badge;
+- [x] **T-34 Native bridge.** `lib/native.ts` with haptics, share, clipboard, image picker, badge;
       browser fallbacks proven. Accept: web build has zero Tauri imports in the bundle graph.
+      — `nativeResultSchema` on every call, ladder plugin → web API → `unsupported`, dynamic
+      `@tauri-apps/api/core` chunk (`core-*.js`) that the browser never requests (measured), and
+      `/dev/native` exercising all five. Rung 1 is inert: no plugin is compiled into `src-tauri`.
 - [ ] **T-35 Android toolchain.** Install cmdline-tools + platform 35 + NDK, rust targets
       `aarch64-linux-android`/`armv7`/`i686`/`x86_64`, `tauri android init`. Accept: debug APK
       builds; note the exact commands in PROGRESS.
@@ -229,6 +232,11 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       — `scripts/smoke.mjs` (+ `scripts/smoke.sh`, `bun run smoke`) walks all twelve in one session at
       360×740 and asserts on the DOM at every step; 12/12, ~7s; `--live` walks the published URL.
 - [ ] **T-39 Release.** Signed Android APK, desktop AppImage, README with links, tag `v0.1.0`.
+- [ ] **T-40 Two stale renders the walk cannot see.** `/character/[id]/edit` can show another
+      character's name in its fields when read ~1.5s after navigation (a 1.8s read sees the right
+      one), and `/moderation/[case.id]`'s *THE ITEM* panel keeps the old body after *Conclude* until
+      a reload. Accept: an edit form's inputs always hold the character named in the URL, and the
+      item panel re-renders the outcome in place; both proven by a `scripts/smoke.mjs` step.
 
 ## Failure bank (the ways this class of product breaks)
 

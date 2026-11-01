@@ -1407,6 +1407,67 @@ export const profileCreationTypeSchema = z.enum(["all", "character", "lorebook",
 export const profileTabSchema = z.enum(["creations", "posts", "followers", "following"]);
 
 /* ------------------------------------------------------------------------------------------------
+ * Native boundary — what a hardware capability answers (T-34, `docs/ARCHITECTURE.md` → *Native
+ * boundary*)
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * Why a capability did not happen — three reasons that call for three different reactions.
+ *
+ * - `unsupported`: this build has no road at all (a desktop browser has no vibration motor, and
+ *   `navigator.vibrate` answers `false` or is absent). Nothing to report; a page stays silent.
+ * - `cancelled`: a person dismissed a system sheet. `navigator.share` rejects with `AbortError`
+ *   precisely here, and a toast on cancel is a bug — the person said no on purpose.
+ * - `failed`: a road existed and broke (a blocked clipboard, a plugin that threw). The only one
+ *   worth a retry affordance.
+ */
+export const nativeUnavailableReasonSchema = z.enum(["unsupported", "cancelled", "failed"]);
+
+/**
+ * The one answer every capability in `lib/native.ts` returns — a typed result, never
+ * `void | throw`, so a page renders *nothing happened* without a `try` (T-34).
+ *
+ * `value` is the human-meaningful echo of what actually happened: the copied text, the picked
+ * file's name, the road that answered. It is a string on purpose — the result is a **report**, not
+ * a carrier; nothing downstream parses it back into an object.
+ */
+export const nativeResultSchema = z.discriminatedUnion("ok", [
+  z.strictObject({ ok: z.literal(true), value: z.string().optional() }),
+  z.strictObject({ ok: z.literal(false), reason: nativeUnavailableReasonSchema }),
+]);
+
+/**
+ * The haptic intensities `haptic()` accepts. A name, not a millisecond count: the shell's plugin
+ * and `navigator.vibrate` take different units, and the pattern belongs inside the module.
+ */
+export const hapticKindSchema = z.enum(["light", "medium", "heavy", "success", "warning", "error"]);
+
+/** Text a capability may copy: non-empty after trimming, or there is nothing to copy. */
+export const clipboardTextSchema = z.string().trim().min(1);
+
+/**
+ * A share sheet's payload (`systems/notifications.md` has no share control yet — this is the
+ * capability only, T-34 wires no button). At least one field carries something; a bare url shares.
+ */
+export const sharePayloadSchema = z
+  .strictObject({
+    title: z.string().trim().min(1).optional(),
+    text: z.string().trim().min(1).optional(),
+    url: z.string().trim().min(1).optional(),
+  })
+  .refine((payload) => Boolean(payload.title ?? payload.text ?? payload.url), {
+    message: "A share needs a title, a text or a url.",
+  });
+
+/** The app badge: `0` clears it, and 99 is the ceiling a home-screen badge shows anyway. */
+export const badgeCountSchema = z.number().int().min(0).max(99);
+
+export type NativeResult = z.infer<typeof nativeResultSchema>;
+export type NativeUnavailableReason = z.infer<typeof nativeUnavailableReasonSchema>;
+export type HapticKind = z.infer<typeof hapticKindSchema>;
+export type SharePayload = z.infer<typeof sharePayloadSchema>;
+
+/* ------------------------------------------------------------------------------------------------
  * Collections — what the adapter loads and what `schema:check` parses
  * ---------------------------------------------------------------------------------------------- */
 

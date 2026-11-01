@@ -208,10 +208,29 @@ model turn.
 
 ## Native boundary
 
-`lib/native.ts` exports async functions that dynamically `import()` Tauri plugins and fall back to
-browser behaviour when `window.__TAURI_INTERNALS__` is missing: `haptic()`, `shareText()`,
-`copy()`, `pickImage()`, `setBadge()`. Hardware features are added here, never called inline from a
-page. Android/iOS builds must keep every web path working.
+`lib/native.ts` is the only place hardware is touched; a page never imports a Tauri module.
+
+- **Capabilities** (T-34): `haptic(kind)`, `shareText(payload)`, `copy(text)`, `pickImage()`,
+  `setBadge(count)`.
+- **Every call answers `nativeResultSchema`** — `{ ok: true, value? } | { ok: false, reason }` with
+  `reason` in `unsupported | cancelled | failed` — so a page renders *nothing happened* without a
+  `try`, and a dismissed share sheet (`AbortError`) reads `cancelled`, never `failed`.
+- **The ladder is plugin → web API → unsupported.** `isNative()` is a runtime read of
+  `window.__TAURI_INTERNALS__`, never an `import.meta.env` flag (a build flag would make the Pages
+  build pretend). All Tauri imports are dynamic and sit **inside** that branch, so Vite emits them
+  as a separate chunk the browser never requests — measured on `/dev/native`: zero `core-*.js`
+  requests, and `dist/assets/index-*.js` contains no `@tauri-apps` string.
+- **Rung 1 is inert today**: `src-tauri` registers `opener` only, so the `plugin:haptics`,
+  `plugin:badge`, `plugin:clipboard-manager` and `plugin:dialog` commands in `COMMANDS` are not
+  compiled in. `invoke()` rejecting reads as *absent*, which is why the web road answers and the
+  module could ship before the plugins exist. Installing one is `Cargo.toml` +
+  `capabilities/default.json` + one string in `COMMANDS`; no caller changes.
+- **The clipboard is a three-rung chain** (`plugin` → `navigator.clipboard` → hidden textarea +
+  `execCommand`) because the middle rung needs a **user gesture in a secure context** — proven, not
+  assumed: a synthetic click on `/dev/native` answers `unsupported`, a real one answers `ok`.
+- **Nothing is wired to a control yet**: no spec asks for Share, the badge belongs to no page
+  (`notifications.md` describes an unread *pill*), and T-31's uploader does not exist. `/dev/native`
+  is the harness that exercises them; a ticket that adds a control calls the module.
 
 ## Open decisions (do not silently resolve)
 

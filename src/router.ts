@@ -241,6 +241,12 @@ export const ROUTES: RouteDef[] = [
     access: "public",
     page: () => import("./pages/dev-state.tsrx"),
   },
+  {
+    path: "/dev/native",
+    title: "Native",
+    access: "public",
+    page: () => import("./pages/dev-native.tsrx"),
+  },
 ];
 
 /** A param segment carries a predicate, so the table can hand a schema rule in directly. */
