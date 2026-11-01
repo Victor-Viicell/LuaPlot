@@ -241,12 +241,25 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       created from the row the URL names (measured: the only stale frame is the shell's own
       transition, ~1 frame before the outlet's skeleton). The case half was real and is fixed: the
       post chip read a hard-coded `No visibility`, so a concluded *Removed* case still said nothing
-      had happened. Both are now steps in the walk (13/13).
-- [ ] **T-41 Walk the other three authored forms.** `/persona/[id]/edit`, `/preset/[id]/edit` and
+      had happened. Both are now steps in the walk (13 rows then; 16 after T-41).
+- [x] **T-41 Walk the other three authored forms.** `/persona/[id]/edit`, `/preset/[id]/edit` and
       `/lorebook/[id]/edit` mount the same phase-union → skeleton → form pattern as the character
       editor and no session has ever opened one. Accept: three new `scripts/smoke.mjs` journeys
       (16 rows) each proving preload identity twice, a real save, and the saved value on the detail
       page. Why next: it is the only work left that a headless session can verify.
+      — All three walked clean; no defect reproduced. The walk is 16 rows: a fifth lorebook entry
+      block that the detail page then prints, a preset model change that leaves the description
+      intact, and a persona tagline that reaches both the detail page and the collection card (plus
+      the *missing* sentence that replaces `forbidden` for a persona). Two read-back helpers
+      (`retype`, `choose`) now make every field edit a two-read proof.
+- [ ] **T-42 The refusal states have never been walked.** Every authored edit route declares a
+      `missing` / `forbidden` / `error` union and the walk only ever opens the `ready` arm: a
+      fixture owned by someone else must read *isn't yours to edit* and an unused id in the right
+      bucket must read the form's own *doesn't exist* sentence. Accept: four new journeys (20 rows)
+      over `/character`, `/lorebook`, `/preset` on a row owned by `ada` (forbidden) and on a dead id
+      (missing), each asserting the exact sentence and that the refusal offers the main action's
+      destination. Why next: read-only, fixture-backed, and the only remaining coverage a headless
+      session can prove.
 
 ## Failure bank (the ways this class of product breaks)
 

@@ -3,7 +3,7 @@
  * T-38 — one scripted walk of the primary journeys, against a build that ships.
  *
  * `node scripts/smoke.mjs [--url <base>]` drives a real Chromium over CDP (no dependency:
- * Node's global WebSocket plus `/json/new`), walks the twelve journeys **in one session** with
+ * Node's global WebSocket plus `/json/new`), walks the sixteen journeys **in one session** with
  * in-app navigation only, and prints one row per journey of `{journey, started, ended, evidence}`.
  * Exit code 1 when any row fails.
  *
@@ -261,6 +261,68 @@ async function type(selector, value, nth = 0) {
   await sleep(60);
 }
 
+/**
+ * Type into the nth matching field with real key events, **replacing** what it held.
+ *
+ * T-41 needs this where the character step only appended: a form preloaded from a row has a caret
+ * wherever Chrome put it after `focus()`, so an append would prove nothing about the edit. The
+ * selection is set on the element (not through a keystroke), the text arrives through
+ * `Input.insertText` — a real input event the bindings hear — and the value is read back and
+ * compared before the step returns, so every use is a two-read proof on its own.
+ */
+async function retype(selector, value, nth = 0) {
+  const ok = await js(`
+    const el = [...document.querySelectorAll(${JSON.stringify(selector)})].filter((e) => e.getBoundingClientRect().height > 0)[${nth}];
+    if (!el) return false;
+    el.scrollIntoView({ block: "center" });
+    el.focus();
+    if (typeof el.setSelectionRange === "function" && typeof el.value === "string") {
+      el.setSelectionRange(0, el.value.length);
+    }
+    return true;
+  `);
+  if (!ok) throw new Error(`no field ${selector}[${nth}] on ${await url()}`);
+  await send("Input.insertText", { text: value });
+  await sleep(60);
+  const read = await js(`
+    const el = [...document.querySelectorAll(${JSON.stringify(selector)})].filter((e) => e.getBoundingClientRect().height > 0)[${nth}];
+    return el ? el.value : "";
+  `);
+  if (read !== value) throw new Error(`${selector}[${nth}] reads ${JSON.stringify(read)} after typing ${JSON.stringify(value)}`);
+  return read;
+}
+
+/**
+ * Drive a native `<select>` by value plus a real `change` event. Its popup cannot be clicked in
+ * headless Chromium, so the value is the honest road — and it is read back, so a control that
+ * ignored the choice fails here rather than on the page it was supposed to change.
+ */
+async function choose(selector, value) {
+  const read = await js(`
+    const el = document.querySelector(${JSON.stringify(selector)});
+    if (!el) return null;
+    if (el.value !== ${JSON.stringify(value)}) {
+      el.value = ${JSON.stringify(value)};
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return el.value;
+  `);
+  if (read === null) throw new Error(`no ${selector} on ${await url()}`);
+  if (read !== value) throw new Error(`${selector} reads ${JSON.stringify(read)} after choosing ${JSON.stringify(value)}`);
+  await sleep(80);
+  return read;
+}
+
+/** One row of a preset detail page's *Generation settings* list, read by its term. */
+const settingValue = (term) =>
+  js(`
+    const s = document.querySelector('section[aria-label="Generation settings"]');
+    if (!s) return "";
+    const row = [...s.querySelectorAll("dt")].find((d) => (d.innerText || "").trim().toLowerCase() === ${JSON.stringify(String(term).toLowerCase())});
+    const dd = row && row.parentElement ? row.parentElement.querySelector("dd") : null;
+    return dd ? dd.innerText.trim() : "";
+  `);
+
 /** In-app hop: exactly what `router.navigate()` does — pushState then the router's popstate. */
 async function go(path) {
   // Resolve against the served base (`/` in Tauri and preview, `/LuaPlot/` on Pages): a leading
@@ -313,8 +375,20 @@ const POST_2 = "/post/90570000-0000-4000-8000-000000000002";
  */
 const POST_REPORTED = "/post/90570000-0000-4000-8000-000000000008";
 const OWN_PRIVATE_CHARACTER = "/character/c0a1b2c3-0000-4000-8000-00000000001c";
+/**
+ * T-41 — the three authored forms that mount the same shape as `/character/[id]/edit` and had never
+ * been opened by a session. Row 1 of each fixture type is the one `you` owns; rows 2+ belong to
+ * `ada`, `bram` and `mira`, so they are the *forbidden* state and cannot be edited here.
+ */
+const OWN_LOREBOOK_EDIT = "/lorebook/10eb00c5-0000-4000-8000-000000000001/edit";
+const OWN_PRESET_EDIT = "/preset/9e5e7000-0000-4000-8000-000000000001/edit";
+const OWN_PERSONA_EDIT = "/persona/9e45014a-0000-4000-8000-000000000001/edit";
+/** An id in the persona bucket that no row uses: personas read *missing* where the others forbid. */
+const NO_PERSONA_EDIT = "/persona/9e45014a-0000-4000-8000-0000000000ff/edit";
 const ownPost = `Smoke walk ${stamp.slice(11, 19)}: a body written by the walk itself.`;
 const ownComment = `Smoke reply ${stamp.slice(11, 19)}: the comment the walk types.`;
+const ownEntry = `Smoke entry ${stamp.slice(11, 19)}: a tide-mark typed into a block that did not exist.`;
+const ownTagline = `Blunt, curious, and reading the whole ledger aloud (${stamp.slice(11, 19)}).`;
 let newPostPath = "";
 
 console.log(`smoke: ${BASE} @ 360x740`);
@@ -477,6 +551,116 @@ results.push(
 );
 
 results.push(
+  await journey("edit an own lorebook (a new entry reaches the page)", async () => {
+    // T-41. `LorebookForm` has had two hosts since T-18 and no session had ever opened the edit
+    // one: the preload and the write were both assumptions. Edit, not create (the baton's choice per
+    // form): it proves the preload *and* the write in one step, and the row budget stays honest.
+    await go(OWN_LOREBOOK_EDIT);
+    await waitFor(`document.querySelector("form input") !== null`, "the lorebook form", 8000);
+    const first = await waitFor(
+      `(() => { const el = document.querySelector("form input"); return el && el.value === "The Salt Archive" ? el.value : ""; })()`,
+      "the form to be pre-filled from its own row",
+      6000,
+    );
+    await sleep(600);
+    const second = await formName();
+    if (second !== first) throw new Error(`the name field read "${first}" then "${second}"`);
+
+    // The entry list is the only thing on this form the character form does not have, so the write
+    // is proven by adding one block — the one road into `repo.updateLorebook` that a name alone
+    // cannot walk.
+    const keywords = 'input[placeholder="king, court, throne"]';
+    const content = 'textarea[placeholder="What is injected into the session when an entry matches."]';
+    const blocks = await js(`return document.querySelectorAll(${JSON.stringify(keywords)}).length;`);
+    if (blocks !== 4) throw new Error(`The Salt Archive preloaded ${blocks} entry blocks, not 4`);
+    await click("Add entry", { exact: true });
+    await waitFor(
+      `document.querySelectorAll(${JSON.stringify(keywords)}).length === ${blocks + 1}`,
+      "the new entry block",
+      6000,
+    );
+    await retype(keywords, "tide-mark", blocks);
+    await retype(content, ownEntry, blocks);
+
+    await click("Save changes", { exact: true });
+    // **Base-agnostic**, like `go()`: the preview serves `/lorebook/…` and Pages serves
+    // `/LuaPlot/lorebook/…`, so an `^/`-anchored test passes locally and fails on the live walk.
+    // Found by the first `smoke.sh --live` of this step (T-41) — the reason the live walk exists.
+    await waitFor(`/\\/lorebook\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the lorebook's own page after saving", 8000);
+    await waitText(ownEntry, 8000);
+    await waitText("tide-mark", 8000);
+    return `the list grew ${blocks} → ${blocks + 1} and the detail page prints the entry and its keyword`;
+  }),
+);
+
+results.push(
+  await journey("edit an own preset (the settings save, the siblings survive)", async () => {
+    // T-41. A preset is the one authored form carrying a `settings` object, so a save that dropped
+    // a sibling field is exactly the defect a name-only assertion would miss: the model changes and
+    // the description is asserted *unchanged* on the far side of the same write.
+    await go(OWN_PRESET_EDIT);
+    await waitFor(`document.querySelector("form input") !== null`, "the preset form", 8000);
+    await waitFor(
+      `(() => { const el = document.querySelector("form input"); return el && el.value === "Quiet Draft"; })()`,
+      "the form to be pre-filled from its own row",
+      6000,
+    );
+    // The preload nobody had read: the stored model, before anything is touched.
+    const before = await choose("select.select-input", "deepseek-chat");
+    await choose("select.select-input", "deepseek-reasoner");
+
+    await click("Save changes", { exact: true });
+    await waitFor(`/\\/preset\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the preset's own page after saving", 8000);
+    await waitFor(
+      `document.querySelector('section[aria-label="Generation settings"]') !== null`,
+      "the detail page's settings list",
+      8000,
+    );
+    await waitFor(
+      `(() => {
+         const s = document.querySelector('section[aria-label="Generation settings"]');
+         return s && /deepseek-reasoner/.test(s.innerText) ? s.innerText.replace(/\\s+/g, " ").trim() : "";
+       })()`,
+      "the detail page to print the model that was chosen",
+      8000,
+    );
+    const model = await settingValue("Model");
+    if (model !== "deepseek-reasoner") throw new Error(`the settings row reads "${model}" after the save`);
+    const body = await text();
+    if (!body.includes("Quiet Draft")) throw new Error("the detail page lost the preset's name");
+    if (!/Tuned for scene-setting/.test(body)) throw new Error("a settings-only save dropped the description");
+    return `model ${before} → ${model}, and the description survived the same write`;
+  }),
+);
+
+results.push(
+  await journey("edit an own persona (and the state that replaces forbidden)", async () => {
+    // T-41. Personas are personal, so this form has **no `forbidden` phase** — an id that is not
+    // the viewer's is *missing* — and that is the state difference from the three authored forms
+    // worth walking. The write is proven on the detail page and again on the collection card.
+    await go(OWN_PERSONA_EDIT);
+    await waitFor(`document.querySelector("form input") !== null`, "the persona form", 8000);
+    await waitFor(
+      `(() => { const el = document.querySelector("form input"); return el && el.value === "Nell"; })()`,
+      "the form to be pre-filled from its own row",
+      6000,
+    );
+    await retype('input[placeholder="Blunt, curious, asks the question nobody wants."]', ownTagline);
+
+    await click("Save changes", { exact: true });
+    await waitFor(`/\\/persona\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the persona's own page after saving", 8000);
+    await waitText(ownTagline, 8000);
+    await go("/persona");
+    await waitText(ownTagline, 8000);
+
+    // Personas answer one sentence for both "gone" and "not yours"; there is no second refusal.
+    await go(NO_PERSONA_EDIT);
+    await waitText("This persona doesn't exist in your collection.", 8000);
+    return "the tagline reached the detail page and the collection; an unowned id reads \"doesn't exist in your collection\"";
+  }),
+);
+
+results.push(
   await journey("report a post and land on the case", async () => {
     await go(POST_REPORTED);
     await waitFor(`[...document.querySelectorAll("button")].some((e) => (e.innerText || "").trim() === "Report")`, "the post's actions", 8000);
@@ -578,4 +762,4 @@ console.log(`smoke: ${passed}/${rows.length} journeys`);
 for (const row of rows) {
   console.log(`${row.ok ? "PASS" : "FAIL"} | ${row.journey} | ${row.ended - row.started}ms | ${row.evidence}`);
 }
-process.exit(passed === rows.length && rows.length === 13 ? 0 : 1);
+process.exit(passed === rows.length && rows.length === 16 ? 0 : 1);

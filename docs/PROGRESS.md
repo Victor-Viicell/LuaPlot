@@ -3,6 +3,34 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## T-41 — the last three authored forms walked, and the walk is sixteen rows (2026-10-31)
+
+- **Changed:** `scripts/smoke.mjs` — three journeys after the character edit-form step.
+  `/lorebook/…1/edit`: preload read twice, a fifth entry block added and typed, **Save changes**, then
+  the detail page prints that entry's body and its keyword (`repo.updateLorebook` proven). `/preset/…1/edit`:
+  the stored model read *before* the change, `deepseek-chat → deepseek-reasoner` through a real
+  `change` event, and the description asserted unchanged after the write (a sibling-dropping save is
+  the defect a name-only assertion misses). `/persona/…1/edit`: the tagline replaced, printed by the
+  detail page **and** by the collection card, then an unused id in the persona bucket asserts
+  `This persona doesn't exist in your collection.` — the sentence that replaces `forbidden` for a
+  personal type. Helpers: `retype()` (select-all + `Input.insertText`, value read back and compared),
+  `choose()` (native `<select>` by value + real `change`, read back), `settingValue()` (a preset
+  detail settings row by term). Row count and exit check 13 → 16, header comments in `smoke.mjs` /
+  `smoke.sh`. `docs/NEXT.md` rewritten for T-42, `docs/SHIP-PLAN.md` T-41 ticked + T-42 filed.
+- **Verified how:** `bash scripts/smoke.sh` **16/16** at 360×740 against the preview build and
+  **16/16** against https://victor-viicell.github.io/LuaPlot/ (rows print their own evidence:
+  `the list grew 4 → 5 and the detail page prints the entry and its keyword`, `model deepseek-chat →
+  deepseek-reasoner, and the description survived the same write`, `the tagline reached the detail
+  page and the collection; an unowned id reads "doesn't exist in your collection"`). `./scripts/check.sh`
+  **GREEN**; `scripts/publish.sh` → live 200, `assets/index-DpakDGV9.js`.
+- **Not verified:** no product defect found — all three forms preloaded and saved correctly on the
+  first pass, so this ticket bought regression coverage, not a fix. The `error` arm of the four phase
+  unions is still unwalked (the memory adapter has no failing method to trigger it). No Tauri/Android
+  build. **One defect was mine and the live walk caught it**: the three new steps asserted
+  `^/lorebook/…` on `location.pathname`, which is true in preview and false on Pages
+  (`/LuaPlot/lorebook/…`) — local 16/16, live 13/16 on the same bundle. Fixed to a suffix match (the
+  `go()` rule); the lesson is in `docs/NEXT.md`.
+
 ## T-40 — the case panel stops lying, and the edit form's identity is proven (2026-10-31)
 
 - **Changed:** `src/pages/moderation-detail.tsrx` — `itemViewOf()`'s post arm read a hard-coded

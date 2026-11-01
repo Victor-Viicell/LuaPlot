@@ -1,81 +1,98 @@
 # Baton — what the next session does
 
-**Ticket: T-41 — the other three authored forms have never been walked.**
+**Ticket: T-42 — the refusal states have never been walked.**
 
-Spec: `src/specs/pages/persona/edit.md` (*Same form as create, preloaded*), `preset/edit.md`,
-`lorebook/edit.md`; `docs/CONTRACT.md` → *Engineering law* (every async surface renders
-Loading / Empty / Error / Success); `src/specs/luaplot-pages.md` (personas are personal: never
-shared, never moderated, never counted).
+Spec: `src/specs/pages/character/edit.md`, `lorebook/edit.md`, `preset/edit.md` → *States*
+(`Not the owner` → forbidden, `Not found` → that form's own sentence); `docs/CONTRACT.md` →
+*Engineering law* (every async surface renders Loading / Empty / Error / Success);
+`src/specs/luaplot-pages.md` (personas are personal: no "not yours" state exists for them).
 
-Why next: **T-40 closed the last defect anyone could name** — the case panel's chip now reads the
-reported row's own `status`, and the edit form's identity is measured instead of assumed. Every
-ticket left in `docs/SHIP-PLAN.md` is blocked on something this box does not have:
+Why next: **T-41 opened the last form nobody had opened.** Every ticket left in `docs/SHIP-PLAN.md`
+is blocked on something this box does not have:
 
 - **T-33** (`bun run tauri dev`) needs a window and a first `cargo` build of the shell.
 - **T-35 / T-36 / T-39** need the Android SDK + NDK + rust android targets, none installed.
 - **T-29…T-32** need a Supabase project ref; the connected token still cannot list projects (403).
 - **T-37B** needs a human palette decision (Latte has no darker mauve), not a hex.
 
-So the next provable work is coverage, not features. `scripts/smoke.mjs` walks thirteen journeys
-and **every one of them is a character, a post, a session or a case**: `/persona/[id]/edit`,
-`/preset/[id]/edit` and `/lorebook/[id]/edit` mount the same `CharacterForm` pattern (phase union →
-`Skeleton` → form in the `ready` arm) and **none has ever been opened by a session**. T-40 just
-proved that class of page can lie to whoever reads it first; three quarters of the class is unproven.
+So the next provable work is again coverage. The walk now opens the `ready` arm of all four authored
+edit forms and has still never rendered a single **refusal**: `character-edit.tsrx`,
+`lorebook-edit.tsrx` and `preset-edit.tsrx` each declare `missing | forbidden`, and those two
+sentences are the only thing a reader ever sees when a link goes wrong. They are four lines of copy
+and four `EmptyState` actions that no session has ever read.
 
 ## Approach
 
-1. **Three steps, not one.** `scripts/smoke.mjs`, appended after the existing edit-form journey:
-   - **`/lorebook/10eb00c5-0000-4000-8000-000000000001/edit`** (own, *The Salt Archive*): assert the
-     name field reads that title, edit the entry body and **Save changes**, then assert the detail
-     page prints the saved text. The lorebook form carries the entries list — one added entry is the
-     only way to prove the write reaches `repo.updateLorebook`.
-   - **`/preset/9e5e7000-0000-4000-8000-000000000001/edit`** (own, *Quiet Draft*): assert preload,
-     change one generation setting, save, and assert the detail page prints the new value. Presets
-     are the one form with a `settings` object — a save that drops a sibling field is exactly the
-     defect a name-only assertion would miss.
-   - **`/persona/9e45014a-0000-4000-8000-000000000001/edit`** (own, *Nell*): assert preload, save an
-     edit, and assert the collection prints it. Personas have **no `forbidden` phase** (they are
-     personal, so "not yours" is *missing*), which is the state difference worth walking.
-2. **Assert identity the T-40 way**: the field's value equals the row the URL names, read twice
-   (the second read after a short settle), never on elapsed time alone.
-3. **Keep the walk one session.** `go()` is an in-app hop; a reload re-seeds the memory adapter and
-   would prove nothing. The walk's row count and exit check move from 13 to 16; the header comment
-   and every "13/13" in `docs/` move with it.
-4. If a step finds a real defect, **fix it in this tick and cite the step as the proof** — that is
-   the T-40 shape, and it is why the walk exists.
+1. **Four rows, appended after the persona step**, one hop and one sentence each:
+   - `/character/<a character ada or bram owns>/edit` → `This character isn't yours to edit.`
+   - `/lorebook/10eb00c5-0000-4000-8000-000000000002/edit` (*Ashmarket Gazetteer*, `ada`) →
+     `This lorebook isn't yours to edit.`
+   - `/preset/9e5e7000-0000-4000-8000-000000000002/edit` (*Long Table*, `ada`) →
+     `This preset isn't yours to edit.`
+   - dead ids in the right buckets → each page's **own** sentence (`This character doesn't exist.`,
+     `This lorebook doesn't exist.`, `This preset doesn't exist.`). Read them off the pages first.
+2. **Assert the road out, not only the sentence.** Every refusal is an `EmptyState` with an action
+   (`Back to catalog`, `Back to personas`): a refusal that offers no destination is a dead end, and
+   asserting only the copy would let that break silently. Check the action's `href` resolves under
+   the served base.
+3. **Personas are not part of this ticket.** T-41 already walks a persona's `missing` sentence; a
+   persona has no `forbidden` arm because it is never addressed across accounts. Do not add a
+   persona row that pretends otherwise.
+4. Row count and exit check move 16 → 19 (three forbidden + three missing in three journeys, one per
+   type) or 22 if you spend a row per hop — pick one and say which in the walk's comment. The header
+   comments in `smoke.mjs` / `smoke.sh`, the exit check and every "16/16" in `docs/` move with it.
 
 ## Traps
 
-- **Persona ids are `9e45014a…`, presets `9e5e7000…`, lorebooks `10eb00c5…`** — one bucket per type
-  (`src/lib/fixtures/ids.ts`), and a wrong bucket is a 404 that reads as a page bug.
-- **The preset and lorebook fixtures are owned by `you` only for row 1**; row 2 and beyond belong to
-  `ada`, `bram`, `mira`, so they are the *forbidden* state, not the editable one.
-- **`CharacterForm` and its siblings snapshot their props at construction.** A step that types into
-  the form and then navigates in-app to the same route with another id must re-read the field after
-  the page has re-mounted — `waitFor`, never a bare `sleep`.
-- **`Select` is a native control**; drive it by setting `value` and dispatching `change`, not by
-  clicking an option — a `<select>` popup cannot be clicked in headless Chromium.
-- **A save that navigates** (`onSaved` → detail) must be waited on with a URL predicate, then the
-  assertion is on the detail page's text, not on the form's.
+- **Buckets**: characters `c0a1b2c3…`, lorebooks `10eb00c5…`, presets `9e5e7000…`, personas
+  `9e45014a…`. An id in the *wrong* bucket lands on the app's 404, not the form's own sentence, and
+  the step would prove nothing while passing.
+- **A refusal page renders no `<form>`**, so `formName()` answers `""` and `retype()` throws. Assert
+  the sentence and the action link; never a field.
+- **Path assertions must be base-agnostic** — `/\/preset\/[0-9a-f-]{36}$/`, never `^\/`. T-41 lost
+  three rows to exactly this on its first `--live` run: preview serves `/`, Pages serves `/LuaPlot/`.
+- **Run `--live` before claiming the walk.** Local 16/16 said nothing about Pages.
+- **A row owned by someone else must actually exist**: row 1 of every authored fixture is `you`, so
+  the forbidden arm has to name row 2 (lorebook, preset) or a character whose `author` is `ada` /
+  `bram` — read `src/lib/fixtures/characters.ts` rather than guessing.
+- **The signed-out arm of these pages is `forbidden` too** (`handle === ""`): a journey that signs out
+  first would walk that branch instead. Keep the refusal rows before the sign-out journey.
 - Keep `bun run smoke` and `./scripts/check.sh` green; the gate stays browser-free.
 
 ## Open decisions
 
-- Whether the walk should also create a persona from scratch (`/persona/create`) or only edit the
-  seeded one. Editing proves preload + write; create proves the gate and the empty state. Pick one
-  per form and say which in the walk's comment — do not do both and blow the row budget.
+- **One row per type or one row per hop.** Three journeys of two hops (19) is the same evidence as
+  six journeys (22) with less wall-clock; the walk's comment should say which and why.
+- **`/dev/native` is still unwalked.** Its presses are asserted by hand in `PROGRESS` (T-34), not by
+  a script. If the refusal work lands early, that page is the next cheapest proof — it needs real
+  `Input.dispatchMouseEvent` for the clipboard, per the finding below.
 - The shell still paints the previous page for one frame before the outlet's `loading` skeleton
   (measured in T-40 at ~1 frame, ~13ms). It is imperceptible and left alone; if a later ticket ever
   adds a view transition it must not make that frame visible.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **T-41 is done**: `/lorebook/…1/edit`, `/preset/…1/edit` and `/persona/…1/edit` all preload and
+  save correctly — **no defect reproduced**, so the ticket bought regression coverage, not a fix.
+  The walk is **16 rows**: a fifth entry block whose body the detail page prints, a preset
+  `deepseek-chat → deepseek-reasoner` change that leaves the description intact, and a persona
+  tagline that reaches the detail page *and* the collection card. Two helpers did the heavy lifting:
+  `retype()` (select-all + `Input.insertText`, value read back and compared) and `choose()` (native
+  `<select>` by value + a real `change`, read back) — use them rather than `type()` for any field
+  that arrives preloaded, because `type()` appends at wherever `focus()` left the caret.
+- **The `--live` walk caught what the local one could not**: T-41's steps asserted
+  `^/lorebook/…` on `location.pathname` — true in preview, false on Pages, where the path is
+  `/LuaPlot/lorebook/…`. Local 16/16, live 13/16, same bundle. The first `--live` run of any new
+  step is not optional; suffix-match every path.
+- **Pages' cold bundle costs ~2.4s more per save step** than the preview (persona 1273ms live vs
+  1156ms local, preset 658 vs 542). The 8000ms waits are already enough; do not tighten them.
+- **The walk is 16 rows** and its exit check is `rows.length === 16`; a new step must move that
+  number, both header comments and the "16/16" in `docs/PROGRESS.md`'s newest entry in the same
+  commit.
 - **T-40 is done**: the case page's *THE ITEM* chip reads the row, not the case —
   `post.status` → `Visible` / `Removed`, plus `Removed — its whole comment thread went with it.`
   The edit-form half of that ticket did **not** reproduce: `/character/[id]/edit` mounts
-  `CharacterForm` only in its `ready` branch. Both halves are walk steps now (13/13).
-- **The walk is 13 rows** and its exit check is `rows.length === 13`; a new step must move that
-  number, the header comment and the "13/13" in `docs/PROGRESS.md`'s newest entry in the same commit.
+  `CharacterForm` only in its `ready` branch. Both halves are walk steps now.
 - **One stale frame on every route change** is the shell's, not a page's: `navigate()` pushes and
   dispatches `popstate`, but the route effect flips `status` to `loading` in the next batch, so a
   *synchronous* read right after `navigate()` still sees the old page. Measured frame by frame in
