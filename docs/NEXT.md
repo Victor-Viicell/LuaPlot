@@ -1,76 +1,86 @@
 # Baton — what the next session does
 
-**Ticket: T-40 — two stale renders the walk cannot see (the edit form and the case item panel).**
+**Ticket: T-41 — the other three authored forms have never been walked.**
 
-Spec: `src/specs/pages/character/edit.md` (the form is pre-filled from the row the URL names);
-`src/specs/pages/moderation/detail.md` (*THE ITEM* panel shows the reported item and, once a case is
-closed, what happened to it); `docs/CONTRACT.md` → *Engineering law* (an async surface renders
-Loading / Empty / Error / Success; no spurious re-fetch).
+Spec: `src/specs/pages/persona/edit.md` (*Same form as create, preloaded*), `preset/edit.md`,
+`lorebook/edit.md`; `docs/CONTRACT.md` → *Engineering law* (every async surface renders
+Loading / Empty / Error / Success); `src/specs/luaplot-pages.md` (personas are personal: never
+shared, never moderated, never counted).
 
-Why next: **T-34 closed P5's only provable ticket** — `lib/native.ts` ships with a typed result on
-every call, the plugin rung inert, and the browser chunk proven unrequested. What is left in the
-plan is blocked on things this box does not have, in this order:
+Why next: **T-40 closed the last defect anyone could name** — the case panel's chip now reads the
+reported row's own `status`, and the edit form's identity is measured instead of assumed. Every
+ticket left in `docs/SHIP-PLAN.md` is blocked on something this box does not have:
 
-- **T-33** (`bun run tauri dev` opens the app) needs a window and a first `cargo` build of the shell;
-  it cannot be *verified* from a headless session, and its `Ctrl/Cmd+K` half names a control no spec
-  describes. Do not implement a command palette to fill the ticket.
+- **T-33** (`bun run tauri dev`) needs a window and a first `cargo` build of the shell.
 - **T-35 / T-36 / T-39** need the Android SDK + NDK + rust android targets, none installed.
 - **T-29…T-32** need a Supabase project ref; the connected token still cannot list projects (403).
 - **T-37B** needs a human palette decision (Latte has no darker mauve), not a hex.
 
-So the next provable work is the two defects already sitting in *Found while working*. Both are
-small, both are visible in a browser this session can drive, and both are the kind of thing a
-release should not carry: a form that shows the wrong row, and a panel that lies after an action.
+So the next provable work is coverage, not features. `scripts/smoke.mjs` walks thirteen journeys
+and **every one of them is a character, a post, a session or a case**: `/persona/[id]/edit`,
+`/preset/[id]/edit` and `/lorebook/[id]/edit` mount the same `CharacterForm` pattern (phase union →
+`Skeleton` → form in the `ready` arm) and **none has ever been opened by a session**. T-40 just
+proved that class of page can lie to whoever reads it first; three quarters of the class is unproven.
 
 ## Approach
 
-1. **Reproduce first, in the walk's own terms.** `scripts/smoke.mjs` is the harness; add a step per
-   defect rather than a one-off probe, so the fix stays proven:
-   - edit form: navigate to `/character/<id>/edit`, read every input **twice** — once immediately
-     after the route resolves, once after ~1.5s — and assert both readings equal the fixture's
-     name. The reported failure is a *first* read that sees the previously opened character's name.
-   - case panel: open an open case, *Conclude* it (the walk already does: `Concluded · removed`),
-     then assert the item panel prints the outcome instead of the old body, **without** a reload.
-2. **Find the mechanism before touching the component.** Two candidates, both plausible:
-   the form's inputs are uncontrolled (`defaultValue`-shaped) and capture their first value before
-   the row resolves — then the fix is to render the fields only once the row is present (the
-   Loading→Success boundary the contract already demands), not to fight the input; and the case
-   page reads its item once into a local `track()` at mount — then the fix is to re-read it after
-   `concludeReport()` returns, or to render from the entity the mutation returned.
-3. **Zod stays the boundary.** If the fix reads the row again, it goes through `repo.getCharacter`
-   / `repo.getReport` (already schema-parsed). Do not add a second shape, do not `as` a field, and
-   do not re-trim a handle in the page.
-4. Keep both steps inside the existing single-session walk: a hard reload re-seeds the memory
-   adapter, so a step that reloads proves nothing about state.
+1. **Three steps, not one.** `scripts/smoke.mjs`, appended after the existing edit-form journey:
+   - **`/lorebook/10eb00c5-0000-4000-8000-000000000001/edit`** (own, *The Salt Archive*): assert the
+     name field reads that title, edit the entry body and **Save changes**, then assert the detail
+     page prints the saved text. The lorebook form carries the entries list — one added entry is the
+     only way to prove the write reaches `repo.updateLorebook`.
+   - **`/preset/9e5e7000-0000-4000-8000-000000000001/edit`** (own, *Quiet Draft*): assert preload,
+     change one generation setting, save, and assert the detail page prints the new value. Presets
+     are the one form with a `settings` object — a save that drops a sibling field is exactly the
+     defect a name-only assertion would miss.
+   - **`/persona/9e45014a-0000-4000-8000-000000000001/edit`** (own, *Nell*): assert preload, save an
+     edit, and assert the collection prints it. Personas have **no `forbidden` phase** (they are
+     personal, so "not yours" is *missing*), which is the state difference worth walking.
+2. **Assert identity the T-40 way**: the field's value equals the row the URL names, read twice
+   (the second read after a short settle), never on elapsed time alone.
+3. **Keep the walk one session.** `go()` is an in-app hop; a reload re-seeds the memory adapter and
+   would prove nothing. The walk's row count and exit check move from 13 to 16; the header comment
+   and every "13/13" in `docs/` move with it.
+4. If a step finds a real defect, **fix it in this tick and cite the step as the proof** — that is
+   the T-40 shape, and it is why the walk exists.
 
 ## Traps
 
-- **The edit-form defect is timing-shaped** — a fix that only widens a timeout will pass today and
-  fail on a slow phone. Assert on *identity* (the name in the field equals the URL's character),
-  never on elapsed time.
-- **`effect()` is the only lifecycle hook** in this Ripple version, and a module-scope `track()`
-  throws. A "re-read on mount" must live inside the component.
-- **The case page's conclusion writes through `concludeReport`**, which returns the updated report;
-  the panel should render from that returned entity, not from a re-fetch that can race the writer.
-- **A post's removal deletes the thread** (T-28B) — the item panel must not render a thread for a
-  removed post; the dead-card copy is the existing pattern.
-- `/moderation/*` needs `?admin=1` in the URL, and the queue's filter links rewrite it; a step that
-  reloads must re-add it.
-- Keep `bun run smoke` (12/12 today) and `./scripts/check.sh` green; a new step joins the same
-  twelve-row table as thirteen.
+- **Persona ids are `9e45014a…`, presets `9e5e7000…`, lorebooks `10eb00c5…`** — one bucket per type
+  (`src/lib/fixtures/ids.ts`), and a wrong bucket is a 404 that reads as a page bug.
+- **The preset and lorebook fixtures are owned by `you` only for row 1**; row 2 and beyond belong to
+  `ada`, `bram`, `mira`, so they are the *forbidden* state, not the editable one.
+- **`CharacterForm` and its siblings snapshot their props at construction.** A step that types into
+  the form and then navigates in-app to the same route with another id must re-read the field after
+  the page has re-mounted — `waitFor`, never a bare `sleep`.
+- **`Select` is a native control**; drive it by setting `value` and dispatching `change`, not by
+  clicking an option — a `<select>` popup cannot be clicked in headless Chromium.
+- **A save that navigates** (`onSaved` → detail) must be waited on with a URL predicate, then the
+  assertion is on the detail page's text, not on the form's.
+- Keep `bun run smoke` and `./scripts/check.sh` green; the gate stays browser-free.
 
 ## Open decisions
 
-- Whether the edit form should render inputs only after the row resolves (a skeleton for ~1 frame)
-  or hold a keyed `<form>` that remounts when the id changes. The first matches the contract's
-  *every async surface renders Loading*; the second avoids a flash. Pick one and write it into
-  `docs/DESIGN.md` in the same commit.
-- T-34's `setBadge()` currently answers through `document.title` in a browser. If a later ticket
-  wires an unread count to it, the badge and the tab bar's `Alerts, N unread` label must agree —
-  decide there, not here.
+- Whether the walk should also create a persona from scratch (`/persona/create`) or only edit the
+  seeded one. Editing proves preload + write; create proves the gate and the empty state. Pick one
+  per form and say which in the walk's comment — do not do both and blow the row budget.
+- The shell still paints the previous page for one frame before the outlet's `loading` skeleton
+  (measured in T-40 at ~1 frame, ~13ms). It is imperceptible and left alone; if a later ticket ever
+  adds a view transition it must not make that frame visible.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **T-40 is done**: the case page's *THE ITEM* chip reads the row, not the case —
+  `post.status` → `Visible` / `Removed`, plus `Removed — its whole comment thread went with it.`
+  The edit-form half of that ticket did **not** reproduce: `/character/[id]/edit` mounts
+  `CharacterForm` only in its `ready` branch. Both halves are walk steps now (13/13).
+- **The walk is 13 rows** and its exit check is `rows.length === 13`; a new step must move that
+  number, the header comment and the "13/13" in `docs/PROGRESS.md`'s newest entry in the same commit.
+- **One stale frame on every route change** is the shell's, not a page's: `navigate()` pushes and
+  dispatches `popstate`, but the route effect flips `status` to `loading` in the next batch, so a
+  *synchronous* read right after `navigate()` still sees the old page. Measured frame by frame in
+  T-40: t=1ms old value, t=2ms no input, t=13ms the new page. Do not "fix" this by clearing the
+  page synchronously — the skeleton already covers every painted frame.
 - **T-34 is done**: `src/lib/native.ts` is the only module that touches hardware, and every call
   answers `nativeResultSchema` (`{ok,value?}` / `{ok:false,reason}`). `isNative()` reads
   `window.__TAURI_INTERNALS__` at runtime — never `import.meta.env`, which is baked at build time
@@ -95,11 +105,12 @@ release should not carry: a form that shows the wrong row, and a panel that lies
 - **A dev page that invents its own chrome stops being evidence**: `/dev/native` uses the
   `/dev/state` shape (kicker, 26px title, lede, badge row, 1px-gap rows, no page padding of its
   own). `--color-success` and `--color-warning` exist as tokens; do not reach for a hex.
-- **T-38 is done**: `scripts/smoke.mjs` walks the twelve journeys in one session at 360×740 and
+- **T-38 is done**: `scripts/smoke.mjs` walks the primary journeys in one session at 360×740 and
   asserts on the DOM at every step (badge label, `aria-pressed`, a card leaving the grid, a case
-  count 3 → 4 open, *Concluded · removed*). `scripts/smoke.sh` builds + previews + walks + tears
-  down; `--live` walks the Pages URL; `bun run smoke` is the alias. 12/12 in ~7s. **It is not in
-  `check.sh`** — the gate stays browser-free, and a machine without Chromium must not fail a commit.
+  count 3 → 4 open, *Concluded · removed*, the item panel's own removal line).
+  `scripts/smoke.sh` builds + previews + walks + tears down; `--live` walks the Pages URL;
+  `bun run smoke` is the alias. **It is not in `check.sh`** — the gate stays browser-free, and a
+  machine without Chromium must not fail a commit.
 - **The report journey needs POST(8)**, not any post: the preview classifier buckets on
   `hash("jev:post:" + body) % 5`, and only buckets 2/3/4 escalate (unsure → a case). A report on a
   clean-pass post verifies the item and opens **no** case, so the journey would prove nothing.
@@ -123,8 +134,6 @@ release should not carry: a form that shows the wrong row, and a panel that lies
 - **T-37 bundle numbers**: `dist` 1.1 MB; JS 728 KB raw / ~187 KB gz; CSS 23.8 KB gz; largest asset
   the JetBrains Mono Latin woff2 at 40,404 B. Budget 300 KB gz — met. T-34 adds a `core-*.js` chunk
   that only a shell loads.
-- **The case page's *THE ITEM* panel does not re-render after *Conclude*** — T-40.
-- **`/character/[id]/edit` may render its inputs before the row resolves** — T-40.
 - **T-28B is done**: `postStatusSchema` (`visible | removed`), `removePost()` (status flipped, thread
   deleted in cascade, vote dropped, row kept), `livePost()` filters `listPosts`/`profilePosts`,
   `getPost` still answers by id, `/post/[id]` draws *Removed by JEV* plus one finality line.

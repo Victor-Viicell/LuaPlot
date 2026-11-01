@@ -242,6 +242,11 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       transition, ~1 frame before the outlet's skeleton). The case half was real and is fixed: the
       post chip read a hard-coded `No visibility`, so a concluded *Removed* case still said nothing
       had happened. Both are now steps in the walk (13/13).
+- [ ] **T-41 Walk the other three authored forms.** `/persona/[id]/edit`, `/preset/[id]/edit` and
+      `/lorebook/[id]/edit` mount the same phase-union → skeleton → form pattern as the character
+      editor and no session has ever opened one. Accept: three new `scripts/smoke.mjs` journeys
+      (16 rows) each proving preload identity twice, a real save, and the saved value on the detail
+      page. Why next: it is the only work left that a headless session can verify.
 
 ## Failure bank (the ways this class of product breaks)
 
