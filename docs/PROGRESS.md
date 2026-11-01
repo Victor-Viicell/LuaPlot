@@ -3,6 +3,22 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — verify-only tick: no unblocked ticket, the tree is whole
+
+- **Changed:** `docs/NEXT.md` only — the *verify-only tick* recipe under *What a tick does when
+  nothing is unblocked* and the pipe trap at the top of *Found while working*. No app source, no
+  scripts, no new ticket; the bundle is byte-identical to T-44's (`assets/index-DpakDGV9.js`).
+- **Verified how:** `./scripts/check.sh` **GREEN** (build ok, `30 routes match the spec`, repo
+  public, schema ok with all 22 comments in 12 roots); `bash scripts/smoke.sh --live` → **27/27
+  journeys**, exit 0, against https://victor-viicell.github.io/LuaPlot/;
+  `LUAPLOT_BASE=/LuaPlot/ bun run build` emits `assets/index-DpakDGV9.js`, exactly what the live
+  `index.html` references — the deploy is `HEAD`, not a stale one; the live URL answers 200.
+- **Not verified / found:** every remaining `[ ]` ticket still needs something this box lacks
+  (Supabase project, a display + `cargo`, the Android SDK) or a human palette call (T-37B) — the
+  register at the bottom of `docs/NEXT.md` is unchanged. Trap that cost this tick two runs:
+  `bash scripts/smoke.sh --live | tail -50` prints no count and exits 0 because the pipe returns
+  `tail`'s status; the walk was green both times, but only the unpiped run proves it.
+
 ## T-44 — the three dev pages walked, and the first breakpoint measured: 27 rows (2026-11-01)
 
 - **Changed:** `scripts/smoke.mjs` — three journeys (one per dev page) plus helpers `toggleSource` /

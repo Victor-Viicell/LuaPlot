@@ -14,6 +14,11 @@ SDK, or a human palette decision. That register is below, and it is the whole of
    `bash scripts/smoke.sh --live` must print `27/27`. If either is red, *that* is the ticket: a
    failing row is the highest-value work available and needs no new ticket number. Fix it, publish,
    log it in `PROGRESS` as a repair entry, and say in the report which row was red.
+   A tick that finds **nothing red and no unblocked ticket** is a *verify-only* tick: record the pass
+   in `docs/PROGRESS.md` (gate GREEN, `27/27` live, and the live bundle hash equals a
+   `LUAPLOT_BASE=/LuaPlot/` build of `HEAD`) and change nothing else. Compare with a **base-built**
+   `dist` — `check.sh` builds without a base, so its hash never matches the live one and the
+   mismatch reads as a stale deploy.
 2. **Do not invent product surface.** `src/specs/luaplot-pages.md` is the law; a spec that says
    *To be specified* stays unbuilt until a decision is recorded in `docs/DESIGN.md`.
 3. **Do not resolve a blocker by faking it.** No offline Supabase stub pretending to be RLS, no
@@ -55,6 +60,9 @@ capability unblocks (T-29 before T-30/31/32; T-35 before T-36; T-33 once `cargo`
 
 ## Found while working (carried forward — keep this list growing)
 
+- **Never pipe `scripts/smoke.sh` into `tail`/`head`/`grep`.** A pipeline hands back the *pager's*
+  status, so a red walk exits 0, and `smoke: N/27 journeys` is the first line the pipe drops — the
+  run looks green and proves nothing. Redirect to a file, then read the file and the exit code.
 - **T-44 is done, and the walk is 27 rows.** New helpers worth reusing: `setToggle(label, want)` /
   `toggleState` (press a `button.toggle`, then **poll the rendered `aria-pressed`** — the store's
   emit is a microtask after the click), `storeCell(label)` (a `.count` cell by `.count-label`,
