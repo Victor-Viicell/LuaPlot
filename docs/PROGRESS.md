@@ -3,6 +3,26 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-33B(a), webview half: the desktop window remembers the account
+
+- **Changed:** nothing in `src/` — this tick is the desktop proof T-33B(a) left `UNVERIFIED`. The only
+  edits are the register (`docs/NEXT.md`, `docs/SHIP-PLAN.md`) and this entry.
+- **Verified how:** `./scripts/check.sh` GREEN, `bash scripts/smoke.sh --live` **27/27** on Pages.
+  Then a real `bun run tauri dev` window on Victor's Hyprland session (WebKitGTK webview, origin
+  `http://localhost:1420`), driven **keyboard-only** with `wtype` (`Tab`/`Return`) and read back with
+  `grim -g "<at> <size>"` + `vision_analyze`, because `computer_use` returns **zero windows** in the
+  cron env and Hyprland 0.56 has no click dispatch. Sequence proven twice over a process restart:
+  *Sign out* → session line reads `SESSION · signed out` → `pkill -x luaplot`, relaunch → still
+  `signed out`; *Sign in as @you* → `SESSION · signed in as You` → quit, relaunch → still
+  `signed in as You`. Ground truth beside every screenshot, read straight out of WebKit's own store:
+  `sqlite3 ~/.local/share/com.viicell.luaplot/localstorage/http_localhost_1420.localstorage
+  "select key, quote(value) from ItemTable"` → `luaplot.session` = UTF-16LE `null` when signed out,
+  `{"handle":"you","displayName":"You"}` when signed in — **no `isAdmin` field**, exactly the shape
+  `storedSessionSchema` allows.
+- **Not verified:** nothing outstanding for T-33B(a). (b) deep link and (c) `Ctrl/Cmd+K` remain
+  blocked on a dependency and a product decision. `docs/NEXT.md` carries the driving recipe so the
+  next session does not rediscover it.
+
 ## 2026-11-01 — T-33B(a): the session survives a restart
 
 - **Changed:** `src/lib/state/session.ts` keeps the account in `localStorage` under `luaplot.session`,

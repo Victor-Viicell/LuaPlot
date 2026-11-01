@@ -225,9 +225,12 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       — **(a) is done (T-33B(a)):** `session.ts` keeps `{handle, displayName}` in `localStorage` under
       `luaplot.session` through `storedSessionSchema` (no `JSON.parse` at the store, `isAdmin` never
       persisted), proven on the live site by sign-out → reload → still signed out and sign in → reload →
-      still signed in, plus `schema:check` section 4. **(b) and (c) stay blocked** exactly as below:
-      one needs a named dependency, the other a product decision. The Tauri webview half is
-      `UNVERIFIED` — `bun run tauri dev` was not relaunched (see PROGRESS).
+      still signed in, plus `schema:check` section 4. **The webview half is also proven** (same day):
+      a `bun run tauri dev` window on Hyprland, signed out and signed back in, then relaunched on both
+      states — `SESSION · signed out` survived one restart and `SESSION · signed in as You` the next,
+      with WebKit's own store holding UTF-16 `null` / `{"handle":"you","displayName":"You"}` and no
+      `isAdmin`. **(b) and (c) stay blocked** exactly as below: one needs a named
+      dependency, the other a product decision. `docs/NEXT.md` carries the keyboard-only drive recipe.
 - [x] **T-34 Native bridge.** `lib/native.ts` with haptics, share, clipboard, image picker, badge;
       browser fallbacks proven. Accept: web build has zero Tauri imports in the bundle graph.
       — `nativeResultSchema` on every call, ladder plugin → web API → `unsupported`, dynamic
@@ -320,6 +323,14 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       "1 / 2 / 3 / 4" was stale and was corrected here. `/dev/data` is proved by a round trip to
       `/character/catalog` *and* the character page's Likes cell, because the card's ratio rounds
       (96% → 96% on this fixture set).
+- [ ] **T-45 Home's entry control must stop re-booting the app.** The landing page's one control is
+      `<a class="btn btn-primary" href={target.value}>` with **no `follow()`**, so *Sign in* / *Open
+      profile* discards the running app and boots it again — the last full document load in the shell,
+      and the reason walk row 1 used to pass on a seed bug instead of a sign-in. Accept: the anchor keeps
+      `href` but navigates in-app (`onClick={follow(target.value)}`), no second `reload` navigation entry
+      appears when it is pressed, the **signed-in arm** (`/user/{handle}`) joins the walk as row 28, and
+      `check.sh` GREEN + `smoke.sh` 28/28 locally and `--live`. Why next: the only open defect that is
+      neither blocked nor cosmetic; the fix is one attribute and the proof is the work.
 
 ## Failure bank (the ways this class of product breaks)
 
