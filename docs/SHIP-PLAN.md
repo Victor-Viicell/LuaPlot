@@ -323,7 +323,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       "1 / 2 / 3 / 4" was stale and was corrected here. `/dev/data` is proved by a round trip to
       `/character/catalog` *and* the character page's Likes cell, because the card's ratio rounds
       (96% → 96% on this fixture set).
-- [ ] **T-45 Home's entry control must stop re-booting the app.** The landing page's one control is
+- [x] **T-45 Home's entry control must stop re-booting the app.** The landing page's one control is
       `<a class="btn btn-primary" href={target.value}>` with **no `follow()`**, so *Sign in* / *Open
       profile* discards the running app and boots it again — the last full document load in the shell,
       and the reason walk row 1 used to pass on a seed bug instead of a sign-in. Accept: the anchor keeps
@@ -331,6 +331,20 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       appears when it is pressed, the **signed-in arm** (`/user/{handle}`) joins the walk as row 28, and
       `check.sh` GREEN + `smoke.sh` 28/28 locally and `--live`. Why next: the only open defect that is
       neither blocked nor cosmetic; the fix is one attribute and the proof is the work.
+      **Done** (T-45): `follow()` now lives in `router.ts` (one seam, `App.tsrx` and `CatalogSwitch.tsrx`
+      use it too), the walk proves document identity rather than a URL, and the live walk caught the
+      ticket's real trap — `follow(href(x))` doubled the base on Pages. `EXPECTED_ROWS` is now explicit so
+      a vanished row is a red walk instead of a green one.
+- [ ] **T-46 Every in-app link is a push, not a load.** T-45 gave the app one seam (`follow()` in
+      `router.ts`) and converted home; ~30 anchors remain bare — *Edit profile* on your own profile,
+      the catalogs' *Create* buttons, the signed-out *Sign in* buttons on the create pages, and the
+      card title/handle/author links. Each is a document load: the mock re-seeds and the shell
+      repaints from scratch. Accept: every internal anchor pairs `href={href(path)}` with
+      `onClick={follow(path)}` (a **path**, never `href(...)` — that doubles the base on Pages),
+      hash links stay bare, `scripts/link-check.mjs` enforces the rule as a `check.sh` section and is
+      proved red against a broken copy, and walk row 29 presses *Edit profile* and proves no reload.
+      Why next: it is the same defect class T-45 just made cheap to fix, and the work is mechanical.
+      Brief: `docs/NEXT.md` → T-46.
 
 ## Failure bank (the ways this class of product breaks)
 

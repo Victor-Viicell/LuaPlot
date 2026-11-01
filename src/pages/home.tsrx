@@ -1,5 +1,5 @@
 import { track } from "ripple";
-import { href } from "../router.ts";
+import { follow, href } from "../router.ts";
 import { currentUser, onSession } from "../lib/state/session.ts";
 import type { User } from "../lib/data/types.ts";
 
@@ -14,7 +14,9 @@ import type { User } from "../lib/data/types.ts";
  * It reads the session and nothing else: no listings, no counts, no content rows. A signed-in
  * visitor is **not** redirected (the redirect matrix is T-30); the control is the way in, and its
  * target follows the session — `/authentification` when signed out, the viewer's own profile when
- * signed in.
+ * signed in. The anchor keeps its real `href` (middle-click, no-JS, crawlers) and intercepts a
+ * plain click with `follow()`, so pressing it is a **push, not a re-boot** (T-45: the bare `href`
+ * made a document load, which re-seeded the mock and read like a successful sign-in).
  */
 
 export function Home() @{
@@ -35,9 +37,10 @@ export function Home() @{
     return self ? `signed in as ${self.displayName}` : "signed out";
   });
 
+  /** The app path the control leads to — **not** an `href()`: `follow()` adds the base, `href()` does not. */
   const target = track(() => {
     const self = user.value;
-    return self ? href(`/user/${self.handle}`) : href("/authentification");
+    return self ? `/user/${self.handle}` : "/authentification";
   });
 
   const label = track(() => (user.value ? "Open profile" : "Sign in"));
@@ -225,7 +228,7 @@ export function Home() @{
           <span class="reading-sep" aria-hidden="true">·</span>
           <span class="reading-value">{reading.value}</span>
         </p>
-        <a class="btn btn-primary" href={target.value}>{label.value}</a>
+        <a class="btn btn-primary" href={href(target.value)} onClick={follow(target.value)}>{label.value}</a>
       </div>
     </div>
   </>

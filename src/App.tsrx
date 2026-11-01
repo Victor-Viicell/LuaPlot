@@ -1,5 +1,5 @@
 import { effect, track, type Component } from "ripple";
-import { currentRoute, href, navigate, onRouteChange, type RouteState } from "./router.ts";
+import { currentRoute, follow, href, navigate, onRouteChange, type RouteState } from "./router.ts";
 import {
   IconBack,
   IconBell,
@@ -165,17 +165,6 @@ export function App() @{
       },
     );
   });
-
-  function follow(to: string) {
-    return (event: MouseEvent) => {
-      // Modified clicks keep the browser's own behaviour: new tab, new window, download.
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
-        return;
-      }
-      event.preventDefault();
-      navigate(to);
-    };
-  }
 
   function goBack() {
     if (window.history.length > 1) window.history.back();

@@ -1,57 +1,75 @@
 # Baton — what the next session does
 
-**T-45 is the one ticket.** Home's entry control is the last hard document load in the shell: it is an
-`<a>` with no `follow()`, so pressing *Sign in* / *Open profile* discards the running app and boots it
-again. Everything else on the board still needs Supabase, Android tooling or a decision (bottom of this
-file). T-33B(a) is now **closed on both halves** — web and webview — so do not spend a tick re-proving it.
+**T-46 is the one ticket.** T-45 closed home's entry control, and in doing it proved *how* that
+defect class fails: a bare `<a href>` is a document load, it re-boots the app, and a walk that only
+reads a URL cannot see it. The app still has **~30 of them**, including a primary action
+(*Edit profile* on your own profile) and the four catalogs' *Create* buttons. Everything else on the
+board still needs Supabase, Android tooling or a decision (bottom of this file). T-33B(a) is closed
+on both halves — do not spend a tick re-proving it.
 
-## T-45 — home's entry control must not re-boot the app
+## T-46 — every in-app link is a push, not a load
 
-**Why it is next.** It is the only known defect that is neither blocked nor cosmetic, it is four
-characters of intent (`onClick={follow(target.value)}`) plus the assertions that prove it, and it is the
-one place where the walk's first row still describes a *re-boot* rather than a navigation. Fixing it also
-removes the last full page load from the shell, which matters for the frame-level work in T-40's notes.
+**Why it is next.** T-45 made the *seam* real (`follow()` in `router.ts`, used by the shell, the
+catalog switch and now home) but converted one control. The rest of the app still discards the
+running app on a press: the mock re-seeds (so half-written form state and the walk's fixture writes
+disappear), the shell repaints from scratch, and on Pages the reader sees a white flash. It is
+mechanical work with a proven helper, and the remaining risk is *which* links must stay bare.
 
-**What is wrong.** `src/pages/home.tsrx` line ~228:
+**What is wrong.** `grep -n 'href={href(' src/**/*.tsrx` — every hit without a sibling `onClick=`
+is a full document load. The ones that matter most:
 
-```tsrx
-<a class="btn btn-primary" href={target.value}>{label.value}</a>
-```
-
-`href` alone is a document load. Every other link in the shell pairs it with `onClick={follow(...)}`
-(`App.tsrx`, the cards, the rail). This one does not.
+- `src/pages/user-profile.tsrx` → `Edit profile` (`.btn btn-secondary`, line ~661) — a primary
+  action on the only page a signed-in reader lands on.
+- `src/pages/{character,lorebook,preset}-catalog.tsrx` → the *Create* buttons (two states each:
+  the empty state and the toolbar).
+- `src/pages/{character,lorebook,preset,persona}-create.tsrx` → the *Sign in* button shown when the
+  viewer is signed out.
+- `src/components/{Card,UserCard,PostCard,PersonaCard}.tsrx` → the title/handle/author links (the
+  card's `.card-title` already takes `onOpen`; the author/handle links do not).
+- `src/pages/{character,lorebook,preset,session,post}-detail.tsrx`, `-edit.tsrx`, `moderation-*`,
+  `bookmarks`, `notifications`, `persona-collection`, `onboarding`, `authentification`, `terms`,
+  `dev-native` → back links, "Create one", the cross-page prose links.
 
 **Approach**
 
-1. Read `.agents/skills/ripple-ts/SKILL.md` before the edit (Ripple `.tsrx`, `class` not `className`).
-2. Add `onClick={follow(target.value)}` and import `follow` from `../router.ts` beside `href`.
-3. Re-read the row it touches: `scripts/smoke.mjs` journey *"sign in from /"* signs out, presses
-   *Sign in*, waits for `/authentification` and for *Continue with Google*. It must stay green **and
-   must still be honest**: with `follow()` the URL is pushed without a reload, so the row no longer
-   passes *because* the app re-seeded. Prove the difference, do not assume it — take the row's evidence
-   string (it prints the assertion it made) and confirm the page did not remount (e.g. the app's own
-   state, a scroll position, or `performance.getEntriesByType("navigation")[0].type` staying
-   `navigate` instead of a second `reload`).
-4. Signed in, the same control points at `/user/{handle}` — walk that arm too (it is the arm no row
-   covers today). Add it to the journey rather than asserting it by hand.
+1. Read `.agents/skills/ripple-ts/SKILL.md` again (`.tsrx`, `class` not `className`).
+2. Import `follow` from `router.ts` (or `../router.ts`) beside `href` and pair every internal
+   anchor: `href={href(path)} onClick={follow(path)}` — **`follow()` takes an app path, never
+   `href(...)`** (T-45's live-only bug: it doubled the base and landed on the not-found page).
+   Where the target is a tracked value, pass the path through and let `follow` read it at render
+   time, exactly as `home.tsrx` does.
+3. **Hash links stay bare.** `follow()` pushes the path and `readLocation()` ignores the fragment,
+   so `/terms#rule-2` would lose its in-page jump. Leave `terms.tsrx`'s contents list,
+   `ReportDialog`'s "What this asserts" and `moderation-detail`'s rule links **without** `onClick`,
+   and say so in a comment (`docs/ARCHITECTURE.md` → Router is the place for the rule).
+4. Add the enforcement so the class cannot come back: a `scripts/link-check.mjs` (same shape as
+   `scripts/spec-routes.mjs`, no dependency) that reads every `.tsrx`, finds each `<a …>` element
+   (attributes span lines — the tab bar's `href` and `onClick` are on different lines), and fails
+   when an anchor carries `href={href(` or `href={\`…\`}` **without** an `onClick=`, unless the href
+   contains a `#`. Wire it into `scripts/check.sh` as its own section and print its count.
+5. Add **one** walk row (29): from `/user/you`, press *Edit profile*, `expectPath("/user/you/edit")`,
+   wait for the account form, and assert `expectNoReload(...)` — the `markDocument` /
+   `expectNoReload` / `expectPath` helpers from T-45 are in `scripts/smoke.mjs`. Bump
+   `EXPECTED_ROWS` to 29 in the same commit.
 
 **Traps**
 
-- Do **not** turn the anchor into a `<button>`: the spec's home page has one entry control and the
-  existing styles/`btn` class expect an anchor; keep `href` (middle-click, no-JS, crawlers) and only
-  intercept the plain left-click, which is exactly what `follow()` does.
-- `target` is `track()`ed (`/user/{handle}` vs `/authentification`), so the handler must read
-  `target.value` at click time — a captured string goes stale after a session change.
-- Row 1 of the walk deliberately starts signed in (the mock seeds) and signs out first. If the fix makes
-  the control navigate *before* the store emits, the row's `waitUrl` can race the skeleton; assert text
-  (`Continue with Google`), not just the path.
-- `bash scripts/smoke.sh` and then `bash scripts/smoke.sh --live` — the `--live` walk is what catches a
-  base-aware `follow()` (T-41/T-42 both lost rows to path handling). Never pipe the walk into
-  `head`/`tail`/`grep`.
+- **`follow(href(x))` is the bug**, not the fix: `navigate()` adds the base. Preview (base `/`)
+  hides it completely; only `--live` sees it.
+- **A `<a>` whose `href` is a template literal** (`/user/${app}`) needs the *path* built, not the
+  href: keep one variable for the path and wrap it with `href()` only in the attribute.
+- `expectPath` compares the **whole** pathname — use it for every new assertion, not `waitUrl`
+  (a substring match reads a doubled base as correct).
+- Do not convert `<button onClick={navigate(...)}>` controls or the `Button` component's callers —
+  they are already pushes and have no `href`.
+- The prose links inside `terms.tsx`/`onboarding.tsx` body copy are still anchors; converting them
+  is fine when they carry no fragment, but keep the copy identical.
+- Never pipe `scripts/smoke.sh` into `head`/`tail`/`grep`: redirect to a file and read the file, or
+  a red walk exits 0 and looks green.
 
-**Accept:** `./scripts/check.sh` GREEN, `scripts/smoke.sh` 28 rows green (the signed-in arm is a new
-row) locally **and** `--live`, no `reload` navigation entry when the control is pressed, `LIVE` printed
-by `publish.sh`.
+**Accept:** `./scripts/check.sh` GREEN **including the new link section** (and the section must fail
+on a deliberately broken copy before you commit — prove it), `scripts/smoke.sh` 29/29 locally and
+`--live`, `LIVE` printed by `publish.sh`.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -81,7 +99,9 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **A desktop notification can sit over the window's top-right corner** and hide the *More* button in a
   capture. The menu renders inside the body, so the session row is still readable — crop below the toast
   rather than concluding the menu did not open.
-- Cron's shell guard refuses `bash -c` / `node -e`; put scripts in a file (or use `jq`) instead.
+- Cron's shell guard refuses `bash -c` / `node -e`; put scripts in a file (or use `jq`). It also
+  refuses `rm` under a root path — clean scratch files with Python's `os.remove`, or leave them in
+  `$TMPDIR` (`~/.hermes/cache/scratch`).
 
 ## Blocked — what a human must do
 
@@ -109,22 +129,26 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **The breakpoint row owns a CDP override.** Anything added after it must assume the session is back
   at 360×740; the row asserts that it cleared (`window.innerWidth === restore`) rather than trusting
   the `finally`.
-- **The shell still paints the previous page for one frame** before the outlet's `loading` skeleton
-  (~13ms, T-40). A later view transition must not make it visible. T-45 removes the *only* full
-  document load from the shell — after it, every route change is a push, so this frame is the whole
-  remaining flicker.
+- **`follow()` drops the fragment on purpose** — a `/terms#anchor` link must stay a real document
+  navigation (or gain scroll handling nothing needs yet). T-46 records the rule in
+  `ARCHITECTURE.md` → Router.
 - **A card's ratio rounds to whole percent**, so a one-vote change can leave the printed number
   identical (96% → 96%). A journey proving an engagement write must read a count (the detail page's
   Likes/Dislikes cells), never a card's percentage.
-- **Row count in the walk grows with T-45** (27 → 28). A later ticket that adds a row must not assume
-  27 in any docs or report text.
+- **Row count is 28 today and becomes 29 with T-46.** `scripts/smoke.mjs` keeps it in an explicit
+  `EXPECTED_ROWS`, so a row that stops running is a red walk — bump it in the same commit as the row.
 
 ## Found while working (carried forward — keep this list growing)
 
-- **Home's entry control does a full document load.** `<a class="btn btn-primary" href={target.value}>`
-  (`home.tsrx`) has **no `follow()`** — that is T-45, the ticket above. It is how smoke row 1 used to
-  pass: the re-boot re-seeded the mock and its `/user/you` assertion was the **seed bug T-33B removed**,
-  not a sign-in (`lib/auth.ts` writes no session until T-30).
+- **A URL assertion cannot see a re-boot.** `waitUrl` is a substring match and a fresh document loads
+  the same route; T-45 proves a push with **document identity** (`window` marker +
+  `performance.timeOrigin`), and `performance.getEntriesByType("navigation")[0].type` is `navigate`
+  even for a full load from a link, so it cannot be the proof. `nav` is only printed as context.
+- **The walk's own row count is a gate.** `process.exit(… rows.length === 27)` was a literal: adding
+  row 28 with all 28 green still exited 1. It is `EXPECTED_ROWS` now — bump it with the row.
+- **A red walk proves the assertion; a green one does not.** T-45 removed the `onClick`, rebuilt, and
+  watched row 1 fail with the document dump before restoring it. Do that for any new invariant.
+- Home's entry control is fixed (T-45); **~30 bare `<a href>` anchors remain** — that is T-46 above.
 - **The webview stores `luaplot.session` as UTF-16LE in a SQLite table** (`localstorage/
   http_localhost_1420.localstorage`, `ItemTable`), so `quote(value)` returns hex — decode before
   comparing, or a correct proof reads as a corrupt one. On Pages the same key lives in the browser
@@ -137,6 +161,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   shell (`Sign out` vs `Sign in as @you`, `prefsLine`'s sentence) instead of `/dev/state`.
 - **A publish is not instantly walkable.** Two `/dev/*` rows timed out on a live walk started ~25s after
   `publish.sh` and passed on the re-run: a mid-propagation chunk 404 looks identical to a broken page.
+  (A failure that survives a re-run is real — that is how T-45's doubled base was caught.)
 - **A `cargo build` debug binary loads `devUrl`, not `frontendDist`.** It opens a mapped window that
   says *Could not connect to localhost: Connection refused* — the app is fine, vite is missing. The
   accept command is `bun run tauri dev`; and `dist` must be built **without** `LUAPLOT_BASE` for Tauri
@@ -150,7 +175,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **`pkill -f vite` kills the tick's own shell**, because the pattern matches the command line that is
   running it. Kill a preview by port: `lsof -ti:4321 | xargs -r kill`. Use `pkill -x luaplot` for the app.
 - **Never pipe `scripts/smoke.sh` into `tail`/`head`/`grep`.** A pipeline hands back the *pager's*
-  status, so a red walk exits 0, and `smoke: N/27 journeys` is the first line the pipe drops — the run
+  status, so a red walk exits 0, and `smoke: N/28 journeys` is the first line the pipe drops — the run
   looks green and proves nothing. Redirect to a file, then read the file and the exit code.
 - **T-44's walk helpers are the ones to reuse**: `setToggle(label, want)` / `toggleState` (press a
   `button.toggle`, then **poll the rendered `aria-pressed`**), `storeCell(label)`, `coveredCards()`,
@@ -165,7 +190,8 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **`/dev/state`'s NSFW pair is restored, not merely flipped.** A journey that leaves Show+Blur on
   makes every later card-grid assertion read the wrong state.
 - **The `--live` walk catches what the local one cannot.** T-41 lost three rows to an `^`-anchored path
-  test, T-42 to a missing `/edit`. Suffix-match every path, and run `--live` before claiming a ticket.
+  test, T-42 to a missing `/edit`, T-45 to a doubled base that base `/` hides. Suffix-match every path,
+  run `--live` before claiming a ticket.
 - **A refusal row must carry the whole path.** T-42's first run failed three rows because `OTHER_*`
   omitted the trailing `/edit` and the failure read like a copy bug.
 - **A `<input type=file>` in headless Chromium hangs the press unless intercepted.**
@@ -194,7 +220,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **Tap targets**: 44px still fails for card-footer author links (WCAG 2.2 `2.5.8` exempts inline
   links) and avatar links at 36×36 (AA's 24×24 floor passes). A card redesign, not a padding tweak.
 - **Bundle numbers**: `dist` 1.1 MB; JS 728 KB raw / ~187 KB gz; CSS 23.8 KB gz; largest asset the
-  JetBrains Mono Latin woff2 at 40,404 B. Budget 300 KB gz — met. Current hash `index-L_hJmeQc.js`.
+  JetBrains Mono Latin woff2 at 40,404 B. Budget 300 KB gz — met.
 - **T-28B is done**: `postStatusSchema` (`visible | removed`), `removePost()`, `livePost()`,
   `getPost` still answers by id.
 - **Counts** (memory adapter; the walk's own journeys add rows as they run, so never assert a bare

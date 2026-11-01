@@ -396,6 +396,33 @@ export function navigate(path: string, options: { replace?: boolean } = {}): voi
   emit();
 }
 
+/**
+ * The only click seam: turn a real anchor into an in-app hop.
+ *
+ * Every link in the app is a real `<a href>` — middle-click, back/forward, a crawler and a no-JS
+ * visit all work — and pairs it with `onClick={follow(to)}`. Without it the press is a **document
+ * load**: the running app is discarded and boots again (T-45 fixed exactly that on home's entry
+ * control, where the reload re-seeded the mock and read like a successful sign-in).
+ *
+ * A modified click is deliberately left to the browser (new tab, new window, download). The caller
+ * passes a plain string, so a control whose target comes from a tracked value must read it at
+ * render time (`follow(target.value)`) — a captured path goes stale after a session change.
+ *
+ * **`to` is an app path, never an `href()`.** `navigate()` adds the base itself, so pairing
+ * `onClick={follow(href(x))}` with `href={href(x)}` looks symmetric and is a bug: on Pages the base
+ * is added twice (`/LuaPlot/LuaPlot/…`), the table matches nothing, and the app lands on its own
+ * not-found page — while a locally-served build (base `/`) behaves perfectly (T-45).
+ */
+export function follow(to: string): (event: MouseEvent) => void {
+  return (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    navigate(to);
+  };
+}
+
 if (typeof window !== "undefined") {
   window.addEventListener("popstate", emit);
 }

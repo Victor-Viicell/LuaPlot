@@ -1,4 +1,4 @@
-import { href, navigate } from "../router.ts";
+import { follow, href } from "../router.ts";
 
 /**
  * CatalogSwitch: the way between the three catalogs.
@@ -21,13 +21,6 @@ const CATALOGS: { key: CatalogKey; label: string; to: string }[] = [
   { key: "presets", label: "Presets", to: "/preset/catalog" },
 ];
 
-/** Intercept a plain click so navigation stays in-app, like every other link in the shell. */
-function openLink(event: MouseEvent, to: string): void {
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-  event.preventDefault();
-  navigate(to);
-}
-
 export function CatalogSwitch({ current }: { current: CatalogKey }) {
   return (
     <nav class="cat-switch" aria-label="Catalogs">
@@ -36,7 +29,7 @@ export function CatalogSwitch({ current }: { current: CatalogKey }) {
           class="cat-tab"
           href={href(item.to)}
           aria-current={item.key === current ? "page" : undefined}
-          onClick={(event) => openLink(event, item.to)}
+          onClick={follow(item.to)}
         >
           {item.label}
         </a>

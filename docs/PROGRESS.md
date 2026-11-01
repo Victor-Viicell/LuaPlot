@@ -3,6 +3,29 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-45: home's entry control pushes instead of re-booting the app
+
+- **Changed:** `src/router.ts` now exports **`follow(to)`** — the one click seam — and `App.tsrx`
+  (which had a private copy) and `CatalogSwitch.tsrx` (which had a second, differently-shaped copy)
+  both import it; `src/pages/home.tsrx` pairs the entry anchor's real `href` with
+  `onClick={follow(target.value)}` and `target` became an **app path** (`/authentification` or
+  `/user/{handle}`) with `href()` applied in the markup. `scripts/smoke.mjs` grew the document-identity
+  pair (`markDocument` / `expectNoReload`), an exact-path waiter (`expectPath`), the signed-in arm as
+  row **28** ("profile from /"), an anchor/href assertion in row 1, and an explicit `EXPECTED_ROWS = 28`.
+- **Verified how:** `./scripts/check.sh` GREEN. `bash scripts/smoke.sh` **28/28** and
+  `bash scripts/smoke.sh --live` **28/28** on Pages; both T-45 rows print the document they kept
+  (`document kept home-sign-in (timeOrigin …, nav navigate)`). The assertion was proved **against a
+  red case**, not assumed: with `onClick` removed and the build rebuilt, row 1 failed with
+  `home's Sign in re-booted the app: the document went from {"mark":"home-sign-in","origin":…177} to
+  {"mark":"","origin":…943,"nav":"navigate"}` (and 18 rows after it cascaded red — a document load
+  also drops the walk's session), then passed again once restored.
+- **Not verified / found:** the first `--live` run after the naive fix failed **only** where it could:
+  `follow()` takes an app path and `navigate()` adds the base, so `follow(href(x))` pushed
+  `/LuaPlot/LuaPlot/authentification` — the app's own not-found page — while every local row stayed
+  green (base `/`). `expectPath` now compares the whole pathname, because `waitUrl`'s substring match
+  is exactly what hid it. The rest of the app still carries ~30 bare `<a href>` links (see
+  `docs/NEXT.md` → T-46); home's was the primary one.
+
 ## 2026-11-01 — T-33B(a), webview half: the desktop window remembers the account
 
 - **Changed:** nothing in `src/` — this tick is the desktop proof T-33B(a) left `UNVERIFIED`. The only

@@ -3,7 +3,7 @@
  * T-38 — one scripted walk of the primary journeys, against a build that ships.
  *
  * `node scripts/smoke.mjs [--url <base>]` drives a real Chromium over CDP (no dependency:
- * Node's global WebSocket plus `/json/new`), walks the twenty-seven journeys **in one session** with
+ * Node's global WebSocket plus `/json/new`), walks the twenty-eight journeys **in one session** with
  * in-app navigation only, and prints one row per journey of `{journey, started, ended, evidence}`.
  * Exit code 1 when any row fails.
  *
@@ -426,11 +426,76 @@ async function go(path) {
   await sleep(350);
 }
 
+/**
+ * Wait for the document to be **exactly** where `path` resolves — `BASE` + `path`, one base deep.
+ *
+ * `waitUrl()` is a substring match on purpose (it is used for query strings and hash routes), and
+ * that is what hid a doubled base on Pages: `/LuaPlot/LuaPlot/authentification` *contains*
+ * `/authentification`, so row 1 read green on the preview and only the live walk timed out — on a
+ * page that had rendered the app's own not-found screen (T-45).
+ */
+async function expectPath(path, label, timeout = 8000) {
+  const want = new URL(path.replace(/^\/+/, ""), BASE).pathname;
+  const deadline = Date.now() + timeout;
+  let seen = "";
+  while (Date.now() < deadline) {
+    seen = await js(`return location.pathname;`);
+    if (seen === want) return seen;
+    await sleep(120);
+  }
+  throw new Error(`${label} landed on ${seen}, expected ${want}`);
+}
+
 const pressed = (label) =>
   js(`
     const el = [...document.querySelectorAll("button")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim().toLowerCase().startsWith(${JSON.stringify(label.toLowerCase())}));
     return el ? el.getAttribute("aria-pressed") : null;
   `);
+
+/* ------------------------------------------------------------------------------------------------
+ * T-45 — did the press stay inside the running document?
+ *
+ * Home's entry control used to be `<a href>` with no `follow()`: pressing it was a **document
+ * load**, so the app booted again and the mock re-seeded. Smoke row 1 could not tell the
+ * difference — the re-boot *re-seeded the user*, so its assertion passed either way — which is
+ * exactly why this needs its own evidence rather than a green row.
+ *
+ * The proof is document identity, not a URL: `window` is replaced by a load, so a marker set
+ * before the press is gone after it, and `performance.timeOrigin` (fixed at document creation)
+ * moves. A push keeps both. `performance.getEntriesByType("navigation")[0].type` is not enough on
+ * its own — a fresh document loaded from a link also reports `navigate`, never `reload`.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Stamp the current document and return its identity. */
+const markDocument = (token) =>
+  js(`
+    window.__walkMark = ${JSON.stringify(token)};
+    return { mark: window.__walkMark, origin: Math.round(performance.timeOrigin) };
+  `);
+
+/** Read the document identity back; a different one means the press re-booted the app. */
+const documentIdentity = () =>
+  js(`
+    return {
+      mark: window.__walkMark || "",
+      origin: Math.round(performance.timeOrigin),
+      nav: (performance.getEntriesByType("navigation")[0] || {}).type || "",
+    };
+  `);
+
+/**
+ * Assert the press that just happened was a push. Returns the sentence the row prints as evidence,
+ * so a reader sees *how* it was proven rather than a bare "green".
+ */
+async function expectNoReload(mark, label) {
+  const now = await documentIdentity();
+  if (now.mark !== mark.mark || now.origin !== mark.origin) {
+    throw new Error(
+      `${label} re-booted the app: the document went from ${JSON.stringify(mark)} to ${JSON.stringify(now)}`,
+    );
+  }
+  return `document kept ${now.mark} (timeOrigin ${now.origin}, nav ${now.nav})`;
+}
 
 /* ------------------------------------------------------------------------------------------------
  * T-43 — `/dev/native`'s five capability rows.
@@ -748,9 +813,21 @@ results.push(
     await click("More");
     await click("Sign out");
     await waitText("signed out");
+    // T-45 — two facts, because the press used to pass this row by *re-booting*: the control is
+    // still a real anchor (an `href` a middle-click, a crawler and a no-JS visit can follow) and
+    // pressing it is a **push**, not a document load.
+    const entry = await js(`
+      const el = document.querySelector(".entry a.btn");
+      return el ? { href: el.getAttribute("href") || "", text: (el.innerText || "").trim() } : null;
+    `);
+    if (!entry) throw new Error("home's entry control is no longer an anchor");
+    if (!entry.text.startsWith("Sign in")) throw new Error(`home's entry control reads ${JSON.stringify(entry.text)}, expected "Sign in"`);
+    if (!entry.href.endsWith("/authentification")) throw new Error(`home's entry control points at ${entry.href}, not /authentification`);
+    const mark = await markDocument("home-sign-in");
     await click("Sign in");
-    await waitUrl("/authentification");
+    await expectPath("/authentification", "home's Sign in");
     await waitText("Continue with Google", 8000);
+    const kept = await expectNoReload(mark, "home's Sign in");
     // The provider button is a **stub** (`lib/auth.ts`: no session write until T-30), so the honest
     // assertion is the outcome it really produces — `cancelled`, nobody signed in. This row used to
     // pass because home's entry control is an `<a>` with no `follow()`, so pressing it hard-reloaded
@@ -765,7 +842,36 @@ results.push(
     await waitText("signed in as You", 8000);
     const label = await badge();
     if (!label.startsWith("Alerts")) throw new Error("the tab bar lost its Alerts destination");
-    return "the provider button answers cancelled and signs nobody in; the menu's switch signs in as You";
+    return `the provider button answers cancelled and signs nobody in; the menu's switch signs in as You; the control pushed (${kept})`;
+  }),
+);
+
+/**
+ * T-45 — the arm no row had walked: signed in, the same control points at `/user/{handle}`.
+ *
+ * It is also the only row that presses the entry control while a session exists, so it is what
+ * catches a `follow()` bound to the **signed-out** path after the session changed: the target is a
+ * `track()`ed value, and a captured string would push `/authentification` here. The owner-only
+ * *Edit profile* action is the extra assertion — it proves the session reached the page, not just
+ * the path.
+ */
+results.push(
+  await journey("profile from /", async () => {
+    await go("/");
+    await waitText("signed in as You", 8000);
+    const entry = await js(`
+      const el = document.querySelector(".entry a.btn");
+      return el ? { href: el.getAttribute("href") || "", text: (el.innerText || "").trim() } : null;
+    `);
+    if (!entry) throw new Error("home's entry control is no longer an anchor");
+    if (!entry.text.startsWith("Open profile")) throw new Error(`the signed-in control reads ${JSON.stringify(entry.text)}, expected "Open profile"`);
+    if (!/\/user\/you$/.test(entry.href)) throw new Error(`the signed-in control points at ${entry.href}, not /user/you`);
+    const mark = await markDocument("home-open-profile");
+    await click("Open profile");
+    await expectPath("/user/you", "home's Open profile");
+    await waitText("Edit profile", 8000);
+    const kept = await expectNoReload(mark, "home's Open profile");
+    return `Open profile pushes to @you's own profile with the owner actions visible; ${kept}`;
   }),
 );
 
@@ -1433,10 +1539,18 @@ results.push(
 socket.close();
 chrome.kill("SIGKILL");
 
+/**
+ * The walk's own arithmetic: **every** row has to exist and pass. Keeping the count explicit (rather
+ * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
+ * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in the
+ * commit that adds or removes a row (T-45: 27 → 28).
+ */
+const EXPECTED_ROWS = 28;
+
 const passed = rows.filter((r) => r.ok).length;
 console.log("");
 console.log(`smoke: ${passed}/${rows.length} journeys`);
 for (const row of rows) {
   console.log(`${row.ok ? "PASS" : "FAIL"} | ${row.journey} | ${row.ended - row.started}ms | ${row.evidence}`);
 }
-process.exit(passed === rows.length && rows.length === 27 ? 0 : 1);
+process.exit(passed === rows.length && rows.length === EXPECTED_ROWS ? 0 : 1);
