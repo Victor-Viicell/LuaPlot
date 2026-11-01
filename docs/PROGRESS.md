@@ -3,6 +3,35 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-36(a): `--keyboard-inset` is written, from the visual viewport
+
+- **Changed:** `src/lib/viewport.ts` — `installKeyboardInset()` is the token's **one writer**:
+  `Math.max(0, Math.min(400, Math.round(innerHeight - visualViewport.height - visualViewport.offsetTop)))`
+  written to `documentElement` as `--keyboard-inset`, coalesced through `requestAnimationFrame` (never
+  a debounce — the dock must not lag the keyboard), subscribed to `resize` **and** `scroll` on the
+  visual viewport, one eager write at install, returns a teardown. No `window.visualViewport` → `0px`
+  once and no subscription (the CSS fallback is the same value). Installed **once** in `App.tsrx`
+  beside `refreshInbox()`, not in the session page: the token is a document property and two writers
+  fight over the last frame. Walk row **32** (`scripts/smoke.mjs`, `EXPECTED_ROWS` 31 → 32) opens a
+  session at **360×740** under its own device-metrics override, shadows `visualViewport.height` with
+  a configurable own value, dispatches `resize` **on the visual viewport**, and reads the token and
+  the dock's computed `padding-bottom` back. `ARCHITECTURE.md` → *Viewport* carries the rule.
+- **Verified how:** `./scripts/check.sh` GREEN. Walk **32/32** locally and **32/32 `--live`** against
+  `https://victor-viicell.github.io/LuaPlot/` (200). Row 32's evidence: `--keyboard-inset 0px → 320px
+  under a 320px shadowed viewport at 360; dock padding 8 → 328, scrollWidth 350/360 — and back`. It was
+  proved **red** first: `schedule()` made a no-op in `viewport.ts`, the walk dropped to 31/32 and the
+  row failed with `--keyboard-inset stayed "0px" and the dock's bottom padding stayed 8px under a
+  320px shadowed viewport — nothing wrote the token`; the exact bytes were restored and the green run
+  above is the proof. The row restores the shadow (`delete vv.height`), dispatches again, asserts the
+  token is back to `0px` and the padding to 8px, and clears the metrics override in an outer
+  `finally`, asserting `innerWidth` returned.
+- **Not verified:** a real on-screen keyboard — the walk shadows the viewport, so the measurement is
+  the writer against Chromium's own object, not Android's (the device half stays with T-35/T-36).
+  Also unmeasured: whether the dock lags a keyboard that animates in over ~250ms (the rAF coalescing
+  is per-frame, but nothing here can time a real keyboard), and iOS's `visualViewport` quirks (no
+  iOS toolchain on this box). Note for the next session: the session page's `documentElement`
+  `scrollWidth` is 350 at 360 — no overflow, so the row's "no wider page" assertion has room.
+
 ## 2026-11-01 — T-48: the tier becomes a gate, and it immediately found 26 sites
 
 - **Changed:** `scripts/tier-check.mjs` (node stdlib only) is **section 8** of `scripts/check.sh`. It

@@ -14,6 +14,7 @@ import { badgeCount } from "./lib/format.ts";
 import { currentUser, onSession, signIn, signOut } from "./lib/state/session.ts";
 import { nsfwPreference, onPrefs } from "./lib/state/prefs.ts";
 import { onInbox, refreshInbox, unreadCount } from "./lib/state/inbox.ts";
+import { installKeyboardInset } from "./lib/viewport.ts";
 import type { AccountPreferences, User } from "./lib/data/types.ts";
 
 /**
@@ -122,6 +123,16 @@ export function App() @{
 
   // Seed once at boot: the badge does not reset on launch, and nothing increments per event.
   void refreshInbox();
+
+  /**
+   * T-36a — the on-screen keyboard, written once for the whole document.
+   *
+   * `--keyboard-inset` is a property of `documentElement`, and the session composer's dock is the
+   * one surface that reads it. Installing the writer here rather than in that page is the rule, not
+   * an optimisation: the shell mounts once, so there is exactly one writer for the app's lifetime
+   * and no route change can stack a second listener on the same token.
+   */
+  installKeyboardInset();
 
   let seq = 0;
   let lastKey = "";

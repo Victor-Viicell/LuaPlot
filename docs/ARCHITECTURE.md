@@ -31,6 +31,7 @@ src/
     fixtures/           seed data shared by memory adapter and tests
     llm/                chat.ts, jev.ts, jevPolicy.ts, mock.ts, provider.ts
     native.ts           Tauri plugin bridge + browser fallback
+    viewport.ts         the on-screen keyboard → `--keyboard-inset` (one writer, installed by App)
     format.ts           percent() today; relativeTime when a card shows "2h"
     state/              session.ts, prefs.ts (NSFW) — plain subscribe/notify stores
     toast.ts            the toast queue, same store shape
@@ -222,6 +223,18 @@ The client never holds a key. `lib/llm/*` posts to `${SUPABASE_URL}/functions/v1
 that env is absent (preview build) it uses `mock.ts`, which returns deterministic, spec-shaped
 responses. Mock output is labelled in the UI (`Preview mode` chip) so nobody mistakes it for a real
 model turn.
+
+## Viewport
+
+`lib/viewport.ts` is the only writer of `--keyboard-inset`, the token a docked surface adds to its
+`padding-bottom`. A phone keyboard shrinks `window.visualViewport`, never `window.innerHeight`, so the
+inset is `innerHeight - vv.height - vv.offsetTop`, clamped to `0…400`, written once per animation
+frame on `resize`/`scroll` **of the visual viewport** (a `window` resize never fires for a keyboard).
+It is installed **once by the shell** (`App.tsrx`), because the token lives on `documentElement`: a
+page that installed its own would be a second writer fighting over the last frame. No
+`window.visualViewport` writes `0px` and stops — the CSS fallback is the same value, so an old
+webview degrades honestly. Walk row 32 shadows `visualViewport.height` at 360×740 and reads the
+composer's dock lifting by exactly the keyboard's height.
 
 ## Native boundary
 

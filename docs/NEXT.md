@@ -1,66 +1,64 @@
 # Baton — what the next session does
 
-**T-36(a) is the one ticket.** T-48 landed the static guard: `scripts/tier-check.mjs` is gate section 8,
-it proved red on four fixtures, and on its first run it named **26** declarations that were still
-painting text with the mark — all in `.tsrx` `<style>` blocks, the half T-37C's hand sweep never
-reached. Those are closed and the walk is 31/31. What is left in P5/P6 is blocked (*Blocked*), so the
-rotation moves to the one mobile defect that is provable in a browser without an Android toolchain:
-**the composer's keyboard lift is a variable nothing writes.**
+**T-49 is the one ticket.** T-36(a) landed: `src/lib/viewport.ts` is the one writer of
+`--keyboard-inset` (installed by the shell), walk row 32 shadows `visualViewport.height` at 360×740
+and reads the session dock's padding 8 → 328, and the walk is **32/32** locally and live. Everything
+else left in P5/P6 is blocked (*Blocked* below: Supabase, the Tauri deep-link dependency, the Android
+toolchain, a release key), so the rotation goes back to the one law the walk still cannot prove —
+**sessions read copies, never live items**.
 
-## T-36(a) — `--keyboard-inset` must be written by something
+## T-49 — the session's copies become a walk row
 
-**Why it is next.** `src/pages/session-detail.tsrx:677` docks the composer with
-`padding: 8px 16px calc(8px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px))`, and
-`grep -rn visualViewport src/` returns **nothing**: the token is read by the one surface that needs it
-and written by no code on any page. On a phone the on-screen keyboard opens and the dock stays exactly
-where it was, under the keyboard — the input is unusable, which is the first thing T-36's accept line
-tests ("no clipped input"). It needs no dependency, no backend and no device: the mechanism is
-`visualViewport`, which Chromium exposes headlessly.
+**Why it is next.** `CONTRACT.md` → *Product law* says **"Sessions read copies, never live items.
+Publishing a cut is a snapshot."** It is the only product law with **no walk row at all**: `grep -n
+"Restore\|copies-toggle" scripts/smoke.mjs` returns nothing, and 32 rows later nothing has ever opened
+a session's **Session copies** disclosure, read a copy's state, or pressed **Restore**. The page draws
+all of it (`src/pages/session-detail.tsrx`: `summary` → `4 copies · 1 edited`, `copy-state` →
+`untouched | edited | unlinked`, `Open the original` only while linked, `Update from original` +
+`Restore copy` behind the confirmation). Session 2 (`5e551000-0000-4000-8000-000000000002`) is seeded
+for exactly this: its character copy is **edited** (so Restore is offered) and its lorebook copy is
+**unlinked** (so neither control nor link is), because that original is private.
 
 **Approach**
 
-1. `src/lib/viewport.ts` — one writer for the token:
-   `inset = Math.max(0, Math.min(400, Math.round(window.innerHeight - vv.height - vv.offsetTop)))`;
-   write it as `document.documentElement.style.setProperty("--keyboard-inset", inset + "px")`.
-   Subscribe to `resize` **and** `scroll` on `window.visualViewport`, coalesce with `requestAnimationFrame`
-   (never `setTimeout` — the dock must not lag the keyboard), and return a teardown. No
-   `window.visualViewport` (old webview) → write `0px` once and do not subscribe; the CSS fallback is
-   already `0px`, so that branch is honest, not a silent failure.
-2. Install it **once** in the shell (`src/App.tsrx`), not per page: `--keyboard-inset` is a document
-   property, and two writers on one page fight over the last frame. Session detail, the thread composer
-   and `user-edit`'s save bar all read it.
-3. Row 32 in `scripts/smoke.mjs` (bump `EXPECTED_ROWS` to 32 — a genuinely new assertion, not a
-   near-copy): open a session, then shadow the box with
-   `Object.defineProperty(window.visualViewport, "height", { configurable: true, value: <h - 320> })`,
-   dispatch a `resize` **on `window.visualViewport`**, and poll `getComputedStyle(document.documentElement)
-   .getPropertyValue("--keyboard-inset")` for `320px`; assert the dock's bottom padding grew by the same
-   320 and `documentElement.scrollWidth` did not grow. Then `delete window.visualViewport.height`,
-   dispatch again, assert `0px` and the original padding — **both restores in `finally`**, like every
-   other override in the walk.
+1. One new row, **row 33** (bump `EXPECTED_ROWS` 32 → 33) — a genuinely new assertion, not a
+   near-copy. `go("/session/5e551000-0000-4000-8000-000000000002")`, then read the **closed**
+   disclosure first: `copies-toggle` prints `4 copies · 1 edited` with `aria-expanded="false"` and no
+   `.copies-body` in the DOM (closed is the default, and that is part of the assertion).
+2. Press the toggle, then read every `.copy` row's `.copy-kind`, `.copy-name` and `.copy-state`:
+   the character row must read `edited`, the lorebook row `unlinked`, the rest `untouched`.
+3. Assert the **unlinked** row has no `a.copy-link` and no `.copy-action` (it still runs — the point
+   of an unlinked copy), and that the **edited** row offers `Update from original` **and**
+   `Restore copy` while an `untouched` row offers only `Update from original`.
+4. Press `Restore copy` → the confirmation line reads *"This puts the copy back and discards the
+   session's edits."* → press the confirming `Restore copy` → the row's `.copy-state` flips to
+   `untouched` and the summary drops to `4 copies · 0 edited`. That last pair is the proof the
+   snapshot moved, not just that a button exists.
+5. Restore nothing: the row runs **after** row 32 and before `sign out`, and nothing later reads the
+   copies. Say so in the row's comment like the other mutating journeys do.
 
 **Traps**
 
-- **`visualViewport.height` is read-only**, so the row shadows it with `defineProperty` on the
-  *instance* (`configurable: true`) and deletes it afterwards. A leaked shadow poisons every later row's
-  layout reading; the restore belongs in `finally` beside the metrics clear.
-- **`innerHeight` does not change when an Android keyboard opens** — the layout viewport stays put and
-  only the visual viewport shrinks. That is exactly why the math is `innerHeight - vv.height - vv.offsetTop`
-  and not a delta of `innerHeight`.
-- **Clamp upward too.** A URL-bar collapse can make the visual viewport *taller* than `innerHeight`; the
-  negative result must clamp to 0, and a pinch-zoom can report a nonsense 2000 — hence the 400 cap.
-- **`resize` on `window` is not the event.** The keyboard fires `resize` on `visualViewport`; a
-  `window.addEventListener("resize")` handler never sees it.
-- **Ripple lifecycle:** use the shell's existing mount/cleanup idiom (`src/lib/reactive.ts`, the same
-  `onMount`-style teardown `App.tsrx` already uses for its scroll listener) — never leave the listener
-  attached across a route change.
-- **`100dvh` does not follow the token.** Home and `authentification` size themselves with `100dvh`;
-  `--keyboard-inset` only pads a docked surface. Do not re-tune those numbers in this ticket.
+- **The disclosure is closed by default**, so a selector for `.copy` finds nothing until the toggle is
+  pressed — a row that skips to `.copy` fails with a page that looks broken.
+- **`Open the original` is an `<a>` that only exists while `!unlinked`.** Asserting "the unlinked row
+  has no link" by counting `a` inside the row is right; asserting it by text finds the *label* in a
+  neighbouring row.
+- **`Restore copy` is the label twice** — the button that opens the confirmation and the button that
+  performs it (the first reads `Update from original` for the update arm). Press by text, then press
+  again inside `.copy-confirm`, and read `.copy-state` back; a single press only proves the dialog.
+- **The aside is a column at `md` and a plain block at 360.** `click()` scrolls into view already;
+  do not measure geometry here (row 30 owns the 44px bands).
+- **`summary` is a tracked sentence, not a count in the DOM.** Compare the whole string
+  (`4 copies · 1 edited`), not a parsed number, so a wording change is a red row rather than a silent
+  pass.
+- Session 2 belongs to `you`; the walk is signed in by then (row 1). Signed out, the page answers
+  *"This session doesn't exist."* — a different ticket, not this row.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **32/32** locally and **32/32 `--live`**; row 32 proved
-**red** by returning a no-op teardown from `viewport.ts` (token stays `0px`, the row fails naming the
-padding it read) and green again with the real writer; `publish.sh` prints `LIVE` and `curl` 200. If the
-shadowed-`visualViewport` trick cannot be made to drive the real handler, stop and file the row as
-`UNVERIFIED` in `PROGRESS` with what a device must run — do not assert the padding from the CSS.
+**Accept:** `./scripts/check.sh` GREEN; walk **33/33** locally and **33/33 `--live`**; row 33 proved
+**red** first (e.g. press the toggle but assert `4 copies · 1 edited` after the restore, and watch it
+fail naming the summary it read) and green again with the exact bytes restored; `publish.sh` prints
+`LIVE` and `curl` is 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -109,15 +107,15 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   `docs/DESIGN.md` (what it lists, what it does, what it costs at 360px) or strike it from the ticket.
 - **T-35/T-39 (Android + release):** install cmdline-tools + platform 35 + NDK, the four rust
   android targets, then `tauri android init`. T-39 also needs a signing key and a `v0.1.0` tag, so it
-  follows T-35. **T-36 is split:** (a) is the keyboard inset, doable and provable in Chromium (this
-  baton); the rest of T-36 — no clipped input **on a real APK**, hardware back-button mapping, 60fps
-  transcript scroll on device — still needs the toolchain above and stays blocked.
+  follows T-35 and stays blocked. **T-36 is split:** (a) — the keyboard inset — **landed as T-36a** (`lib/viewport.ts`
+  + walk row 32); the rest of T-36 — no clipped input **on a real APK**, hardware back-button mapping,
+  60fps transcript scroll on device — still needs the toolchain above and stays blocked.
 - **Tauri on this box is NOT blocked — and the webview session proof is done.** `bun run tauri dev`
   opens, the account survives a restart in both directions, and the recipe above reproduces it.
 
 ## Open decisions
 
-- **Row count is 31 (T-37B, extended in place by T-37C).** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 32 (T-36a, after T-37B/T-37C extended theirs in place).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
   adding a near-copy of it, and bump the count only when a row is genuinely new.
 - **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
@@ -150,8 +148,10 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 32 after T-36(a).** Row 32 shadows `visualViewport.height`; anything added after it
-  must assume the shadow is gone (`delete`s in `finally`) and the token is back to `0px`.
+- **Row count is 32 after T-36(a); 33 is T-49's.** Row 32 shadows `visualViewport.height`, takes its
+  own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
+  shadow is gone, the token is back to `0px` and the session is back at the browser's own window
+  size (assert `innerWidth` returned, never trust the `finally`).
 - **The pressed-pill fill is a rule, not a one-off (T-48).** A control whose own background is
   `--color-surface` cannot hold static accent text in Latte; pressed means accent **fill** +
   `--color-accent-contrast`. `DESIGN.md` → *Contrast* carries it.
@@ -312,6 +312,25 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   post 6 removed), reports 5 (3 open, 2 concluded), comments 22, sessions 2, bookmarks 8 (one dead),
   notifications 6 (3 unread), profiles 7, follow edges 15. `/dev/data`'s *Characters* cell reads the
   **page** count (24 = `PAGE_SIZE`), not the fixture total.
+
+- **`visualViewport.height` is shadowable on the instance (T-36a).** `Object.defineProperty(vv,
+  "height", { configurable: true, value: n })` works — the read-only accessor lives on the prototype
+  and does not block an own property — and `delete vv.height` puts the real getter back. Dispatch
+  `new Event("resize")` **on `vv`**: a `window` resize is not the event a keyboard fires.
+- **The walk does not run at 360 by default.** `--window-size=360,740` is the browser's, but a tab
+  opened through `/json/new` measures **500×653** (probed 2026-11-01), and every row that clears its
+  override returns to *that*. A row of phone geometry therefore takes its **own** `360×740` override
+  and compares `scrollWidth` against the `innerWidth` it read, never against a constant — T-36a's
+  first run reported `scrollWidth 490`, which looks like a broken page until you see the viewport was
+  500.
+- **A character's session entry is `Continue` after any earlier row opened one.** `click("Start a
+  session")` matched nothing on the second visit; take `clickAny(["Continue", "Start a session"])`.
+- **`requestAnimationFrame` does fire in headless Chromium** for the active tab, so a rAF-coalesced
+  writer (`viewport.ts`) is walkable — no `Emulation.setPageVisibility` or timer fallback needed.
+- **A red proof that fails on a poll's timeout message is not the proof an accept line asks for.**
+  T-36a's first red run said `timed out waiting for --keyboard-inset to read 320px`; the row now
+  catches that poll and re-reads the token **and the dock's padding**, so the failure names the two
+  numbers a reader can act on. Do the same wherever a row's accept line says what the message must say.
 
 ## When blocked
 

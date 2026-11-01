@@ -242,6 +242,12 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 - [ ] **T-36 Mobile polish.** Safe areas, keyboard-avoiding composer, pull-to-refresh off,
       hardware back button mapping, 60fps transcript scroll. Accept: APK runs on device/emulator
       with no clipped input and haptics fire on send.
+      — **T-36(a) done:** `src/lib/viewport.ts` writes `--keyboard-inset` from
+      `innerHeight - visualViewport.height - offsetTop` (clamped 0…400, rAF-coalesced, `resize` +
+      `scroll` on the visual viewport), installed once in `App.tsrx`; walk row 32 shadows
+      `vv.height` at 360×740 and reads the session dock's bottom padding 8 → 328px. The rest of
+      T-36 (a real APK, keyboard on device, hardware back, 60fps scroll) still needs T-35's
+      Android toolchain.
 
 ## P6 — Release
 

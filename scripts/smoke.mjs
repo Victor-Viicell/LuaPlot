@@ -1894,6 +1894,141 @@ results.push(
   }),
 );
 
+/* ------------------------------------------------------------------------------------------------
+ * T-36a — `--keyboard-inset` is written by something, and the thing it is written from is the
+ * **visual** viewport.
+ *
+ * The rule this row defends: a phone keyboard shrinks `window.visualViewport`, never
+ * `window.innerHeight`, so `lib/viewport.ts` measures `innerHeight - vv.height - vv.offsetTop` and
+ * writes it as `--keyboard-inset`, which the session composer's `.dock` already reads in its
+ * `padding-bottom`. Before T-36a nothing in `src/` mentioned `visualViewport` at all: the token was
+ * read by the one surface that needs it and written by nothing, so the composer stayed under the
+ * keyboard on device.
+ *
+ * The keyboard itself is not reachable headlessly, so the row **shadows** the viewport: it gives the
+ * `visualViewport` instance a configurable own `height` (the real one is a read-only accessor on the
+ * prototype), dispatches `resize` **on that object** — a `window` resize is not the event the writer
+ * listens for — and reads the token and the dock's padding back from computed style. The shadow is
+ * deleted in the `finally`: a leaked one would mis-measure every later row in the same run.
+ * ---------------------------------------------------------------------------------------------- */
+results.push(
+  await journey("the keyboard inset lifts the dock from the visual viewport (no wider page)", async () => {
+    await go("/character/c0a1b2c3-0000-4000-8000-000000000002");
+    await waitText("Sonic the Hedgehog", 8000);
+    // Earlier rows already opened a session for this character, so the entry control now reads
+    // **Continue**; the pair is clicked in that order so the row works in either state.
+    await clickAny(["Continue", "Start a session"]);
+    await waitFor(`/\\/session\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the session route", 8000);
+    await waitFor(`!!document.querySelector(".dock textarea")`, "the docked composer");
+
+    const metrics = () =>
+      js(`
+        const dock = document.querySelector(".dock");
+        if (!dock) return null;
+        const vv = window.visualViewport;
+        return {
+          token: getComputedStyle(document.documentElement).getPropertyValue("--keyboard-inset").trim(),
+          pad: Math.round(parseFloat(getComputedStyle(dock).paddingBottom) * 100) / 100,
+          inner: window.innerHeight,
+          innerWidth: window.innerWidth,
+          vvHeight: vv ? vv.height : null,
+          offsetTop: vv ? Math.round(vv.offsetTop) : 0,
+          scrollWidth: document.documentElement.scrollWidth,
+        };
+      `);
+
+    // The phone case, taken by the row itself: the session runs at the browser's own window size
+    // (the walk launches it, but earlier rows clear their overrides back to that), and a keyboard
+    // only exists at a phone width. Cleared in the `finally` — a leaked override poisons every later
+    // row exactly as a leaked shadow does.
+    const restore = await js(`return window.innerWidth;`);
+    let seen = "";
+    try {
+      await send("Emulation.setDeviceMetricsOverride", { width: 360, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260);
+
+      const resting = await metrics();
+      if (!resting) throw new Error("the session page drew no .dock");
+      if (resting.innerWidth !== 360) throw new Error(`the override asked for 360 and the page measured ${resting.innerWidth}`);
+      if (resting.vvHeight === null) {
+        throw new Error("this Chromium reports no window.visualViewport, so the token cannot be judged here");
+      }
+      if (resting.token !== "0px") {
+        throw new Error(`--keyboard-inset rests at ${JSON.stringify(resting.token)}, not 0px: the writer is not settled`);
+      }
+      if (resting.scrollWidth > resting.innerWidth) {
+        throw new Error(`the session page already overflows at 360 before any keyboard: scrollWidth ${resting.scrollWidth} > ${resting.innerWidth}`);
+      }
+
+      // 320px stands in for a keyboard. `height` is read-only on VisualViewport, so the shadow is an
+      // own configurable value on the instance; `read` proves the shadow took before anything is
+      // asserted, because a silent no-op would leave the rest of the row measuring the real viewport.
+      const shadow = await js(`
+        const vv = window.visualViewport;
+        const target = Math.max(1, Math.round(window.innerHeight - 320));
+        Object.defineProperty(vv, "height", { configurable: true, value: target });
+        vv.dispatchEvent(new Event("resize"));
+        return { target, read: vv.height };
+      `);
+      if (shadow.read !== shadow.target) throw new Error("the visualViewport height shadow did not take");
+
+      try {
+        const expected = Math.max(0, Math.min(400, Math.round(resting.inner - shadow.target - resting.offsetTop)));
+        if (expected !== 320) {
+          throw new Error(`the row is mis-set: innerHeight ${resting.inner} − shadow ${shadow.target} − offset ${resting.offsetTop} is ${expected}, not 320`);
+        }
+        try {
+          await waitFor(
+            `Math.round(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--keyboard-inset")) || 0) === ${expected}`,
+            `--keyboard-inset to read ${expected}px`,
+            2400,
+          );
+        } catch {
+          // A writer that never runs is the bug this row exists for: report the two numbers a reader
+          // can act on (the token and the dock's own padding), not just the poll that timed out.
+          const now = await metrics();
+          throw new Error(`--keyboard-inset stayed ${JSON.stringify(now.token)} and the dock's bottom padding stayed ${now.pad}px under a ${expected}px shadowed viewport — nothing wrote the token`);
+        }
+        await sleep(120);
+        const lifted = await metrics();
+        const grew = Math.round((lifted.pad - resting.pad) * 100) / 100;
+        if (grew !== expected) {
+          throw new Error(`the dock's bottom padding grew ${grew}px under a ${expected}px keyboard (${resting.pad} → ${lifted.pad})`);
+        }
+        if (lifted.scrollWidth > lifted.innerWidth) {
+          throw new Error(`the keyboard widened the document: scrollWidth ${lifted.scrollWidth} > ${lifted.innerWidth} (resting ${resting.scrollWidth})`);
+        }
+        seen = `--keyboard-inset 0px → ${lifted.token} under a 320px shadowed viewport at 360; dock padding ${resting.pad} → ${lifted.pad}, scrollWidth ${lifted.scrollWidth}/${lifted.innerWidth} — and back`;
+      } finally {
+        // The shadow and the token are one trap: a leaked `height` would make every later layout
+        // reading in this run wrong, and a leaked inset would leave the next page's dock lifted.
+        await js(`
+          const vv = window.visualViewport;
+          if (vv) {
+            delete vv.height;
+            vv.dispatchEvent(new Event("resize"));
+          }
+          return true;
+        `);
+        await waitFor(
+          `getComputedStyle(document.documentElement).getPropertyValue("--keyboard-inset").trim() === "0px"`,
+          "--keyboard-inset to return to 0px",
+        );
+        const back = await metrics();
+        if (Math.round(back.pad) !== Math.round(resting.pad)) {
+          throw new Error(`the dock stayed at ${back.pad}px after the keyboard closed, not ${resting.pad}px`);
+        }
+      }
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const after = await js(`return window.innerWidth;`);
+    if (after !== restore) throw new Error(`the override cleared to ${after}px, but the session runs at ${restore}px`);
+    return seen;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -1915,9 +2050,10 @@ chrome.kill("SIGKILL");
  * The walk's own arithmetic: **every** row has to exist and pass. Keeping the count explicit (rather
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
- * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31).
+ * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
+ * T-36a: 32).
  */
-const EXPECTED_ROWS = 31;
+const EXPECTED_ROWS = 32;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");
