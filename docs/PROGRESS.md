@@ -3,6 +3,25 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-47: every target inside a card reaches 44px
+
+- **Changed:** `.card-foot` is a 44px band (`min-height`, `padding-top` removed — the band *is* the
+  gap under the rule) and `a.card-author` stretches (`flex: 1 1 auto`, `line-height: 44px`) so the
+  whole left of the row is the author's target and the ratio stays plain text; `PostCard`'s
+  `.post-avatar` is a 44×44 box with `margin: -4px` around the unchanged 36px `Avatar` drawing, and
+  `.post-author`/`.post-time` carry the same band; `UserCard`'s `.card-handle` is a `<p>`, not a
+  second link to the profile. `docs/DESIGN.md` → *Card* records the rule and the numbers, `SHIP-PLAN`
+  gets T-47, `scripts/smoke.mjs` grows row 30 (`EXPECTED_ROWS = 30`).
+- **Verified how:** `./scripts/check.sh` GREEN (7 sections, `52 internal anchors are pushes` — one
+  fewer, the person card's duplicate). `bash scripts/smoke.sh` **30/30**, `--live` **30/30** on Pages
+  after `publish.sh` printed `LIVE=` and `curl` answered 200. Row 30 prints `catalog author 244×44 in
+  a 45px foot, ratio 96% plain · thread avatar link 44×44 around a 36px drawing, @handle 44px — no
+  horizontal scroll`; the breakpoint row still measures 1/2/3/3 tracks. Proved **red** first: with
+  `line-height` back at 1.3 the row failed `the card's author link is 16px tall at 360`.
+- **Not verified / found:** the first honest run failed at *width* — a 2-letter handle in a 44px-tall
+  band is a 36px-wide target, which is why the link stretches rather than hugs its text. Nothing else
+  in the card's box moved; the taller footer did not leak into the grid's track math.
+
 ## 2026-11-01 — T-46: every in-app anchor is a push, not a document load
 
 - **Changed:** all 53 internal anchors now carry `onClick={follow(path)}` beside their real

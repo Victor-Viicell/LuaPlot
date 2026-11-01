@@ -1555,6 +1555,88 @@ results.push(
 );
 
 results.push(
+  await journey("measure the card's touch targets at 360×740 (44px bands, no new scroll)", async () => {
+    await go("/character/catalog");
+    await waitFor(`document.querySelectorAll(".card a.card-author").length > 0`, "a catalog card's author link", 10000);
+    const restore = await js(`return window.innerWidth;`);
+    const seen = [];
+    try {
+      // The phone case is the one the floor exists for; the session runs at 360 already, but the
+      // override makes the row honest after any earlier row that moved the viewport.
+      await send("Emulation.setDeviceMetricsOverride", { width: 360, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260);
+      const first = await js(`
+        const card = document.querySelector(".card:has(a.card-author)");
+        if (!card) return null;
+        const box = (el) => { const r = el.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; };
+        const author = card.querySelector("a.card-author");
+        const foot = card.querySelector(".card-foot");
+        const ratio = card.querySelector(".card-ratio");
+        return {
+          author: box(author),
+          foot: box(foot),
+          ratio: ratio ? box(ratio) : null,
+          footLinks: foot.querySelectorAll("a,button").length,
+          ratioLink: ratio ? !!(ratio.querySelector("a") || ratio.closest("a")) : false,
+          ratioText: ratio ? ratio.innerText.trim() : "",
+          scroll: document.documentElement.scrollWidth,
+          viewport: window.innerWidth,
+        };
+      `);
+      if (!first) throw new Error("/character/catalog drew no card with an author link");
+      if (first.viewport !== 360) throw new Error(`the override asked for 360 and the page measured ${first.viewport}`);
+      if (first.author.h < 44) throw new Error(`the card's author link is ${first.author.h}px tall at 360, under the 44px floor`);
+      if (first.author.w < 44) throw new Error(`the card's author link is only ${first.author.w}px wide at 360, under the 44px floor`);
+      if (first.footLinks !== 1) throw new Error(`the card footer holds ${first.footLinks} interactive children; the author link must be the only one`);
+      if (first.ratioLink) throw new Error("the ratio became a target: the percentage is a reading, not a link");
+      if (!/%$/.test(first.ratioText)) throw new Error(`the ratio cell reads ${JSON.stringify(first.ratioText)}, not a percentage`);
+      if (first.scroll - first.viewport > 0) {
+        throw new Error(`the taller card footer introduced a horizontal scroll at 360: scrollWidth ${first.scroll} > ${first.viewport}`);
+      }
+      seen.push(`catalog author ${first.author.w}×${first.author.h} in a ${first.foot.h}px foot, ratio ${first.ratioText} plain`);
+
+      await go("/post/thread");
+      await waitFor(`document.querySelectorAll("a.post-avatar").length > 0`, "a post's avatar link", 10000);
+      const post = await js(`
+        const link = document.querySelector("a.post-avatar");
+        if (!link) return null;
+        const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; };
+        const author = document.querySelector("a.post-author");
+        const avatar = link.querySelector(".avatar");
+        return {
+          link: box(link),
+          // The drawing must not grow with the box: a 44px avatar is a different card (DESIGN.md).
+          drawing: box(avatar),
+          author: box(author),
+          authorLine: author ? Math.round(author.getBoundingClientRect().height) : -1,
+          scroll: document.documentElement.scrollWidth,
+          viewport: window.innerWidth,
+        };
+      `);
+      if (!post) throw new Error("/post/thread drew no post with an avatar link");
+      if (post.link.h < 44 || post.link.w < 44) {
+        throw new Error(`the post avatar link is ${post.link.w}×${post.link.h}, under the 44×44 floor`);
+      }
+      if (!post.drawing || post.drawing.w !== 36) {
+        throw new Error(`the avatar drawing measures ${post.drawing ? `${post.drawing.w}×${post.drawing.h}` : "nothing"}, not 36: the box grew, the circle must not`);
+      }
+      if (post.authorLine < 44) throw new Error(`the post's @handle is ${post.authorLine}px tall, under the 44px floor`);
+      if (post.scroll - post.viewport > 0) {
+        throw new Error(`the thread scrolls horizontally at 360: scrollWidth ${post.scroll} > ${post.viewport}`);
+      }
+      seen.push(`thread avatar link ${post.link.w}×${post.link.h} around a ${post.drawing.w}px drawing, @handle ${post.authorLine}px`);
+    } finally {
+      // Same trap as the breakpoint row: a leaked override poisons every later row.
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const back = await js(`return window.innerWidth;`);
+    if (back !== restore) throw new Error(`the override cleared to ${back}px, but the session runs at ${restore}px`);
+    return `${seen.join(" · ")} — no horizontal scroll`;
+  }),
+);
+
+results.push(
   await journey("sign out", async () => {
     await go("/");
     await waitText("signed in as", 8000);
@@ -1575,9 +1657,9 @@ chrome.kill("SIGKILL");
  * The walk's own arithmetic: **every** row has to exist and pass. Keeping the count explicit (rather
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
- * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29).
+ * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30).
  */
-const EXPECTED_ROWS = 29;
+const EXPECTED_ROWS = 30;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

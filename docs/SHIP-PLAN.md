@@ -351,6 +351,18 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       `scripts/link-check.mjs` is gate section 7 and was proved red on a broken copy (single-line and
       multi-line tags, fragment and `target="_blank"` exempt). Row 29 presses *Edit profile* and proves
       document identity; 29/29 local and `--live`.
+- [x] **T-47 The card's links reach the 44px floor.** Measured in T-44 and carried in the failure
+      bank: `.card-foot`'s author link was a ~16px text run, `PostCard`'s avatar link was 36×36, and
+      `UserCard` put two links on one destination. Accept: `.card-foot` is a 44px band whose only
+      interactive child is the stretched author link (the ratio stays plain text), `.post-avatar` is a
+      44×44 box *around* the 36px drawing, the person card's handle is not a link, `DESIGN.md` → *Card*
+      carries the rule and the numbers, and walk row 30 measures both at 360×740 with no horizontal
+      scroll. No new class, no colour, no dependency.
+      — **Done** (T-47): `line-height: 44px` is the band (type unchanged), `flex: 1 1 auto` is what
+      makes it a 44px *wide* target — the first run failed for a 36px-wide box around a 2-letter
+      handle. `.post-avatar` grew by `margin: -4px` so the drawing did not move. Row 30 prints
+      `catalog author 244×44 in a 45px foot … thread avatar link 44×44 around a 36px drawing`, and was
+      proved red (16px) with the band removed. 30/30 local and `--live`.
 
 ## Failure bank (the ways this class of product breaks)
 

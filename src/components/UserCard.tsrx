@@ -12,7 +12,8 @@ import type { Profile } from "../lib/data/types.ts";
  * person reads at the same rhythm as an item.
  *
  * The handle sits under the title rather than in the footer: the footer is the counts, and a handle
- * is identity, not engagement.
+ * is identity, not engagement. It is **not** a second link to the profile (T-47): the title already
+ * opens it, and the handle line measured under the 44px floor, so it is plain text with the same type.
  */
 export function UserCard({ person }: { person: Profile }) @{
   const to = `/user/${person.handle}`;
@@ -22,7 +23,7 @@ export function UserCard({ person }: { person: Profile }) @{
       <a class="card-title" href={href(to)} onClick={follow(to)}>{person.displayName}</a>
     </div>
 
-    <a class="card-handle" href={href(to)} onClick={follow(to)}>{`@${person.handle}`}</a>
+    <p class="card-handle">{`@${person.handle}`}</p>
 
     <div class="card-middle">
       <div class="card-veil">

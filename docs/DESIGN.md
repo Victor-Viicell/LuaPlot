@@ -385,6 +385,23 @@ list, so the decisions below are the ones they inherit.
   real character, so they still satisfy `Character`). The grid section sits **outside** the
   fixed-width stage, because its columns follow the viewport and a 360px stage would only ever prove
   the phone case. `/dev/data` renders the same card through the same component.
+- **Every target inside a card is 44px; the drawing does not grow** (T-47). This supersedes the T-44
+  note that called it "a card redesign" — it is a hit-area change and nothing else:
+  - `.card-foot` is a **44px band** (`min-height`, no `padding-top`: the band *is* the gap under the
+    rule) and `a.card-author` is its only interactive child, stretched `flex: 1 1 auto` so the band
+    is the whole left half of the row rather than the width of `@name` (a 2-letter handle measured a
+    36px-wide target inside a 44px band before the stretch). `line-height: 44px` is what makes the
+    box 44 tall — the type stays 12px, the colour, the underline and the ellipsis are untouched, so
+    this reads as the same card. The ratio is plain text: a percentage is a reading, never a target.
+  - `PostCard`: `.post-avatar` is a 44×44 box with `margin: -4px`, so the 36px `Avatar` (`size={36}`,
+    the drawing) lands on the same pixel and the head row simply grows to 44. `.post-author` and
+    `.post-time` join it at `line-height: 44px` — both are ways into the post, so both are bands.
+  - `UserCard`'s `.card-handle` is a `<p>`, not an anchor: the title already opens the profile, and
+    two links to one destination is two small targets where there should be one.
+  - **Measured at 360×740** (walk row 30): catalog author **244×44 in a 45px foot**, ratio `96%`
+    plain text; thread avatar link **44×44 around a 36px drawing**, `@handle` 44. No horizontal
+    scroll on either page, and the grid still measures 1 / 2 / 3 / 3 tracks — the taller footer did
+    not leak into the track math.
 
 ## Catalog (decided in T-09, do not re-invent)
 

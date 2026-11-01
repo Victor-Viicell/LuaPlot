@@ -808,24 +808,26 @@ a.card-title:hover {
 
 /* The person card's handle line, under the title: identity, not a count, so it does not live in the
    footer the way an author does on an item card. */
+/* T-47 — the handle is **not** a second way in: the title already opens the profile, so this line is
+   identity and only identity. Two links to one destination read as two targets and both measured
+   under the 44px floor. The type is unchanged; only the interactivity left. */
 .card-handle {
-    margin-top: -6px;
+    margin: -6px 0 0;
     color: var(--color-text-subtle);
     font-size: 12px;
     line-height: 1.3;
-    text-decoration: none;
 }
 
-.card-handle:hover {
-    color: var(--color-text-muted);
-}
-
+/* T-47 — the footer row is a **44px band** and the author link owns all of it. The band used to be a
+   16px text run 12px under the rule; `line-height: 44px` on the link is what makes the hit box 44
+   tall without touching the type, the colour or the underline, and the ratio stays plain text on the
+   right (a percentage is a reading, not a target). Measured at 360: author 44, foot 44. */
 .card-foot {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding-top: 12px;
+    min-height: 44px;
     border-top: 1px solid var(--color-border);
     color: var(--color-text-subtle);
     font-size: 12px;
@@ -833,8 +835,15 @@ a.card-title:hover {
 }
 
 .card-author {
+    display: block;
+    /* The band is the **whole left half of the row**, not the width of `@name`: a short handle would
+       otherwise leave a 36px target inside a 44px band (measured at 360). `min-width: 0` is what
+       keeps the ellipsis available on a 24-character handle. */
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     color: var(--color-text-muted);
+    line-height: 44px;
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1058,9 +1067,17 @@ a.persona-card-open:hover {
     min-width: 0;
 }
 
+/* T-47 — a 44px hit box **around** the 36px drawing, not a bigger avatar. The negative margin
+   cancels the extra 4px on each side, so the circle lands on the same pixel it did before and the
+   head row simply grows by 8. `size={36}` stays on the Avatar prop: the box is this link's. */
 .post-avatar {
     display: flex;
     flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: -4px;
     text-decoration: none;
 }
 
@@ -1072,11 +1089,14 @@ a.persona-card-open:hover {
     min-width: 0;
 }
 
+/* T-47 — the handle and the timestamp are both ways into the post, so both carry the 44px band
+   (`line-height`, not a bigger type). They share one baseline, so the row still reads as one line. */
 .post-author {
     overflow: hidden;
     color: var(--color-text);
     font-size: 14px;
     font-weight: 600;
+    line-height: 44px;
     text-decoration: none;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1091,6 +1111,7 @@ a.post-time:hover {
 .post-time {
     color: var(--color-text-subtle);
     font-size: 12px;
+    line-height: 44px;
     text-decoration: none;
 }
 

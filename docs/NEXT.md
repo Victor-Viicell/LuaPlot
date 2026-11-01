@@ -1,59 +1,68 @@
 # Baton — what the next session does
 
-**T-47 is the one ticket.** T-46 closed the last defect class that was neither blocked nor cosmetic:
-every in-app anchor is now a push (`follow()`), gate section 7 fails on a new bare one, and row 29
-proves it on the page a session lands on. What is left on the board needs Supabase, Android tooling, a
-dependency or a decision (bottom of this file). The one unblocked defect with a **spec-backed** answer
-is the card's touch targets, carried in the failure bank since T-44.
+**T-37B is the one ticket.** T-47 closed the last measured defect on the board that needed no
+backend, no toolchain and no dependency: every target inside a card is 44px and the drawing stayed
+the same size. What remains is either blocked (Supabase, Android, a plugin dependency) or a design
+decision. **T-37B is the one decision that is now cheap to take**, because the fix is a token, the
+accept is a number, and the walk can measure it — the same shape as T-47.
 
-## T-47 — the card's links reach the 44px floor
+## T-37B — the light flavours' accent text clears 4.5:1
 
-**Why it is next.** It is the only remaining open item that needs no backend, no dependency and no
-decision: T-44 measured it, the failure bank records it, and WCAG 2.2's `2.5.8` is what says it is
-allowed today rather than what makes it good. A catalogue card is the product's most-touched surface
-and its author line is a 16px-high text run.
+**Why it is next.** It is the only unchecked item in P6 that is neither backend nor toolchain, and it
+is the last known WCAG failure in the app. `docs/DESIGN.md` → *Contrast* records it as 0.05 short:
+Latte's active tab label is `--color-accent` (`--ctp-mauve`) on `--color-bg-elevated`, which measures
+**4.45:1** where AA wants 4.5. Every other pair in every flavour measures clean (T-37 walked six
+pages at 360×740 and found 0 failing pairs in Mocha).
 
-**What is wrong.** Measured at 360×740 in T-44 and unchanged since:
+**What is wrong.** The accent is a *mark* colour used as a *text* colour. On dark flavours
+`--ctp-mauve` is light enough to read; on Latte the same token is dark-on-light and lands 0.05 short —
+which is the one place the palette's design (an accent for strokes and fills) meets this app's
+decision (accent also carries the active label, `DESIGN.md` → *Tokens*).
 
-- `.card-foot`'s author link (`a.card-author`, `@handle`) is a text run with no vertical padding —
-  well under 44 and under the 24×24 AA floor as well, once line-height is subtracted.
-- `PostCard`'s avatar link (`.post-avatar`) is a **36×36** box (`Avatar size={36}`), under 44.
-- `a.card-handle` on `UserCard` duplicates the title's destination — two links, one target, both small.
+**The decision (take it, do not re-open it in the baton).** Add a **derived, flavour-specific text
+tier** rather than a hex: `--color-accent-text`, defined as `--ctp-mauve` in the three dark flavours
+and as `color-mix(in srgb, var(--ctp-mauve) 88%, var(--ctp-crust))` (or whatever mix measures ≥ 4.6)
+in Latte. Then:
+
+- the **label** of the active nav destination (tab bar, `md` rail, `lg` sidebar) uses
+  `--color-accent-text`;
+- the **marks** keep `--color-accent` unchanged — the 20×2px tick above the icon, the 2px left bar at
+  `lg`, the `CatalogSwitch` underline, the `.btn-primary` fill, the focus ring. Nothing about the
+  accent's job changes, only which tier text may use.
+- `--color-accent-text` also covers the two `:hover` colours that currently paint text in
+  `--color-accent` (`a.card-author:hover`, `.post-author:hover`, `.post-time:hover`) — they are text
+  and they carry the same 4.45 problem on Latte's card surface.
 
 **Approach**
 
-1. Treat the **whole card footer row** as the author's target: give `.card-foot` the author link as its
-   only interactive child and let it stretch to a 44px band (`min-height: 44px`, the ratio stays
-   plain text on the right). Keep the underline/colour exactly as `docs/DESIGN.md` → *Card* draws it —
-   this is a hit-area change, not a typography change.
-2. `PostCard`: give `.post-avatar` a 44×44 box around the existing 36px `Avatar` (padding, not a
-   bigger avatar — the drawing stays). Same for `.post-author`, whose `@handle` is the second way in.
-3. `UserCard`: make `.card-handle` non-interactive (`<p>` with the same type) since the title already
-   goes to the profile; one destination, one target, and the row stops being a small link.
-4. Record the rule in `docs/DESIGN.md` → *Card*: *every interactive element inside a card carries a
-   44px hit box; the drawing does not grow.* Add the measured numbers after the change.
-5. Add **one** walk row (30): at 360×740, on `/character/catalog`, assert the first card's author link
-   box is ≥ 44px tall and the document still does not scroll horizontally; then on `/post/thread` the
-   first post's avatar link box is ≥ 44. Reuse the box reader the breakpoint row already uses
-   (`getBoundingClientRect`), and bump `EXPECTED_ROWS` to 30.
-6. Nothing else: no new class names in the pages, no colour, no dependency. `.card-foot` and
-   `.post-avatar` are shell C-S-S/`styles.css` rules, not a page's.
+1. Declare the token in every flavour block in `src/styles.css` (Mocha, Macchiato, Frappé, Latte and
+   the `prefers-color-scheme` default), never a hex in a page. `docs/DESIGN.md` → *Token*s and
+   *Contrast* get the token and the measured number in the same commit.
+2. Sweep the label usage: `.tab.is-active`, `.rail-link.is-active`, `.nav-link.is-active` (whatever
+   the shell calls them — read `App.tsrx`) and the three hover rules above. **Do not** touch
+   `--color-accent` on any mark.
+3. Add **walk row 31**: for each flavour (`Emulation.setEmulatedMedia` with
+   `prefers-color-scheme: light` for Latte, dark for Mocha — the same mechanism the T-37 audit used),
+   read `getComputedStyle` of the active tab label's `color` and the tab backplate's
+   `background-color`, compute the contrast ratio **in the page** and assert ≥ 4.5; print the ratio per
+   flavour as the evidence. Bump `EXPECTED_ROWS` to 31.
+4. Nothing else: no layout change, no dependency, no second font.
 
 **Traps**
 
-- **`percent()` and the ratio cell must not move.** The ratio is plain text on the right; widening the
-  author's band must not turn it into a target or shift the grid.
-- **A 44px band changes the card's height**, and the breakpoint row asserts `outlet`/`grid` tracks, not
-  height — so re-run that row before claiming the layout is unchanged; if the grid count moves, the
-  padding leaked into the track math.
-- **`Avatar`'s `size={36}` prop is the drawing.** Do not pass 44 to it: the box grows, the circle does
-  not (`docs/DESIGN.md` → *Card*: the avatar is 36 in the foot of a post card).
-- **A card is not a link.** The title is the link (T-46 paired it with `follow`); do not wrap the whole
-  card in an anchor — the footer's author link and the title must stay separate destinations.
+- **A flavour is measured through `Emulation.setEmulatedMedia`**, never by writing `data-theme` from
+  JS (failure bank: T-37). If a flavour is only settable by `data-theme`, say so and use the dev
+  gallery's switch — but the walk's proof must be a media emulation.
+- **`--color-accent-text` must not be used for a fill.** A darker mauve behind `--color-accent-contrast`
+  text drops that pair to ~2:1; the primary button keeps `--color-accent`.
+- **The contrast maths must live in the page expression**, not in the walk's host side: the numbers
+  under test are the *computed* colours, and a host-side table would only re-assert the tokens.
+- **A ratio of 4.49 rounds to 4.5** — assert the unrounded value and print two decimals.
+- **Latte is not the only light flavour under `prefers-color-scheme: light`** — check which flavour
+  the media query actually lands on before asserting, or the row proves Mocha against itself.
 
-**Accept:** `./scripts/check.sh` GREEN (including section 7 — a new anchor without `follow` fails),
-`scripts/smoke.sh` **30/30** locally and `--live`, measured boxes printed in the row's evidence,
-`LIVE` printed by `publish.sh`.
+**Accept:** `./scripts/check.sh` GREEN, walk **31/31** locally **and** `--live`, row 31 printing the
+ratio per flavour at ≥ 4.5, `publish.sh` prints `LIVE`, `curl` 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -80,8 +89,8 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   "select key, quote(value) from ItemTable"` → `luaplot.session` as **UTF-16LE** hex: `null` when signed
   out, `{"handle":"you","displayName":"You"}` when signed in (never `isAdmin`).
 - **`pkill -x luaplot` ends the whole `bun run tauri dev`**; relaunching takes ~20s (cargo is warm).
-- **A desktop notification can sit over the window's top-right corner** and hide the *More* button in a
-  capture. The menu renders inside the body, so the session row is still readable — crop below the toast
+- **A desktop notification can sit over the window's top-right corner** and hide the *More* button in
+  a capture. The menu renders inside the body, so the session row is still readable — crop below the toast
   rather than concluding the menu did not open.
 - Cron's shell guard refuses `bash -c` / `node -e`; put scripts in a file (or use `jq`). It also
   refuses `rm` under a root path — clean scratch files with Python's `os.remove`, or leave them in
@@ -97,9 +106,6 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   bundle config — a dependency, and the contract forbids one the ticket does not name.
 - **T-33B(c) `Ctrl/Cmd+K`:** a decision, not work — no spec file describes a command palette. Record
   it in `docs/DESIGN.md` (what it lists, what it does, what it costs at 360px) or strike it.
-- **T-37B (palette):** Latte's active tab label is 4.45:1 (`accent` on `bg-elevated`) and Latte has no
-  darker mauve: pick a darker light-mode accent ramp or a lighter surface. `docs/DESIGN.md` → *Theme*
-  records the three tokens T-37 settled.
 - **T-35/T-36/T-39 (Android):** install cmdline-tools + platform 35 + NDK, the four rust android
   targets, then `tauri android init`.
 - **Tauri on this box is NOT blocked — and the webview session proof is done.** `bun run tauri dev`
@@ -112,15 +118,20 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   from the log before comparing. Do not pin a character id.
 - **The breakpoint row owns a CDP override.** Anything added after it must assume the session is back
   at 360×740; the row asserts that it cleared (`window.innerWidth === restore`) rather than trusting
-  the `finally`.
+  the `finally`. T-47's row 30 takes its own 360×740 override and clears it for the same reason.
 - **`follow()` drops the fragment on purpose** — a `/terms#anchor` link must stay a real document
   navigation (or gain scroll handling nothing needs yet). `ARCHITECTURE.md` → Router carries the rule
   and the three exemptions `scripts/link-check.mjs` encodes (fragment, `target=`, external).
 - **A card's ratio rounds to whole percent**, so a one-vote change can leave the printed number
   identical (96% → 96%). A journey proving an engagement write must read a count (the detail page's
   Likes/Dislikes cells), never a card's percentage.
-- **Row count is 29 (T-46).** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a row
-  that stops running is a red walk — bump it in the same commit as the row (30 when T-47 adds one).
+- **Row count is 30 (T-47).** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a row
+  that stops running is a red walk — bump it in the same commit as the row (31 when T-37B adds one).
+- **A 44px band is `line-height`/`min-height`, not `padding`.** Vertical padding on an inline `<a>` is
+  hit-testable but invisible to layout, so a row that measures `getBoundingClientRect()` would pass
+  while the row still collapsed; a flex item with `line-height: 44px` is the band the walk can see.
+  A band that only hugs its text is still a small target: `flex: 1 1 auto` is what makes it 44 **wide**
+  (T-47's first run failed at 36px wide on `@you`).
 
 ## Found while working (carried forward — keep this list growing)
 
@@ -131,10 +142,12 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **The walk's own row count is a gate.** `process.exit(… rows.length === 27)` was a literal: adding
   row 28 with all 28 green still exited 1. It is `EXPECTED_ROWS` now — bump it with the row.
 - **A red walk proves the assertion; a green one does not.** T-45 removed the `onClick`, rebuilt, and
-  watched row 1 fail with the document dump before restoring it. Do that for any new invariant.
-- **Bare anchors are gone (T-46):** 53 internal anchors pair `href` with `follow`, `EmptyState` takes
-  a **path** (`to=`) so its 39 call sites cannot regress, and gate section 7 fails on a new one.
-  The static check is the guard the walk cannot be: 29 rows cannot visit every page.
+  watched row 1 fail with the document dump before restoring it; T-47 set the band back to
+  `line-height: 1.3` and watched row 30 read `16px tall` before restoring `44px`. Do that for any new
+  invariant — and restore the exact bytes that passed, so the green run stays the proof.
+- **Bare anchors are gone (T-46):** 52 internal anchors pair `href` with `follow`, `EmptyState` takes
+  a **path** (`to=`) so its call sites cannot regress, and gate section 7 fails on a new one.
+  The static check is the guard the walk cannot be: 30 rows cannot visit every page.
 - **The webview stores `luaplot.session` as UTF-16LE in a SQLite table** (`localstorage/
   http_localhost_1420.localstorage`, `ItemTable`), so `quote(value)` returns hex — decode before
   comparing, or a correct proof reads as a corrupt one. On Pages the same key lives in the browser
@@ -161,14 +174,16 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **`pkill -f vite` kills the tick's own shell**, because the pattern matches the command line that is
   running it. Kill a preview by port: `lsof -ti:4321 | xargs -r kill`. Use `pkill -x luaplot` for the app.
 - **Never pipe `scripts/smoke.sh` into `tail`/`head`/`grep`.** A pipeline hands back the *pager's*
-  status, so a red walk exits 0, and `smoke: N/28 journeys` is the first line the pipe drops — the run
+  status, so a red walk exits 0, and `smoke: N/30 journeys` is the first line the pipe drops — the run
   looks green and proves nothing. Redirect to a file, then read the file and the exit code.
 - **T-44's walk helpers are the ones to reuse**: `setToggle(label, want)` / `toggleState` (press a
   `button.toggle`, then **poll the rendered `aria-pressed`**), `storeCell(label)`, `coveredCards()`,
   `measureAt(width)` and the `BREAKPOINTS` table.
 - **The card grid is 1 / 2 / 3 / 3, not 1 / 2 / 3 / 4.** Measured ladder live: `360:1col/field1/rail0/
   btn44/outlet340 · 640:2col/field2/rail0/btn44/outlet620 · 900:3col/field2/rail84/btn44/outlet794 ·
-  1200:3col/field2/rail240/btn44/outlet794`, no document-level horizontal scroll at any width.
+  1200:3col/field2/rail240/btn44/outlet794`, no document-level horizontal scroll at any width — and
+  still exactly these numbers after T-47 made the card footer 44 tall (the height did not enter the
+  track math).
 - **`.count-label` carries `text-transform: uppercase`** and `innerText` returns the *rendered* text
   (`SHOW`, `LIKES`): a case-sensitive label match finds nothing and reads as a broken page.
 - **`Emulation.setDeviceMetricsOverride` is the only honest way to change width**, and a leak poisons
@@ -211,8 +226,9 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **Measure a flavour through `Emulation.setEmulatedMedia`**, never by flipping `data-theme` from JS.
 - **`/bookmarks` carries an internal horizontal scroller** (`.tabs`, `overflow-x: auto`); the
   **document** does not scroll. The breakpoint row asserts `documentElement`.
-- **Tap targets**: 44px still fails for card-footer author links (WCAG 2.2 `2.5.8` exempts inline
-  links) and avatar links at 36×36 (AA's 24×24 floor passes). A card redesign, not a padding tweak.
+- **`:has()` is available in the walk's Chromium** (`Chromium 105+`), and it is the only way to pick
+  "the first card that actually draws an author link" in one selector (T-47's row 30) without
+  flattening the whole grid into the page expression.
 - **Bundle numbers**: `dist` 1.1 MB; JS 728 KB raw / ~187 KB gz; CSS 23.8 KB gz; largest asset the
   JetBrains Mono Latin woff2 at 40,404 B. Budget 300 KB gz — met.
 - **T-28B is done**: `postStatusSchema` (`visible | removed`), `removePost()`, `livePost()`,
