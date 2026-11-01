@@ -390,6 +390,13 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       text/hover tiers, and the three `.vote`/`.save` pressed pills (own `--color-surface`, where no
       static accent tier clears AA in Latte) became an accent fill with `--color-accent-contrast`. The
       walk stayed 31/31 with row 31 unmoved, so `styles.css` was not touched at all.
+- [x] **T-49 The session's copies become a walk row.** The product law *sessions read copies, never
+      live items* had no row: nothing had opened the **Session copies** disclosure, read a copy's
+      state or pressed **Restore**. Row **33** (33/33 local and `--live`) reads the closed header, the
+      three states (`edited` / `unlinked` / `untouched`), the per-state controls, and the restore's
+      effect on both the row and the tracked sentence. Proved red first. Two ticket premises were
+      wrong and the DOM won: session 2 holds three copies (not four) and the summary drops the suffix
+      rather than printing `0 edited`.
 
 ## Failure bank (the ways this class of product breaks)
 

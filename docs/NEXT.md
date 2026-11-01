@@ -1,63 +1,64 @@
 # Baton — what the next session does
 
-**T-49 is the one ticket.** T-36(a) landed: `src/lib/viewport.ts` is the one writer of
-`--keyboard-inset` (installed by the shell), walk row 32 shadows `visualViewport.height` at 360×740
-and reads the session dock's padding 8 → 328, and the walk is **32/32** locally and live. Everything
-else left in P5/P6 is blocked (*Blocked* below: Supabase, the Tauri deep-link dependency, the Android
-toolchain, a release key), so the rotation goes back to the one law the walk still cannot prove —
-**sessions read copies, never live items**.
+**T-50 is the one ticket.** T-49 landed: `scripts/smoke.mjs` has row **33**, the walk is **33/33**
+locally and live, and *sessions read copies, never live items* is no longer the one product law with
+no row. The next law with no mechanical guard is *personas are personal (never shared, never
+moderated, never counted)* — a law about **absences**, which is exactly what a hand sweep forgets.
 
-## T-49 — the session's copies become a walk row
+## T-50 — a persona carries none of the shared-item chrome
 
-**Why it is next.** `CONTRACT.md` → *Product law* says **"Sessions read copies, never live items.
-Publishing a cut is a snapshot."** It is the only product law with **no walk row at all**: `grep -n
-"Restore\|copies-toggle" scripts/smoke.mjs` returns nothing, and 32 rows later nothing has ever opened
-a session's **Session copies** disclosure, read a copy's state, or pressed **Restore**. The page draws
-all of it (`src/pages/session-detail.tsrx`: `summary` → `4 copies · 1 edited`, `copy-state` →
-`untouched | edited | unlinked`, `Open the original` only while linked, `Update from original` +
-`Restore copy` behind the confirmation). Session 2 (`5e551000-0000-4000-8000-000000000002`) is seeded
-for exactly this: its character copy is **edited** (so Restore is offered) and its lorebook copy is
-**unlinked** (so neither control nor link is), because that original is private.
+**Why it is next.** `CONTRACT.md` → *Product law*: **"Personas are personal (never shared, never
+moderated, never counted)."** `src/specs/pages/persona/detail.md` fixes it in the negative — *"No
+engagement row, no report control, and no comment thread … nothing about it is counted"* — and
+`collection.md` adds *"personas are absent from profiles and never shared"*. The walk reaches
+`/persona/[id]` only through row 13's edit journey, which lands on the form; **no row has ever read
+the absences**, and a control that quietly appears one day (a Report button copied in from a template,
+an engagement strip, a comment count) is invisible to every existing gate: `link-check.mjs` reads
+anchors, `tier-check.mjs` reads colours, `spec-routes.mjs` reads routes. None of them can see "there
+is no such element".
 
 **Approach**
 
-1. One new row, **row 33** (bump `EXPECTED_ROWS` 32 → 33) — a genuinely new assertion, not a
-   near-copy. `go("/session/5e551000-0000-4000-8000-000000000002")`, then read the **closed**
-   disclosure first: `copies-toggle` prints `4 copies · 1 edited` with `aria-expanded="false"` and no
-   `.copies-body` in the DOM (closed is the default, and that is part of the assertion).
-2. Press the toggle, then read every `.copy` row's `.copy-kind`, `.copy-name` and `.copy-state`:
-   the character row must read `edited`, the lorebook row `unlinked`, the rest `untouched`.
-3. Assert the **unlinked** row has no `a.copy-link` and no `.copy-action` (it still runs — the point
-   of an unlinked copy), and that the **edited** row offers `Update from original` **and**
-   `Restore copy` while an `untouched` row offers only `Update from original`.
-4. Press `Restore copy` → the confirmation line reads *"This puts the copy back and discards the
-   session's edits."* → press the confirming `Restore copy` → the row's `.copy-state` flips to
-   `untouched` and the summary drops to `4 copies · 0 edited`. That last pair is the proof the
-   snapshot moved, not just that a button exists.
-5. Restore nothing: the row runs **after** row 32 and before `sign out`, and nothing later reads the
-   copies. Say so in the row's comment like the other mutating journeys do.
+1. One new row, **row 34** (bump `EXPECTED_ROWS` 33 → 34). Open an own persona's detail page —
+   `go("/persona/9e45014a-0000-4000-8000-000000000001")` — poll for `.detail h1.name`, and read the
+   name back so a later fixture rename is a red row, not a silent pass.
+2. Assert the **absences** within the page's own root (`.detail`), never against `document.body`:
+   zero `button`/`a` whose accessible name matches `/report/i`, zero elements matching
+   `.counts, .count, .ratio, .engagement`, zero comment thread (`.comments`, `.comment-thread`,
+   `.comment`), zero save/bookmark control. Absence is asserted by **counting elements inside the
+   page root**, not by searching the text: an earlier row's toast, or a footer that says "report",
+   would make a text search pass on a page that still has the button.
+3. Assert `/persona` is **own-only**: the collection's `.card-cell` count equals the number of cards
+   read (`3` today — personas are seeded for `you` only), and every card links to a `/persona/<uuid>`
+   path under the served base. Do not pin a total without reading the cards first: the count is the
+   assertion, the number is evidence.
+4. The refusal on a persona that is not yours: `go("/persona/9e45014a-0000-4000-8000-0000000000ff")`
+   → the sentence **This persona doesn't exist in your collection.** and **no `<form>`** on the page.
+   Missing and unowned are one state on purpose (`getPersona` answers `null` for both); say so in the
+   row's comment.
+5. Nothing is mutated: the row only reads, so its position after row 33 and before `sign out` is for
+   tidiness, not safety — but keep it there, so `sign out` stays the walk's last row.
 
 **Traps**
 
-- **The disclosure is closed by default**, so a selector for `.copy` finds nothing until the toggle is
-  pressed — a row that skips to `.copy` fails with a page that looks broken.
-- **`Open the original` is an `<a>` that only exists while `!unlinked`.** Asserting "the unlinked row
-  has no link" by counting `a` inside the row is right; asserting it by text finds the *label* in a
-  neighbouring row.
-- **`Restore copy` is the label twice** — the button that opens the confirmation and the button that
-  performs it (the first reads `Update from original` for the update arm). Press by text, then press
-  again inside `.copy-confirm`, and read `.copy-state` back; a single press only proves the dialog.
-- **The aside is a column at `md` and a plain block at 360.** `click()` scrolls into view already;
-  do not measure geometry here (row 30 owns the 44px bands).
-- **`summary` is a tracked sentence, not a count in the DOM.** Compare the whole string
-  (`4 copies · 1 edited`), not a parsed number, so a wording change is a red row rather than a silent
-  pass.
-- Session 2 belongs to `you`; the walk is signed in by then (row 1). Signed out, the page answers
-  *"This session doesn't exist."* — a different ticket, not this row.
+- **`innerText` is the rendered text.** `.copies-toggle` and `.copy-kind` carry `text-transform:
+  uppercase`, so T-49's first run read `3 COPIES · 1 EDITED` and failed on a page that was correct.
+  Read **`textContent`** for a sentence the code writes and `innerText` only when the rendering is the
+  thing under test (T-49's lesson, now in *Found while working*).
+- **Do not invent a selector for the next session.** Read `src/pages/persona-detail.tsrx` first: the
+  page root is `.detail` inside `.page`, the name is `h1.name`, and the missing state is the shared
+  `EmptyState` with a **path** (`to="/persona"`), not an href. If a selector below does not exist in
+  the file, the row is mis-set, not the page broken.
+- **The shell draws controls of its own** (the `More` menu, the tab bar). Scope every absence query to
+  `.detail`; a `document.querySelector("button")` anywhere is the wrong node.
+- **`/persona` is a searchable collection at 360** — the toolbar has a search field and a sort. Do not
+  assume one card per row; count `.card-cell`, not columns.
+- **The word "report" can arrive from a toast.** Row 33 restores a copy (toast *Copy restored.*) and
+  rows 17–19 toast on cases; a text search would be flaky, an element count would not.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **33/33** locally and **33/33 `--live`**; row 33 proved
-**red** first (e.g. press the toggle but assert `4 copies · 1 edited` after the restore, and watch it
-fail naming the summary it read) and green again with the exact bytes restored; `publish.sh` prints
+**Accept:** `./scripts/check.sh` GREEN; walk **34/34** locally and **34/34 `--live`**; row 34 proved
+**red** first (e.g. add a `Report` button to the persona page's identity block, watch the row fail
+naming the control it found, then restore the exact bytes and watch it green); `publish.sh` prints
 `LIVE` and `curl` is 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
@@ -115,7 +116,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Open decisions
 
-- **Row count is 32 (T-36a, after T-37B/T-37C extended theirs in place).** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 33 (T-49, after T-37B/T-37C extended theirs in place).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
   adding a near-copy of it, and bump the count only when a row is genuinely new.
 - **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
@@ -148,16 +149,31 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 32 after T-36(a); 33 is T-49's.** Row 32 shadows `visualViewport.height`, takes its
+- **Row count is 33 after T-49; 34 is T-50's.** Row 32 shadows `visualViewport.height`, takes its
   own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
   shadow is gone, the token is back to `0px` and the session is back at the browser's own window
-  size (assert `innerWidth` returned, never trust the `finally`).
+  size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
+  **Restore copy** on session 2, so session 2's character copy is `untouched` for the rest of the
+  run — a later row that wants an `edited` copy must seed or edit its own.
 - **The pressed-pill fill is a rule, not a one-off (T-48).** A control whose own background is
   `--color-surface` cannot hold static accent text in Latte; pressed means accent **fill** +
   `--color-accent-contrast`. `DESIGN.md` → *Contrast* carries it.
 
 ## Found while working (carried forward — keep this list growing)
 
+- **`innerText` is the rendered text, so a `text-transform` redesigns the assertion (T-49).** The
+  session copies header and each `.copy-kind` are uppercased in CSS, so row 33's first run read
+  `3 COPIES · 1 EDITED` and failed on a page that was right. Read `textContent` for a sentence the
+  code writes; use `innerText` only when what the reader sees is the thing under test.
+- **A ticket's example strings are a hypothesis; the fixture is the fact (T-49).** T-49 predicted
+  `4 copies · 1 edited` → `4 copies · 0 edited`. Session 2 holds **three** copies (character, one
+  lorebook, preset) and `summary` appends ` · N edited` only while `N > 0`, so the truth was
+  `3 copies · 1 edited` → `3 copies`. Four is session 1's two-lorebook shape, which is the example
+  `DESIGN.md` quotes. Count the fixture before writing the assertion.
+- **`Restore` and `Restore copy` are two different buttons.** The edited row's opener is labelled
+  **Restore**; only the confirmation's button says **Restore copy**. Pressing by a `startsWith`
+  match hits the opener, and a second press must be scoped to `.copy-confirm`, or the row proves the
+  dialog and never the snapshot.
 - **A hand sweep is a list; the gate is the guard (T-48).** T-37C moved every accent-text site it could
   see in `src/styles.css` and reported the tree clean — `scripts/tier-check.mjs` then found **26** more
   in `.tsrx` `<style>` blocks on its first run, including `.vote`/`.save` pressed pills on three pages.

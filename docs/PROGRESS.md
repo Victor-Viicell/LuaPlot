@@ -3,6 +3,36 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-49: the session's copies become a walk row
+
+- **Changed:** walk row **33** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 32 → 33) — the product law
+  *sessions read copies, never live items* had no row at all. It opens
+  `/session/5e551000-…-000000000002`, reads the **closed** disclosure (`aria-expanded="false"`, no
+  `.copies-body`, header `3 copies · 1 edited`), presses the toggle, and reads all three copy rows:
+  the character `edited`, the lorebook `unlinked` (0 `a.copy-link`, 0 `.copy-action`, its *out of
+  reach* line), the preset `untouched` (only **Update from original**; **Restore** appears only on
+  the edited copy). Then it presses the edited row's **Restore**, asserts the confirmation sentence
+  verbatim, presses the confirming **Restore copy**, and reads back both halves of the snapshot —
+  the row's `.copy-state` flips to `untouched` and the header's tracked sentence drops to `3 copies`.
+  Mutating journey: it runs after row 32 and before `sign out`, and nothing later reads the copies.
+- **Verified how:** `./scripts/check.sh` GREEN. Walk **33/33** locally and **33/33 `--live`** against
+  `https://victor-viicell.github.io/LuaPlot/` (200). Row 33's evidence: `closed: "3 copies · 1 edited"
+  · Ninth edited / Unfiled Notes on the Ninth unlinked / Cold Open untouched · unlinked offers 0 links
+  / 0 controls · restored → "3 copies"`. Proved **red** first: the post-restore expectation was set
+  back to the pre-restore sentence, the walk dropped to 32/33 and the row failed with `after the
+  restore the character copy reads "untouched" and the header reads "3 copies"`; the exact bytes
+  (`cp` of the green file) were restored and the green run above is the proof.
+- **Ticket premises corrected, not the page:** session 2 holds **three** copies (character, one
+  lorebook, preset), so the header reads `3 copies · 1 edited`, not `4 copies · 1 edited` — four is
+  session 1's two-lorebook shape, which is what `DESIGN.md` → *Session* quotes. After the only edited
+  copy goes back the summary is `3 copies`: `summary` appends ` · N edited` only while `N > 0`, so
+  there is no `0 edited` state to assert. The **Restore** opener is labelled `Restore`; `Restore copy`
+  is only the confirming button. The row was written against the DOM, and the walk asserts the
+  sentence whole so a wording change is red.
+- **Not verified:** nothing mobile — this is desktop Chromium at 360×740. The row does not measure
+  the aside's geometry (row 30 owns the 44px bands) and does not re-read the copies after a reload:
+  the memory adapter reseeds on a full document load, so persistence stays with T-29.
+
 ## 2026-11-01 — T-36(a): `--keyboard-inset` is written, from the visual viewport
 
 - **Changed:** `src/lib/viewport.ts` — `installKeyboardInset()` is the token's **one writer**:

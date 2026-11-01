@@ -2029,6 +2029,152 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-49 — the one product law with no row: **sessions read copies, never live items.** Publishing a
+ * cut is a snapshot; an author editing a character never reaches a session already running.
+ *
+ * Session 2 is seeded for exactly this shape: its character copy is `edited` (so **Restore** is
+ * offered and the snapshot can move), its lorebook copy is `unlinked` (its original is private, so
+ * it offers neither control nor link and still runs), and its preset copy is `untouched`.
+ *
+ * The disclosure is **closed by default**, which is why the row reads the header first: a selector
+ * for `.copy` finds nothing until the toggle is pressed, and skipping straight to it fails looking
+ * like a broken page. The summary is a **tracked sentence**, so it is compared whole — the count is
+ * 3 (character, one lorebook, preset; the `4 copies · 1 edited` in DESIGN.md is the two-lorebook
+ * example) and when the only edited copy goes back the suffix disappears with it: `3 copies`.
+ *
+ * **Mutating journey.** It presses **Restore copy**, which rewrites session 2's copies in the
+ * adapter. Nothing after it reads the copies — it runs after row 32 and before `sign out` — so it
+ * restores nothing.
+ * ---------------------------------------------------------------------------------------------- */
+const SESSION_COPIES = "/session/5e551000-0000-4000-8000-000000000002";
+
+results.push(
+  await journey("the session's copies are the snapshot: closed, stated, and restorable", async () => {
+    await go(SESSION_COPIES);
+    await waitFor(`!!document.querySelector(".copies-toggle")`, "the copies disclosure");
+
+    /** The header's sentence, the disclosure's state, and every copy row as the reader sees it. */
+    const panels = () =>
+      js(`
+        const toggle = document.querySelector(".copies-toggle");
+        if (!toggle) return null;
+        const spans = [...toggle.querySelectorAll("span")];
+        return {
+          expanded: toggle.getAttribute("aria-expanded"),
+          summary: (spans[spans.length - 1]?.textContent || "").replace(/\\s+/g, " ").trim(),
+          body: !!document.querySelector(".copies-body"),
+          rows: [...document.querySelectorAll(".copy")].map((row) => ({
+            kind: (row.querySelector(".copy-kind")?.textContent || "").trim(),
+            name: (row.querySelector(".copy-name")?.textContent || "").trim(),
+            state: (row.querySelector(".copy-state")?.textContent || "").trim(),
+            links: row.querySelectorAll("a.copy-link").length,
+            detail: (row.querySelector(".copy-detail")?.textContent || "").replace(/\\s+/g, " ").trim(),
+            actions: [...row.querySelectorAll(".copy-action")].map((b) => (b.textContent || "").trim()),
+          })),
+        };
+      `);
+
+    const closed = await panels();
+    if (!closed) throw new Error(`the session page drew no copies disclosure at ${await url()}`);
+    if (closed.expanded !== "false") throw new Error(`the disclosure starts aria-expanded=${closed.expanded}`);
+    if (closed.body) throw new Error("the copies body is in the DOM before anything was pressed");
+    if (closed.summary !== "3 copies · 1 edited") {
+      throw new Error(`the closed header reads ${JSON.stringify(closed.summary)}, not "3 copies · 1 edited"`);
+    }
+
+    await clickSelector(".copies-toggle");
+    await waitFor(`document.querySelectorAll(".copy").length === 3`, "three copy rows");
+
+    const open = await panels();
+    if (open.expanded !== "true") throw new Error(`the pressed disclosure reads aria-expanded=${open.expanded}`);
+
+    const rowFor = (kind) => open.rows.find((row) => row.kind === kind) ?? null;
+    const character = rowFor("Character");
+    const lorebook = rowFor("Lorebook");
+    const preset = rowFor("Preset");
+    if (!character || !lorebook || !preset) {
+      throw new Error(`the copies read ${open.rows.map((r) => r.kind || "(no kind)").join(", ") || "nothing"}`);
+    }
+
+    const dealt = `${character.name} ${character.state} / ${lorebook.name} ${lorebook.state} / ${preset.name} ${preset.state}`;
+    if (character.state !== "edited") throw new Error(`the character copy reads ${JSON.stringify(character.state)}, not "edited" (${dealt})`);
+    if (lorebook.state !== "unlinked") throw new Error(`the lorebook copy reads ${JSON.stringify(lorebook.state)}, not "unlinked" (${dealt})`);
+    if (preset.state !== "untouched") throw new Error(`the preset copy reads ${JSON.stringify(preset.state)}, not "untouched" (${dealt})`);
+
+    // The unlinked copy is the point of the state: no link to an original it cannot reach, and no
+    // control that would promise to refresh from one — and it still carries its own line of fact.
+    if (lorebook.links !== 0) throw new Error(`the unlinked copy draws ${lorebook.links} link(s) to an original`);
+    if (lorebook.actions.length !== 0) throw new Error(`the unlinked copy offers ${JSON.stringify(lorebook.actions)}`);
+    if (!/out of reach/i.test(lorebook.detail)) throw new Error(`the unlinked copy reads ${JSON.stringify(lorebook.detail)}`);
+
+    // One control per state: only the edited copy can be put back, and every linked copy can pull
+    // the original forward (which confirms first, because it overwrites the session's edits).
+    if (character.links !== 1) throw new Error(`the edited copy draws ${character.links} links, not 1`);
+    if (!character.actions.includes("Update from original")) throw new Error(`the edited copy offers ${JSON.stringify(character.actions)}`);
+    if (!character.actions.includes("Restore")) throw new Error(`the edited copy cannot be restored: ${JSON.stringify(character.actions)}`);
+    if (preset.actions.length !== 1 || preset.actions[0] !== "Update from original") {
+      throw new Error(`the untouched copy offers ${JSON.stringify(preset.actions)}, not just "Update from original"`);
+    }
+
+    // Press the row's own **Restore** (the opener, not the confirmation's button of the same stem).
+    const armed = await js(`
+      const row = [...document.querySelectorAll(".copy")].find((r) => (r.querySelector(".copy-kind")?.textContent || "").trim() === "Character");
+      if (!row) return "";
+      const button = [...row.querySelectorAll(".copy-actions button")].find((b) => (b.textContent || "").trim() === "Restore");
+      if (!button) return "";
+      button.scrollIntoView({ block: "center" });
+      button.click();
+      return (button.textContent || "").trim();
+    `);
+    if (armed !== "Restore") throw new Error(`no Restore on the edited copy (pressed ${JSON.stringify(armed)})`);
+
+    await waitFor(`!!document.querySelector(".copy-confirm")`, "the restore confirmation");
+    const sentence = await js(`return (document.querySelector(".copy-confirm .copy-detail")?.textContent || "").replace(/\\s+/g, " ").trim();`);
+    if (sentence !== "This puts the copy back and discards the session's edits.") {
+      throw new Error(`the restore confirmation reads ${JSON.stringify(sentence)}`);
+    }
+
+    const done = await js(`
+      const confirm = document.querySelector(".copy-confirm");
+      if (!confirm) return "";
+      const button = [...confirm.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Restore copy");
+      if (!button) return "";
+      button.click();
+      return (button.textContent || "").trim();
+    `);
+    if (done !== "Restore copy") throw new Error(`the confirmation offered no "Restore copy" (pressed ${JSON.stringify(done)})`);
+
+    // Both halves are the proof: the row's own state, and the header's tracked sentence. A button
+    // that renders a dialog proves nothing about the snapshot.
+    let restored = null;
+    try {
+      await waitFor(
+        `(() => {
+          const row = [...document.querySelectorAll(".copy")].find((r) => (r.querySelector(".copy-kind")?.textContent || "").trim() === "Character");
+          const state = (row?.querySelector(".copy-state")?.textContent || "").trim();
+          const spans = [...document.querySelectorAll(".copies-toggle span")];
+          const summary = (spans[spans.length - 1]?.textContent || "").replace(/\\s+/g, " ").trim();
+          return state === "untouched" && summary === "3 copies";
+        })()`,
+        "the character copy to read untouched and the header to drop the edit",
+        4000,
+      );
+      restored = await panels();
+    } catch {
+      restored = await panels();
+      const now = restored?.rows.find((row) => row.kind === "Character");
+      throw new Error(
+        `after the restore the character copy reads ${JSON.stringify(now?.state)} and the header reads ${JSON.stringify(restored?.summary)}`,
+      );
+    }
+
+    if (restored.summary !== "3 copies") throw new Error(`the header still reads ${JSON.stringify(restored.summary)}`);
+
+    return `closed: ${JSON.stringify(closed.summary)} · ${dealt} · unlinked offers ${lorebook.links} links / ${lorebook.actions.length} controls · restored → ${JSON.stringify(restored.summary)}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -2051,9 +2197,9 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32).
+ * T-36a: 32, T-49: 33).
  */
-const EXPECTED_ROWS = 32;
+const EXPECTED_ROWS = 33;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");
