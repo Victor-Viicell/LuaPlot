@@ -16,17 +16,23 @@ could not be verified.
   the 2px accent bar `lg` already drew, and hover steps the label to `--color-text`. `DESIGN.md` →
   *Contrast*, *Layout law*, *Shell* carry the numbers and both decisions; `SHIP-PLAN` records the
   ticket under T-37B's entry; `scripts/smoke.mjs` row 31 grew in place (`EXPECTED_ROWS` stays 31).
-- **Verified how:** `./scripts/check.sh` GREEN. Walk **31/31** locally; row 31 prints
+- **Verified how:** `./scripts/check.sh` GREEN. Walk **31/31** locally and **31/31 `--live`**
+  (`https://victor-viicell.github.io/LuaPlot/`, serving `index-C5UZDJib.js`, `curl` 200); row 31 prints
   `Mocha … tab 8.64:1, @author hover 9.81:1, bare link 8.64:1 / hover 9.81:1 (#b4befe), rail 8.64:1
   on #181825 (bar #cba6f7, no fill) · Latte … tab 4.83:1, @author hover 5.91:1, bare link 4.83:1 /
-  hover 5.91:1 (#64469f, 4.66:1 on surface), rail 4.83:1 on #e6e9ef (bar #8839ef, no fill)`. The
-  mix was chosen from a computed table, not by eye: 55/45 lands 4.38 on `--color-surface` and 60/40
-  lands 4.29 (both under the 4.6 the tier exists for), 40/60 lands 4.66 — the hue is kept, only the
-  chroma drops. The bare-link half installs one classless `<a>` in the first card, because no page
-  prints one there, and removes it in the `finally`; its colour, backplate and `:hover` all come from
-  the real stylesheet.
-- **Not verified:** nothing disabled. `T-39` (signed APK + AppImage + tag) is the last open item in
-  P6 and is blocked on the Android toolchain, not on this ticket. `--live` is run at publish time.
+  hover 5.91:1 (#64469f, 4.66:1 on surface), rail 4.83:1 on #e6e9ef (bar #8839ef, no fill)`. Proved
+  **red twice** from the committed tree: with the base rule set back to `var(--color-accent)` the row
+  failed `Latte's a bare link on a card measures 4.45:1` (the mark's own number, measured on a real
+  card), and with the `md` rail's fill restored it failed `the md rail's active row paints
+  rgb(49, 50, 68) behind its label — the fill is back`; both were reverted with `git checkout -- .`
+  so the green run measures the shipped bytes. The mix was chosen from a computed table, not by eye:
+  55/45 lands 4.38 on `--color-surface` and 60/40 lands 4.29 (both under the 4.6 the tier exists for),
+  40/60 lands 4.66 — the hue is kept, only the chroma drops. The bare-link half installs one classless
+  `<a>` in the first card, because no page prints one there, and removes it in the `finally`; its
+  colour, backplate and `:hover` all come from the real stylesheet.
+- **Not verified:** nothing on this ticket — `check.sh` GREEN, local walk 31/31, live walk 31/31, live
+  build 200. T-39 (signed APK + AppImage + tag) is the last open item in P6 and is blocked on the
+  Android toolchain and a signing key, not on this ticket.
 
 ## 2026-11-01 — T-37B: the accent gets a text tier, and the light flavour clears AA
 
