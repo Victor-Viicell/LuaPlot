@@ -32,6 +32,7 @@ import {
   POST_REQUIRED,
   postWriteSchema,
   seedSchemas,
+  storedSessionSchema,
   type CommentBranch,
   type SeedCollection,
 } from "../src/lib/schema.ts";
@@ -254,6 +255,33 @@ if (parsedTree.success) {
 }
 if (counted(tree) !== COMMENTS.length) bad("the comment tree lost rows");
 else ok(`every one of ${COMMENTS.length} comment rows is in the tree`);
+
+/* 4. The kept session (T-33B) — the one shape read from `localStorage` at module load, where a
+   wrong answer is a launch that forgets who you are or a launch that never signs out. The three
+   states must be distinguishable, which is why a *removed* key and a stored `null` cannot mean the
+   same thing, and a corrupt or stale row must fail the parse rather than half-apply. */
+console.log("== stored session");
+const keptRow = storedSessionSchema.safeParse(JSON.stringify({ handle: "  You ", displayName: "  Ana   Lima " }));
+if (!keptRow.success) bad(`storedSessionSchema rejected a real row (${keptRow.error.issues[0]?.message})`);
+else if (keptRow.data?.handle !== "you" || keptRow.data.displayName !== "Ana Lima") {
+  bad(`storedSessionSchema did not normalise an account (${JSON.stringify(keptRow.data)})`);
+} else ok("storedSessionSchema normalises a stored handle and display name");
+
+const keptOut = storedSessionSchema.safeParse("null");
+if (!keptOut.success || keptOut.data !== null) bad("storedSessionSchema lost the explicit signed-out row");
+else ok("storedSessionSchema reads an explicit signed-out row");
+
+const keptAdmin = storedSessionSchema.safeParse(
+  JSON.stringify({ handle: "you", displayName: "You", isAdmin: true }),
+);
+if (keptAdmin.success) bad("storedSessionSchema accepted a client-written isAdmin");
+else ok("storedSessionSchema refuses an isAdmin field from storage");
+
+for (const junk of ["", "{", "{}", '{"handle":"A B"}', "true", '["you"]']) {
+  const keptJunk = storedSessionSchema.safeParse(junk);
+  if (keptJunk.success) bad(`storedSessionSchema accepted ${JSON.stringify(junk)}`);
+}
+ok("storedSessionSchema refuses corrupt and stale rows");
 
 if (failures > 0) {
   console.log(`SCHEMA RED — ${failures} failing`);

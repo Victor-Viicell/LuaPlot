@@ -1354,6 +1354,46 @@ export const profileWriteSchema = z.strictObject({
   displayName: displayNameSchema,
 });
 
+/* --- The session this device keeps (T-33B) ------------------------------------------------------ */
+
+/**
+ * Where `lib/state/session.ts` remembers the account across a restart — one key, one string, and
+ * the desktop shell stops forgetting who you are on every launch.
+ *
+ * The stored value is the **`localStorage` string itself**, not a decoded object, so the store
+ * calls `safeParse` on what the browser hands it and a corrupt, stale or hand-edited row fails a
+ * parse instead of a `try/catch JSON.parse` the store has to keep straight. Three states, and the
+ * difference between the last two is the whole point:
+ *
+ * - **no key at all** → a fresh install; the store seeds the mock account (a preview worth opening);
+ * - **`null`** → this device signed out on purpose, and stays signed out across a reload. Deleting
+ *   the key instead would restore the seed, so *sign out* would last exactly until the next launch;
+ * - **`{ handle, displayName }`** → the account, normalised by the same `profileWriteSchema` the
+ *   onboarding form writes, so a restored handle cannot differ from a saved one.
+ *
+ * **`isAdmin` is deliberately absent.** `userSchema` carries it because `/moderation` checks it, but
+ * a client-writable store must never be the source of an authorisation mark — the store re-attaches
+ * the seed's `isAdmin` on restore, exactly as `signIn()` does.
+ *
+ * `strictObject` under it: an unknown key in the stored row fails the parse and the device falls
+ * back to the seed rather than half-applying a stale shape.
+ */
+export const SESSION_KEY = "luaplot.session";
+
+export const SESSION_CORRUPT = "The stored session is not a session.";
+
+export const storedSessionSchema = z
+  .string()
+  .transform((raw, ctx) => {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      ctx.addIssue({ code: "custom", message: SESSION_CORRUPT });
+      return z.NEVER;
+    }
+  })
+  .pipe(z.union([z.null(), profileWriteSchema]));
+
 /**
  * `pages/user/profile.md` → *Data*: a profile is who an author is beyond the handle they sign a row
  * with — a display name, an avatar, a bio and a join date. It carries **no** engagement, no NSFW
