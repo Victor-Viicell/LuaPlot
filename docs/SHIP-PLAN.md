@@ -251,6 +251,14 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       dark flavours, `color-mix(… 85%, --ctp-text)` on Latte (`#7f3cdb`) — used by the active nav
       label and three link hovers; marks keep `--color-accent`. Smoke row 31 measures the tab pair in
       the page per flavour via media emulation: Mocha 8.64:1, Latte 4.83:1 (was 4.45).
+      — **Done** (T-37C): the rest of the accent's text joined the tier and the hover got a tier of
+      its own (`--color-accent-hover-text`: lavender on dark, `color-mix(… 40%, --ctp-text)` = `#64469f`
+      on Latte, 5.91:1 on a card and 4.66:1 on `--color-surface`). `a`, `a:hover`, `a.card-title:hover`,
+      `a.persona-card-name:hover`, `a.persona-card-open:hover`, `.post-comments:hover`,
+      `.persona-card-mark` and the selected tab's count moved; every fill kept `--color-accent`. The
+      `md` rail stopped filling — its active indicator is now the 2px bar `lg` drew (DESIGN → *Layout
+      law*). Row 31 grew, `EXPECTED_ROWS` stayed 31: bare link 4.83 / hover 5.91 (Latte), rail 4.83
+      on the rail's own plate with no fill.
 - [x] **T-38 End-to-end smoke.** Scripted walk of the 12 primary journeys against the Pages build.
       — `scripts/smoke.mjs` (+ `scripts/smoke.sh`, `bun run smoke`) walks all twelve in one session at
       360×740 and asserts on the DOM at every step; 12/12, ~7s; `--live` walks the published URL.
@@ -363,6 +371,13 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       handle. `.post-avatar` grew by `margin: -4px` so the drawing did not move. Row 30 prints
       `catalog author 244×44 in a 45px foot … thread avatar link 44×44 around a 36px drawing`, and was
       proved red (16px) with the band removed. 30/30 local and `--live`.
+- [ ] **T-48 A static guard for the accent's text tier.** `--color-accent` / `--color-accent-hover` may
+      paint `background-color`, `border-*`, `outline`, `box-shadow`, `fill`, `stroke` and
+      `accent-color` — never the `color` property. Accept: `scripts/tier-check.mjs` scans
+      `src/styles.css` and every `src/**/*.tsrx` `<style>` block, `check.sh` grows section 8 and still
+      prints `GREEN`, the scanner is proved red on an injected `a:hover { color: var(--color-accent) }`
+      (naming `file:line`), and no colour changes in the commit. Why next: it is the only way the tier
+      survives a page nobody walked — T-37C's sweep is a list in a doc today. Brief: `docs/NEXT.md`.
 
 ## Failure bank (the ways this class of product breaks)
 

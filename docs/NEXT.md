@@ -1,78 +1,60 @@
 # Baton — what the next session does
 
-**T-37C is the one ticket.** T-37B built the accent's text tier and moved the nav label and three
-hovers onto it: the tab label now measures **4.83:1** on Latte where it measured 4.45, proved by
-smoke row 31 in the page, per flavour. That gave the tier a home — and, while measuring, it found
-**two more pairs that are still short on the same tier**. T-37C finishes the sweep. It needs no
-backend, no toolchain and no dependency, and the walk can measure both halves.
+**T-48 is the one ticket.** T-37C finished the accent's text sweep by hand: `a`, its hover and seven
+component hovers moved onto `--color-accent-text` / the new `--color-accent-hover-text`, and the `md`
+rail stopped filling so its label sits on `--color-bg-elevated`. Smoke row 31 now measures all of it
+per flavour — Mocha 8.64 → 9.81, Latte 4.83 → 5.91 (4.66 on `--color-surface`), rail 4.83 with a
+2px bar and no fill. What holds that invariant today is **a list in a doc**. A new
+`.thing { color: var(--color-accent) }` in `styles.css` or any `.tsrx` `<style>` block reopens the
+defect three ticks just closed, and no walk row would see it: 31 rows cannot visit every page. T-48
+turns the list into gate section 8 — the way T-46 turned "every link is a push" into
+`scripts/link-check.mjs`.
 
-## T-37C — the rest of the accent's text joins the tier
+## T-48 — a static guard: `color:` may not paint the mark
 
-**Why it is next.** It is the last unchecked item in P6 that is neither backend nor toolchain, and it
-is the same defect T-37B just fixed, one surface over. Two measured failures are already recorded in
-`docs/DESIGN.md` → *Contrast*:
+**Why it is next.** It protects the invariant the last three ticks established, needs no backend, no
+toolchain and no dependency (node stdlib only), and copies a pattern already in the gate
+(section 7, `scripts/link-check.mjs`, proved red against a broken copy). Nothing else in P6 is
+unblocked — see *Blocked*.
 
-- **The base link rule.** `src/styles.css`: `a { color: var(--color-accent) }` — every link that has
-  no class of its own — paints the **mark** as text: **4.45:1** on Latte's `--color-bg-elevated` and
-  **3.51:1** on `--color-surface`. Its hover, `a:hover { color: var(--color-accent-hover) }`
-  (lavender), is **2.62:1** on bg-elevated — the worst pair in the app.
-- **The `md` rail label.** `.rail-item.is-active` paints `--color-surface` behind the label. Even the
-  new tier measures **3.81:1** there on Latte (the mark was 3.51), so this one is **not** a token
-  swap: the fill is the row's only `md` indicator (the 2px bar appears at `lg`), and a light-filled
-  row cannot carry accent text at 4.5 with this palette.
+**The rule (from `docs/DESIGN.md` → *Contrast*, settled — do not re-open it).**
 
-**The decision (take it, do not re-open it in the baton).**
-
-1. **Text** goes to `--color-accent-text`: `a`, and a hover that is text. The hover needs a tier of
-   its own — do **not** point `a:hover` at `--color-accent-hover` (lavender is 2.62:1 on Latte and
-   8.1:1 on Mocha, so it cannot be one value). Declare `--color-accent-hover-text` beside
-   `--color-accent-text` in every flavour block: the mark's hover value on dark, and a mix toward
-   `--ctp-text` on Latte that measures ≥ 4.6 on **both** `--color-bg-elevated` and `--color-surface`
-   (that is what "a link on a card" means). Compute the mix, do not guess: 85/15 landed 4.83 / 3.81,
-   so this hover needs roughly **55/45** to clear a card backplate — check the number before shipping
-   and if the hue goes muddy, say so in DESIGN and ship the surface change instead.
-2. **The `md` rail** stops filling. Either drop the `--color-surface` backplate on light flavours or
-   move the active indicator to a **mark** (a left bar, as `lg` already draws) so the label sits on
-   `--color-bg-elevated` (4.83). Record whichever in `docs/DESIGN.md` → *Layout law*, because it is a
-   design decision, not a token.
-3. **Every remaining `color: var(--color-accent)` is text.** Sweep them in the same commit:
-   `.persona-card-mark`, `a.persona-card-open:hover`, `.post-comments:hover`,
-   `.tab-pill[aria-selected="true"] .tab-count`. Nothing that is a **fill** moves —
-   `.btn-primary`, `.toggle-track`, `.cat-tab::after`, `.tab-pill::after`, the input focus borders,
-   the tab tick, the rail bar and the focus ring all keep `--color-accent`.
+- The accent is a **mark** colour. `--color-accent` and `--color-accent-hover` may paint
+  `background-color`, `border-*`, `outline`, `box-shadow`, `fill`, `stroke`, `accent-color` — never
+  the `color` property.
+- Text that is accent-coloured uses `--color-accent-text`; a **hover** that is text uses
+  `--color-accent-hover-text`.
+- The one exemption is `color: var(--color-accent-contrast)` on an accent **fill** (the primary
+  button's label): that token is a fill's foreground, not text on a surface.
 
 **Approach**
 
-1. `src/styles.css` + `src/App.tsrx`: the two tokens in all six blocks, then the sweep above.
-2. **Extend smoke row 31** (do not add a row — the row already owns the flavoured contrast proof):
-   measure `a` and `a:hover` with `CSS.forcePseudoState`, on `/character/catalog` where a printed
-   link sits on a card, and assert ≥ 4.5 per flavour. Extend the `md` half with
-   `Emulation.setDeviceMetricsOverride` at 900 **inside the same `try`/`finally`** as the media
-   emulation, and assert the rail label clears 4.5 after your fill decision. Keep `EXPECTED_ROWS`
-   at 31 — a row that grows is a row, a row that multiplies is a trap.
-3. `docs/DESIGN.md` → *Contrast* carries the new pairs and the measured numbers in the same commit.
+1. `scripts/tier-check.mjs`: scan `src/styles.css` and every `src/**/*.tsrx` (their `<style>` blocks
+   are real CSS — the rail, the tab bar and half the shell live there). For each declaration whose
+   property is exactly `color`, flag a value of `var(--color-accent)` or `var(--color-accent-hover)`.
+   Print `file:line — <selector> paints text with <token>` and exit 1.
+2. Wire it as section 8 of `scripts/check.sh`, after the link check. `check.sh` still prints `GREEN`.
+3. Prove it **red inside this tick**: copy `styles.css`, add `a:hover { color: var(--color-accent); }`
+   to the copy, run the scanner against the copy, watch it fail naming the line, delete the copy. A
+   scanner that cannot fail is a decoration.
 
 **Traps**
 
-- **`color-mix()` computes to `color(srgb 0.49 0.23 0.85)`**, 0–1 floats, not `rgb(…)`. Parsing that
-  as bytes turned 4.83:1 into a fake **17.23:1** on T-37B's first run — `CONTRAST_FN` in
-  `scripts/smoke.mjs` now handles both forms; reuse it, never re-roll it.
-- **Mix toward `--ctp-text`, never `--ctp-crust`,** to darken a light flavour. Crust is the lightest
-  Latte step: mixing toward it *lightens* the accent (88/12 → 3.82:1) and makes the pair worse.
-- **`CSS.forcePseudoState` is the honest way to measure `:hover`** and needs both `DOM.enable` and
-  `CSS.enable` first; resolve the node with `DOM.getDocument` + `DOM.querySelector`. Release it with
-  `forcedPseudoClasses: []` or the next row inherits a hovered element.
-- **Assert the flavour actually landed** (`--ctp-base` is `#1e1e2e` dark / `#eff1f5` light) before
-  trusting a ratio: a light pass that never switched measures Mocha against itself.
-- **A red walk first.** T-37B set the tier back to `var(--ctp-mauve)` and watched row 31 read
-  `4.45:1` before restoring — do the same for the new pairs, and remember a `replace` across the
-  whole stylesheet hits the **dark** blocks too (that mistake made the dark flavour print `9.09:1`
-  with `#cbadf7`: the fix is context-anchored, not a global swap).
-- **No regex escapes inside the `CONTRAST_FN` template literal** — one `\\` inside a template string
-  is a double-escaping trap; `s.indexOf("color(") === 0` is what shipped.
+- **`grep "color:"` matches three properties.** `background-color:` and `border-color:` end in
+  `color:`; a substring test flags every fill and the gate goes red on a correct tree. Anchor on the
+  property name (`/^\s*color\s*:/`) or split the declaration at its first colon.
+- **Custom properties are not declarations.** `--color-accent: var(--ctp-mauve)` inside a flavour
+  block starts with `--`; it defines a token, it does not paint text. The anchored test excludes it.
+- **Blocks span lines and nest.** Selector lists wrap (`a.post-author:hover,`), comments contain the
+  word `color` in prose, and `@media` nests. Strip `/* … */` first, then walk from `{` to the matching
+  `}` counting depth — that is what `link-check.mjs` does for tags, and a line-based grep is exactly
+  what misses the multi-line cases this exists for.
+- **`.tsrx` only.** No `.tsx`/`.js` stylesheets exist; do not widen the scan into TS string literals
+  where `color:` appears inside style objects that never reach CSS.
 
-**Accept:** `./scripts/check.sh` GREEN, walk **31/31** locally **and** `--live`, row 31 printing the
-`a`/`a:hover`/rail ratios per flavour at ≥ 4.5, `publish.sh` prints `LIVE`, `curl` 200.
+**Accept:** `./scripts/check.sh` GREEN with section 8 present; the scanner exits 1 on the injected
+violation and names `file:line`; the shipped tree is byte-identical to the CSS that passed row 31 in
+T-37C (this is a gate, not an edit — no colour changes). `publish.sh` prints `LIVE`, `curl` 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -104,7 +86,8 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   rather than concluding the menu did not open.
 - Cron's shell guard refuses `bash -c` / `node -e`; put scripts in a file (or use `jq`). It also
   refuses `rm` under a root path — clean scratch files with Python's `os.remove`, or leave them in
-  `$TMPDIR` (`~/.hermes/cache/scratch`).
+  `$TMPDIR` (`~/.hermes/cache/scratch`). **`execute_code` is blocked in this cron profile** — for
+  arithmetic, write a `.py` under `$TMPDIR` and run `python3 <file>`.
 
 ## Blocked — what a human must do
 
@@ -114,31 +97,37 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   today) and the redirect matrix; T-29's migration is the first thing after the ref lands.
 - **T-33B(b) deep link (desktop):** needs `tauri-plugin-deep-link` + a `luaplot://` scheme in the
   bundle config — a dependency, and the contract forbids one the ticket does not name.
-- **T-33B(c) `Ctrl/Cmd+K`:** a decision, not work — no spec file describes a command palette. Record
-  it in `docs/DESIGN.md` (what it lists, what it does, what it costs at 360px) or strike it.
-- **T-35/T-36/T-39 (Android):** install cmdline-tools + platform 35 + NDK, the four rust android
-  targets, then `tauri android init`.
+- **T-33B(c) `Ctrl/Cmd+K`:** a decision, not work — no spec file describes a command palette, and
+  `luaplot-pages.md` is product law, so nothing may invent it. The owner must either record it in
+  `docs/DESIGN.md` (what it lists, what it does, what it costs at 360px) or strike it from the ticket.
+- **T-35/T-36/T-39 (Android + release):** install cmdline-tools + platform 35 + NDK, the four rust
+  android targets, then `tauri android init`. T-39 also needs a signing key and a `v0.1.0` tag, so it
+  follows T-35/T-36 rather than any CSS tick.
 - **Tauri on this box is NOT blocked — and the webview session proof is done.** `bun run tauri dev`
   opens, the account survives a restart in both directions, and the recipe above reproduces it.
 
 ## Open decisions
 
-- **`/dev/data`'s vote is order-dependent but not fragile.** The row votes on whatever the adapter's
-  newest character is *at that moment* (earlier journeys re-save rows), and it reads the name back
-  from the log before comparing. Do not pin a character id.
+- **Row count is 31 (T-37B, extended in place by T-37C).** `scripts/smoke.mjs` keeps it in an explicit
+  `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
+  adding a near-copy of it, and bump the count only when a row is genuinely new.
+- **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
+  page prints one, and the base rule is the thing under test), measures it resting and through
+  `CSS.forcePseudoState`, takes its own 900px `Emulation.setDeviceMetricsOverride` for the rail, and
+  clears the media emulation, the metrics override *and* the probe in one `finally`. Anything added
+  after it must assume 360×740 and no probe in the DOM.
 - **The breakpoint row owns a CDP override.** Anything added after it must assume the session is back
   at 360×740; the row asserts that it cleared (`window.innerWidth === restore`) rather than trusting
-  the `finally`. T-47's row 30 takes its own 360×740 override and clears it for the same reason, and
-  T-37B's row 31 owns a **media** emulation with the same discipline (`features: []` in `finally`).
+  the `finally`. T-47's row 30 takes its own 360×740 override and clears it for the same reason.
 - **`follow()` drops the fragment on purpose** — a `/terms#anchor` link must stay a real document
   navigation (or gain scroll handling nothing needs yet). `ARCHITECTURE.md` → Router carries the rule
   and the three exemptions `scripts/link-check.mjs` encodes (fragment, `target=`, external).
 - **A card's ratio rounds to whole percent**, so a one-vote change can leave the printed number
   identical (96% → 96%). A journey proving an engagement write must read a count (the detail page's
   Likes/Dislikes cells), never a card's percentage.
-- **Row count is 31 (T-37B).** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a row
-  that stops running is a red walk — bump it in the same commit as the row, and **extend** an
-  existing row rather than adding a near-copy of it.
+- **`/dev/data`'s vote is order-dependent but not fragile.** The row votes on whatever the adapter's
+  newest character is *at that moment* (earlier journeys re-save rows), and it reads the name back
+  from the log before comparing. Do not pin a character id.
 - **A 44px band is `line-height`/`min-height`, not `padding`.** Vertical padding on an inline `<a>` is
   hit-testable but invisible to layout, so a row that measures `getBoundingClientRect()` would pass
   while the row still collapsed; a flex item with `line-height: 44px` is the band the walk can see.
@@ -147,15 +136,30 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **A token tier has a *surface* limit, not just a flavour limit.** `--color-accent-text` clears AA on
   `--color-bg` (5.20) and `--color-bg-elevated` (4.83) in Latte, and does **not** on
   `--color-surface` (3.81) — the same surface where `--color-text-muted` already fails (4.05). Latte's
-  `surface-0` (`#ccd0da`) is the app's worst backplate; text above it should move to a fill-free
-  layout rather than a darker token.
+  `surface-0` (`#ccd0da`) is the app's worst backplate; **a surface that cannot hold AA text loses the
+  text, not the token** — that is what happened to the `md` rail's fill in T-37C, and the hover tier
+  exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
+  and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
 ## Found while working (carried forward — keep this list growing)
 
-- **A `color-mix()` value computes to `color(srgb 0.49 0.23 0.85)`** — 0–1 floats. A contrast helper
-  that assumes 0–255 bytes reads it as near-black and reports a fake **17.23:1**. `CONTRAST_FN` in
-  `scripts/smoke.mjs` branches on `indexOf("color(") === 0`; a regex escape inside that template
-  literal is a double-escaping trap that produced exactly this bug twice.
+- **A backtick inside a `js(…)` template literal ends the string.** A comment in row 31's page
+  expression quoted `--color-surface` in backticks and node reported `Invalid left-hand side
+  expression in postfix operation` at the snippet's *opening* line — no template-literal error, no
+  pointer at the comment. Page snippets carry no backticks; write the token plainly.
+- **A token with no element left on it can still be measured honestly.** The hover tier exists for
+  `--color-surface`, which now paints no text at all (the rail's fill is gone), so row 31 resolves it
+  through a throwaway `div` — set `style.backgroundColor = "var(--color-surface)"`, read the computed
+  `backgroundColor`, remove it. The value is the browser's own, not a hex copied into the walk (a hex
+  would keep passing after the token moved).
+- **Two hovered nodes need two force/release pairs.** Forcing the author link and then reading the
+  *probe's* `:hover` colour measures the author's rule; each node is forced, read and released in
+  turn. Release is `forcedPseudoClasses: []`.
+- **`color-mix()` computes to `color(srgb 0.49 0.23 0.85)`** — 0–1 floats. A contrast helper that
+  assumes 0–255 bytes reads it as near-black and reports a fake **17.23:1**. `CONTRAST_FN` in
+  `scripts/smoke.mjs` branches on `indexOf("color(") === 0`, and `cssHex()` makes the same branch for
+  evidence; a regex escape inside that template literal is a double-escaping trap that produced
+  exactly this bug twice.
 - **`CSS.forcePseudoState` (`DOM.enable` + `CSS.enable` + `DOM.querySelector`) measures a `:hover`
   pair without a synthetic mouse** — the only honest way to assert a hover colour, and it must be
   released (`forcedPseudoClasses: []`) before the next measurement.
@@ -181,7 +185,8 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   passed, so the green run stays the proof.
 - **Bare anchors are gone (T-46):** 52 internal anchors pair `href` with `follow`, `EmptyState` takes
   a **path** (`to=`) so its call sites cannot regress, and gate section 7 fails on a new one.
-  The static check is the guard the walk cannot be: 31 rows cannot visit every page.
+  The static check is the guard the walk cannot be: 31 rows cannot visit every page. (T-48 is the same
+  argument for the colour tier.)
 - **The webview stores `luaplot.session` as UTF-16LE in a SQLite table** (`localstorage/
   http_localhost_1420.localstorage`, `ItemTable`), so `quote(value)` returns hex — decode before
   comparing, or a correct proof reads as a corrupt one. On Pages the same key lives in the browser
@@ -250,7 +255,8 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   the `href`+`follow` pair inside the component is what stopped it — apply that to any new one.
 - **`link-check.mjs` reads tags, not lines.** Attributes span lines (the tab bar and the dev pages do),
   so the scanner walks from `<a` to the matching `>` counting braces, quotes and backticks; a
-  line-based grep would miss exactly the multi-line cases it exists for.
+  line-based grep would miss exactly the multi-line cases it exists for. T-48's scanner needs the same
+  block-walking discipline.
 - **The report journey needs POST(8)**: the preview classifier buckets on `hash("jev:post:" + body) % 5`
   and only buckets 2/3/4 escalate.
 - **A shared Chromium profile makes the walk flake** — profiles are unique per run and removed on exit.

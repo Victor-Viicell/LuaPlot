@@ -54,11 +54,21 @@ WCAG AA wants **4.5:1** for text under 18.66px — which is all of this app's ty
     a dark flavour.
   - Text uses `--color-accent-text`; **nothing that is a fill may**. A darker mauve behind
     `--color-accent-contrast` drops the primary button's label to ~2:1.
-  - **Two pairs still short, measured and recorded rather than hidden:** at `md` the active rail row
-    paints `--color-surface` behind its label, where even the text tier is **3.81:1** on Latte (the
-    fill is the md indicator, so the fix is a filled-row decision, not a token); and the base
-    `a { color: var(--color-accent) }` rule — every link that has no class of its own — still paints
-    the mark at **4.45:1**, with `a:hover` (lavender) at **2.62:1**. Filed as T-37C.
+- **`--color-accent-hover-text` (T-37C) is the hover tier**, and it exists because the mark's hover
+  cannot be one value: lavender is **2.62:1** on Latte's `--color-bg-elevated` and **9.81:1** on
+  Mocha's. Dark flavours hover *to* `--ctp-lavender` (Mocha 9.81 on a card); Latte hovers *down* to
+  `color-mix(in srgb, var(--ctp-mauve) 40%, var(--ctp-text))` = `#64469f`, **5.91:1** on a card and
+  **4.66:1** on `--color-surface` — the app's worst backplate, which is what set the mix at 40/60
+  rather than 55/45 (4.38:1 there) or 60/40 (4.29:1). The hue is kept and only the chroma drops: a
+  darker violet, not a muddy one. **A hover takes the hover tier; static accent text takes the text
+  tier** — `a`, `a:hover`, `a.card-title:hover`, `a.card-author:hover`, `a.post-time:hover`,
+  `a.persona-card-name:hover`, `a.persona-card-open:hover`, `.post-comments:hover`,
+  `.persona-card-mark`, `.tab-pill[aria-selected="true"] .tab-count`. Measured in smoke row 31:
+  `Mocha 8.64 → 9.81 · Latte 4.83 → 5.91 (4.66 on surface)`.
+- **The base link rule is the text tier now (T-37C).** `a { color: var(--color-accent-text) }` —
+  previously the raw mark on every classless link, **4.45:1** on Latte's card and **3.51:1** on
+  `--color-surface`, with a lavender hover at 2.62:1. Both of the two pairs T-37B filed are closed
+  by measurement, not by eye: the classless link reads 4.83 / 5.91 on a card in Latte in row 31.
 
 ## Type
 
@@ -94,6 +104,15 @@ scrolls under the bar with `padding-bottom: env(safe-area-inset-bottom)`.
 
 `md` 900–1199: sidebar rail appears (icon + label), bottom bar goes.
 
+**The rail never fills (T-37C).** An active rail item is a *mark*, never a backplate: a 2px accent
+bar on the row's leading edge at `md` and `lg` alike (8px inset at `md`, 10px at `lg`), with the label
+on the rail's own `--color-bg-elevated`. Until T-37C the `md` row painted `--color-surface` and the
+fill *was* the indicator; that backplate cannot carry accent text at 4.5 (the text tier measures
+3.81:1 there on Latte) and a light flavour has no darker mauve to reach for, so the indicator became
+the bar the wide rail already drew. Hover is a label change, not a fill: `--color-text` (6.57:1 on
+Latte's rail), because `--color-text-subtle` and `--color-text-muted` are the same value in every
+flavour — a hover pointing at the muted tier would be invisible once the fill is gone.
+
 `lg` 1200+: fixed 240px sidebar, content still **one A4 page wide (794px)**, detail pages become two
 columns (main + aside for author/engagement/attached items). **The column stops growing with the
 viewport** — a 1280 monitor draws the same 794px page as a 1024 one, which is what keeps a paragraph
@@ -115,9 +134,11 @@ blur = middle covered, footer numbers visible, per-item Reveal.
 - Mobile tab bar 60px + safe area: Home, Thread, Catalog, **Alerts**, Profile. The inbox page is
   titled *Notifications*; the tab reads *Alerts* because five 12px labels must fit a 72px cell at
   360. Never shorten the other four.
-- Active destination: `--color-accent` on icon and label, plus a 20×2px accent tick above the icon
-  (mobile / rail) or a 2px accent bar on the left edge (`lg`). The 1200+ sidebar is 240px, the rail
-  at `md` is 84px icon-over-label.
+- Active destination: `--color-accent-text` on icon and label — the icon is `currentColor`, so a
+  fill-only token would leave it behind — plus a 20×2px accent **tick** above the icon in the mobile
+  tab bar, or a 2px accent **bar** on the row's leading edge in the rail (`md` and `lg`; the rail
+  never fills a row, see *Layout law*). The 1200+ sidebar is 240px, the rail at `md` is 84px
+  icon-over-label.
 - Overflow menu (top right) holds Bookmarks, Moderation, Terms — app-level destinations that are
   not in the tab bar. It is a 6px sheet with the one sanctioned shadow; the scrim is invisible.
 - Content outlet: 16/24/32/40 gutters, capped at **794px at every width** (A4 at 96dpi). One owner —

@@ -3,6 +3,31 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-37C: the rest of the accent's text joins the tier, and the rail stops filling
+
+- **Changed:** `--color-accent-hover-text` is a new token in all six blocks of `src/styles.css`
+  (dark default + Frappé/Macchiato/Mocha = `--ctp-lavender`; the light media block and `latte` =
+  `color-mix(in srgb, var(--ctp-mauve) 40%, var(--ctp-text))` = `#64469f`). `a` and every text hover
+  that painted the accent moved onto the two tiers (`a`, `a:hover`, `a.card-title:hover`,
+  `a.card-author:hover`, `a.post-time:hover`, `a.persona-card-name:hover`, `a.persona-card-open:hover`,
+  `.post-comments:hover`, `.persona-card-mark`, `.tab-pill[aria-selected="true"] .tab-count`); every
+  fill, stroke, the tab tick, the rail bar and the focus ring kept `--color-accent`. `App.tsrx`'s
+  `md` rail no longer paints `--color-surface` on the active or hovered row — the active indicator is
+  the 2px accent bar `lg` already drew, and hover steps the label to `--color-text`. `DESIGN.md` →
+  *Contrast*, *Layout law*, *Shell* carry the numbers and both decisions; `SHIP-PLAN` records the
+  ticket under T-37B's entry; `scripts/smoke.mjs` row 31 grew in place (`EXPECTED_ROWS` stays 31).
+- **Verified how:** `./scripts/check.sh` GREEN. Walk **31/31** locally; row 31 prints
+  `Mocha … tab 8.64:1, @author hover 9.81:1, bare link 8.64:1 / hover 9.81:1 (#b4befe), rail 8.64:1
+  on #181825 (bar #cba6f7, no fill) · Latte … tab 4.83:1, @author hover 5.91:1, bare link 4.83:1 /
+  hover 5.91:1 (#64469f, 4.66:1 on surface), rail 4.83:1 on #e6e9ef (bar #8839ef, no fill)`. The
+  mix was chosen from a computed table, not by eye: 55/45 lands 4.38 on `--color-surface` and 60/40
+  lands 4.29 (both under the 4.6 the tier exists for), 40/60 lands 4.66 — the hue is kept, only the
+  chroma drops. The bare-link half installs one classless `<a>` in the first card, because no page
+  prints one there, and removes it in the `finally`; its colour, backplate and `:hover` all come from
+  the real stylesheet.
+- **Not verified:** nothing disabled. `T-39` (signed APK + AppImage + tag) is the last open item in
+  P6 and is blocked on the Android toolchain, not on this ticket. `--live` is run at publish time.
+
 ## 2026-11-01 — T-37B: the accent gets a text tier, and the light flavour clears AA
 
 - **Changed:** `--color-accent-text` is declared in all six blocks of `src/styles.css` (the dark

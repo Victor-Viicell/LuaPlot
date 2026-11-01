@@ -593,15 +593,31 @@ export function App() @{
             background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
+        /* T-37C: the rail stopped **filling**. Even the text tier measures 3.81:1 on Latte's
+           `--color-surface` (the mark was 3.51), and a light-filled row cannot carry accent text at
+           4.5 with this palette — so the `md` active state is now the 2px accent bar `lg` already
+           drew, and the label sits on the rail's own `--color-bg-elevated` (4.83:1). DESIGN.md →
+           *Layout law* carries the rule: a rail's indicators are marks, never backplates.
+           Hover is a label change, not a fill: `--color-text-subtle` and `--color-text-muted` are
+           the same value in every flavour (styles.css), so a hover that pointed at the muted tier
+           would now be invisible — it steps to the full text colour (6.55:1 on Latte's rail). */
         .rail-item:hover {
-          background-color: var(--color-surface);
-          color: var(--color-text-muted);
+          color: var(--color-text);
         }
 
         /* T-37B: the label is text (text tier); the ::before bar is a mark and keeps the accent. */
         .rail-item.is-active {
-          background-color: var(--color-surface);
           color: var(--color-accent-text);
+        }
+
+        .rail-item.is-active::before {
+          position: absolute;
+          top: 8px;
+          bottom: 8px;
+          left: 0;
+          width: 2px;
+          background-color: var(--color-accent);
+          content: "";
         }
 
         .rail-label {
@@ -642,14 +658,11 @@ export function App() @{
           padding: 0 12px;
         }
 
+        /* The bar's geometry only: position, left edge and width are the `md` rule's (T-37C), and a
+           44px row carries the 2px mark a little tighter to its own height. */
         .rail-item.is-active::before {
-          position: absolute;
           top: 10px;
           bottom: 10px;
-          left: 0;
-          width: 2px;
-          background-color: var(--color-accent);
-          content: "";
         }
 
         .rail-label {

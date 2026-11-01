@@ -1637,21 +1637,28 @@ results.push(
 );
 
 /* ------------------------------------------------------------------------------------------------
- * T-37B — the accent's **text** tier clears AA in every flavour.
+ * T-37B/T-37C — the accent's **text** tiers clear AA in every flavour.
  *
  * The accent is a mark colour (fills, strokes, the tab tick, the focus ring) that also carried text:
- * the active nav label and three link hovers. On Latte the mark measures 4.45:1 on
- * `--color-bg-elevated` — 0.05 short — so text moved to `--color-accent-text`, which is the mark on
- * the dark flavours and 85% of it toward `--ctp-text` on the light ones.
+ * the active nav label, the base `a` rule, and a handful of link hovers. On Latte the mark measures
+ * 4.45:1 on `--color-bg-elevated` — 0.05 short — so text moved to `--color-accent-text` (the mark on
+ * the dark flavours, 85% of it toward `--ctp-text` on the light ones), and T-37C gave the hover its
+ * own tier (`--color-accent-hover-text`: the mark's hover on dark, 40/60 toward `--ctp-text` on
+ * light) because lavender is 2.62:1 on a Latte card and 9.81:1 on a Mocha one — it cannot be one
+ * value. T-37C also stopped the `md` rail **filling** its active row: the label now sits on the
+ * rail's own `--color-bg-elevated`, with the 2px accent bar `lg` already drew as the indicator.
  *
- * Three things make this row honest:
+ * Four things make this row honest:
  *  - the flavour is chosen by **media emulation** (`Emulation.setEmulatedMedia`), never by writing
  *    `data-theme`, and the row first refuses to run against a pinned attribute — otherwise the light
  *    pass would prove Mocha against itself;
  *  - the Maths runs **in the page** on the *computed* colours, so the numbers under test are the ones
  *    the reader sees; a host-side table would only re-assert the tokens;
- *  - the hovered handle is measured through `CSS.forcePseudoState`, so the pair under test is the
- *    `:hover` rule's colour, not the resting one.
+ *  - every hovered pair is measured through `CSS.forcePseudoState`, so the colour under test is the
+ *    `:hover` rule's, not the resting one — and each is released before the next measurement;
+ *  - a bare `<a>` (no class) is the only element the base rule paints, and no page prints one inside
+ *    a card, so the row **installs** one in the first card and removes it in the `finally`. The
+ *    cascade and the backplate are the page's; only the text is a probe.
  *
  * The unrounded ratio is asserted (4.49 rounds to 4.5) and printed to two decimals.
  * ---------------------------------------------------------------------------------------------- */
@@ -1687,7 +1694,7 @@ const cssHex = (value) => {
 };
 
 results.push(
-  await journey("the accent's text tier clears 4.5:1 in both flavours", async () => {
+  await journey("the accent's text tiers clear 4.5:1 in both flavours", async () => {
     await go("/character/catalog");
     await waitFor(`!!document.querySelector(".tabbar .tab.is-active .tab-label")`, "an active tab label", 8000);
     await waitFor(`!!document.querySelector(".card a.card-author")`, "a catalog card's author link", 8000);
@@ -1702,8 +1709,57 @@ results.push(
     await send("DOM.enable");
     await send("CSS.enable");
     const doc = await send("DOM.getDocument", { depth: 1 });
-    const author = await send("DOM.querySelector", { nodeId: doc.result.root.nodeId, selector: ".card a.card-author" });
-    if (!author.result || !author.result.nodeId) throw new Error("could not resolve a card's author link to a DOM node");
+    const node = async (selector) => {
+      const found = await send("DOM.querySelector", { nodeId: doc.result.root.nodeId, selector });
+      if (!found.result || !found.result.nodeId) throw new Error(`could not resolve ${selector} to a DOM node`);
+      return found.result.nodeId;
+    };
+    const author = await node(".card a.card-author");
+
+    // The one element the base `a` rule paints is an anchor with no class of its own, and no page
+    // prints one inside a card — so install one in the first card. Its colour, its backplate and the
+    // `:hover` that `forcePseudoState` applies all come from the real stylesheet; the text is a probe.
+    await js(`
+      const card = document.querySelector(".card:has(a.card-author)");
+      if (!card) return false;
+      const probe = document.createElement("a");
+      probe.href = "#probe";
+      probe.setAttribute("data-walk-probe", "bare-link");
+      probe.textContent = "probe";
+      card.appendChild(probe);
+      return true;
+    `);
+    const probe = await node('a[data-walk-probe="bare-link"]');
+
+    const read = () => js(`
+      const label = document.querySelector(".tabbar .tab.is-active .tab-label");
+      const tab = label.closest(".tab");
+      const link = document.querySelector(".card a.card-author");
+      const card = link.closest(".card");
+      const bare = document.querySelector('a[data-walk-probe="bare-link"]');
+      // A token pair with no element left on it: T-37C removed the rail's surface fill, and
+      // --color-surface is the app's worst backplate — the hover tier exists for it. Resolve it
+      // through a throwaway element so the value is the one the browser computed, not a hex here.
+      const swatch = document.createElement("div");
+      swatch.style.backgroundColor = "var(--color-surface)";
+      card.appendChild(swatch);
+      const surface = getComputedStyle(swatch).backgroundColor;
+      swatch.remove();
+      const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
+      return {
+        text: label.innerText.trim(),
+        label: cs(label).color,
+        plate: cs(tab.closest(".tabbar")).backgroundColor,
+        mark: cs(tab, "::before").backgroundColor,
+        author: cs(link).color,
+        cardBg: cs(card).backgroundColor,
+        bare: cs(bare).color,
+        bareBg: cs(bare.parentElement).backgroundColor,
+        surface,
+        base: getComputedStyle(document.documentElement).getPropertyValue("--ctp-base").trim(),
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+      };
+    `);
 
     const seen = [];
     const flavours = [
@@ -1714,58 +1770,124 @@ results.push(
       for (const want of flavours) {
         await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: want.scheme }] });
         await sleep(240);
-        // Forced, so the pair is the `:hover` rule's colour rather than the resting `--color-text`.
-        await send("CSS.forcePseudoState", { nodeId: author.result.nodeId, forcedPseudoClasses: ["hover"] });
-        const read = await js(`
-          const label = document.querySelector(".tabbar .tab.is-active .tab-label");
-          const tab = label.closest(".tab");
-          const plate = tab.closest(".tabbar");
-          const link = document.querySelector(".card a.card-author");
-          const card = link.closest(".card");
-          const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
-          return {
-            text: label.innerText.trim(),
-            label: cs(label).color,
-            plate: cs(plate).backgroundColor,
-            mark: cs(tab, "::before").backgroundColor,
-            author: cs(link).color,
-            cardBg: cs(card).backgroundColor,
-            base: getComputedStyle(document.documentElement).getPropertyValue("--ctp-base").trim(),
-            scheme: getComputedStyle(document.documentElement).colorScheme,
-          };
-        `);
+
+        const rest = await read();
+        // One forced pseudo state at a time: the author link, then the bare link, each released
+        // before the next is applied — a hover left on poisons every later measurement in the row.
+        await send("CSS.forcePseudoState", { nodeId: author, forcedPseudoClasses: ["hover"] });
+        const authorHover = await js(`return getComputedStyle(document.querySelector(".card a.card-author")).color;`);
+        await send("CSS.forcePseudoState", { nodeId: author, forcedPseudoClasses: [] });
+        await send("CSS.forcePseudoState", { nodeId: probe, forcedPseudoClasses: ["hover"] });
+        const bareHover = await js(`return getComputedStyle(document.querySelector('a[data-walk-probe="bare-link"]')).color;`);
+        await send("CSS.forcePseudoState", { nodeId: probe, forcedPseudoClasses: [] });
+
         const ratios = await js(`${CONTRAST_FN}
-          return {
-            tab: contrast(${JSON.stringify(read.label)}, ${JSON.stringify(read.plate)}),
-            hover: contrast(${JSON.stringify(read.author)}, ${JSON.stringify(read.cardBg)}),
+          const table = ${JSON.stringify({
+            tab: ["label", "plate"],
+            authorHover: ["authorHover", "cardBg"],
+            link: ["bare", "bareBg"],
+            linkHover: ["bareHover", "bareBg"],
+            linkHoverSurface: ["bareHover", "surface"],
+          })};
+          const values = {
+            label: ${JSON.stringify(rest.label)},
+            plate: ${JSON.stringify(rest.plate)},
+            authorHover: ${JSON.stringify(authorHover)},
+            cardBg: ${JSON.stringify(rest.cardBg)},
+            bare: ${JSON.stringify(rest.bare)},
+            bareBg: ${JSON.stringify(rest.bareBg)},
+            bareHover: ${JSON.stringify(bareHover)},
+            surface: ${JSON.stringify(rest.surface)},
           };
+          const out = {};
+          for (const key of Object.keys(table)) out[key] = contrast(values[table[key][0]], values[table[key][1]]);
+          return out;
         `);
 
         // The flavour actually landed (a green row against the wrong palette would prove nothing).
-        if (read.base.toLowerCase() !== want.base) {
-          throw new Error(`the ${want.scheme} emulation landed on --ctp-base ${read.base}, not ${want.base} (${want.flavour}): the flavour did not switch`);
+        if (rest.base.toLowerCase() !== want.base) {
+          throw new Error(`the ${want.scheme} emulation landed on --ctp-base ${rest.base}, not ${want.base} (${want.flavour}): the flavour did not switch`);
         }
-        if (read.scheme !== want.scheme) {
-          throw new Error(`the ${want.scheme} emulation asserts color-scheme ${read.scheme}`);
+        if (rest.scheme !== want.scheme) {
+          throw new Error(`the ${want.scheme} emulation asserts color-scheme ${rest.scheme}`);
         }
-        if (!(ratios.tab >= 4.5)) {
-          throw new Error(`${want.flavour}'s active tab label "${read.text}" measures ${ratios.tab.toFixed(2)}:1 (${read.label} on ${read.plate}), under AA 4.5`);
+        for (const [key, what] of [
+          ["tab", `the active tab label "${rest.text}"`],
+          ["authorHover", "a hovered card author"],
+          ["link", "a bare link on a card"],
+          ["linkHover", "a hovered bare link on a card"],
+        ]) {
+          if (!(ratios[key] >= 4.5)) {
+            throw new Error(`${want.flavour}'s ${what} measures ${ratios[key].toFixed(2)}:1, under AA 4.5`);
+          }
         }
-        if (!(ratios.hover >= 4.5)) {
-          throw new Error(`${want.flavour}'s hovered card author measures ${ratios.hover.toFixed(2)}:1 (${read.author} on ${read.cardBg}), under AA 4.5`);
+        // The mix's whole reason for being 40/60 rather than 85/15: the hover must survive the app's
+        // worst backplate, `--color-surface`, where the text tier measures 3.81:1 on Latte.
+        if (want.scheme === "light" && !(ratios.linkHoverSurface >= 4.6)) {
+          throw new Error(`${want.flavour}'s hovered link measures ${ratios.linkHoverSurface.toFixed(2)}:1 on --color-surface (${rest.surface}), under the 4.6 the hover tier was mixed for`);
         }
-        // The mark must not follow the text. On the dark flavours the two tiers are the same value by
-        // design (the mark already reads as text), so the direction only has to be proved where they
-        // differ: on light the label must sit **darker** than the tick it belongs to.
-        if (want.scheme === "light" && read.mark === read.label) {
-          throw new Error(`${want.flavour}: the tab tick and the label are the same colour (${read.mark}) — the text tier did not diverge from the mark`);
+        // The text tiers must not be the mark. On the dark flavours they are the same value by
+        // design (the mark already reads as text); on light both hovers and the link must sit darker.
+        if (want.scheme === "light" && rest.mark === rest.label) {
+          throw new Error(`${want.flavour}: the tab tick and the label are the same colour (${rest.mark}) — the text tier did not diverge from the mark`);
         }
-        seen.push(`${want.flavour} ${read.base} "${read.text}" ${ratios.tab.toFixed(2)}:1 (label ${cssHex(read.label)}, tick ${cssHex(read.mark)}), hovered @author ${ratios.hover.toFixed(2)}:1`);
-        await send("CSS.forcePseudoState", { nodeId: author.result.nodeId, forcedPseudoClasses: [] });
+        if (want.scheme === "light" && rest.bare === rest.mark) {
+          throw new Error(`${want.flavour}: a bare link paints the mark (${rest.bare}) — the base rule skipped the text tier`);
+        }
+        if (want.scheme === "light" && bareHover === rest.bare) {
+          throw new Error(`${want.flavour}: a hovered link is the same colour as a resting one (${rest.bare}) — the hover tier is not attached`);
+        }
+
+        // The `md` rail, in the same flavour: its own 84px column, the label on the rail's plate.
+        await send("Emulation.setDeviceMetricsOverride", { width: 900, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        const rail = await js(`
+          const row = document.querySelector(".rail-item.is-active");
+          if (!row) return null;
+          const label = row.querySelector(".rail-label");
+          const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
+          return {
+            viewport: window.innerWidth,
+            text: label ? label.innerText.trim() : "",
+            label: label ? cs(label).color : null,
+            rowBg: cs(row).backgroundColor,
+            plate: cs(row.closest(".rail")).backgroundColor,
+            bar: cs(row, "::before").backgroundColor,
+          };
+        `);
+        await send("Emulation.clearDeviceMetricsOverride");
+        await sleep(260);
+        if (!rail || !rail.label) throw new Error(`at 900px ${want.flavour} draws no active rail label`);
+        if (rail.viewport !== 900) throw new Error(`the override asked for 900px and the rail measured ${rail.viewport}px`);
+        if (rail.rowBg !== "rgba(0, 0, 0, 0)") {
+          throw new Error(`the md rail's active row paints ${rail.rowBg} behind its label — the fill is back, and on light no accent text clears AA on it`);
+        }
+        if (rail.bar === "rgba(0, 0, 0, 0)") {
+          throw new Error(`the md rail's active row draws no bar (${rail.bar}) — it has no indicator left`);
+        }
+        const railRatio = await js(`${CONTRAST_FN}
+          return contrast(${JSON.stringify(rail.label)}, ${JSON.stringify(rail.plate)});
+        `);
+        if (!(railRatio >= 4.5)) {
+          throw new Error(`${want.flavour}'s active rail label "${rail.text}" measures ${railRatio.toFixed(2)}:1 (${rail.label} on ${rail.plate}), under AA 4.5`);
+        }
+
+        seen.push(
+          `${want.flavour} ${rest.base} "${rest.text}" tab ${ratios.tab.toFixed(2)}:1 (label ${cssHex(rest.label)}, tick ${cssHex(rest.mark)}), ` +
+            `@author hover ${ratios.authorHover.toFixed(2)}:1, bare link ${ratios.link.toFixed(2)}:1 / hover ${ratios.linkHover.toFixed(2)}:1 (${cssHex(bareHover)}${want.scheme === "light" ? `, ${ratios.linkHoverSurface.toFixed(2)}:1 on surface` : ""}), ` +
+            `rail "${rail.text}" ${railRatio.toFixed(2)}:1 on ${cssHex(rail.plate)} (bar ${cssHex(rail.bar)}, no fill)`,
+        );
       }
     } finally {
-      // A leaked media emulation is the same trap as a leaked viewport override.
+      // A leaked media emulation, a leaked viewport override and a stray probe are the same trap:
+      // every later row would measure the wrong palette, width or DOM.
       await send("Emulation.setEmulatedMedia", { features: [] });
+      await send("Emulation.clearDeviceMetricsOverride");
+      await js(`
+        const probe = document.querySelector('a[data-walk-probe="bare-link"]');
+        if (probe) probe.remove();
+        return !!document.querySelector('a[data-walk-probe="bare-link"]');
+      `);
       await sleep(240);
     }
     return seen.join(" · ");
