@@ -3,6 +3,44 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-58: deleting the default persona hands the mark to one heir, in one step
+
+- **Changed:** `scripts/smoke.mjs` — new walk **row 41**, `EXPECTED_ROWS` 40 → 41, placed after
+  T-56's row 40 and before `sign out` (it is mutating and final: `deletePersona()` splices the memory
+  store, so every later row sees two personas). The row reads `/persona` as data after
+  `.skel-card` is **gone** (**3** `.persona-card`, exactly one `.is-default`, exactly one
+  `.persona-card-mark` reading `default` in `textContent` — the mark is uppercased in CSS, so
+  `innerText` would defeat it), names the seed's default (**Nell**, `PERSONA(1)`) and its own
+  `/persona/<uuid>` link, opens **that card's** name link (**not `nth 0`**, so the row still proves
+  the *default* was opened if the grid order moves), asserts the detail's `h1.name` (a character's is
+  `h1.title`) and its `.mark`, then deletes in **two presses**: `Delete` inside `.delete-row`, then
+  `Confirm delete` scoped to `.delete-actions` — a `startsWith("Delete")` match hits the opener (the
+  T-49 trap) — reading the confirmation sentence in between. The landing is read **in one pass**:
+  path `/persona`, **2** cards, Nell absent, exactly one default mark, and it is **Ash** — the heir is
+  the **newest remaining** by `createdAt` (`PERSONA(3)`, `at(16,4,10)`), while The Correspondent is
+  the second card but the *oldest* (`at(8,…)`), so a row pinning "the first remaining card" would be
+  red on a right page. Last half: `go()` back to the deleted id must mount the spec's **Not found**
+  sentence (`This persona doesn't exist in your collection.`) with its `/persona` road out — no
+  heading, no `<form>`. `docs/SHIP-PLAN.md` ticks T-58 and marks failure bank 8 walked; `NEXT.md`
+  carries T-59.
+- **Verified how:** `./scripts/check.sh` → **GREEN** (build ok, 30 routes, schema, tauri, links, tiers
+  5822 declarations). `./scripts/smoke.sh` → **41/41** locally, evidence: *"before: 3 cards, one
+  .is-default reading \"Nell\" (the seed's default) · opened that card → /persona/9e45014a-…0001 with
+  its mark · Delete → \"Delete this persona? This cannot be undone.\"… → Confirm delete · after: 2
+  cards [\"Ash\",\"The Correspondent\"], \"Nell\" gone, the one mark on \"Ash\" (newest remaining; The
+  Correspondent is the oldest and is not the heir) · /persona/9e45014a-…0001 → Not found, sentence +
+  road /persona"*. Proved **red** first on `src/lib/data/memory.ts` — the hand-off disabled
+  (`if (false && row.isDefault)`) read *"2 card(s) [\"Ash\",\"The Correspondent\"] at \"/persona\", 0
+  .is-default [], mark text [\"\",\"\"] — the collection was left with 2 persona(s) and 0 default(s); a
+  persona delete hands the mark on in the same step and never leaves personas with no default"*
+  (40/41); bytes restored and `sha256sum -c` clean (`f768bb74…`). `publish.sh` printed
+  `LIVE=https://victor-viicell.github.io/LuaPlot/` with `assets/index-BoTUzpAc.js`; `curl` 200;
+  `smoke.mjs --live` → **41/41**.
+- **Not verified:** nothing outstanding for this ticket. The row does **not** walk the refusal half
+  (`deletePersona` answering `false` for a non-owner) — that law is a different one and stays covered
+  by the item-delete refusals. The persona **edit** page's own delete row is the same component and is
+  not pressed here.
+
 ## 2026-11-02 — T-57: a real second page, and Load more writes no URL
 
 - **Changed:** `src/lib/fixtures/posts.ts` is **30 posts** — `POST(1..12)` byte-untouched (walk rows

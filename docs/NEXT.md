@@ -1,81 +1,85 @@
 # Baton — what the next session does
 
-**T-58 is the one ticket.** T-57 landed: `lib/fixtures/posts.ts` is **30 rows** (29 listed — post 6 is
-`removed`), so `/post/thread` draws **Load more** for the first time and walk **row 39** presses it.
-The measured shape, keep it: page 1 is **24 rows / 23 visible cards** (post 7 is the only `nsfw` post
-and the walk's account seeds Show **off**), the press appended the remainder to **29 cards**, the
-first page's **23 stamps and its order survived**, `location.search` stayed `""`, the pager then read
-`End of feed.` (page 2 *was* the whole remainder, so there was no second press to make — say that in
-the message rather than inventing one), and `history.back()` **left the thread** — paging pushed no
-entry — with a return re-reading page 1 (23 cards, 0 stamps, Load more back). Both red proofs are in
-`PROGRESS.md`; the second one matters: inverting the append to a prepend **kept all 23 stamps**, so
-node identity alone runs green on that bug and the **order** assertion is what carries the row.
+**T-58 landed.** Row **41** (`EXPECTED_ROWS` 41) presses **Delete** on a persona for the first time:
+the seed's default (**Nell**, `PERSONA(1)`) is opened by **its own card's link** (not `nth 0`), the
+detail's `h1.name` + `.mark` are read, then two presses (`Delete` in `.delete-row`, `Confirm delete`
+scoped to `.delete-actions`) land back on `/persona` with **2** cards, Nell absent, exactly **one**
+`.is-default` — and it is **Ash** (`PERSONA(3)`, newest by `createdAt`), not The Correspondent (the
+second card, the oldest). `go()` back to the deleted id mounts the spec's **Not found** sentence with
+its `/persona` road out. Red first: disabling the hand-off read *"the collection was left with 2
+persona(s) and 0 default(s)"*. 41/41 local, 41/41 `--live`.
 
-T-57 also leaves failure bank entry **8** as the only unwalked entry whose machinery already exists.
+T-58 was the last failure-bank entry whose machinery already existed — but **entry 2 was never
+walked at all**, and its machinery also exists. That is the ticket now.
 
-## T-58 — deleting the default persona hands the mark to exactly one heir, in one step
+## T-59 — an author's edit never reaches a running session, and a published cut is a snapshot
 
-**Why it is next.** Failure bank entry 8 is *"Deleting a persona leaves the collection without a
-default → reassign in one step"*. `persona/collection.md` → *States* → **Populated**: *"every persona
-listed, exactly one carrying the default mark"*, and *Actions*: *"the collection is never left with
-personas and no default"*. `persona/detail.md` → *States* fixes the **Not found** sentence
-(*"This persona doesn't exist in your collection."*) and *Actions* fixes **Delete** *"with
-confirmation"*. `memory.ts` `deletePersona()` already implements the hand-off (the heir is the
-**newest remaining** persona by `createdAt`), and the detail page's delete copy states the rule in
-the product's own words — but **no row has ever pressed Delete on a persona**. The collection is only
-ever *read* (row 34, T-50), so a delete that dropped the mark, handed it to two rows, or emptied the
-collection is green in every gate and every row today.
+**Why it is next.** Failure bank entry 2 is *"Session reads live items, so author edits corrupt
+running chats → copies only"*. `session/detail.md` → **Purpose** makes it law: *"the character, every
+lorebook attached to that character, and the preset are snapshotted when the session starts, and the
+session reads only its own copies from then on. So an author editing a character never changes a
+session already running, and the session owner editing a copy never changes the character for anyone
+else."* And → *Layout* → **Transcript**: *"a cut already published is a snapshot no later change in
+the session touches."* T-15 implemented copies, `SESSION_COPIES` (session 2) is already read by row
+**33** for its **states** and for **Restore copy** — but **no row has ever edited a live item and then
+looked at a session**. A session that joined straight to `getCharacter()` by id, or a `publishCut()`
+that stored an id instead of the copy's text, is green in every gate and in all 41 rows today.
 
 **Approach**
 
-1. **Row 41**, `EXPECTED_ROWS` 40 → 41. This one *is* a new row: row 40 is T-56's vote and reads a
-   character, so nothing existing can host a persona delete. Place it **after row 40 and before
-   `sign out`**, so `sign out` stays the walk's last row.
-2. Read the collection **before**: `/persona` (wait for `.skel-card` **gone** — three skeleton
-   `.card-cell`s look like cards on the first frame) draws **3** `.persona-card`, exactly **one**
-   `.persona-card.is-default` / one `.persona-card-mark` reading `default`. Record the default's
-   **name** (the seed's default is **Nell**, `PERSONA(1)`) and its `href`. Read `textContent`, not
-   `innerText`: the mark and the labels are uppercased in CSS (T-49).
-3. Open **that card** — its `.persona-card-name` link or **Open**, never `nth 0` by habit, so the row
-   still proves *the default* was opened if the grid order ever moves. Land on `/persona/<id>`;
-   the heading is **`h1.name`** on this page (a character's is `h1.title`).
-4. Delete in **two presses**: `.delete-row`'s opener reads **`Delete`**; the confirmation's button
-   reads **`Confirm delete`** inside `.delete-actions`. Two different buttons — the T-49 trap
-   (*Restore* vs *Restore copy*) — so scope the second press or it hits nothing.
-5. Assert **after**, in one reading: the page pushed to `/persona` (path ends `/persona`, no query),
-   **2** `.persona-card`, the deleted name **absent**, exactly **one** default mark, and it is
-   **Ash** — the heir is the *newest remaining* by `createdAt` (`PERSONA(3)`, `at(16,4,10)`), not The
-   Correspondent, which is the second card but the oldest (`at(8,…)`). Read the heir's name from the
-   page and name it in the evidence; a row that pins "the first remaining card" is red on a right
-   page.
-6. Last half: `go()` back to the deleted persona's URL. It must mount the **Not found** state with
-   the spec's exact sentence (and the road out to `/persona`), not a crash and not a blank page.
+1. **Row 42**, `EXPECTED_ROWS` 41 → 42, placed **after row 41 and before `sign out`** (row 41 is the
+   walk's last-but-one and `sign out` must stay last).
+2. Open **session 1** (the ordinary one: character copy `edited`, lorebook copy `unlinked` — read its
+   id from the page, do not pin it), and record the **copy's own name** and the copy **state** line per
+   participant (row 33's reader is the shape to copy: `.copy-kind`, the summary sentence, the state).
+3. Walk to that copy's **original** — the session page offers *Open participant* / a link back while
+   the link resolves — and change its **name** on `/character/<id>/edit` (the form is the live item,
+   not a copy). Save, land on the detail page, and assert the detail reads the new name (the author's
+   edit really happened).
+4. **Assert the session did not move, in one reading**: `go()` back to the session, the copy's name is
+   still the **old** one, its state line still reads what it read in step 2 (**an author's edit is not
+   an *updated from original*** — a page that refreshes the copy on mount flips the state and that is
+   the bug), and its *Update from original* action is still offered (the link still resolves).
+5. Publish a **cut** from the session (the transcript's publish-a-cut control), then edit the
+   character's name a **second** time and assert the published post still reads the cut's own text —
+   a snapshot, not a live join. Read the post by the URL the publish landed on or the toast/link it
+   offers; do not search the feed by the new name.
+6. Leave the store in a state a later session can read: name the character you edited **in the
+   message** and the two names (copy's and post's), because the fixtures now differ from
+   `lib/fixtures/characters.ts` for the rest of the run.
 
 **Traps**
 
-- **The default is Nell; the heir is Ash** (newest by `createdAt`). The second card is not the heir.
-- **Two Delete buttons** (opener + `Confirm delete`); a `startsWith("Delete")` match hits the opener.
-- **The row is mutating and final.** `deletePersona()` splices the row out of the memory store, so
-  every later row sees two personas. Rows 34/T-50's persona reads and the collection count sit
-  **before** it; nothing after it reads a persona except `sign out`. Keep it last-but-one and say so
-  in the row's comment.
-- **`deletePersona` answers `false` for a non-owner and the page keeps the row** — that is a
-  different law (refusal), already covered for items by row 24-ish; do not re-walk it here, walk the
-  **owner's** own default.
-- **The default mark is a class plus its own element** (`.persona-card.is-default`,
-  `.persona-card-mark`), and the button beside it reads **`Default persona`** (disabled) vs
-  **`Set as default`** — never key the proof on button text alone.
-- **`schema:check` parses personas too**; if a fixture must change, fix it against the spec, never
-  the schema.
+- **`Update from original` is a different law.** Step 4 asserts the copy did **not** refresh; do not
+  press the control, and do not read *Restore* as the proof — *Restore* discards the session's edits,
+  it never pulls the author's.
+- **Session 1's character copy is `edited`**, so *Restore* is offered and the state is already not
+  `untouched`: assert the **state line is unchanged**, never a literal `untouched`.
+- **Session 2's copy is the one row 33 restores.** Use session **1** (or re-read row 33's row for what
+  session 2 can no longer prove — it pressed **Restore copy** on the character, so session 2's copy is
+  `untouched` for the rest of the run).
+- **`/character/<id>/edit` writes the live row through the repo**, so the *character* catalog, its
+  detail page and every card in a later row now read the edited name. That is why the row is
+  last-but-one; nothing after it reads a character except `sign out`.
+- **Two names is not a flake, it is the proof.** A row that reads the same name on both sides proves
+  nothing about copies; assert the **difference** and name both strings in the message.
+- **`publishCut()` may return the post id, not the post** — read the page's own destination
+  (`location.pathname` after the publish, or the control's link) rather than assuming a route.
+- **The walk's account seeds Show off.** If the character is flagged NSFW the session still resolves
+  (NSFW never blocks a route), so do not read any listing to prove the session; read the session.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **41/41** locally and **41/41 `--live`**; the assertion
-proved **red** first — delete the hand-off (`if (row.isDefault) { … heir … }` in
-`deletePersona()`) or set the heir's `isDefault` back to `false` — and the message must read that the
-collection was left with personas and **no** default (capture it, then restore the exact bytes and
-`sha256sum -c` them); `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **42/42** locally and **42/42 `--live`**; the assertion
+proved **red** first — make the session page read the live character (join by id in
+`session-detail.tsrx`, or have `publishCut()` store the item rather than the copy) — the message must
+read that the **copy followed the author's edit**, capture it, then restore the exact bytes and
+`sha256sum -c` them; `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Blocked — what a human must do
 
+- **T-29/T-30/T-31/T-32 (Supabase):** create a project and export `SUPABASE_URL` +
+  `SUPABASE_ANON_KEY` (server key stays out of the client). Nothing about the data seam can move past
+  the memory adapter until then. T-30 also owns the real auth body (`lib/auth.ts` writes no session
+  today) and the redirect matrix; T-29's migration is the first thing after the ref lands.
 - **T-29/T-30/T-31/T-32 (Supabase):** create a project and export `SUPABASE_URL` +
   `SUPABASE_ANON_KEY` (server key stays out of the client). Nothing about the data seam can move past
   the memory adapter until then. T-30 also owns the real auth body (`lib/auth.ts` writes no session
@@ -96,15 +100,17 @@ collection was left with personas and **no** default (capture it, then restore t
 
 ## Open decisions
 
-- **T-58 is the ticket, and it is the last walkable failure-bank entry.** Entries 1 (T-54), 3 (T-55 +
-  T-57), 4 (T-53) and 5 (T-56) are walked; 8 becomes walked by T-58. The rest are blocked on the
-  backend or the toolchain (2 → T-29's copies, 6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
-  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). After T-58 the rotation should stop inventing
-  law-walks and take a **page** instead: `docs/NEXT.md`'s *Found while working* list is the source of
-  the gaps a page owes.
-- **Row count is 40 after T-57.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+- **T-59 is the ticket: failure-bank entry 2, the one entry that was never walked at all.** Entries 1
+  (T-54), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked. Entry 2 (*session reads live
+  items → copies only*) is **implemented in the memory adapter** (T-15) and **never asserted**: row 33
+  reads session 2's copy *states* and presses **Restore copy**, but no row has ever edited a live item
+  and looked at a session, and no row has ever published a cut. Its **DB** half stays blocked on T-29;
+  the adapter's behaviour is walkable today. After it, the remaining entries are blocked on the backend
+  or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 → T-32, 11 → T-16, 12 → T-01,
+  13 → `check.sh`).
+- **Row count is 41 after T-58.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
-  it, and bump the count only when a row is genuinely new (**T-58 adds row 41**). **Rows 36 and 37
+  it, and bump the count only when a row is genuinely new (**T-59 adds row 42**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -112,6 +118,9 @@ collection was left with personas and **no** default (capture it, then restore t
   **composes a flagged post** (NSFW toggle on) because row 21 removes the only fixture one, and it
   presses nothing that writes preferences: the Reveal is per-mount. Anything after it must assume the
   pair is the seed and the store holds one extra flagged post.
+- **Row 41 (T-58) is mutating and final.** `deletePersona()` splices the row out of the memory store,
+  so every later row sees **two** personas — a later row that wants a persona must seed or create one,
+  and a collection count must be read, not pinned. Row 42 comes after it and reads none.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.

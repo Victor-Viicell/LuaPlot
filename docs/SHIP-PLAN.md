@@ -502,13 +502,23 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       stamps **survived** that inversion, so node identity alone would have been green — the order
       half is what caught it). 40/40 local and 40/40 `--live`. Brief: `docs/NEXT.md` (T-57).
 
-- [ ] **T-58 Deleting the default persona leaves the collection with exactly one default.**
-      Failure-bank entry 8: *Deleting a persona leaves the collection without a default → reassign in
-      one step*. `persona/collection.md` → *States* → **Populated**: *"exactly one carrying the
-      default mark"*, and *"the collection is never left with personas and no default"*.
-      `memory.ts` `deletePersona()` hands the mark to the **newest remaining** persona, but no row
-      has ever pressed **Delete** on a persona — the collection is only ever read. Row **41** as
-      briefed in `docs/NEXT.md`.
+- [x] **T-58 Deleting the default persona hands the mark to exactly one heir, in one step.** Failure-bank
+      entry 8: *Deleting a persona leaves the collection without a default → reassign in one step*.
+      `persona/collection.md` → *States* → **Populated**: *"exactly one carrying the default mark"*, and
+      *"the collection is never left with personas and no default"*. `memory.ts` `deletePersona()` hands
+      the mark to the **newest remaining** persona, but no row had ever pressed **Delete** on a persona —
+      the collection was only ever read (row 34). Row **41** (`EXPECTED_ROWS` 41) reads `/persona` as
+      data (3 cards, one `.is-default` / one `.persona-card-mark` reading `default` — **Nell**,
+      `PERSONA(1)`), opens **that** card's own link (not `nth 0`), asserts the detail's `h1.name` and its
+      `.mark`, then deletes in **two presses** (`Delete` in `.delete-row`, then `Confirm delete` scoped
+      to `.delete-actions` — a `startsWith` match hits the opener, the T-49 trap) and reads the landing in
+      one pass: path `/persona`, **2** cards, Nell absent, exactly one mark, and it is **Ash** — the heir
+      is the newest by `createdAt` (`PERSONA(3)`, `at(16,4,10)`), while The Correspondent is the second
+      card and the *oldest*. Last half: `go()` back to the deleted id mounts the spec's **Not found**
+      sentence with its `/persona` road out (no heading, no form). Proved **red** first by disabling the
+      hand-off (`if (false && row.isDefault)`) → *"2 card(s) ["Ash","The Correspondent"] at "/persona", 0
+      .is-default [] — the collection was left with 2 persona(s) and 0 default(s)"* (40/41); bytes
+      restored, `sha256sum -c` clean. 41/41 local and 41/41 `--live`. Brief: `docs/NEXT.md` (T-58).
 
 - [x] **T-56 One vote per viewer: a repeat is not a vote, a switch moves one count.** Failure-bank
       entry 5: *Voting allows multiple votes per viewer → uniqueness in adapter and DB*.
@@ -531,15 +541,16 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 ## Failure bank (the ways this class of product breaks)
 
 1. Card blur hides the numbers → footer stays outside the blur (T-08; walked by T-54).
-2. Session reads live items, so author edits corrupt running chats → copies only (T-15).
+2. Session reads live items, so author edits corrupt running chats → copies only (T-15; being walked by
+   T-59).
 3. `Load more` state lost on back → paging in component state, filters in URL (T-09; the URL/sort half
    is walked by T-55, the paging half by T-57).
 4. NSFW preference treated as access control (404s) → detail routes always resolve (T-25; walked by T-53).
 5. Voting allows multiple votes per viewer → uniqueness in adapter and DB (T-03, T-29; walked by T-56).
 6. Report piles create one scan per report → cumulative case joins (T-27).
 7. Deleting an item orphans its thread → cascade delete (T-29).
-8. Deleting a persona leaves the collection without a default → reassign in one step (T-20; being
-   walked by T-58).
+8. Deleting a persona leaves the collection without a default → reassign in one step (T-20; walked by
+   T-58).
 9. JEV deletes authored content → visibility only, ever (T-27).
 10. API keys end up in the client bundle → server-only Edge Functions (T-32).
 11. Preview build looks produced but is mock → `Preview mode` chip stays until real backend (T-16).

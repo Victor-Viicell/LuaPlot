@@ -3667,6 +3667,267 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-58 — failure bank 8: *"Deleting a persona leaves the collection without a default →
+ * reassign in one step"*.
+ *
+ * `persona/collection.md` → *Data* makes it law: *exactly one persona carries [the default] once
+ * the collection holds any* and *the collection is never left with personas and no default*;
+ * `detail.md` gives **Delete** *with confirmation* and fixes the Not-found sentence.
+ * `memory.ts` `deletePersona()` implements the hand-off (the heir is the **newest remaining** row
+ * by `createdAt`), but no row had ever pressed Delete on a persona: the collection was only ever
+ * *read* (row 34), so a delete that dropped the mark, handed it to two rows or emptied the
+ * collection was green in every gate and every row.
+ *
+ * **The heir is Ash, not The Correspondent.** `lib/fixtures/personas.ts`: Ash is `at(16,…)`,
+ * The Correspondent `at(8,…)`, Nell `at(1,…)` — the *second card* is the oldest, so a row that
+ * pinned "the first remaining card" would read red on a right page. The row reads the heir's name
+ * from the page and names it in the evidence.
+ *
+ * **Mutating and final.** `deletePersona()` splices the row out of the memory store, so every
+ * later row sees two personas. That is why this row is the walk's last but one: nothing after it
+ * reads a persona except `sign out` (row 34's collection read sits before it). It also writes no
+ * preference and takes no CDP override, so it leaves the session exactly as row 40 did.
+ * ---------------------------------------------------------------------------------------------- */
+/** The seed's collection: three personas, Nell (`PERSONA(1)`) carrying the mark. */
+const PERSONA_SEED_COUNT = 3;
+const PERSONA_DEFAULT_NAME = "Nell";
+/** The heir: the newest remaining row by `createdAt` — NOT the second card (the oldest). */
+const PERSONA_HEIR_NAME = "Ash";
+
+results.push(
+  await journey("deleting the default persona hands the mark to exactly one heir", async () => {
+    /**
+     * One reading of `/persona` as data: every card's name, its mark, its box classes and its own
+     * `/persona/<uuid>` link. `textContent`, never `innerText` — the mark is uppercased in CSS
+     * (T-49), so the rendered text reads `DEFAULT` on a page that wrote `default`.
+     *
+     * `.skel-card` is read beside the cards because three skeleton `.card-cell`s look like cards on
+     * the first frame (T-50's trap): a mark count taken then is a count of nothing.
+     */
+    const collection = () =>
+      js(`
+        const cards = [...document.querySelectorAll(".persona-card")];
+        const nameOf = (card) => (card.querySelector(".persona-card-name")?.textContent || "").replace(/\\s+/g, " ").trim();
+        return {
+          path: location.pathname + location.search,
+          skeletons: document.querySelectorAll(".skel-card").length,
+          cards: cards.length,
+          names: cards.map(nameOf),
+          marks: cards.map((card) => (card.querySelector(".persona-card-mark")?.textContent || "").trim().toLowerCase()),
+          defaults: cards.filter((card) => card.classList.contains("is-default")).map(nameOf),
+          buttons: cards.map((card) => [...card.querySelectorAll("button")].map((b) => (b.textContent || "").trim()).join("/")),
+          hrefs: cards.map((card) => {
+            const a = card.querySelector(".persona-card-name");
+            return a ? a.getAttribute("href") || "" : "";
+          }),
+        };
+      `);
+
+    const describe = (now) =>
+      now
+        ? `${now.cards} card(s) ${JSON.stringify(now.names)} at ${JSON.stringify(now.path)}, ${now.defaults.length} .is-default ${JSON.stringify(now.defaults)}, mark text ${JSON.stringify(now.marks)}`
+        : "no /persona grid on the page";
+
+    // 1. The seed, read before anything is pressed. Exactly one card carries the mark and it is Nell.
+    await go("/persona");
+    let before = null;
+    try {
+      await waitFor(
+        `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".persona-card").length > 0`,
+        "the persona collection to leave its skeletons",
+        8000,
+      );
+    } catch (error) {
+      throw new Error(`${error.message} — read ${describe(await collection())}`);
+    }
+    before = await collection();
+
+    if (before.cards !== PERSONA_SEED_COUNT) {
+      throw new Error(
+        `${describe(before)} — the seed holds ${PERSONA_SEED_COUNT} personas, so an earlier row created or deleted one and this row's counts assume the fixture`,
+      );
+    }
+    if (before.defaults.length !== 1) {
+      throw new Error(`${describe(before)} — the seed must carry the mark on exactly one card before Delete is pressed`);
+    }
+    if (before.defaults[0] !== PERSONA_DEFAULT_NAME) {
+      throw new Error(`${describe(before)} — the mark is on ${JSON.stringify(before.defaults[0])}, not the seed's default ${JSON.stringify(PERSONA_DEFAULT_NAME)}`);
+    }
+    if (before.marks.filter((mark) => mark === "default").length !== 1) {
+      throw new Error(`${describe(before)} — the one default card carries ${JSON.stringify(before.marks)}, not one \`default\` mark written in textContent`);
+    }
+    // The stopgap a row might mistake for the mark: the button beside it reads *Default persona*
+    // (disabled) on the holder and *Set as default* on the others.
+    if (!before.buttons.some((labels) => labels.startsWith("Default persona"))) {
+      throw new Error(`${describe(before)} — no card's own control reads "Default persona" (read ${JSON.stringify(before.buttons)})`);
+    }
+
+    const seedIndex = before.names.indexOf(PERSONA_DEFAULT_NAME);
+    const seedHref = before.hrefs[seedIndex];
+    if (!/\/persona\/[0-9a-f-]{36}$/.test(seedHref || "")) {
+      throw new Error(`${describe(before)} — the default's card links to ${JSON.stringify(seedHref)}, not a /persona/<uuid>`);
+    }
+    const deletedId = seedHref.split("/persona/")[1];
+
+    // 2. Open **that card**, not `nth 0`: the row must prove the *default* was opened even if the
+    //    grid order ever moves.
+    const opened = await js(`
+      const card = [...document.querySelectorAll(".persona-card")].find((c) => c.classList.contains("is-default"));
+      if (!card) return "";
+      const a = card.querySelector(".persona-card-name");
+      if (!a) return "";
+      a.scrollIntoView({ block: "center" });
+      a.click();
+      return (a.textContent || "").replace(/\\s+/g, " ").trim();
+    `);
+    if (opened !== PERSONA_DEFAULT_NAME) {
+      throw new Error(`the default card's name link pressed as ${JSON.stringify(opened)} — wanted ${JSON.stringify(PERSONA_DEFAULT_NAME)}`);
+    }
+
+    try {
+      await waitFor(`!!document.querySelector(".detail h1.name")`, "the persona's own name heading", 8000);
+    } catch (error) {
+      throw new Error(`${error.message} — at ${await url()}, body reads ${JSON.stringify((await text()).slice(0, 120))}`);
+    }
+
+    // The persona page's heading is `h1.name` (a character's is `h1.title`), and the default mark is
+    // its own `.mark` line — the row must delete the one that carries it.
+    const detail = await js(`
+      const clean = (el) => (el?.textContent || "").replace(/\\s+/g, " ").trim();
+      return {
+        path: location.pathname,
+        name: clean(document.querySelector(".detail h1.name")),
+        kicker: clean(document.querySelector(".detail .kicker")),
+        mark: clean(document.querySelector(".detail .mark")),
+      };
+    `);
+    if (detail.name !== PERSONA_DEFAULT_NAME) {
+      throw new Error(`the detail page reads ${JSON.stringify(detail.name)} (${JSON.stringify(detail.kicker)}), not ${JSON.stringify(PERSONA_DEFAULT_NAME)} at ${detail.path}`);
+    }
+    if (!detail.path.endsWith(`/persona/${deletedId}`)) {
+      throw new Error(`the card for ${deletedId} landed on ${detail.path}`);
+    }
+    if (!detail.mark) {
+      throw new Error(`the detail page draws no default mark — this row must delete the one persona that holds it (read ${JSON.stringify(detail)})`);
+    }
+
+    // 3. Delete in **two presses**: the opener reads `Delete`, the confirmation's button reads
+    //    `Confirm delete`. A `startsWith("Delete")` match would hit the opener on the second press.
+    const armed = await js(`
+      const row = document.querySelector(".delete-row");
+      if (!row) return "";
+      const button = [...row.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Delete" && !b.disabled);
+      if (!button) return "";
+      button.scrollIntoView({ block: "center" });
+      button.click();
+      return (button.textContent || "").trim();
+    `);
+    if (armed !== "Delete") {
+      const seen = await js(`return [...document.querySelectorAll(".delete-row button")].map((b) => (b.textContent || "").trim()).join(" | ");`);
+      throw new Error(`the persona's delete row offers ${JSON.stringify(seen)}, not a "Delete" opener at ${await url()}`);
+    }
+
+    await waitFor(`!!document.querySelector(".delete-row .delete-actions")`, "the delete confirmation");
+    const confirmSentence = await js(`
+      const copy = document.querySelector(".delete-row .delete-actions");
+      const line = copy ? copy.parentElement.querySelector(".delete-copy") : null;
+      return (line?.textContent || "").replace(/\\s+/g, " ").trim();
+    `);
+    if (!confirmSentence) {
+      throw new Error("the confirmation draws no sentence — Delete with confirmation means a question, not a silent write");
+    }
+
+    const confirmed = await js(`
+      const box = document.querySelector(".delete-row .delete-actions");
+      if (!box) return "";
+      const button = [...box.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Confirm delete" && !b.disabled);
+      if (!button) return "";
+      button.scrollIntoView({ block: "center" });
+      button.click();
+      return (button.textContent || "").trim();
+    `);
+    if (confirmed !== "Confirm delete") {
+      const seen = await js(`return [...document.querySelectorAll(".delete-row .delete-actions button")].map((b) => (b.textContent || "").trim() + (b.disabled ? ":disabled" : "")).join(" | ");`);
+      throw new Error(`the confirmation offers ${JSON.stringify(seen)}, not an enabled "Confirm delete"`);
+    }
+
+    // 4. The landing, in ONE reading: the collection, two cards, the deleted name gone, the mark on
+    //    exactly one card, and that card is the newest remaining persona.
+    const deadline = Date.now() + 8000;
+    let after = await collection();
+    while (Date.now() < deadline && !(/\/persona$/.test(after.path) && after.cards === PERSONA_SEED_COUNT - 1 && after.skeletons === 0)) {
+      await sleep(120);
+      after = await collection();
+    }
+
+    if (!/\/persona$/.test(after.path)) {
+      throw new Error(`the delete landed on ${JSON.stringify(after.path)}, not the collection (${describe(after)})`);
+    }
+    if (after.cards !== PERSONA_SEED_COUNT - 1) {
+      throw new Error(
+        `${describe(after)} — a delete removes exactly one card, so ${PERSONA_SEED_COUNT} becomes ${PERSONA_SEED_COUNT - 1}`,
+      );
+    }
+    if (after.names.includes(PERSONA_DEFAULT_NAME)) {
+      throw new Error(`${describe(after)} — the deleted persona ${JSON.stringify(PERSONA_DEFAULT_NAME)} is still listed`);
+    }
+    if (after.defaults.length !== 1) {
+      throw new Error(
+        `${describe(after)} — the collection was left with ${after.cards} persona(s) and ${after.defaults.length} default(s); a persona delete hands the mark on in the same step and never leaves personas with no default`,
+      );
+    }
+    if (after.marks.filter((mark) => mark === "default").length !== 1) {
+      throw new Error(`${describe(after)} — ${after.marks.filter((mark) => mark === "default").length} card(s) carry the \`default\` mark in textContent, not one`);
+    }
+    if (after.defaults[0] !== PERSONA_HEIR_NAME) {
+      throw new Error(
+        `${describe(after)} — the mark moved to ${JSON.stringify(after.defaults[0])}, not ${JSON.stringify(PERSONA_HEIR_NAME)}: the heir is the newest remaining persona by createdAt, and the second card is the oldest`,
+      );
+    }
+
+    // 5. The deleted URL is **Not found**, not a crash and not a blank page: the spec's one
+    //    sentence and its road back to the collection.
+    await go(`/persona/${deletedId}`);
+    let missing = null;
+    try {
+      await waitText("This persona doesn't exist in your collection.", 8000);
+    } catch (error) {
+      missing = await js(`
+        return {
+          path: location.pathname,
+          title: document.title,
+          head: (document.querySelector(".detail")?.innerText || document.body.innerText || "").slice(0, 120),
+        };
+      `);
+      throw new Error(`the deleted persona's address did not mount the Not found state: ${error.message} — read ${JSON.stringify(missing)} at ${await url()}`);
+    }
+
+    missing = await js(`
+      const root = document.querySelector(".detail");
+      const road = root ? root.querySelector("a[href]") : null;
+      return {
+        path: location.pathname,
+        sentence: (document.body.innerText || "").includes("This persona doesn't exist in your collection."),
+        name: !!document.querySelector(".detail h1.name"),
+        forms: document.querySelectorAll("form").length,
+        road: road ? road.getAttribute("href") : "",
+      };
+    `);
+    if (!missing.path.endsWith(`/persona/${deletedId}`)) {
+      throw new Error(`the deleted persona's address reads ${JSON.stringify(missing.path)} in the bar`);
+    }
+    if (!missing.sentence) throw new Error("the Not found state lost its sentence");
+    if (missing.name) throw new Error("the deleted persona still draws its heading — the row survived the delete");
+    if (missing.forms !== 0) throw new Error(`the Not found state mounted ${missing.forms} <form>(s)`);
+    if (!/\/persona$/.test(missing.road)) {
+      throw new Error(`the Not found state's road out points at ${JSON.stringify(missing.road)}, not /persona`);
+    }
+
+    return `before: ${before.cards} cards, one .is-default reading ${JSON.stringify(before.defaults[0])} (the seed's default) · opened that card → ${detail.path} with its mark · Delete → ${JSON.stringify(confirmSentence.slice(0, 60))}… → Confirm delete · after: ${after.cards} cards ${JSON.stringify(after.names)}, ${JSON.stringify(PERSONA_DEFAULT_NAME)} gone, the one mark on ${JSON.stringify(after.defaults[0])} (newest remaining; The Correspondent is the oldest and is not the heir) · ${missing.path} → Not found, sentence + road ${missing.road}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -3689,9 +3950,10 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40).
+ * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
+ * T-58: 41).
  */
-const EXPECTED_ROWS = 40;
+const EXPECTED_ROWS = 41;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");
