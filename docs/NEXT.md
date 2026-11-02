@@ -1,65 +1,63 @@
 # Baton — what the next session does
 
-**T-50 is the one ticket.** T-49 landed: `scripts/smoke.mjs` has row **33**, the walk is **33/33**
-locally and live, and *sessions read copies, never live items* is no longer the one product law with
-no row. The next law with no mechanical guard is *personas are personal (never shared, never
-moderated, never counted)* — a law about **absences**, which is exactly what a hand sweep forgets.
+**T-51 is the one ticket.** T-50 landed: `scripts/smoke.mjs` has row **34**, the walk is **34/34**
+locally and live, and *personas are personal (never shared, never moderated, never counted)* — the law
+about absences — now has a row that counts elements inside the page root. The next law with no
+mechanical guard is **"IDs carry identity, names never do. Fixed segments (`catalog`, `create`,
+`thread`) win over `[id]` params"**: it is a *precedence* rule, so no existing gate can see it —
+`spec-routes.mjs` proves each route's page module resolves, never that the table picks it.
 
-## T-50 — a persona carries none of the shared-item chrome
+## T-51 — a fixed segment wins over an id
 
-**Why it is next.** `CONTRACT.md` → *Product law*: **"Personas are personal (never shared, never
-moderated, never counted)."** `src/specs/pages/persona/detail.md` fixes it in the negative — *"No
-engagement row, no report control, and no comment thread … nothing about it is counted"* — and
-`collection.md` adds *"personas are absent from profiles and never shared"*. The walk reaches
-`/persona/[id]` only through row 13's edit journey, which lands on the form; **no row has ever read
-the absences**, and a control that quietly appears one day (a Report button copied in from a template,
-an engagement strip, a comment count) is invisible to every existing gate: `link-check.mjs` reads
-anchors, `tier-check.mjs` reads colours, `spec-routes.mjs` reads routes. None of them can see "there
-is no such element".
+**Why it is next.** `CONTRACT.md` → *Product law*: *"IDs carry identity, names never do. Fixed
+segments (`catalog`, `create`, `thread`) win over `[id]` params."* `src/specs/luaplot-pages.md` repeats
+it and adds *"A user may hold several rows with the same name, so every address is an id."* The router
+gets this from `TABLE`'s sort (`src/router.ts`: fewer params first, then deeper) plus the id predicate
+(`/^[0-9a-f-]{36}$/i`), and **no row has ever opened a fixed sibling**: the walk reaches a detail page
+through a card, never by typing `…/catalog` or `…/create` beside an id route of the same depth. A sort
+that loses its param count, or an id predicate that loosens to `\w+`, would make `/character/catalog`
+render the character *detail* page with `id="catalog"` — the app would read *not found* on a route the
+spec guarantees, and every gate would stay green.
 
 **Approach**
 
-1. One new row, **row 34** (bump `EXPECTED_ROWS` 33 → 34). Open an own persona's detail page —
-   `go("/persona/9e45014a-0000-4000-8000-000000000001")` — poll for `.detail h1.name`, and read the
-   name back so a later fixture rename is a red row, not a silent pass.
-2. Assert the **absences** within the page's own root (`.detail`), never against `document.body`:
-   zero `button`/`a` whose accessible name matches `/report/i`, zero elements matching
-   `.counts, .count, .ratio, .engagement`, zero comment thread (`.comments`, `.comment-thread`,
-   `.comment`), zero save/bookmark control. Absence is asserted by **counting elements inside the
-   page root**, not by searching the text: an earlier row's toast, or a footer that says "report",
-   would make a text search pass on a page that still has the button.
-3. Assert `/persona` is **own-only**: the collection's `.card-cell` count equals the number of cards
-   read (`3` today — personas are seeded for `you` only), and every card links to a `/persona/<uuid>`
-   path under the served base. Do not pin a total without reading the cards first: the count is the
-   assertion, the number is evidence.
-4. The refusal on a persona that is not yours: `go("/persona/9e45014a-0000-4000-8000-0000000000ff")`
-   → the sentence **This persona doesn't exist in your collection.** and **no `<form>`** on the page.
-   Missing and unowned are one state on purpose (`getPersona` answers `null` for both); say so in the
-   row's comment.
-5. Nothing is mutated: the row only reads, so its position after row 33 and before `sign out` is for
-   tidiness, not safety — but keep it there, so `sign out` stays the walk's last row.
+1. One new row, **row 35** (bump `EXPECTED_ROWS` 34 → 35), read-only, placed after row 34 and before
+   `sign out` (so `sign out` stays last). It walks each literal sibling of a param route and asserts
+   the page that mounted is its own, by a landmark the detail page cannot draw:
+   `/character/catalog`, `/character/create`, `/lorebook/catalog`, `/lorebook/create`,
+   `/preset/catalog`, `/preset/create`, `/persona/create`, `/post/thread`, `/post/create`.
+2. Read `document.title` (it is `<Title> — LuaPlot` on a non-root route, `App.tsrx`) **and** one
+   landmark per page — the title alone is a string the code writes twice. For the catalogs that is
+   the grid (`.card-grid`) with a heading; for the create pages it is a mounted `form`; for
+   `/post/thread` check the page's own root class in `src/pages/post-thread.tsrx`. **Read the page
+   files first** — the same rule as row 34: a selector that is not in the file means the row is
+   mis-set, not the page broken.
+3. The **control** half: a uuid-shaped path of the same depth must still reach a detail page — one
+   `go("/character/c0a1b2c3-…-02")` with `waitText("Sonic the Hedgehog")` is enough, because a router
+   that made every segment literal would pass every line above and fail this one.
+4. `/post/thread` and `/post/create` are the pair the law is named for (`thread` is a fixed word at
+   the same depth as `[post.id]`), so they are not optional. `/moderation` has no fixed sibling at
+   depth 2 today — say that in the row's comment rather than inventing one.
 
 **Traps**
 
-- **`innerText` is the rendered text.** `.copies-toggle` and `.copy-kind` carry `text-transform:
-  uppercase`, so T-49's first run read `3 COPIES · 1 EDITED` and failed on a page that was correct.
-  Read **`textContent`** for a sentence the code writes and `innerText` only when the rendering is the
-  thing under test (T-49's lesson, now in *Found while working*).
-- **Do not invent a selector for the next session.** Read `src/pages/persona-detail.tsrx` first: the
-  page root is `.detail` inside `.page`, the name is `h1.name`, and the missing state is the shared
-  `EmptyState` with a **path** (`to="/persona"`), not an href. If a selector below does not exist in
-  the file, the row is mis-set, not the page broken.
-- **The shell draws controls of its own** (the `More` menu, the tab bar). Scope every absence query to
-  `.detail`; a `document.querySelector("button")` anywhere is the wrong node.
-- **`/persona` is a searchable collection at 360** — the toolbar has a search field and a sort. Do not
-  assume one card per row; count `.card-cell`, not columns.
-- **The word "report" can arrive from a toast.** Row 33 restores a copy (toast *Copy restored.*) and
-  rows 17–19 toast on cases; a text search would be flaky, an element count would not.
+- **A create page is a `<form>`; a catalog is not.** `/character/create` mounts `CharacterForm`, and
+  T-40's lesson applies: it draws its form only in its `ready` branch, so poll for the form rather
+  than asserting it on the first frame.
+- **`/persona/create` is signed-in-only and never walked.** If it fails, that is the ticket's find —
+  record it in PROGRESS and fix the cause (the router's param predicate, or the page), not the row.
+- **Do not assert the not-found screen for a bad id.** `/character/9e45…` is a *bucket* mismatch (a
+  persona id under `/character/`), and an id-shaped path is matched by the detail route on purpose —
+  the page renders its own refusal. Read a real character's page instead.
+- **The walk's tab is 500×653 by default**, and nothing in this row measures width, so no CDP
+  override is needed — do not add one; every override leaks unless it is cleared.
+- **The pages are paged.** A catalog at 360 draws one column of `.card-cell`; count the grid, never
+  the cards, when the assertion is "the catalog is here".
 
-**Accept:** `./scripts/check.sh` GREEN; walk **34/34** locally and **34/34 `--live`**; row 34 proved
-**red** first (e.g. add a `Report` button to the persona page's identity block, watch the row fail
-naming the control it found, then restore the exact bytes and watch it green); `publish.sh` prints
-`LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **35/35** locally and **35/35 `--live`**; row 35 proved
+**red** first (e.g. drop the param count from `TABLE`'s sort, or widen `ID` to `/^[0-9a-z-]{1,36}$/i`,
+watch `/character/catalog` mount the detail page and the row name it, then restore the exact bytes);
+`publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -116,9 +114,11 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Open decisions
 
-- **Row count is 33 (T-49, after T-37B/T-37C extended theirs in place).** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 34 (T-50, after T-49 extended theirs in place).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
-  adding a near-copy of it, and bump the count only when a row is genuinely new.
+  adding a near-copy of it, and bump the count only when a row is genuinely new. **Row 34 is
+  read-only**: it opens an own persona, then `/persona`, then an unowned persona id — no write, no CDP
+  override, no shadow left behind.
 - **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
   page prints one, and the base rule is the thing under test), measures it resting and through
   `CSS.forcePseudoState`, takes its own 900px `Emulation.setDeviceMetricsOverride` for the rail, and
@@ -149,7 +149,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 33 after T-49; 34 is T-50's.** Row 32 shadows `visualViewport.height`, takes its
+- **Row count is 34 after T-50; 35 is T-51's.** Row 32 shadows `visualViewport.height`, takes its
   own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
   shadow is gone, the token is back to `0px` and the session is back at the browser's own window
   size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
@@ -161,6 +161,20 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A loading state can satisfy an absence count (T-50).** `/persona` draws **three `.card-cell`s of
+  skeletons** before it draws a card, so a row that counted cells on the first frame read `3` on a
+  grid that had not loaded and would have passed a broken collection. Wait for `.skel-card` to be
+  **gone**, and assert the real card (`.persona-card`) too. The same shape applies to any page whose
+  skeleton mirrors the grid.
+- **"Zero elements" is a node count, never a text search (T-50).** Row 34 counts `button, a` inside
+  `.detail` and matches their `aria-label`-then-`textContent`; a toast from row 33 (*Copy restored.*)
+  or a footer that says "report" makes a body-text search pass on a page that still has the control.
+  Read the accessible name as `aria-label || textContent` — the same order `click()` uses — rather
+  than reaching for `Accessibility.getFullAXTree`, which is thousands of nodes to filter.
+- **An absence row needs a presence half or it passes on an empty page (T-50).** Row 34 asserts the
+  name `Nell` and the four controls the persona spec *does* require (Start a session, the default
+  pair, Edit) before asserting what must be missing. Otherwise a page that rendered nothing is a
+  green row.
 - **`innerText` is the rendered text, so a `text-transform` redesigns the assertion (T-49).** The
   session copies header and each `.copy-kind` are uppercased in CSS, so row 33's first run read
   `3 COPIES · 1 EDITED` and failed on a page that was right. Read `textContent` for a sentence the

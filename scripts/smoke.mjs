@@ -2175,6 +2175,140 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-50 — the law about **absences**: *personas are personal (never shared, never moderated, never
+ * counted)* (`src/specs/pages/persona/detail.md`: *no engagement row, no report control, and no
+ * comment thread … nothing about it is counted*).
+ *
+ * Every existing gate reads what a page **has** — `link-check.mjs` reads anchors, `tier-check.mjs`
+ * reads colours, `spec-routes.mjs` reads routes — so a Report button copied into the persona header
+ * from a template would be invisible to all of them. This row counts elements inside the page's own
+ * **`.detail`** root (never `document.body`: the shell draws a `More` menu and a tab bar of its own,
+ * and row 33's *Copy restored.* toast can still be on screen).
+ *
+ * The absences alone would also pass on a page that rendered nothing, so the row reads the four
+ * controls the spec does require (Start a session, the default pair, Edit) and the name **Nell**
+ * first: the fixture is the fact, and a later rename is a red row rather than a silent pass.
+ *
+ * Then `/persona` is **own-only**: personas are seeded for `you` alone and are absent from profiles,
+ * so every card must point at a seeded persona id and there must be exactly one card per cell. The
+ * loading state also draws three `.card-cell`s (skeletons), which is why the row waits for
+ * `.skel-card` to be gone before counting a single thing.
+ *
+ * Read-only: nothing here writes, so its position after row 33 and before `sign out` is tidiness —
+ * but keep it there, so `sign out` stays the walk's last row.
+ * -------------------------------------------------------------------------------------------- */
+const OWN_PERSONA = "/persona/9e45014a-0000-4000-8000-000000000001";
+const NO_PERSONA = "/persona/9e45014a-0000-4000-8000-0000000000ff";
+/** The three personas `you` owns (`lib/fixtures/personas.ts`). A fourth fixture row makes this red. */
+const PERSONA_IDS = [1, 2, 3].map((n) => `9e45014a-0000-4000-8000-${String(n).padStart(12, "0")}`);
+
+results.push(
+  await journey("a persona carries none of the shared-item chrome", async () => {
+    await go(OWN_PERSONA);
+    await waitFor(`!!document.querySelector(".detail h1.name")`, "the persona's name", 8000);
+
+    /**
+     * The page's own root, read as data. `name()` is the accessible name as close as a walk gets
+     * without `Accessibility.getFullAXTree`: `aria-label` first, then the rendered text — the same
+     * order the `click()` helper uses, so a control found here is a control a reader could press.
+     */
+    const page = () =>
+      js(`
+        const root = document.querySelector(".detail");
+        if (!root) return null;
+        const name = (el) => (el.getAttribute("aria-label") || el.textContent || "").replace(/\\s+/g, " ").trim();
+        const controls = [...root.querySelectorAll("button, a")];
+        return {
+          name: (root.querySelector("h1.name")?.textContent || "").replace(/\\s+/g, " ").trim(),
+          labels: controls.map(name),
+          report: controls.filter((el) => /report/i.test(name(el))).map(name),
+          save: controls.filter((el) => /bookmark|save/i.test(name(el))).map(name),
+          counts: [...root.querySelectorAll(".counts, .count, .ratio, .engagement")].length,
+          thread: [...root.querySelectorAll(".comments, .comment-thread, .comment")].length,
+          forms: root.querySelectorAll("form").length,
+        };
+      `);
+
+    const own = await page();
+    if (!own) throw new Error(`the persona page drew no .detail at ${await url()}`);
+    if (own.name !== "Nell") throw new Error(`the page's name reads ${JSON.stringify(own.name)}, not "Nell"`);
+
+    // The page has to be *populated* for an absence to mean anything.
+    for (const label of ["Start a session", "Edit"]) {
+      if (!own.labels.includes(label)) {
+        throw new Error(`the persona page lost its own ${JSON.stringify(label)} control — read ${JSON.stringify(own.labels)}`);
+      }
+    }
+
+    if (own.report.length !== 0) throw new Error(`the persona page draws a report control: ${JSON.stringify(own.report)}`);
+    if (own.save.length !== 0) throw new Error(`the persona page draws a save/bookmark control: ${JSON.stringify(own.save)}`);
+    if (own.counts !== 0) throw new Error(`the persona page draws ${own.counts} engagement element(s) (.counts/.count/.ratio/.engagement)`);
+    if (own.thread !== 0) throw new Error(`the persona page draws ${own.thread} comment element(s) (.comments/.comment-thread/.comment)`);
+    if (own.forms !== 0) throw new Error("the persona detail page mounted a <form>; only /persona/[id]/edit has one");
+
+    // `/persona` is the viewer's own collection, so every card it draws is one of the seeded rows.
+    await go("/persona");
+    await waitFor(
+      `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".persona-card").length > 0`,
+      "the persona collection to leave its skeletons behind",
+      8000,
+    );
+    const collection = await js(`
+      const cells = [...document.querySelectorAll(".card-cell")];
+      const cards = [...document.querySelectorAll(".persona-card")];
+      const links = cards.map((card) => {
+        const a = [...card.querySelectorAll("a[href]")].find((el) => /\\/persona\\/[0-9a-f-]{36}$/.test(el.getAttribute("href") || ""));
+        return a ? a.getAttribute("href") : "";
+      });
+      return {
+        skeletons: document.querySelectorAll(".skel-card").length,
+        cells: cells.length,
+        cards: cards.length,
+        names: cards.map((card) => (card.querySelector(".persona-card-name")?.textContent || "").trim()),
+        links,
+      };
+    `);
+
+    if (collection.skeletons !== 0) throw new Error(`${collection.skeletons} skeleton card(s) stayed in the grid`);
+    if (collection.cells !== collection.cards) {
+      throw new Error(`the collection drew ${collection.cells} card cell(s) but ${collection.cards} card(s)`);
+    }
+    if (collection.links.some((href) => href === "")) {
+      throw new Error(`a persona card carries no /persona/<uuid> link: ${JSON.stringify(collection.names)}`);
+    }
+
+    // Under the served base ("" locally, "/LuaPlot" on Pages) — a leading-slash href would drop it.
+    const basePath = new URL(BASE).pathname.replace(/\/$/, "");
+    const ids = collection.links.map((href) => href.split("/persona/")[1]);
+    for (const [index, id] of ids.entries()) {
+      if (!collection.links[index].startsWith(`${basePath}/persona/`)) {
+        throw new Error(`the card for ${collection.names[index]} links to ${collection.links[index]}, outside the served base ${basePath || "/"}`);
+      }
+      if (!PERSONA_IDS.includes(id)) {
+        throw new Error(`the collection draws an id that is not a seeded persona: ${id} (${JSON.stringify(collection.names)})`);
+      }
+    }
+    if (new Set(ids).size !== ids.length) throw new Error(`the collection drew the same persona twice: ${JSON.stringify(ids)}`);
+
+    // Missing and unowned are **one state on purpose** (`getPersona` answers null for both), so this
+    // id proves the refusal a stranger's persona sees: the one sentence, and no form to write with.
+    await go(NO_PERSONA);
+    await waitText("This persona doesn't exist in your collection.", 8000);
+    const refusal = await js(`
+      const empty = document.querySelector(".detail a[href]");
+      return {
+        forms: document.querySelectorAll("form").length,
+        road: empty ? empty.getAttribute("href") : "",
+      };
+    `);
+    if (refusal.forms !== 0) throw new Error(`the missing state mounted ${refusal.forms} <form>(s)`);
+    if (!/\/persona$/.test(refusal.road)) throw new Error(`the missing state's road out points at ${JSON.stringify(refusal.road)}, not /persona`);
+
+    return `Nell: 0 report / 0 save / 0 counts / 0 comment / 0 form in .detail, ${own.labels.length} own controls · collection: ${collection.cards}/${collection.cells} cards, ids ${ids.map((id) => id.slice(-2)).join("/")} under ${basePath || "/"} · unowned → the one sentence, no form, road out ${refusal.road}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -2197,9 +2331,9 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32, T-49: 33).
+ * T-36a: 32, T-49: 33, T-50: 34).
  */
-const EXPECTED_ROWS = 33;
+const EXPECTED_ROWS = 34;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

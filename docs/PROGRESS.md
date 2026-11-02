@@ -3,6 +3,31 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-50: a persona carries none of the shared-item chrome
+
+- **Changed:** walk row **34** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 33 → 34) for the law *personas
+  are personal (never shared, never moderated, never counted)*, which no gate could see because every
+  gate reads what a page **has**. The row opens an own persona (`.detail h1.name` → `Nell`), reads its
+  four own controls (**Start a session**, the default pair, **Edit**) so the absences are not vacuous,
+  then counts inside `.detail`: 0 report controls, 0 save/bookmark controls, 0
+  `.counts/.count/.ratio/.engagement`, 0 `.comments/.comment-thread/.comment`, 0 `<form>`. It then
+  opens `/persona` (waiting for the three skeleton cells to go — the loading grid draws `.card-cell`s
+  too), asserts one `.persona-card` per `.card-cell`, and that every card links under the served base
+  to a **seeded** persona id, none twice. Finally an unowned id reads the single sentence *This
+  persona doesn't exist in your collection.*, mounts no `<form>`, and its road out resolves to
+  `/persona` (missing and unowned are one state on purpose).
+- **Verified how:** `./scripts/check.sh` GREEN. Walk **34/34** locally and **34/34 `--live`** against
+  `https://victor-viicell.github.io/LuaPlot/` (200). Row 34's evidence: `Nell: 0 report / 0 save / 0
+  counts / 0 comment / 0 form in .detail, 4 own controls · collection: 3/3 cards, ids 03/02/01 under
+  /LuaPlot · unowned → the one sentence, no form, road out /LuaPlot/persona`. Proved **red** first: a
+  `<button class="act">Report</button>` injected into the identity block dropped the walk to 33/34 and
+  the row failed with `the persona page draws a report control: ["Report"]`; the exact bytes were
+  restored (`sha256sum` matched `082dedb7…`) and the green runs above are the proof.
+- **Not verified:** nothing mobile *on device* — desktop Chromium at 360×740 only. The row asserts
+  absence by class/name, so a control drawn with a class and a name the sweep does not know (e.g. an
+  icon-only `…` menu with no accessible name) would not be seen; that is the honest limit of a
+  DOM-reading walk. Nothing about persistence.
+
 ## 2026-11-01 — T-49: the session's copies become a walk row
 
 - **Changed:** walk row **33** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 32 → 33) — the product law

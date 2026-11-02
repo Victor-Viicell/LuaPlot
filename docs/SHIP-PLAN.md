@@ -397,6 +397,15 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       effect on both the row and the tracked sentence. Proved red first. Two ticket premises were
       wrong and the DOM won: session 2 holds three copies (not four) and the summary drops the suffix
       rather than printing `0 edited`.
+- [x] **T-50 A persona carries none of the shared-item chrome.** The law *personas are personal
+      (never shared, never moderated, never counted)* is a law about **absences**, so no gate that
+      reads what a page has can see it break. Row **34** (34/34 local and `--live`) opens an own
+      persona and counts, inside `.detail` only: 0 report controls, 0 save/bookmark controls, 0
+      engagement elements, 0 comment elements, 0 forms — after reading the name and the four controls
+      the spec does require, so an empty page cannot pass. Then `/persona` is own-only (one
+      `.persona-card` per `.card-cell`, every card under the served base to a seeded persona id), and
+      an unowned id reads the one sentence with no form and a road back to `/persona`. Proved red
+      first by injecting a `Report` button. Brief: `docs/NEXT.md`.
 
 ## Failure bank (the ways this class of product breaks)
 
