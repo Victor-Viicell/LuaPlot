@@ -1,71 +1,81 @@
 # Baton — what the next session does
 
-**T-53 is the one ticket.** T-52 landed: `scripts/smoke.mjs` has row **36** (walk **36/36** locally
-and **36/36 `--live`**), and the law it guards — *Engagement is metadata on cards (ratio only) and
-actions on detail pages (counts live there)* — now has **both halves** measured: 20/20 catalogue
-cards print exactly one `.card-ratio` (a whole percent, a `SPAN`, outside every control) and no
-`.count/.counts/.count-label/.count-value/.comments`, while `/character/[id]` prints its four
-engagement cells and its two `.vote` controls, and `/post/thread` is measured as the *other* card on
-purpose (two `.post-count` cells plus one comment link, no ratio — `thread.md` fixes that footer).
-The next unguarded law is the one `SHIP-PLAN.md`'s failure bank already names and that no row walks:
-**entry 4, "NSFW preference treated as access control (404s) → detail routes always resolve"**.
+**T-54 is the one ticket.** T-53 landed: `scripts/smoke.mjs` has row **37** (walk **37/37** locally and
+**37/37 `--live`**), and failure-bank entry 4 — *NSFW preference treated as access control (404s)* — is
+now measured, not asserted by hand: with Show off the catalogue drops *Hollow Saint* (24 cards with
+Show on → 20 with it off) while `/character/…0004` still **resolves** by address, draws its chrome,
+covers only its body (`.veiled.is-covered` + `aria-hidden="true"`) and keeps its four engagement
+cells. The next unguarded law is failure-bank entry **1**, and the T-53 row is what makes it visible:
+**the cover has to leave the numbers outside it** — and no row has ever looked at a *covered* card.
 
-## T-53 — a viewer's filter never blocks a route
+## T-54 — a cover is structural: the chrome and the numbers stay outside it
 
-**Why it is next.** `src/specs/systems/nsfw.md` → *Rules*, twice in one breath: *"It is not access
-control. No route is blocked, no 404, no redirect: a direct link still resolves"* and *"**With Show
-off, a detail route still resolves.** The item draws with its chrome intact and the body withheld
-behind the same reveal control a blurred item carries; there is no separate notice page and no empty
-render."* Row 25 (`/dev/state`) proves the **listing** obeys the pair — it flips Show+Blur on, counts
-covered cards on `/character/catalog`, then restores — but **no row has ever opened a detail route
-with Show off**. `character-detail.tsrx` already implements the rule (`const covered = track(() =>
-nsfw.value && !show.value && !revealed.value)`, `.veiled.is-covered` plus a `Reveal` button at
-~line 1134). The obvious "fix" — gating the page on `show` for a viewer who turned NSFW off, or
-answering the not-found sentence — would 404 a route the spec guarantees, and every gate would stay
-green: `spec-routes.mjs` proves the module resolves, never what it renders under a preference.
+**Why it is next.** `src/specs/systems/nsfw.md` → *Rules*, *Blur is structural*: *"The unit keeps its
+chrome. On a catalog card the top header is the title and the bottom footer is a single row holding
+the author beside the ratio as a percentage … The blurred area is exactly what sits between them —
+the avatar, the tagline, and the tags … **The numbers are never hidden** — only the body is
+covered."* And `SHIP-PLAN.md`'s failure bank puts it first: *"Card blur hides the numbers → footer
+stays outside the blur (T-08)"*. `Card.tsrx` implements the split deliberately — `.card-head` (title),
+`.card-middle > .card-veil`, `.card-foot` (author + `.card-ratio`) — with a comment calling it
+load-bearing, and `PostCard.tsrx` mirrors it (`.post-head`, `.post-veil`, `.post-foot` with
+`.post-counts` + `.post-comments`). **No gate can see any of it:** row 36 measures the counts with
+**no blur on**, so it never renders a covered card; row 25 counts `.card.is-covered` and stops; row 37
+reads the *detail* page's cover. Moving `.card-foot` inside `.card-veil` — one indentation — would
+leave every gate green and hide every ratio behind a blur, and the spec calls that the worst thing on
+the page.
 
 **Approach**
 
-1. One new row, **row 37** (bump `EXPECTED_ROWS` 36 → 37), after row 36 and before `sign out`.
-2. The fixture: `/character/c0a1b2c3-0000-4000-8000-000000000004` — *Hollow Saint*, `author: sable`,
-   `nsfw: true` (`src/lib/fixtures/characters.ts`, `CHARACTER(4)`). It is the fixture's only NSFW
-   **character**, and rows 6/32/35/36 all read Sonic (`…002`, SFW), so nothing collides.
-3. **Record the seed pair, never assume it.** Row 25's helpers: `toggleState("Show NSFW content")` and
-   `toggleState("Blur NSFW content")` first, then `setToggle("Show NSFW content", false)`. Blur is
-   irrelevant while Show is off (`nsfw.md`: *Blur only matters while Show is on*).
-4. **Listing half.** `/character/catalog`: wait for `.skel-card` to be **gone** (T-50), read the
-   `.card-title` texts, and assert cards > 0 **and** "Hollow Saint" absent. The listing half is what
-   makes the absence meaningful.
-5. **Route half, by address.** `go()` the id directly — no press: the law is about a *direct link*.
-   Read the page as data and assert: `.detail` mounted, its name reads *Hollow Saint*, `.veiled`
-   carries `is-covered`, `aria-hidden="true"`, a control named **Reveal** is inside `.detail`, and the
-   `.counts[aria-label="Engagement"]` cells still draw their numbers (`nsfw.md`: *the numbers are
-   never hidden*). Then press `Reveal` and assert `is-covered` is gone and the name survives — a
-   reveal is one view, and it writes nothing to the account.
-6. **Restore in `finally` and assert the restore.** Row 25 restores by value; row 31/32/36 assert
-   rather than trust the `finally`. Read `/dev/state` back, compare with the seed, then re-read the
-   catalogue. A leak here makes the *next run's* rows read a flipped account.
+1. One new row, **row 38** (bump `EXPECTED_ROWS` 37 → 38), after row 37 and before `sign out`.
+2. **Record the pair, never assume it.** Row 25's and row 37's helpers: `toggleState(...)` for the
+   seed, `setToggle("Show NSFW content", true)` + `setToggle("Blur NSFW content", true)` for the
+   state under test. Blur only matters while Show is on (`nsfw.md`), so both are needed here — this
+   is the one row that genuinely wants Blur on.
+3. **Catalogue half.** `/character/catalog`, wait for `.skel-card` **gone**, then read every
+   `.card.is-covered` as data and assert per card: `.card-head .card-title` and `.card-foot` exist
+   and **are not** descendants of `.card-veil` (`veil.contains(...) === false`, not a sibling guess);
+   `.card-ratio` sits inside `.card-foot` and outside `.card-veil`; `.card-veil` carries
+   `aria-hidden="true"`; a `Reveal` button is inside `.card-cover`; and **zero**
+   `.card-ratio`/`.card-author`/`.count` inside the veil. Assert covered cards > 0 or the row proves
+   nothing (T-53's lesson: the seed account has Blur **off**, so this row must turn it on).
+4. **One reveal reveals one item.** With ≥1 covered card, press the *first* card's `Reveal` (scope the
+   press to that card, `exact: true` — a page-level `click("Reveal")` presses whichever card answers
+   first) and assert the covered count drops by exactly **1**, the pressed card is no longer
+   `is-covered`, and every other covered card still is. That is the spec's *"Revealing one item never
+   reveals the rest"*, which nothing measures today.
+5. **Thread half.** `/post/thread`, wait for `.skel-card` **gone** (T-52's find: the thread's loading
+   state draws three `.skel-card`s, not `.card-cell`s), and assert the same split on every
+   `.card.post.is-covered`: `.post-counts` (two `.post-count` cells) and `.post-comments` are outside
+   `.post-veil`, `aria-hidden="true"` is on the veil, and the veil holds no count. Fixture: post 7 is
+   NSFW (`lib/fixtures/posts.ts`) — **verify it is on page one** before pinning anything; if it is
+   not, the row reports it rather than passing on an empty set.
+6. **Restore in a way that cannot mask the failure.** T-53's shape: capture the body error, restore
+   the recorded seed pair in a second `try`, assert the pair and the listing back, then rethrow the
+   body error — a restore failure is reported *with* the body failure, never instead of it.
 
 **Traps**
 
-- **This row owns the NSFW pair, and a leak poisons every later run.** Restore from the seed you
-  recorded, never from a hard-coded `true/true`, and assert it before the row returns.
-- **`Reveal` is a `Button` whose accessible name is its label**, and the page also draws *Start a
-  session*, *Bookmark* and *More*. Scope the read to `.detail` and press with `exact: true`, or the
-  row proves a control somewhere else on screen.
-- **The cover is a class, not a colour.** `.veiled.is-covered`, and the `<aside>` holding the counts
-  sits *outside* it — "the body is withheld" and "the numbers stay visible" are two separate reads,
-  and both must be asserted.
-- **A listing's absence says nothing about the route.** The two halves fail independently; report
-  which one moved rather than one combined failure.
-- **A poll timeout is not the proof the accept line asks for (T-36a).** If the page never resolves,
-  catch the wait, re-read `.detail`/the name/`document.title`, and name what actually mounted — a red
-  proof that says "timed out waiting for the name" wastes the next session's run.
+- **This row owns the NSFW pair too, and now two rows do.** Each records its own seed and restores
+  it; never hard-code `true/true`, and re-read `/dev/state` before returning. A leak makes every
+  later run read a flipped account.
+- **`innerText` uppercases `.count-label` and `.post-count-label`** — read labels through
+  `textContent`, and only when the label matters.
+- **The pressed card's Reveal must be scoped by card**, not by index into a page-wide list: the DOM
+  order changes with the sort, and `click()`'s `nth` counts *visible* matches.
+- **`card-cover` is inside `.card-middle`, beside the veil** — a containment assertion built on
+  `.card` descendants would pass even if the Reveal overlay were inside the blurred area. Assert
+  inside `.card-cover` **and** outside `.card-veil`.
+- **A covered card still renders its tags twice**: the real `.card-tags` and an `aria-hidden="true"`
+  measuring mirror (`.card-tags.is-measure`). Counting tags on a card reads double; do not.
+- **Do not assert a blur radius.** Whether the veil is `filter: blur()` or an overlay is a
+  `DESIGN.md` decision that has changed once; the spec's law is *what* is covered, and the DOM split
+  is the honest proof. If a visual check is wanted, measure the veil's computed `filter` and record
+  it in the evidence line — never gate on the number.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **37/37** locally and **37/37 `--live`**; row 37 proved
-**red** first (gate `character-detail.tsrx`'s `.detail` content on `show.value || !nsfw.value` so a
-Show-off viewer gets an empty render, watch the row name the route and what mounted instead, then
-restore the exact bytes); `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **38/38** locally and **38/38 `--live`**; row 38 proved
+**red** first (move `.card-foot` inside `.card-veil` in `Card.tsrx`, watch the row name the card, the
+footer's absence and the ratio inside the veil, then restore the exact bytes — sha256 the file before
+and after); `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -122,12 +132,14 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Open decisions
 
-- **Row count is 36 (T-52).** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 37 (T-53).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
-  adding a near-copy of it, and bump the count only when a row is genuinely new. **Row 36 is
-  read-only**: it reads the catalogue, one detail page and the thread, so no write, no CDP override,
-  no probe and no NSFW flip left behind. **Row 37 (T-53) will own the NSFW pair** — it must restore
-  from a seed it recorded and assert the restore, or every later run reads a flipped account.
+  adding a near-copy of it, and bump the count only when a row is genuinely new. **Rows 36 and 37 are
+  read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the thread;
+  row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write is left
+  behind. **Row 38 (T-54) will own the NSFW pair as well** — it needs Show + Blur *on* to render a
+  covered card, so it must record its own seed, restore **that**, and assert the restore, or every
+  later run reads a flipped account.
 - **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
   page prints one, and the base rule is the thing under test), measures it resting and through
   `CSS.forcePseudoState`, takes its own 900px `Emulation.setDeviceMetricsOverride` for the rail, and
@@ -158,7 +170,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 36 after T-52; 37 is T-53's.** Row 32 shadows `visualViewport.height`, takes its
+- **Row count is 37 after T-53; 38 is T-54's.** Row 32 shadows `visualViewport.height`, takes its
   own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
   shadow is gone, the token is back to `0px` and the session is back at the browser's own window
   size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
@@ -169,6 +181,34 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   `--color-accent-contrast`. `DESIGN.md` → *Contrast* carries it.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **The walk's account seeds Show **off** / Blur **off** (measured by T-53's seed read).** So an
+  absence-only listing assertion is **vacuous**: the catalogue already omits every NSFW row before the
+  row touches anything. Measure **both directions** — with Show on the same page prints the row
+  (`/character/catalog` draws **24** cards, four of them the flagged characters 004 *Hollow Saint*,
+  014 *Auntie Sorrow*, 018 *Tamsin Rede*, 023 *The Salt Bride*), with Show off it draws **20** and
+  none of those titles. A "was there, now gone" is the only listing proof worth a row.
+- **The character detail page's name is `h1.title`; the persona's is `h1.name`.** T-50's row read
+  `.detail h1.name` because that page draws one; T-53 read a character and would have found nothing.
+  Use `.detail h1.title, .detail h1.name, .detail h1` — the fallback costs nothing and survives a
+  class rename on either page.
+- **A `finally` restore masks the failure it was called to protect.** If the body throws and the
+  restore then throws, the body's message is gone. T-53's shape: `catch` the body error into a
+  variable, run the restore in a **second** `try`, and throw `` `${bodyError.message} — and the
+  restore failed: ${error.message}` `` — a leak is the louder failure, but it must not erase the
+  first one.
+- **A row that owns a store pair must assert the pair *after* its own gesture, not only after the
+  restore.** T-53 reads `Show` again once the Reveal has been pressed: a Reveal that wrote to
+  prefs would otherwise be "restored" and read green. Any gesture whose spec says *writes nothing*
+  deserves that read.
+- **A covered detail page's four engagement cells read `["51","22","70%","0"]`** — the Ratio cell is
+  the percent, so "every cell is a number" is false on a *right* page under the cover too (T-52's
+  find, confirmed twice now). Assert the shape per label.
+- **A poll timeout is only useful if your catch replaces it.** T-53's red proof was readable because
+  the row caught the name poll and re-read `document.title`, `location.pathname`, the root-class
+  counts, the headings and the first 120 chars of body text — it named the route, the title and the
+  fact that only `.detail` mounted. Without that, the same red run says "timed out waiting for the
+  name" and tells the next session nothing.
 
 - **The detail page's engagement list has four cells and one of them is a percent (T-52).** `T-52`'s
   first run failed on a page that was right: `/character/[id]` draws `Likes`, `Dislikes`, **`Ratio`**,

@@ -2585,6 +2585,231 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-53 — the law about **preference versus permission**: *It is not access control. No route is
+ * blocked, no 404, no redirect: a direct link still resolves* and *With Show off, a detail route
+ * still resolves. The item draws with its chrome intact and the body withheld behind the same
+ * reveal control a blurred item carries; there is no separate notice page and no empty render*
+ * (`src/specs/systems/nsfw.md` → *Rules*). That is failure-bank entry 4, and no row had ever
+ * opened a detail route with Show off — row 25 proves the *listing* obeys the pair and stops there.
+ *
+ * The two halves fail independently, so the row proves them separately and names which one moved:
+ *
+ *   - **Listing.** Both directions, so the absence is a *difference* and not a fact about a
+ *     catalogue that never lists the row: with Show on, `/character/catalog` prints *Hollow Saint*
+ *     (`CHARACTER(4)`, the only NSFW character that reaches page one); with Show off the same
+ *     catalogue draws cards (20, not zero — an absence over an empty grid proves nothing) and none
+ *     of them prints that title.
+ *   - **Route.** `/character/c0a1b2c3-…-000000000004` is opened **by address**, never by a press:
+ *     the law is about a direct link. `.detail` mounts, its `h1.title` reads *Hollow Saint*, the
+ *     `.veiled` body carries `is-covered` + `aria-hidden="true"`, a control named **Reveal** is
+ *     inside `.detail`, and the `.counts[aria-label="Engagement"]` cells still print their numbers
+ *     (*the numbers are never hidden*). Then *Reveal* is pressed and `is-covered` is gone, the name
+ *     survives, the control is gone, and Show still reads off — *a reveal is one view, and it
+ *     writes nothing to the account*.
+ *
+ * **This row owns the NSFW pair**, so it records the seed pair from `/dev/state` instead of
+ * assuming `true/true`, restores **that**, reads it back, and re-reads the catalogue — a leak makes
+ * the *next run's* rows read a flipped account. The restore runs even when a half failed, and a
+ * restore failure is reported **with** the body failure rather than masking it.
+ *
+ * Sits after row 36 and before `sign out`, so `sign out` stays the walk's last row.
+ * -------------------------------------------------------------------------------------------- */
+const NSFW_CHARACTER = "/character/c0a1b2c3-0000-4000-8000-000000000004";
+const NSFW_NAME = "Hollow Saint";
+
+results.push(
+  await journey("a viewer's NSFW filter hides a listing, never a route", async () => {
+    await go("/dev/state");
+    await waitFor(`document.querySelectorAll("button.toggle").length === 2`, "/dev/state's two toggles", 8000);
+    // The pair as this session found it — recorded, never assumed (row 25's lesson, and this row
+    // owns the pair, so a hard-coded restore would silently flip the account for every later run).
+    const seedShow = (await toggleState("Show NSFW content")) === "true";
+    const seedBlur = (await toggleState("Blur NSFW content")) === "true";
+
+    /** The catalogue read as data: how many cards, and the title each one prints. */
+    const listing = async () => {
+      await go("/character/catalog");
+      await waitFor(
+        `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".card").length > 0`,
+        "the character catalog to leave its skeletons behind",
+        8000,
+      );
+      await sleep(150);
+      return js(`
+        const cards = [...document.querySelectorAll(".card")];
+        return {
+          cards: cards.length,
+          titles: cards.map((card) => {
+            const title = card.querySelector(".card-title");
+            return title ? title.textContent.trim() : "";
+          }),
+        };
+      `);
+    };
+
+    let flipped = false;
+    let listingHalf = "";
+    let routeHalf = "";
+    let restoreHalf = "";
+    let bodyError = null;
+
+    try {
+      /**
+       * **Both directions.** The seed this walk signs in with has Show off, so an absence alone
+       * would be the *only* reading and would pass on a catalogue that never lists the row at all
+       * (a private row, a paging change, a fixture edit). Turning Show on first makes the absence
+       * below a **difference**: the same card, on the same page, gone for one preference.
+       */
+      await setToggle("Show NSFW content", true);
+      const shown = await listing();
+      if (!shown.titles.includes(NSFW_NAME)) {
+        throw new Error(
+          `the catalogue does not print ${JSON.stringify(NSFW_NAME)} even with Show on — ${shown.cards} card(s), first ${JSON.stringify(shown.titles.slice(0, 3))}; the absence below would prove nothing`,
+        );
+      }
+
+      await setToggle("Show NSFW content", false);
+      flipped = true;
+
+      const hidden = await listing();
+      if (hidden.cards === 0) {
+        throw new Error("the catalog drew no cards with Show off — the absence proves nothing on an empty listing");
+      }
+      if (hidden.titles.includes(NSFW_NAME)) {
+        throw new Error(
+          `the listing still prints ${JSON.stringify(NSFW_NAME)} with Show off — ${hidden.cards} card(s): ${JSON.stringify(hidden.titles.slice(0, 4))}`,
+        );
+      }
+      listingHalf = `${shown.cards} card(s) with Show on incl. ${JSON.stringify(NSFW_NAME)} → ${hidden.cards} with Show off, absent`;
+
+      // By address, no press: a direct link is the thing the spec promises to resolve.
+      await go(NSFW_CHARACTER);
+      try {
+        await waitFor(
+          `(() => {
+            const h = document.querySelector(".detail h1.title, .detail h1.name, .detail h1");
+            return h && h.textContent.trim() === ${JSON.stringify(NSFW_NAME)} ? h.textContent.trim() : "";
+          })()`,
+          `the detail page's name, ${JSON.stringify(NSFW_NAME)}`,
+          8000,
+        );
+      } catch {
+        // A poll timeout is not the proof (T-36a): name the route and what mounted instead.
+        const now = await js(`
+          const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+          const roots = {};
+          for (const sel of [".detail", ".catalog", ".card-grid", ".alert"]) {
+            roots[sel] = document.querySelectorAll(sel).length;
+          }
+          return {
+            title: document.title,
+            path: location.pathname,
+            roots,
+            headings: [...document.querySelectorAll("h1, h2")].map((el) => clean(el.textContent)).slice(0, 4),
+            body: clean(document.body.innerText).slice(0, 120),
+          };
+        `);
+        throw new Error(
+          `${NSFW_CHARACTER} resolved nothing with Show off — title ${JSON.stringify(now.title)}, path ${now.path}, roots ${JSON.stringify(now.roots)}, headings ${JSON.stringify(now.headings)}, body ${JSON.stringify(now.body)}; nsfw.md → Rules says a detail route always resolves`,
+        );
+      }
+
+      const covered = await js(`
+        const root = document.querySelector(".detail");
+        if (!root) return null;
+        const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+        const label = (el) => clean(el.getAttribute("aria-label") || el.textContent);
+        const veiled = root.querySelector(".veiled");
+        const list = root.querySelector(".counts[aria-label='Engagement']");
+        const cells = list ? [...list.querySelectorAll(".count")] : [];
+        return {
+          name: clean((root.querySelector("h1.title, h1.name, h1") || {}).textContent),
+          veiled: veiled !== null,
+          covered: veiled ? veiled.classList.contains("is-covered") : null,
+          hidden: veiled ? veiled.getAttribute("aria-hidden") : null,
+          labels: [...root.querySelectorAll("button, a")].map(label),
+          counts: cells.map((cell) => ({
+            label: clean((cell.querySelector(".count-label") || {}).textContent).toLowerCase(),
+            value: clean((cell.querySelector(".count-value") || {}).textContent),
+          })),
+        };
+      `);
+      if (!covered) throw new Error(`no .detail on ${NSFW_CHARACTER} after the name resolved`);
+      if (covered.name !== NSFW_NAME) throw new Error(`the detail page's name reads ${JSON.stringify(covered.name)}`);
+      if (!covered.veiled) throw new Error("the covered detail page draws no .veiled body to withhold");
+      if (covered.covered !== true) {
+        throw new Error(`.veiled does not carry is-covered with Show off (classList: ${JSON.stringify(covered.covered)}) — the body is not withheld`);
+      }
+      if (covered.hidden !== "true") {
+        throw new Error(`.veiled reads aria-hidden=${JSON.stringify(covered.hidden)} with Show off; the body must be hidden from a screen reader too`);
+      }
+      if (!covered.labels.includes("Reveal")) {
+        throw new Error(`no control named Reveal inside .detail — it draws ${JSON.stringify(covered.labels.slice(0, 8))}`);
+      }
+      if (covered.counts.length === 0) throw new Error("the covered detail page draws no engagement cells — the numbers are never hidden");
+      const blank = covered.counts.filter((cell) => !/^[0-9]{1,3}%?$/.test(cell.value));
+      if (blank.length > 0) {
+        throw new Error(`a covered engagement cell reads no number: ${JSON.stringify(blank)} (all ${JSON.stringify(covered.counts)})`);
+      }
+
+      await click("Reveal", { exact: true, scope: ".detail button" });
+      const revealed = await js(`
+        const root = document.querySelector(".detail");
+        if (!root) return null;
+        const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+        const veiled = root.querySelector(".veiled");
+        return {
+          name: clean((root.querySelector("h1.title, h1.name, h1") || {}).textContent),
+          covered: veiled ? veiled.classList.contains("is-covered") : null,
+          hidden: veiled ? veiled.getAttribute("aria-hidden") : null,
+          reveal: [...root.querySelectorAll("button")].filter((el) => clean(el.getAttribute("aria-label") || el.textContent).toLowerCase() === "reveal").length,
+        };
+      `);
+      if (!revealed) throw new Error("the detail page unmounted on Reveal");
+      if (revealed.covered !== false) throw new Error(`Reveal left .veiled is-covered=${JSON.stringify(revealed.covered)}`);
+      if (revealed.hidden !== "false") throw new Error(`Reveal left .veiled aria-hidden=${JSON.stringify(revealed.hidden)}`);
+      if (revealed.reveal !== 0) throw new Error(`Reveal is still on the page ×${revealed.reveal} after it was pressed`);
+      if (revealed.name !== NSFW_NAME) throw new Error(`the name changed on Reveal: ${JSON.stringify(revealed.name)}`);
+
+      routeHalf = `.detail + ${JSON.stringify(NSFW_NAME)}, .veiled.is-covered + aria-hidden, Reveal inside .detail, ${covered.counts.length} count cell(s) ${JSON.stringify(covered.counts.map((cell) => cell.value))} → Reveal clears the cover, name survives`;
+    } catch (error) {
+      bodyError = error;
+    }
+
+    try {
+      await go("/dev/state");
+      await waitFor(`document.querySelectorAll("button.toggle").length === 2`, "/dev/state's two toggles after the route half", 8000);
+      // A reveal is a single look and writes nothing to the account (`nsfw.md` → *Rules*).
+      if (flipped && (await toggleState("Show NSFW content")) !== "false") {
+        throw new Error("Show reads on again after a Reveal — a reveal must not change the preference");
+      }
+      await setToggle("Show NSFW content", seedShow);
+      await setToggle("Blur NSFW content", seedBlur);
+      const backShow = (await toggleState("Show NSFW content")) === "true";
+      const backBlur = (await toggleState("Blur NSFW content")) === "true";
+      if (backShow !== seedShow || backBlur !== seedBlur) {
+        throw new Error(
+          `the NSFW pair did not come back: Show ${backShow} / Blur ${backBlur}, seed Show ${seedShow} / Blur ${seedBlur} (strip reads ${await storeCell("Show")}/${await storeCell("Blur")})`,
+        );
+      }
+      const back = await listing();
+      const listed = back.titles.includes(NSFW_NAME);
+      if (listed !== seedShow) {
+        throw new Error(
+          `after restoring Show ${seedShow} the catalogue ${listed ? "still lists" : "loses"} ${JSON.stringify(NSFW_NAME)} — ${back.cards} card(s), first ${JSON.stringify(back.titles.slice(0, 3))}`,
+        );
+      }
+      restoreHalf = `Show ${backShow} / Blur ${backBlur} · catalogue ${back.cards} card(s), ${JSON.stringify(NSFW_NAME)} ${listed ? "listed" : "absent"}`;
+    } catch (error) {
+      throw new Error(bodyError ? `${bodyError.message} — and the restore failed: ${error.message}` : error.message);
+    }
+    if (bodyError) throw bodyError;
+
+    return `Show off: ${listingHalf} · ${NSFW_CHARACTER.slice(-6)} → ${routeHalf} · restored ${restoreHalf}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -2607,9 +2832,9 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36).
+ * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37).
  */
-const EXPECTED_ROWS = 36;
+const EXPECTED_ROWS = 37;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

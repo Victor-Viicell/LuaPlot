@@ -431,13 +431,28 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       fixes for posts. Proved **red** first: a `<span class="count">{item.likes}</span>` in the card
       footer made the row report `the card for "The Lamplighter's Widow" … with ["count"] inside it —
       20/20 card(s) fail`. Brief: `docs/NEXT.md`.
+- [x] **T-53 A viewer's filter never blocks a route.** Failure-bank entry 4: *NSFW preference treated
+      as access control (404s) → detail routes always resolve*. `nsfw.md` → *Rules* says it twice —
+      *"It is not access control. No route is blocked, no 404, no redirect: a direct link still
+      resolves"* and *"With Show off, a detail route still resolves … no separate notice page and no
+      empty render"* — and row 25 only ever proved the **listing** half. Row **37** (37/37 local and
+      `--live`) records the seed pair from `/dev/state`, flips **Show** off, and reads both halves as
+      data: the catalogue prints *Hollow Saint* with Show on (24 cards) and drops it with Show off
+      (20 cards), then `/character/…0004` is opened **by address** and must mount `.detail` + its
+      `h1.title` + `.veiled.is-covered` + `aria-hidden="true"` + a **Reveal** control inside
+      `.detail` + four engagement cells still printing numbers; pressing Reveal clears the cover,
+      removes the control, keeps the name, and leaves Show reading off. The restore runs even when a
+      half failed and asserts the seed pair plus the catalogue. Proved **red** first: an
+      `@else if (nsfw.value && !show.value) { <p class="prose"></p> }` arm in `character-detail.tsrx`
+      made the row report `resolved nothing with Show off — title "Character — LuaPlot", roots
+      {".detail":1,…}, headings []` at 36/37. Brief: `docs/NEXT.md`.
 
 ## Failure bank (the ways this class of product breaks)
 
 1. Card blur hides the numbers → footer stays outside the blur (T-08).
 2. Session reads live items, so author edits corrupt running chats → copies only (T-15).
 3. `Load more` state lost on back → paging in component state, filters in URL (T-09).
-4. NSFW preference treated as access control (404s) → detail routes always resolve (T-25).
+4. NSFW preference treated as access control (404s) → detail routes always resolve (T-25; walked by T-53).
 5. Voting allows multiple votes per viewer → uniqueness in adapter and DB (T-03, T-29).
 6. Report piles create one scan per report → cumulative case joins (T-27).
 7. Deleting an item orphans its thread → cascade delete (T-29).

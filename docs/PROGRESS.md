@@ -3,6 +3,45 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-53: a viewer's NSFW filter hides a listing, never a route
+
+- **Changed:** walk row **37** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 36 → 37) for the product law
+  *NSFW is a boolean on content + a per-account preference (Show / Blur). It never blocks a route*
+  (`src/specs/systems/nsfw.md` → *Rules*: *"It is not access control. No route is blocked, no 404, no
+  redirect: a direct link still resolves"* / *"With Show off, a detail route still resolves … no
+  separate notice page and no empty render"*). That is failure-bank entry 4, and row 25 only ever
+  proved the **listing** obeyed the pair — no row had opened a detail route with Show off. The row
+  records the seed pair from `/dev/state` (never `true/true`), flips **Show** off and reads both
+  halves: the catalogue prints *Hollow Saint* with Show on (24 cards) and drops it with Show off (20
+  cards, not zero — an absence over an empty grid proves nothing), then
+  `/character/…0004` is opened **by address** (no press: the law is about a direct link) and must
+  mount `.detail` + `h1.title` *Hollow Saint* + `.veiled.is-covered` + `aria-hidden="true"` + a
+  **Reveal** control inside `.detail` + its four engagement cells still printing numbers (*the
+  numbers are never hidden*). Pressing Reveal must clear `is-covered`, restore `aria-hidden="false"`,
+  remove the control, keep the name, and leave Show reading off (a reveal is one view and writes
+  nothing to the account). The restore runs **even when a half failed**, restores the seed pair, reads
+  it back, and re-reads the catalogue against `seedShow`; a restore failure is reported **with** the
+  body failure instead of masking it.
+- **Verified how:** `./scripts/check.sh` GREEN (build, 30 routes, schema, 52 anchors, tauri, tiers —
+  5822 declarations); walk **37/37** locally, evidence `Show off: 24 card(s) with Show on incl.
+  "Hollow Saint" → 20 with Show off, absent · 000004 → .detail + "Hollow Saint", .veiled.is-covered +
+  aria-hidden, Reveal inside .detail, 4 count cell(s) ["51","22","70%","0"] → Reveal clears the cover,
+  name survives · restored Show false / Blur false · catalogue 20 card(s), "Hollow Saint" absent`;
+  walk **37/37 `--live`** against `https://victor-viicell.github.io/LuaPlot/` (curl 200) after
+  `publish.sh` printed `LIVE` for `assets/index-CPVMPrcv.js`.
+  Proved **red** first: an `@else if (nsfw.value && !show.value) { <p class="prose"></p> }` arm in
+  `character-detail.tsrx` (the forbidden empty render) made the row report `resolved nothing with Show
+  off — title "Character — LuaPlot", path /character/…0004, roots {".detail":1,".catalog":0,
+  ".card-grid":0,".alert":0}, headings [], body "Character Home Thread Catalog Alerts 3 Profile";
+  nsfw.md → Rules says a detail route always resolves` and **36/37** — the other 36 rows stayed green,
+  so the row names the route and what mounted, not a poll timeout. The file was restored from a
+  sha256-verified copy (`2d11f91c…b164`) before the green run, and `git diff` on it is empty.
+- **Not verified:** nothing mobile — no Android toolchain on this box (T-35). The reveal's *"returns
+  to covered on reload"* arm is not asserted: a document reload re-seeds the memory adapter, so the
+  row proves the one-view reveal by the control and the class, not by reloading. The account this walk
+  signs in with seeds Show **off** / Blur **off**, so the restore assertion ran against that seed —
+  the row reads the seed rather than assuming it, which is what makes it safe on a re-seeded account.
+
 ## 2026-11-01 — T-52: engagement is a ratio on a card, and counts on the detail page
 
 - **Changed:** walk row **36** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 35 → 36) for the product law
