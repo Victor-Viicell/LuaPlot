@@ -463,11 +463,32 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       moved inside `.card-veil` read `footer true (outside the veil false), ratio true (in the footer
       true, outside the veil false) … 4/4 covered card(s) fail`. Brief: `docs/NEXT.md`.
 
+- [x] **T-55 The thread's sort is a URL fact, and Back is the proof.** Failure-bank entry 3: *`Load more`
+      state lost on back → paging in component state, filters in URL*. `post/thread.md` → *URL* says
+      *"Sorting and filtering live in the query string, per the conventions, so a filtered thread is
+      shareable"*, and *Layout* says *"paging stays out of the URL"*. `post-thread.tsrx` already did
+      both (`writeSort()` pushes `?sort=`, `newest` writes **no** param, `loadMore()` never touches the
+      address) and nothing could see it: no row read `location.search` on the thread and no row had
+      ever called `history.back()` (row 4 hops with `go()`, forward only). Row **39** (39/39 local and
+      `--live`) reads **all three** — the address, the `select.select-input`'s own value, and the
+      cards — and asserts the **exact** `location.search` at every step: `?sort=discussed` **by
+      address** (shareable, 11 cards), no query ⇒ `""` + `newest` (the default is the *absence* of the
+      param), press `discussed` ⇒ `?sort=discussed`, press `liked` ⇒ `?sort=liked`, `history.back()` ⇒
+      `?sort=discussed` with the control **and** the listing following, a second `history.back()` ⇒
+      `""` + `newest`. The refetch is proved by **nodes** (each card is stamped before a gesture and
+      the stamp must be gone after it — the fetch's `epoch` rides in every row's key), because
+      "the address changed" cannot claim the page re-read it, and `choose()` returns the value it read
+      so it proves the control only. Proved **red** first: a module-level `frozenSort` (first read in a
+      document wins) read `wanted search "?sort=discussed" with the control on "discussed" — read
+      search "?sort=discussed", sort control "newest", 11 post card(s) … at /post/thread`. Brief:
+      `docs/NEXT.md`. **Paging half not walked:** needs 25+ posts (filed as T-57).
+
 ## Failure bank (the ways this class of product breaks)
 
 1. Card blur hides the numbers → footer stays outside the blur (T-08; walked by T-54).
 2. Session reads live items, so author edits corrupt running chats → copies only (T-15).
-3. `Load more` state lost on back → paging in component state, filters in URL (T-09).
+3. `Load more` state lost on back → paging in component state, filters in URL (T-09; the URL/sort half
+   is walked by T-55 — the paging half needs a 25+ post seed, T-57).
 4. NSFW preference treated as access control (404s) → detail routes always resolve (T-25; walked by T-53).
 5. Voting allows multiple votes per viewer → uniqueness in adapter and DB (T-03, T-29).
 6. Report piles create one scan per report → cumulative case joins (T-27).

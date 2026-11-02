@@ -3,6 +3,50 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-55: the thread's sort is a URL fact, and Back is the proof
+
+- **Changed:** walk row **39** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 38 → 39) for failure-bank
+  entry 3 — *`Load more` state lost on back → paging in component state, filters in URL* — and
+  `post/thread.md` → *URL*: *"Sorting and filtering live in the query string, per the conventions, so
+  a filtered thread is shareable"*, with *"paging stays out of the URL"* in *Layout*.
+  `post-thread.tsrx` already implemented both (`writeSort()` pushes `?sort=`, `newest` writes **no**
+  param, `loadMore()` never touches the address) and no gate could see it: nothing had read
+  `location.search` on the thread and nothing had ever called `history.back()` (row 4 hops with `go()`
+  — the forward direction only). The row reads **all three** — `location.search`, the
+  `select.select-input`'s own value, and the cards — and asserts the **exact** search string at every
+  step, never a substring: `?sort=discussed` **by address** (shareable: the control already reads
+  `discussed` and the address keeps the param, 11 cards); `go("/post/thread")` reads `""` with
+  `newest` (the default is the *absence* of the param, never `?sort=newest`); press `discussed` →
+  `?sort=discussed`; press `liked` → `?sort=liked`; `history.back()` → `?sort=discussed` with the
+  control **and** the listing following; a second `history.back()` → `""` + `newest`. The refetch is
+  proved by **nodes**, not the address: each card is stamped with an expando before a gesture and the
+  stamp must be gone after it, because the fetch's `epoch` rides in every row's key, so a new listing
+  remounts every card — an assertion "the address changed" cannot make (`choose()` returns the value
+  it read, so it proves the control and never the page).
+- **The suspicion, settled — not assumed.** `sort = track(readSort(useQuery()))` is a **one-time
+  read** with `chooseSort()` as its only writer, so a Back that merely repainted the address could
+  leave the listing sorted the old way with the `Select` — reading the same frozen track — agreeing
+  with the listing and disagreeing with the URL. It does not: `App.tsrx`'s effect keys on
+  `path + search`, so a Back remounts the page and the read is honest. Row 39 is what keeps that true.
+  **Order in the row is deliberate:** the shareable half runs *first* by address, then the two
+  presses, so the walk's own entries line up one-for-one with the two `history.back()` steps — a
+  `go()` to `?sort=discussed` between the presses would leave two entries with the same URL
+  underneath and the second back would land on `?sort=discussed` again, red on a page that is right.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30 routes, schema, tauri, 52 anchors, 5822
+  declarations across 46 regions); local walk **39/39**; **red proof first** — a module-level
+  `frozenSort` (the first read in a document wins) made the row read `the thread opened at
+  ?sort=discussed: wanted search "?sort=discussed" with the control on "discussed" — read search
+  "?sort=discussed", sort control "newest", 11 post card(s), 0 skeleton(s) … at /post/thread`, and
+  `post-thread.tsrx` was restored to sha256 `840fc9b6d236480dcc8a38a995b5017a0fb46b896e20e73de85e6d399c6aa2b7` — the exact bytes that ran green,
+  `sha256sum -c` OK. Published `assets/index-CPVMPrcv.js`; `curl` **200**; live walk **39/39**.
+- **Not verified / filed:** the **paging half** of failure bank 3 cannot be walked — 11 listed posts
+  against `PAGE_SIZE` 24, so the feed legitimately draws no `.pager-action`. The row asserts that
+  absence **and** the pager's `End of feed.` note (so an absent Load more is the pager's end, not a
+  missing pager) instead of pretending to press a control that is not there. Seeding 25+ posts
+  changes every post count in the walk (row 36's feed, row 38's composed post), so it is **T-57**,
+  not a side-edit. The mobile/desktop ladder is untouched by this ticket (no layout change) — no new
+  width was measured.
+
 ## 2026-11-02 — T-54: a cover keeps the chrome and the numbers outside it
 
 - **Changed:** walk row **38** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 37 → 38) for failure-bank

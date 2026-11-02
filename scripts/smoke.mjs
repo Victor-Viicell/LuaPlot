@@ -3134,6 +3134,193 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-55 — the law about **where the thread's sort lives**: *Sorting and filtering live in the query
+ * string, per the conventions, so a filtered thread is shareable* … *paging stays out of the URL*
+ * (`src/specs/pages/post/thread.md` → *URL* / *Layout*). `SHIP-PLAN.md`'s failure bank entry 3 is
+ * *"`Load more` state lost on back → paging in component state, filters in URL"*, so the product
+ * answer is **sort in the URL, paging in the component**.
+ *
+ * `post-thread.tsrx` implements exactly that — `writeSort()` pushes `?sort=`, `newest` writes **no**
+ * param, `loadMore()` never touches the URL — and no gate could see any of it: `spec-routes.mjs`
+ * proves a page module resolves (never *what it read*), and no row had ever read `location.search`
+ * on the thread or called `history.back()` (row 4 hops with `go()`, the forward direction only).
+ *
+ * **The suspicion, settled rather than assumed.** `sort = track(readSort(useQuery()))` is a
+ * **one-time read** and `chooseSort()` is the only writer, so a Back that merely repainted the
+ * address could leave the listing sorted the old way, with the `Select` — reading the same frozen
+ * track — agreeing with the listing and disagreeing with the URL. The row therefore reads **all
+ * three**: `location.search`, the control's own value, and the cards. `App.tsrx`'s effect keys on
+ * `path + search`, so a real Back remounts the page and the one-time read is honest — this row is
+ * what keeps that true.
+ *
+ * **Order matters.** The shareable half runs *first*, by address; then the two presses. A `go()` to
+ * `?sort=discussed` between the presses would leave two entries with the same URL underneath, and
+ * the second `history.back()` would land on `?sort=discussed` again — the row would read red on a
+ * page that is right. Entries are counted from the `go("/post/thread")` this row makes, not assumed.
+ *
+ * The refetch is proved by the **nodes**, not the URL: the fetch's `epoch` rides in each row's key,
+ * so a new listing remounts every card. Each card is stamped before a gesture and the stamp must be
+ * gone after it — an assertion "the address changed" cannot make. A `Select` value read back from
+ * `choose()` proves the control, never the page, so it is never the evidence here.
+ *
+ * The paging half is an **absence**: 12 listed posts are under `PAGE_SIZE` 24, so the feed draws no
+ * `.pager-action` and its pager reads *End of feed.* Walking a real **Load more** needs a seed of
+ * 25+ posts, which is filed as a ticket instead of publishing 13 posts inside the walk.
+ *
+ * Read-only: no store write, no CDP override, no probe. Ends on `/post/thread` with no query, and
+ * sits after row 38 and before `sign out`, so `sign out` stays the walk's last row.
+ * -------------------------------------------------------------------------------------------- */
+const THREAD_PATH = "/post/thread";
+
+results.push(
+  await journey("the thread's sort is a URL fact, and Back is the proof", async () => {
+    /** One reading of all three: the address, the control, and the listing. */
+    const state = () =>
+      js(`
+        const el = document.querySelector("select.select-input");
+        const cards = [...document.querySelectorAll(".card.post")];
+        const note = document.querySelector(".pager-note");
+        return {
+          path: location.pathname,
+          search: location.search,
+          value: el ? el.value : null,
+          cards: cards.length,
+          skeletons: document.querySelectorAll(".skel-card").length,
+          marks: cards.filter((card) => card.__walkMark !== undefined).length,
+          order: cards.map((card) => {
+            const link = card.querySelector(".post-time");
+            const raw = link ? link.getAttribute("href") || "" : "";
+            return raw.split("/").filter(Boolean).pop() || "";
+          }),
+          pager: document.querySelectorAll(".pager-action").length,
+          note: (note ? note.textContent : "").replace(/\\s+/g, " ").trim(),
+        };
+      `);
+
+    const describe = (now) =>
+      `search ${JSON.stringify(now.search)}, sort control ${JSON.stringify(now.value)}, ${now.cards} post card(s), ${now.skeletons} skeleton(s), ${now.marks} still stamped, at ${now.path}`;
+
+    /**
+     * Poll for the **exact** `location.search` **and** the control's own value, and fail with all
+     * three readings. `waitUrl()` is a substring match — `?sort=discussed` *contains* `?sort=disc`,
+     * which is the class of bug that hid a doubled base on Pages (T-45) — and a bare poll timeout
+     * names nothing a reader can act on (T-36a).
+     */
+    async function expectSort(wantSearch, wantValue, label, timeout = 8000) {
+      const deadline = Date.now() + timeout;
+      let now = await state();
+      while (Date.now() < deadline && !(now.search === wantSearch && now.value === wantValue)) {
+        await sleep(120);
+        now = await state();
+      }
+      if (now.search !== wantSearch || now.value !== wantValue) {
+        throw new Error(
+          `${label}: wanted search ${JSON.stringify(wantSearch)} with the control on ${JSON.stringify(wantValue)} — read ${describe(now)}`,
+        );
+      }
+      return now;
+    }
+
+    /** Stamp every card, so a listing that was **re-rendered** is visible and a frozen one is not. */
+    const stamp = () =>
+      js(`
+        const cards = [...document.querySelectorAll(".card.post")];
+        for (const card of cards) card.__walkMark = "before";
+        return cards.length;
+      `);
+
+    /** The refetch proof: a skeleton frame, cards whose stamp is gone, or a new order. */
+    async function expectRerender(had, label, timeout = 8000) {
+      const deadline = Date.now() + timeout;
+      let sawSkeleton = false;
+      let now = await state();
+      while (Date.now() < deadline) {
+        if (now.skeletons > 0) sawSkeleton = true;
+        if (now.cards > 0 && (now.marks === 0 || JSON.stringify(now.order) !== JSON.stringify(had.order))) {
+          return now;
+        }
+        await sleep(80);
+        now = await state();
+      }
+      throw new Error(
+        `${label}: the feed never re-rendered — ${describe(now)}, a loading frame was ${sawSkeleton ? "seen" : "never seen"}`,
+      );
+    }
+
+    // 1. **Shareable**, by address: the spec's word is about a loaded page, not a pressed control.
+    await go(`${THREAD_PATH}?sort=discussed`);
+    const shared = await expectSort("?sort=discussed", "discussed", "the thread opened at ?sort=discussed");
+    if (shared.cards === 0) {
+      throw new Error(
+        `?sort=discussed loaded ${shared.cards} post card(s) — a sort read over an empty feed proves nothing (${describe(shared)})`,
+      );
+    }
+    if (!/\/post\/thread$/.test(shared.path)) {
+      throw new Error(`?sort=discussed mounted ${shared.path}, not /post/thread`);
+    }
+
+    // 2. **`newest` is the absence of the param** — never `?sort=newest`, in either direction.
+    await go(THREAD_PATH);
+    const newest = await expectSort("", "newest", "the thread at no query");
+    if (newest.cards === 0) {
+      throw new Error(`/post/thread drew ${newest.cards} post card(s) at no query (${describe(newest)})`);
+    }
+    if ((await stamp()) === 0) {
+      throw new Error(`no post card could be stamped before the sort change (${describe(await state())})`);
+    }
+
+    await choose("select.select-input", "discussed"); // T-41: a native select needs a real `change`
+    const discussed = await expectSort("?sort=discussed", "discussed", "choosing Most discussed");
+    await expectRerender(newest, "choosing Most discussed");
+
+    // 3. A second choice, so the Back below has a real entry to return to.
+    const beforeLiked = await state();
+    await stamp();
+    await choose("select.select-input", "liked");
+    const liked = await expectSort("?sort=liked", "liked", "choosing Most liked");
+    await expectRerender(beforeLiked, "choosing Most liked");
+
+    // 4. **Back is the proof**: the address, the control *and* the listing must move together.
+    const beforeBack = await state();
+    await stamp();
+    await js(`history.back(); return true;`);
+    const back = await expectSort("?sort=discussed", "discussed", "history.back() to ?sort=discussed");
+    await expectRerender(beforeBack, "history.back() to ?sort=discussed");
+
+    // …and once more, onto the entry `newest` writes: the address carries **no** param at all.
+    const beforeSecondBack = await state();
+    await stamp();
+    await js(`history.back(); return true;`);
+    const home = await expectSort("", "newest", "a second history.back() to no query");
+    await expectRerender(beforeSecondBack, "a second history.back()");
+
+    // 5. **Paging stays out of the URL** — and 12 listed posts give Load more nothing to load.
+    const end = await state();
+    if (end.cards === 0) throw new Error(`the feed is empty at the end of the Back walk (${describe(end)})`);
+    if (end.cards >= 24) {
+      throw new Error(
+        `/post/thread now lists ${end.cards} posts, at or past PAGE_SIZE 24 — the paging half of this row is stale and needs its own .pager-action step`,
+      );
+    }
+    if (end.pager !== 0) {
+      throw new Error(
+        `/post/thread draws ${end.pager} .pager-action control(s) with ${end.cards} listed post(s), well under PAGE_SIZE 24 — Load more has nothing to append, and its own note reads ${JSON.stringify(end.note)}`,
+      );
+    }
+    if (!/end of feed/i.test(end.note)) {
+      throw new Error(
+        `the pager reads ${JSON.stringify(end.note)}, not an end-of-feed note — an absent Load more must be the pager's *end*, not a missing pager`,
+      );
+    }
+    if (end.search !== "" || !/\/post\/thread$/.test(end.path)) {
+      throw new Error(`the row did not leave the thread at no query (${describe(end)})`);
+    }
+
+    return `?sort=discussed loads by address with the control on discussed (${shared.cards} cards) · newest writes no param (search "") · press discussed → ?sort=discussed, ${discussed.cards} card(s) re-rendered · press liked → ?sort=liked, ${liked.cards} · Back → ?sort=discussed with the control and the listing (${back.cards}) · Back → "" + newest (${home.cards}) · ${end.cards} listed < PAGE_SIZE 24, so 0 .pager-action and the pager reads ${JSON.stringify(end.note)} — the paging half needs a 25+ seed`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -3156,9 +3343,9 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38).
+ * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39).
  */
-const EXPECTED_ROWS = 38;
+const EXPECTED_ROWS = 39;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

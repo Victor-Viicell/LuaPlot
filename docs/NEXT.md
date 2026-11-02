@@ -1,77 +1,82 @@
 # Baton — what the next session does
 
-**T-55 is the one ticket.** T-54 landed: `scripts/smoke.mjs` has row **38** (walk **38/38** locally and
-**38/38 `--live`**), and failure-bank entry 1 — *Card blur hides the numbers* — is now measured on a
-**covered** card: 4 of 24 catalogue cards carry `is-covered`, their `.card-head`/`.card-foot`/
-`.card-ratio` sit **outside** `.card-veil` (`veil.contains(...) === false`), the veil carries
-`aria-hidden="true"` and holds zero numbers, one `Reveal` press drops the covered count by exactly one
-and keeps the rest covered in order, and a seeded flagged post shows the same split on the feed
-(`.post-head` / `.post-counts` ×2 / `.post-comments` outside `.post-veil`). The row proved **red**
-first — `.card-foot` moved inside `.card-veil` read `footer true (outside the veil false), ratio true
-(in the footer true, outside the veil false) … 4/4 covered card(s) fail`. The next unguarded law is
-failure-bank entry **3**, and no row has ever read a query string or pressed Back.
+**T-56 is the one ticket.** T-55 landed: `scripts/smoke.mjs` has row **39** (walk **39/39** locally and
+**39/39 `--live`**), and failure-bank entry 3's **URL half** is now measured — the thread's sort is a
+`location.search` fact, asserted **exactly** at every step, with `?sort=discussed` loading by address
+(shareable), `newest` writing **no** param, a press writing `?sort=`, and two real `history.back()`
+steps landing on `?sort=discussed` and then `""` with the `Select` **and** the listing following (the
+refetch proved by node identity: the fetch's `epoch` rides in every row's key). The suspicion — that
+a one-time `readSort(useQuery())` would leave the listing sorted the old way after a Back — was
+settled, not assumed: `App.tsrx` remounts on a `path + search` change, and row 39 is what keeps that
+true. The paging half needs a 25+ post seed and is filed as **T-57**. The next unguarded law is
+failure-bank entry **5**, and it is only half-guarded: row 8 reads a post's `aria-pressed` and never a
+number.
 
-## T-55 — the thread's sort is a URL fact, and Back is the proof
+## T-56 — one vote per viewer: a repeat is not a vote, a switch moves one count
 
-**Why it is next.** `src/specs/pages/post/thread.md` → *URL*: *"Sorting and filtering live in the
-query string, per the conventions, so a filtered thread is shareable"*; → *Layout*: *"**Load more**
-sits at the bottom … paging stays out of the URL"*. `SHIP-PLAN.md`'s failure bank entry 3 is
-*"`Load more` state lost on back → paging in component state, filters in URL"*: the product answer is
-**sort in the URL, paging in component state**. `post-thread.tsrx` implements exactly that
-(`writeSort()` writes `?sort=` by `pushState`, `newest` writes **no** param, `loadMore()` never touches
-the URL) and **no gate can see any of it**: no row calls `choose("select.select-input", …)` on the
-thread, no row reads `location.search`, and no row has ever called `history.back()` — row 4 hops with
-`go()` (a `pushState` + `popstate`), which is the *forward* direction only.
-
-**The suspicion to settle, not assume.** `sort = track(readSort(useQuery()))` is read **once** at
-mount, and `chooseSort()` is the only writer. So a real **Back** from `?sort=liked` to
-`?sort=discussed` may repaint the URL and leave the listing sorted the old way (the `Select` reads its
-own `value` from the same frozen track, so it would agree with the listing and disagree with the URL).
-The row is written to catch that; if it fires, fix `post-thread.tsrx` by following the query (an
-`onQuery`/`useQuery` subscription that calls `chooseSort`-without-push, keeping `seq`), **not** by
-loosening the row.
+**Why it is next.** `repo.ts` → `vote()`: *"One vote per viewer per item, and a switch replaces the
+earlier vote — the adapter owns that rule"*, and `memory.ts` implements it as
+`if (previous === direction) return row` then *"Replacing a vote moves one count and leaves the other
+where it is"*. Failure bank entry 5 is *"Voting allows multiple votes per viewer → uniqueness in
+adapter and DB"*. **Nothing has ever read a count around a vote**: row 8 presses a brand-new post's
+**Like** and asserts `aria-pressed="true"` — a page-local boolean that a doubled count would leave
+exactly where it was. `character/detail.md` → *States* makes the reader's contract concrete: the
+**Voted** state has to survive a remount, and the counts are the adapter's (`castVote()` renders what
+came back and never recomputes). A `vote()` that lost its `previous === direction` guard, or that
+incremented before it decremented, would double a like or leave a like **and** a dislike counted —
+green in every gate, green in the walk, and wrong for every reader.
 
 **Approach**
 
-1. One new row, **row 39** (bump `EXPECTED_ROWS` 38 → 39), after row 38 and before `sign out`.
-2. **The control and the URL.** `go("/post/thread")`; wait for `.skel-card` **gone** and
-   `select.select-input` present. Read `select.select-input`'s `value` (should be `newest`) and
-   `location.search` (should be `""` — `newest` is written *out* of the URL). Then
-   `choose("select.select-input", "discussed")` (T-41's helper — a native `<select>` needs a `change`
-   event, not a `.click()`), poll until `location.search === "?sort=discussed"`, and assert the feed
-   re-fetched (`.skel-card` appears and goes, or the first card's counts change — do not pin order).
-3. **Shareable.** Open `…/post/thread?sort=discussed` **by address** (a fresh document, `go()` is
-   enough but `newWindow` is not needed): the `select` must already read `discussed` and the URL must
-   keep the param. That is the spec's *shareable* — a loaded page, not a pressed control.
-4. **Back is a history entry.** From `?sort=discussed` choose `liked` (now `?sort=liked`), then
-   `history.back()`, then wait for the URL to read `?sort=discussed` **and** for the `select` to read
-   `discussed`; a second `history.back()` must land on `""` with `newest`. `waitUrl` is a substring
-   match, so assert `location.search` **exactly** (`""` vs `"?sort=..."`), never a `String#includes`.
-   `history.back()` is asynchronous in the router (`popstate` → emit): poll, do not `sleep` once.
-5. **Paging stays out of the URL.** With 12 listed posts (`PAGE_SIZE` 24) the feed **has no Load
-   more** — assert `.pager-action` is absent *and* say so in the evidence, so the row cannot pretend
-   it pressed one. The paging half of failure-bank entry 3 is **not walkable** until a seed with 25+
-   posts exists; file that as a ticket rather than publishing 13 posts inside the walk.
-6. Leave the page clean: end on `/post/thread` with no query (row 39 is read-only — no store write, no
-   CDP override, no probe), then `sign out` stays the walk's last row.
+1. One new row, **row 40** (bump `EXPECTED_ROWS` 39 → 40), after row 39 and before `sign out`.
+2. Open the **read** surface, not a card: `/character/c0a1b2c3-0000-4000-8000-000000000002` (Sonic —
+   rows 6, 32, 35, 36 and 37 already open it, and **no row has ever voted on it**, so its seed is the
+   fixture's). Wait for `.detail .counts[aria-label="Engagement"]` and for both `button.vote`
+   controls, then read the four cells **per label** through `textContent` — `.count-label` is
+   uppercased in CSS, so `innerText` reads `LIKES` (T-49), and the **Ratio** cell is a percent
+   (T-52), so a blanket "every value is a number" is false on a correct page.
+3. Record the seed: `{likes, dislikes}` plus each `.vote`'s `aria-pressed`. Assert a **delta**, never
+   a value — the walk's own rows add rows (a post, a character copy) and no count is pinned anywhere
+   else either.
+4. **A press is one vote.** Press **Like**, wait until `busy` clears (`button.vote:not(:disabled)`),
+   and poll the numbers: `likes === seed.likes + 1`, `dislikes === seed.dislikes`, Like
+   `aria-pressed="true"`, Dislike `"false"`.
+5. **A repeat is not a second vote.** Press **Like** again and poll for the cleared state, then read
+   the counts **twice** ~300ms apart and assert both readings equal the *first* press's numbers. This
+   is the assertion the ticket exists for; it must read the **numbers**, because the pressed state
+   agrees either way.
+6. **A switch moves one count and not two.** Press **Dislike**: `likes` back to `seed.likes`
+   (the like is *replaced*, not added), `dislikes === seed.dislikes + 1`, exactly one `.vote`
+   pressed, and the Ratio cell still a percent.
+7. Restore what can be restored: the specs describe **two** buttons and no *unvote*, so a viewer who
+   arrived with no vote cannot be returned to none. Record the seed, note in the evidence what was
+   left behind, and leave the vote on **Like** (`likes` back to `seed.likes + 1`) so the final state
+   is one vote, not two — `sign out` follows and each run starts a fresh memory adapter. **Do not add
+   an unvote affordance**; `character/detail.md` fixes the pair.
+8. Read-only apart from the viewer's own vote row: no CDP override, no probe, no store pair. Ends on
+   the character page, then `sign out` stays the walk's last row.
 
 **Traps**
 
-- **`newest` is the absence of a param** (`writeSort` writes `""`), so a `?sort=newest` assertion is
-  wrong in both directions.
-- **`sort` is a one-time read of `useQuery()`.** This is the bug the row exists for; if it goes red,
-  the fix is a query subscription, not a second sort write.
-- **`choose()` sets `.value` then dispatches `change`** — it returns the value it read, so it proves
-  the control, never the page. The URL and the feed need their own reads.
-- **A `history.back()` in the walk goes back through the walk's own hops** unless the row's first
-  action is the `go("/post/thread")` it just made; count entries rather than assuming a single step.
-- **The `Select` repaints from the same frozen track** as the listing, so "the control agrees with the
-  listing" can be true while both disagree with the URL. Read all three.
+- **`busy` disables both `.vote` buttons during the await** (`character-detail.tsrx` →
+  `castVote`), so a press dispatched while it is set is swallowed by the `disabled` attribute and the
+  row reads "the count never moved" on a page that is right. Poll `button.vote:not([disabled])`
+  before every press.
+- **`myVote` is the page's own state, filled from `repo.myVote` at load**, so the pressed state
+  surviving a remount is worth one extra read (re-`go()` the same character after the switch and
+  assert the same `.vote` is still pressed) — that is `detail.md` → *States* → *Voted*, and it is
+  cheap.
+- **Counts are the adapter's answer, not a local `+1`** — if the page started recomputing, the row's
+  delta would still pass. Read the `.count-value` cells, never the button.
+- **A card's ratio rounds to whole percent**, so any "the number moved" assertion must be on the
+  detail page's Likes/Dislikes cells (T-52's find, twice now).
+- **The moderator/owner branches draw extra controls** on this page (Report, the notice, Fork) — key
+  the vote read on `button.vote`, never on "the page's buttons".
 
-**Accept:** `./scripts/check.sh` GREEN; walk **39/39** locally and **39/39 `--live`**; row 39 proved
-**red** first (if the Back half is broken, that *is* the red proof — capture the message, fix, and
-re-run; otherwise freeze the sort track by hand, sha256 the file before and after); `publish.sh` prints
-`LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **40/40** locally and **40/40 `--live`**; row 40 proved
+**red** first by deleting `memory.ts`'s `if (previous === direction) return row as EntityOf<V>;`
+guard (a repeat then doubles the like) — capture the message, restore the exact bytes, `sha256sum -c`
+it; `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -128,7 +133,14 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Open decisions
 
-- **Row count is 38 (T-54).** `scripts/smoke.mjs` keeps it in an explicit
+- **T-57 is filed, not started — the follow-up to T-55.** Failure-bank entry 3's paging half needs
+  **25+ posts** so the thread actually draws **Load more**: `lib/fixtures/posts.ts` holds 12 (11
+  listed, post 7 removed by row 21), `PAGE_SIZE` is 24, so `hasMore` is false and `/post/thread`
+  correctly draws no `.pager-action` — row 39 asserts that absence plus the `End of feed.` note
+  instead of pressing a control that is not there. Seeding 25+ rows is one commit of fixtures **plus**
+  every post count in the walk (row 36's feed read, row 38's composed flagged post, row 39's 11-card
+  reading), so it is a ticket of its own and not a side-edit.
+- **Row count is 39 (T-55).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
   adding a near-copy of it, and bump the count only when a row is genuinely new. **Rows 36 and 37 are
   read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the thread;
@@ -168,7 +180,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 38 after T-54; 39 is T-55's.** Row 32 shadows `visualViewport.height`, takes its
+- **Row count is 39 after T-55; 40 is T-56's.** Row 32 shadows `visualViewport.height`, takes its
   own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
   shadow is gone, the token is back to `0px` and the session is back at the browser's own window
   size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
@@ -179,6 +191,32 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   `--color-accent-contrast`. `DESIGN.md` → *Contrast* carries it.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **`App.tsrx`'s effect keys on `path + search`, and that is the whole reason a one-time
+  `useQuery()` read is honest (T-55).** A query change sets `status = "loading"` first, so the
+  `@default` branch (and the page component in it) is torn down before `Page.value` is set again —
+  the page **remounts**, `track(readSort(useQuery()))` re-initialises, and the `Select` and the
+  listing move together. Do not "optimise" that effect to key on `path` alone: it would leave every
+  query-string page (the thread's sort, the profile tabs, the moderation filters) reading a stale
+  mount value, and row 39 is the only thing that would notice.
+- **A page that writes the URL itself never notifies the router.** `writeSort()` calls
+  `history.pushState` directly (not `navigate()`), so no `emit()` runs, no remount happens and the
+  loaded rows survive a sort change — which is the point, but it also means a row cannot use the
+  router's state as evidence for a press. Read `location.search`.
+- **`history.back()` is one `sleep` away from a flaky row.** It is asynchronous (`popstate` →
+  `emit` → effect → dynamic import), so poll the three readings; T-55's `expectSort` polls the
+  search **and** the control together and throws with both plus the card count.
+- **A refetch can be proved by node identity when the data may not change.** The thread's fetch
+  stamps an `epoch` into every row's key, so a refetch remounts every card: an expando written
+  before a gesture is gone after it. Use that shape for any "the page really reloaded its data" —
+  the URL, the data and the control can all stay identical while nothing was fetched.
+- **`choose()` returns the value it read, so it never proves the page.** T-41's helper sets `.value`
+  and dispatches `change`; a page that ignores the event still returns the value. Assert the
+  consequence (URL, listing), never the helper's return value.
+- **The paging half of failure bank 3 cannot be walked on this fixture.** 11–12 posts are listed
+  against `PAGE_SIZE` 24, so `hasMore` is false and `/post/thread` correctly draws no
+  `.pager-action` — a row that "pressed Load more" would have to publish 13 posts inside the walk.
+  Row 39 asserts the absence **plus** the `End of feed.` note instead, and T-57 owns the seed.
 
 - **The walk removes the only NSFW post before row 38 can read it (T-54).** Case 2's target is post 7
   (`lib/fixtures/posts.ts`, the only `nsfw: true` post), and row 21 concludes that case as *removed*,
