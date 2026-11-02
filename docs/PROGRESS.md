@@ -3,6 +3,39 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-60: deleting a session takes its transcript and copies, and a published cut outlives it
+
+- **Changed:** `scripts/smoke.mjs` — new walk **row 43**, `EXPECTED_ROWS` 42 → 43, placed after
+  T-59's row 42 and before `sign out` (it deletes session 1 out of the memory store, so it is
+  mutating and final). It finds row 42's cut as `/post/thread?sort=newest`'s first **`.card.post`** by
+  its **body** (`ownCut`, no pinned post id), takes the card's `.post-time` permalink, and reads the
+  whole cut on its own page (the thread card folds after two messages, so `.cut-turn` there is 2 of
+  8). Then it opens the seed character (`…0001`) and presses its **own Continue** (no pinned session
+  id), asserts the primary control was `Continue`, reads the transcript (8 `.turn-text`) and the copies
+  disclosure (`4 copies`, no ` · N edited`), and deletes through the settings menu: `Session settings`
+  → `.menu-row.is-danger` (`Delete session`) → the confirmation's sentence (*"This removes the
+  transcript and every copy in it. A cut you already published stays, because a post is a snapshot of
+  what was said."*) → the confirmation's `Delete session` **scoped to `.menu-actions button`**, because
+  the opener carries the same label and an unscoped match would press it again.
+- **Verified:** `./scripts/check.sh` GREEN (typecheck, build, 30 routes, schema, tauri, links, tiers);
+  `./scripts/smoke.sh` **43/43** locally — row 43's evidence names the cut's id, the session's 8 turns
+  and 4 copies, the menu's two rows, the landing (`/character/…0001`, `Aurelia of the Second Tide`,
+  `Start a session`), the Not-found route with its `/character/catalog` road, and the cut still reading
+  8 messages; **red first** by deleting `store.sessions.splice(index, 1)` from `deleteSession()` in
+  `src/lib/data/memory.ts` → row 43 read *"the session survived the delete: /character/…0001 reads
+  \"Aurelia of the Second Tide\" with its primary control at \"Continue\", not \"Start a session\" — the
+  store still resolves a session for 5e551000-…0001 (8 turn(s), 4 copies)"* (42/43); the exact bytes
+  restored from `$TMPDIR/memory.ts.bak` and `sha256sum -c` clean; `publish.sh` printed `LIVE` and
+  `curl` is **200**; `./scripts/smoke.sh --live` **43/43** against the published bundle
+  (`assets/index-BoTUzpAc.js`).
+- **Not verified:** the copies half of the cascade is only visible *through* the deleted session
+  (there is no copy list anywhere else), so the row proves it by the session becoming unresolvable,
+  not by counting copies in a store — an adapter that leaked copies without the session would still
+  read green (nothing can observe them). The delete's desktop/webview behaviour (a real Tauri window)
+  was not re-driven this tick; every other ticket in `SHIP-PLAN.md` is blocked on Supabase, the
+  Android toolchain or an owner decision, so `docs/NEXT.md` now points at the first **unwalked** page,
+  `/onboarding`.
+
 ## 2026-11-02 — T-59: an author's edit never reaches a running session, and a cut is a snapshot
 
 - **Changed:** `scripts/smoke.mjs` — new walk **row 42**, `EXPECTED_ROWS` 41 → 42, placed after

@@ -1,74 +1,96 @@
 # Baton — what the next session does
 
-**T-59 landed.** Row **42** (`EXPECTED_ROWS` 42) walks failure-bank entry 2 end to end: the seed's
-character (`…0001`, **Aurelia**) is opened and its own **Continue** pressed (no pinned session id),
-the session's Character copy is read (`Aurelia`, `untouched`, `From Aurelia of the Tides · version
-4`), the original is reached **through the copy's own `a.copy-link`**, the **live** character is
-renamed — **name and in-session name**, because the row prints `inSessionName || name` — and the
-session, read again, is byte-for-byte what it was. Then the whole transcript is published as a
-**cut**, read on the post's own page, and the live character is renamed a **second** time: the post
-does not move. Red first: `load()` joining the live character read *"the copy followed the author's
-edit: the Character copy read \"Aurelia\" … and \"Aurelia Rebuilt\" after"*. 42/42 local, 42/42
-`--live`.
+**T-60 landed.** Row **43** (`EXPECTED_ROWS` 43) presses the settings menu's dangerous row end to end:
+it finds row 42's cut as `/post/thread?sort=newest`'s first `.card.post` **by its body**, reads the whole
+cut on its own page (the card folds at 2 of 8), opens the seed character and presses its own
+**Continue**, reads 8 `.turn-text` and `4 copies`, then *Session settings* → `.menu-row.is-danger` → the
+confirmation's sentence → `Delete session` **scoped to `.menu-actions button`**. The landing reads
+`Aurelia of the Second Tide` with **`Start a session`**, `go("/session/<id>")` mounts *This session
+doesn't exist.* with its road and no transcript, and the post still reads all 8 messages. Red first:
+removing the `store.sessions.splice(…)` line made the row read *"the session survived the delete …
+primary control at \"Continue\", not \"Start a session\""*. 43/43 local, 43/43 `--live`. **Session 1 is
+gone** for the rest of the run (`session 2` and its copies are untouched).
 
-Entry 2 was the last failure-bank entry whose machinery existed and had never been walked. The one
-session law still unwalked is the **other** half of the same spec section: what a session delete does,
-and what it must *not* touch.
+That closes the last session law and the failure bank's walkable half. Every remaining ticket in
+`SHIP-PLAN.md` is blocked (Supabase T-29–T-32, the Android toolchain T-35/T-36/T-39, T-33B(b)'s
+dependency, T-33B(c)'s decision), so the baton turns to the one **page** in the route table that no row
+has ever mounted.
 
-## T-60 — deleting a session takes its transcript and its copies, and a published cut outlives it
+## T-61 — `/onboarding` has never been walked: the handle rule is a gate, the refusal is one sentence, and a draft is a write
 
-**Why it is next.** `session/detail.md` → *Actions* → **Delete session** is law: *"the settings
-menu's only other option, with confirmation: it removes the transcript and the session's copies,
-while a cut already published stays as it was."* Three rows now read a session (33, 42) and one
-publishes a cut (42), but **no row has ever pressed Delete session** — the settings menu has only
-ever been read for its two labels (`docs/DESIGN.md` → *Session*). A `deleteSession()` that forgot the
-copies, that left the session resolvable, or that cascaded into the post the cut became is green in
-every gate and in all 42 rows.
+**Why it is next.** `/onboarding` appears **zero times** in `scripts/smoke.mjs`. Every other page in
+`src/router.ts` has at least one row; this one has none. `onboarding.md` is law in four places nothing
+executes: *"Unique across accounts, compared case-insensitively; a handle already taken blocks **Finish**
+with **Username taken** and names no alternative"*, *"Lowercase letters, digits, and underscores, 3–24
+characters, lowercased on save"*, *"Only **Username** and **Display name** block **Finish**"*, and
+*"Enabled once the two required fields are valid; the whole form is written in one save, so an abandoned
+first run keeps what was typed"* (→ *States* → **Resumed after abandonment**: *"the entered values are
+restored"*). T-07B then moved the one sentence into `schema.ts` (`HANDLE_RULE`) and the classification
+into `lib/validate.ts`, so the inline error, the Finish gate and a failed save have three seams and no
+witness: a page that trims or regexes on its own, or a gate that enables on a taken handle, is green in
+every gate and in all 43 rows.
 
 **Approach**
 
-1. **Row 43**, `EXPECTED_ROWS` 42 → 43, placed **after row 42 and before `sign out`**.
-2. Find the post **row 42** published, without pinning its id: `/post/thread` with `sort=newest`
-   (row 39 leaves the thread at page 1 with no query, so `go("/post/thread?sort=newest")` is a fresh
-   mount) and read the **first** `.card.post`'s `.post-body` — it must be row 42's `ownCut` (the
-   walk's own constant, so this is a legal cross-row read). Take that card's permalink
-   (`.post-time`'s href) as the post's own path, and its `.cut-turn` count.
-3. Open the session that published it: the seed character's own **Continue** (`…0001`). Read the
-   transcript's `.turn-text` count and the copies disclosure (`4 copies`, no ` · N edited`).
-4. **Delete in the settings menu**: `Session settings` (`aria-label`) → the danger row reading
-   `Delete session` → the confirmation. Assert the confirmation's own sentence names the transcript,
-   the copies and the kept cut (`This removes the transcript and every copy in it. A cut you already
-   published stays, because a post is a snapshot of what was said.`), then press the confirmation's
-   `Delete session` — **scoped to `.menu-actions`**, because the opener carries the same label.
-5. Read the landing in one pass: it is the character's page (`/character/…0001`), the primary control
-   now reads **`Start a session`** (not `Continue` — one session per character per user), and
-   `go(sessionPath)` mounts the spec's **Not found** sentence (`This session doesn't exist.`) with its
-   road out. Note the new name the character carries (row 42's second rename) in the message.
-6. `go(postPath)`: the cut **still reads its own text** — same body, same `.cut-who`/`.cut-text`
-   lines, same count. A `deleteSession()` that cascaded into `posts` is the bug this half catches.
+1. **Row 44**, `EXPECTED_ROWS` 43 → 44, placed **after row 43 and before `sign out`**. It is
+   **mutating**: the form's draft is a real `repo.saveProfile` write.
+2. `go("/onboarding")` and wait for `input[name="handle"]` and `input[name="displayName"]` (a `Field`
+   with `name=`; the page is a form of fields, not a `<form>` submit). Read the two prefilled values —
+   the walk's account is `you` / `You`, but **read them, never pin** (row 3 edits the display name).
+   Assert `Show NSFW content` / `Blur NSFW content` toggles exist and that **Finish** is **enabled**
+   with the prefilled pair (both required fields are already valid: this is the "only the two fields
+   block Finish" half).
+3. **The format refusal, priced against the gate.** `retype('input[name="handle"]', "ab")`, then poll
+   the field's error and the button: the error must be the schema's `HANDLE_RULE` sentence and
+   **Finish must be `disabled`**. Read `disabled` on the button element (`.props`), not a style.
+4. **The uniqueness refusal, case-insensitively.** `retype('input[name="handle"]', "Ada")` — `ada` is a
+   fixture handle and the value is **uppercase on purpose**, because the spec compares
+   case-insensitively *and* lowercases on save: the field's error must read **`Username taken`** and
+   Finish must stay `disabled`. Poll (the check is async and 250 ms-settled); a stale verdict is the bug
+   this half catches.
+5. **The save.** `retype('input[name="handle"]', <a free handle the walk owns>)`, keep the display name,
+   then press **Finish** and wait for `/user/<handle>`. This is *"the whole form is written in one
+   save"*: the landing must be the new handle's own profile, and the shell must read `signed in as
+   @<handle>` — the account moved.
+6. **The resume, and the restore in one gesture.** `go("/onboarding")` again: the two fields must come
+   back holding **what was saved** (that is the draft read — *"the entered values are restored"*), not
+   blanks. Then `retype` handle `you` and display name **the display name read in step 2** (not a
+   pinned `You`), press **Finish**, wait for `/user/you`, and assert the shell reads `signed in as
+   @you` again. Row 44 hands the walk back exactly the account it borrowed — both the landing and the
+   shell are read before it returns.
 
 **Traps**
 
-- **Row 42 renamed the character twice.** `/character/…0001` now reads **`Aurelia of the Second
-  Tide`** with in-session **`Aurelia Rebuilt Twice`**, so a row that asserts the seed's name is red on
-  a right page. Read the name from the page and put it in the message.
-- **Row 42 published a post.** `/post/thread?sort=newest`'s first card is that cut; the thread is 32
-  posts now. Never pin a post count anywhere after row 8.
-- **`deleteSession()` splices the session out of the memory store**, so a re-run of the walk is the
-  only way to get it back — this row mutates for the rest of the run, which is why it is last but one.
-- **The two `Delete session` labels are one opener and one confirmation.** A `startsWith("Delete")`
-  or an unscoped match presses the wrong one and proves the dialog only — scope the second press to
-  `.menu-actions`.
-- **The session page hides the shell but not the toast.** Nothing here should read body text for an
-  absence; read the character page's own control (`Start a session`) instead.
-- **A cut post carries no attachment link** (`PostCard` draws no `a.post-attach` for a cut), so do not
-  read one to identify it — read `.post-body` against `ownCut` and the `.cut-turn`s.
+- **The draft is a write, ~250 ms after a valid pair settles.** `persistDraft()` calls
+  `repo.saveProfile` (plus `savePreferences`) for any value that is *valid and free* — so a row that
+  types a plausible handle early and then does something else for 300 ms has **already renamed the
+  walk's account** and every later assertion about `@you` reads a stranger. Order the probes so every
+  intermediate value is **invalid or taken** (steps 3 and 4), and make step 5 the only free value.
+  `ada` is safe because the draft skips a taken handle (it re-checks with `isHandleTaken`).
+- **The route has no guard for an onboarded account** (`onboarding.tsrx` reads `currentProfile()` and
+  prefills; it never redirects a finished account away), which is the only reason this page is
+  walkable at all. Do not add a guard in this ticket — the spec has no such state.
+- **Finish is disabled by a `Derived`** (`blocked = track(() => !canFinish.value)`), and `Button`
+  reads it live. Poll `disabled` **after** the 250 ms settle + the async `isHandleTaken` answer; a read
+  on the next frame catches the old value and reads as a broken gate.
+- **The two error texts are different shapes**: format comes from `HANDLE_RULE` (the schema's own
+  sentence), uniqueness is the literal **`Username taken`** (which *"names no alternative"* — assert
+  the sentence has no `try`/`instead`/`use` suggestion, or at least that it equals the spec's two
+  words). Read the field's error node, not body text: a toast from row 43 could contain either word.
+- **`Field` renders its error node only when `error` is set**, so an absence read must be paired with
+  the presence half (a page that never mounts the field would otherwise pass an "no error" check).
+- **The restore is the last thing this row does.** If the second Finish is never reached the account
+  is left under a walk handle; `sign out` still passes (it reads `signed out` and the Profile tab),
+  so nothing after this row would catch it — assert `/user/you` **and** the shell's own line, and put
+  both in the message.
+- **`/user/<handle>` for a fresh handle has no posts** and must still render (the profile page is
+  spec'd for it); if it reads Not found, that is a product bug — do not paper over it by landing on
+  `/`.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **43/43** locally and **43/43 `--live`**; the assertion
-proved **red** first — make `deleteSession()` return `true` without splicing the row (or leave the
-cut's post behind by removing the post from the store) — the message must read that the session
-survived (or that the post left with it), capture it, restore the exact bytes and `sha256sum -c`
-them; `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **44/44** locally and **44/44 `--live`**; the assertion
+proved **red** first — make the gate ignore the verdict (`blocked = track(() => false)` in
+`onboarding.tsrx`) and watch step 4 read *"Finish stayed enabled on a taken handle"*; capture it,
+restore the exact bytes and `sha256sum -c` them; `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Blocked — what a human must do
 
@@ -96,15 +118,17 @@ them; `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Open decisions
 
-- **T-60 is the ticket: the session's own delete, the last session law with no row.** Failure-bank
-  entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
-  are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27,
-  10 → T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). `session/detail.md` still has one action no row
-  has pressed — **Delete session** — and its law is a *cascade plus a non-cascade*: the transcript
-  and the copies go, a published cut stays.
-- **Row count is 42 after T-59.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+- **T-61 is the ticket: the one page no row has ever mounted.** Failure-bank entries 1 (T-54), 2
+  (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest are blocked on the
+  backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 → T-32, 11 → T-16,
+  12 → T-01, 13 → `check.sh`). With the session's **Delete** walked (T-60) the failure bank has no
+  walkable entry left, so the next row comes from coverage instead: `/onboarding` is the only route
+  in `src/router.ts` that `scripts/smoke.mjs` never mentions (grep it — zero hits). Its law is a gate
+  (a taken handle disables **Finish** and says `Username taken`, case-insensitively), a format rule
+  (`[a-z0-9_]` 3–24, lowercased on save) and a **draft that is a real write**.
+- **Row count is 43 after T-60.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
-  it, and bump the count only when a row is genuinely new (**T-60 adds row 43**). **Rows 36 and 37
+  it, and bump the count only when a row is genuinely new (**T-61 adds row 44**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -120,6 +144,11 @@ them; `publish.sh` prints `LIVE` and `curl` is 200.
   walk's **last** post — the whole session-1 transcript, whose first card is now the **newest** in
   `/post/thread?sort=newest`. Anything after it must read a character's name from the page and must
   not pin a post count.
+- **Row 43 (T-60) is mutating and final, and it is the last row that reads a session.** It deleted
+  **session 1** out of the memory store, so `…0001`'s primary control now reads `Start a session` for
+  every later row and `/session/5e551000-…0001` mounts the Not found sentence; session 2 (the
+  adapter's second session) is untouched. It also leaves the reader on the cut's post page, and it
+  takes **no** override and writes no preference.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.
@@ -197,6 +226,21 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   arithmetic, write a `.py` under `$TMPDIR` and run `python3 <file>`.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **A thread card folds a cut at two messages, so `.cut-turn` on the feed is not the cut's length
+  (T-60).** `PostCard` takes `fold`, and `/post/thread` folds (`FOLD = 2`) while the post's own page
+  does not: row 43 read **2** `.cut-turn` on the newest card and **8** on `/post/<id>` for the same
+  post. Read the count on the post's own page before comparing anything after a delete, and keep the
+  card's count in the message as the fold's evidence — comparing the two would be red on a right page.
+- **`deleteSession()`'s red proof is the character page's own control, not the store (T-60).** The
+  session page navigates away on success, so an unspliced row cannot be seen at `/session/<id>` — it
+  is seen one mount later: `/character/…0001` reads **`Continue`** instead of **`Start a session`**,
+  because `findSessionForCharacter` still answers. Any "delete the row" ticket should name the
+  *landing's* absence, which is what a reader would see, rather than a store read no page exposes.
+- **A row that opens a session must first assert the control it is about to press (T-60).** Row 43
+  reads the character's primary label and refuses to run unless it is `Continue`; `clickAny(["Continue",
+  "Start a session"])` would otherwise create a *second* session and delete the wrong one — and it
+  would look identical in the message.
 
 - **A row that returns to a page must `go()` there first (T-59).** Row 42's first run failed with
   *"timed out waiting for the copies disclosure (after the edit)"* on a page that was right: the row

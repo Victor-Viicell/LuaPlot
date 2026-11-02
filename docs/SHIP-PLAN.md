@@ -502,6 +502,30 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       stamps **survived** that inversion, so node identity alone would have been green — the order
       half is what caught it). 40/40 local and 40/40 `--live`. Brief: `docs/NEXT.md` (T-57).
 
+- [x] **T-60 Deleting a session takes its transcript and its copies, and a published cut outlives it.**
+      `session/detail.md` → *Actions* → **Delete session**: *"the settings menu's only other option,
+      with confirmation: it removes the transcript and the session's copies, while a cut already
+      published stays as it was"*. Three rows read a session (33, 42) and row 42 published a cut, but
+      **no row had ever pressed the settings menu's dangerous row** — a `deleteSession()` that left the
+      session resolvable, forgot the copies, or cascaded into the post the cut became was green in
+      every gate and all 42 rows. Row **43** (`EXPECTED_ROWS` 43) finds row 42's cut as
+      `/post/thread?sort=newest`'s first `.card.post` **by its body** (`ownCut`, no pinned post id), takes
+      its `.post-time` permalink, reads the whole cut on its own page (the thread card folds after two
+      messages), opens the seed character and presses its own **Continue**, reads the transcript count
+      and the four-copy disclosure (`4 copies`, no ` · N edited`), then deletes in the settings menu:
+      `Session settings` → `.menu-row.is-danger` (*Delete session*) → the confirmation's own sentence
+      (*removes the transcript and every copy in it. A cut you already published stays …*) → the
+      confirmation's `Delete session` **scoped to `.menu-actions button`** (the opener carries the same
+      label). Landing: `/character/…0001` reading **`Start a session`**, the character named
+      `Aurelia of the Second Tide` (row 42's second rename) — read, never pinned. Then
+      `go("/session/<id>")` mounts *This session doesn't exist.* with its `/character/catalog` road and
+      **no** `.turn-text`, and the post still reads the same body, lines and count. Proved **red**
+      first by removing `store.sessions.splice(index, 1)` from `deleteSession()` → *"the session
+      survived the delete: /character/…0001 reads \"Aurelia of the Second Tide\" with its primary
+      control at \"Continue\", not \"Start a session\" — the store still resolves a session for
+      5e551000-…0001 (8 turn(s), 4 copies)"* (42/43); bytes restored, `sha256sum -c` clean. 43/43 local
+      and 43/43 `--live`. Brief: `docs/NEXT.md` (T-60).
+
 - [x] **T-59 An author's edit never reaches a running session, and a published cut is a snapshot.**
       Failure-bank entry 2: *Session reads live items, so author edits corrupt running chats → copies
       only*. `session/detail.md` → **Purpose**: *the character, every lorebook attached to that

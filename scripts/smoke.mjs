@@ -4216,6 +4216,210 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-60 — `session/detail.md` → *Actions* → **Delete session** is a cascade *and* a non-cascade:
+ * *"it removes the transcript and the session's copies, while a cut already published stays as it
+ * was"*. Three rows read a session (33, 42) and row 42 published a cut, but no row had ever
+ * pressed the settings menu's dangerous row — a `deleteSession()` that left the session resolvable,
+ * forgot the copies, or cascaded into the post the cut became was green in every gate and in all
+ * 42 rows.
+ *
+ * **Mutating and final.** `deleteSession()` splices the row out of the memory store, so this row is
+ * the walk's last but one: nothing after it may want session 1 again (`sign out` does not). The
+ * character it belonged to carries **row 42's second rename**, so its name is read from the page,
+ * never pinned. The cut is found by its **body** (`ownCut`, the walk's own constant) because
+ * `/post/thread?sort=newest`'s first card is that post for every later row.
+ * ---------------------------------------------------------------------------------------------- */
+const DELETE_CONFIRM_SENTENCE =
+  "This removes the transcript and every copy in it. A cut you already published stays, because a post is a snapshot of what was said.";
+
+results.push(
+  await journey("deleting a session takes its transcript and copies, and a published cut outlives it", async () => {
+    /** A cut as a reader sees it — the body, every line's stamp and text, and how many lines. */
+    const readCut = () =>
+      js(`
+        const clean = (el) => (el?.textContent || "").replace(/\\s+/g, " ").trim();
+        return {
+          path: location.pathname,
+          body: clean(document.querySelector(".post-body")),
+          who: [...document.querySelectorAll(".cut-who")].map(clean),
+          texts: [...document.querySelectorAll(".cut-text")].map(clean),
+          turns: document.querySelectorAll(".cut-turn").length,
+        };
+      `);
+
+    // 1. Row 42's cut is the thread's newest post — found by its body, never by an id.
+    await go("/post/thread?sort=newest");
+    await waitFor(
+      `document.querySelectorAll(".card.post").length > 0 && document.querySelectorAll(".skel-card").length === 0`,
+      "the thread's first page",
+      12000,
+    );
+    const newest = await js(`
+      const card = document.querySelector(".card.post");
+      if (!card) return null;
+      const clean = (el) => (el?.textContent || "").replace(/\\s+/g, " ").trim();
+      return {
+        body: clean(card.querySelector(".post-body")),
+        href: card.querySelector(".post-time")?.getAttribute("href") || "",
+        turns: card.querySelectorAll(".cut-turn").length,
+      };
+    `);
+    if (!newest) throw new Error("/post/thread?sort=newest drew no .card.post — there is no card to find the cut in");
+    if (newest.body !== ownCut) {
+      throw new Error(
+        `the thread's newest post reads ${JSON.stringify((newest.body || "").slice(0, 80))}, not the cut row 42 published (${JSON.stringify(ownCut.slice(0, 80))}) — the cut must sort first by its own createdAt`,
+      );
+    }
+    if (newest.turns === 0) {
+      throw new Error(`the newest post's card drew no .cut-turn — the post is not the cut row 42 published (${JSON.stringify(newest.body.slice(0, 60))})`);
+    }
+    const postId = (newest.href || "").split("/").filter(Boolean).pop();
+    if (!/^[0-9a-f-]{36}$/.test(postId || "")) {
+      throw new Error(`the cut card's permalink is ${JSON.stringify(newest.href)}, not a /post/<uuid>`);
+    }
+    const postPath = `/post/${postId}`;
+
+    // 2. The cut in full on its own page: the thread card folds after two messages, so the whole
+    //    snapshot is read where the reader can see all of it.
+    await go(postPath);
+    await waitFor(`document.querySelectorAll(".cut-turn").length > 0`, "the cut on its own page", 10000);
+    const cutBefore = await readCut();
+    if (cutBefore.body !== ownCut) {
+      throw new Error(`the cut's own page reads ${JSON.stringify(cutBefore.body.slice(0, 80))}, not what the composer wrote`);
+    }
+
+    // 3. The session that published it: the seed character's own **Continue**, no pinned id.
+    await go(SNAPSHOT_CHARACTER);
+    await waitFor(`!!document.querySelector(".detail h1.title")`, "the character's own page", 8000);
+    const character = await js(`
+      return {
+        name: (document.querySelector(".detail h1.title")?.textContent || "").trim(),
+        primary: (document.querySelector(".actions .start button")?.textContent || "").trim(),
+      };
+    `);
+    if (character.primary !== "Continue") {
+      throw new Error(
+        `the character page reads its primary control as ${JSON.stringify(character.primary)}, not "Continue" — a session must exist before this row deletes one (character ${JSON.stringify(character.name)})`,
+      );
+    }
+
+    await click("Continue", { exact: true });
+    await waitFor(`/\\/session\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the session route", 8000);
+    const sessionPath = await js(`return location.pathname;`);
+    const sessionId = sessionPath.split("/").filter(Boolean).pop();
+    if (!/^[0-9a-f-]{36}$/.test(sessionId || "")) {
+      throw new Error(`the Continue landed on ${JSON.stringify(sessionPath)}, not a /session/<uuid>`);
+    }
+
+    const before = await js(`
+      const clean = (el) => (el?.textContent || "").replace(/\\s+/g, " ").trim();
+      const spans = [...document.querySelectorAll(".copies-toggle span")];
+      return {
+        path: location.pathname,
+        turns: document.querySelectorAll(".turn-text").length,
+        copies: clean(spans[spans.length - 1]),
+      };
+    `);
+    if (before.turns === 0) throw new Error(`the session at ${sessionPath} draws no .turn-text — there is no transcript to delete`);
+    if (before.copies !== "4 copies") {
+      throw new Error(
+        `the session's copies disclosure reads ${JSON.stringify(before.copies)}, not "4 copies" — this row deletes a session whose copies are the fixture's four and none edited (a re-run after a delete reads a fresh store)`,
+      );
+    }
+
+    // 4. The settings menu's dangerous row, then the confirmation's own button.
+    await click("Session settings", { exact: true });
+    await waitFor(`document.querySelectorAll(".menu-row").length > 0`, "the session settings menu", 8000);
+    const menu = await js(`return [...document.querySelectorAll(".menu-row")].map((el) => (el.textContent || "").trim());`);
+    if (menu.join(" | ") !== "New Session | Delete session") {
+      throw new Error(`the settings menu offers ${JSON.stringify(menu)}, not "New Session" and "Delete session" and nothing more`);
+    }
+
+    await clickSelector(".menu-row.is-danger");
+    await waitFor(`!!document.querySelector(".menu-actions")`, "the delete confirmation", 8000);
+    const note = await js(`return (document.querySelector(".menu-note")?.textContent || "").replace(/\\s+/g, " ").trim();`);
+    if (note !== DELETE_CONFIRM_SENTENCE) {
+      throw new Error(
+        `the confirmation reads ${JSON.stringify(note)}, not the sentence that names the transcript, the copies and the kept cut (${JSON.stringify(DELETE_CONFIRM_SENTENCE)})`,
+      );
+    }
+
+    // The opener carries the same label, so the press that deletes is scoped to `.menu-actions` —
+    // an unscoped match would press the opener again and prove the dialog only.
+    await click("Delete session", { exact: true, scope: ".menu-actions button" });
+
+    // 5. The landing is the character's page, and its one session is gone: **Start a session**.
+    try {
+      await expectPath(SNAPSHOT_CHARACTER, "the session's delete", 10000);
+    } catch (error) {
+      const seen = await js(`return { path: location.pathname, text: document.body.innerText.replace(/\\s+/g, " ").trim().slice(0, 140) };`);
+      throw new Error(`${error.message} — the delete left the reader at ${JSON.stringify(seen)}`);
+    }
+
+    let landed = { path: "", name: "", primary: "" };
+    const landingDeadline = Date.now() + 8000;
+    for (;;) {
+      landed = await js(`
+        return {
+          path: location.pathname,
+          name: (document.querySelector(".detail h1.title")?.textContent || "").trim(),
+          primary: (document.querySelector(".actions .start button")?.textContent || "").trim(),
+        };
+      `);
+      if (landed.primary === "Start a session" || Date.now() > landingDeadline) break;
+      await sleep(150);
+    }
+    if (landed.primary !== "Start a session") {
+      throw new Error(
+        `the session survived the delete: ${landed.path} reads ${JSON.stringify(landed.name)} with its primary control at ${JSON.stringify(landed.primary)}, not "Start a session" — the store still resolves a session for ${sessionId} (${before.turns} turn(s), ${before.copies})`,
+      );
+    }
+
+    // 6. The route itself: the spec's Not found sentence, no transcript, and its road out.
+    await go(`/session/${sessionId}`);
+    await waitText("This session doesn't exist.", 8000);
+    const missing = await js(`
+      const road = [...document.querySelectorAll("a")].find((a) => /catalog/i.test((a.textContent || "")));
+      return {
+        path: location.pathname,
+        text: document.body.innerText.replace(/\\s+/g, " ").trim(),
+        road: road ? new URL(road.getAttribute("href") || "", location.href).pathname : "",
+        turns: document.querySelectorAll(".turn-text").length,
+      };
+    `);
+    if (!missing.text.includes("This session doesn't exist.")) {
+      throw new Error(`/session/${sessionId} after the delete reads ${JSON.stringify(missing.text.slice(0, 120))}`);
+    }
+    if (missing.turns !== 0) {
+      throw new Error(`the deleted session's route still draws ${missing.turns} .turn-text — the transcript survived`);
+    }
+    if (!/\/character\/catalog$/.test(missing.road)) {
+      throw new Error(`the Not found state's road out points at ${JSON.stringify(missing.road)}, not /character/catalog`);
+    }
+
+    // 7. The cut did not leave with the session: same body, same lines, same count.
+    await go(postPath);
+    await waitFor(`document.querySelectorAll(".cut-turn").length > 0`, "the cut after the session was deleted", 10000);
+    const cutAfter = await readCut();
+    if (cutAfter.turns !== cutBefore.turns) {
+      throw new Error(
+        `the cut left with the session: ${cutBefore.turns} message(s) before the delete, ${cutAfter.turns} after — a published cut is a snapshot, not a view of the session`,
+      );
+    }
+    if (cutAfter.body !== cutBefore.body) {
+      throw new Error(`the cut's body moved from ${JSON.stringify(cutBefore.body)} to ${JSON.stringify(cutAfter.body)} when its session was deleted`);
+    }
+    if (cutAfter.who.join("|") !== cutBefore.who.join("|") || cutAfter.texts.join("|") !== cutBefore.texts.join("|")) {
+      throw new Error(
+        `the cut's lines moved with the session: was ${JSON.stringify(cutBefore.who[0])} / ${JSON.stringify((cutBefore.texts[0] || "").slice(0, 50))}, reads ${JSON.stringify(cutAfter.who[0])} / ${JSON.stringify((cutAfter.texts[0] || "").slice(0, 50))}`,
+      );
+    }
+
+    return `thread newest = the walk's cut (${postId}, ${newest.turns} folded .cut-turn on the card) · session ${sessionPath}: ${before.turns} turn(s), ${before.copies} · settings menu ${JSON.stringify(menu)} · confirmation ${JSON.stringify(note.slice(0, 52))}… → Delete session → ${landed.path} reads ${JSON.stringify(landed.name)} with ${JSON.stringify(landed.primary)} · /session/${sessionId} → Not found ("This session doesn't exist.", road ${missing.road}) · the cut still reads ${cutAfter.turns} message(s), body ${JSON.stringify(cutAfter.body)}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -4239,9 +4443,9 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41, T-59: 42).
+ * T-58: 41, T-59: 42, T-60: 43).
  */
-const EXPECTED_ROWS = 42;
+const EXPECTED_ROWS = 43;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");
