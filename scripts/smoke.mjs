@@ -2416,6 +2416,175 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-52 — the law about **where a number lives**: *Engagement is metadata on cards (ratio only) and
+ * actions on detail pages (counts live there)* (`docs/CONTRACT.md` → *Product law*;
+ * `src/specs/luaplot-pages.md` line 170, restated per page in `character/detail.md` and
+ * `preset/detail.md`: *"the detail page is where the counts live, while a card shows only the
+ * ratio"*).
+ *
+ * `Card.tsrx` is handed the whole `AuthoredItem`, so a `likes`/`dislikes` pair is one interpolation
+ * away from every card in the app, and its footer draws exactly two things: the author link and
+ * `.card-ratio`. Nothing has ever asserted that — `tier-check.mjs` reads colours, `link-check.mjs`
+ * reads anchors, row 30 measures a card's **links** and row 31 a token's **contrast**. A page that
+ * printed a count itself would be invisible to every gate.
+ *
+ * So the row reads the engagement surface of **every** card on `/character/catalog` as data:
+ * exactly one `.card-ratio`, its text a whole percent, **zero** `.count/.counts/.count-label/
+ * .count-value/.comments` inside the card, and the ratio **not a control** — its tag is `SPAN` and
+ * `closest("a, button, [role=button]")` is null, so a card's only interactive children are the two
+ * links row 30 already measures.
+ *
+ * The ratio **rounds to whole percent**, so no number is pinned (failure bank: `96% → 96%` after a
+ * vote). The assertion is the shape, never a value.
+ *
+ * The absences would pass on an empty grid, so the row asserts cards > 0 and reads the first card's
+ * `.card-title` and `.card-author` first — and it waits for `.skel-card` to be **gone**, because the
+ * loading grid draws `.card-cell`s too (T-50's find).
+ *
+ * The other side of the law: `/character/[id]` must still carry the counts. Sonic is the character
+ * rows 6, 32 and 35 already open. The row reads `.counts[aria-label="Engagement"]`, its `.count`
+ * labels through **`textContent`** (`.count-label` is uppercased in CSS, so `innerText` reads
+ * `LIKES`), asserts each `.count-value` is a number, and asserts the like/dislike `.vote` controls
+ * and a `.save` are on that page. It presses nothing — row 8 (`vote on it`) already proves the write.
+ *
+ * `/post/thread` is **not** an exception, and the row measures the difference instead of assuming
+ * one: a post's card is `PostCard.tsrx`, whose footer `thread.md` → *Layout* fixes as *"a header with
+ * the poster's profile and the time of posting, the body with its inline images, and a footer with
+ * likes, dislikes, and the comment count"*. So a post card must draw two `.post-count` cells and one
+ * `.post-comments` link **and no `.card-ratio`** — the ratio law is about the shared-item cards. A
+ * later change that "fixes" either card to match the other turns this red.
+ *
+ * Read-only: no write, no CDP override, no probe left behind. Sits after row 35 and before
+ * `sign out`, so `sign out` stays the walk's last row.
+ * -------------------------------------------------------------------------------------------- */
+const ENGAGEMENT_CHARACTER = CONTROL_CHARACTER;
+
+results.push(
+  await journey("engagement is a ratio on a card and counts on the detail page", async () => {
+    await go("/character/catalog");
+    await waitFor(
+      `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".card .card-ratio").length > 0`,
+      "the character catalog to leave its skeletons behind",
+      8000,
+    );
+    // The card re-measures its tags on a ResizeObserver, so the footer is read once the grid settles.
+    await sleep(150);
+
+    const grid = await js(`
+      const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+      const cells = [...document.querySelectorAll(".card-cell")];
+      const cards = cells.map((cell) => cell.querySelector(".card")).filter(Boolean);
+      const surface = cards.map((card) => {
+        const ratios = [...card.querySelectorAll(".card-ratio")];
+        const ratio = ratios.length === 1 ? ratios[0] : null;
+        return {
+          title: clean(card.querySelector(".card-title")?.textContent),
+          author: clean(card.querySelector(".card-author")?.textContent),
+          ratios: ratios.length,
+          text: ratio ? clean(ratio.textContent) : "",
+          tag: ratio ? ratio.tagName : "",
+          control: ratio ? (ratio.closest("a, button, [role=button]") ? "yes" : "no") : "none",
+          stray: [...card.querySelectorAll(".count, .counts, .count-label, .count-value, .comments")].map((el) => el.className),
+        };
+      });
+      return {
+        skeletons: document.querySelectorAll(".skel-card").length,
+        cells: cells.length,
+        cards: cards.length,
+        ratios: surface.map((one) => one.text),
+        bad: surface.filter((one) => one.ratios !== 1 || !/^[0-9]{1,3}%$/.test(one.text) || one.tag !== "SPAN" || one.control !== "no" || one.stray.length > 0),
+        unnamed: surface.filter((one) => one.title === "" || one.author === "").map((one) => one.title),
+        first: surface[0] || null,
+      };
+    `);
+
+    if (grid.cards === 0) {
+      throw new Error(`the catalog drew ${grid.cells} card cell(s) and ${grid.skeletons} skeleton(s) but no card — an absence over an empty grid proves nothing`);
+    }
+    if (grid.bad.length > 0) {
+      const one = grid.bad[0];
+      throw new Error(
+        `the card for ${JSON.stringify(one.title)} reads ${one.ratios} ratio(s) as ${JSON.stringify(one.text)} in a ${one.tag || "nothing"}, in a control: ${one.control}, with ${JSON.stringify(one.stray)} inside it — ${grid.bad.length}/${grid.cards} card(s) fail`,
+      );
+    }
+    if (grid.unnamed.length > 0) {
+      throw new Error(`the header or footer of ${grid.unnamed.length} card(s) drew no name: ${JSON.stringify(grid.unnamed.slice(0, 3))}`);
+    }
+
+    // The counts, on the page that owns them. Labels are read as textContent: innerText would say
+    // LIKES (the .count-label rule uppercases), and a case-sensitive match would read as missing.
+    await go(ENGAGEMENT_CHARACTER);
+    await waitFor(
+      `document.querySelector(".detail .counts[aria-label='Engagement']") !== null`,
+      "the character detail page's engagement counts",
+      8000,
+    );
+    const detail = await js(`
+      const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+      const list = document.querySelector(".detail .counts[aria-label='Engagement']");
+      const cells = list ? [...list.querySelectorAll(".count")] : [];
+      return {
+        labels: cells.map((el) => clean(el.querySelector(".count-label")?.textContent).toLowerCase()),
+        values: cells.map((el) => clean(el.querySelector(".count-value")?.textContent)),
+        votes: [...document.querySelectorAll(".detail button.vote")].map((el) => clean(el.textContent).toLowerCase()),
+        save: document.querySelectorAll(".detail .save").length,
+      };
+    `);
+    for (const label of ["likes", "dislikes"]) {
+      if (!detail.labels.includes(label)) {
+        throw new Error(`the detail page's engagement list draws no ${label} cell — it reads ${JSON.stringify(detail.labels)}`);
+      }
+    }
+    if (detail.values.length !== detail.labels.length) {
+      throw new Error(`the engagement list draws ${detail.labels.length} label(s) and ${detail.values.length} value(s): ${JSON.stringify(detail.labels)} / ${JSON.stringify(detail.values)}`);
+    }
+    /**
+     * Four cells, and only three of them are counts: `Likes`, `Dislikes` and `Comments` read a whole
+     * number, `Ratio` reads the same whole percent a card prints (`character-detail.tsrx` renders
+     * `percent(ratioOf(...))` in a `.count-value`). So the shape is asserted **per label** — a blanket
+     * "every value is a number" fails on a page that is right, which is exactly what this row's first
+     * run did (`["412","61","87%","0"]`).
+     */
+    const shape = { likes: /^[0-9]+$/, dislikes: /^[0-9]+$/, ratio: /^[0-9]{1,3}%$/, comments: /^[0-9]+$/ };
+    const wrong = detail.labels
+      .map((label, index) => ({ label, value: detail.values[index] }))
+      .filter((one) => !(shape[one.label] || /^[0-9]+$/).test(one.value));
+    if (wrong.length > 0) {
+      throw new Error(`an engagement cell does not read its own shape: ${JSON.stringify(wrong)} (labels ${JSON.stringify(detail.labels)})`);
+    }
+    if (!detail.votes.includes("like") || !detail.votes.includes("dislike") || detail.save === 0) {
+      throw new Error(`the counts are on the page but the actions are not — .vote reads ${JSON.stringify(detail.votes)}, .save ×${detail.save}`);
+    }
+
+    // …and the feed's card is the other component on purpose: thread.md fixes counts in its footer.
+    await go("/post/thread");
+    await waitFor(
+      `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".post-counts").length > 0`,
+      "the thread to draw its post cards",
+      8000,
+    );
+    const feed = await js(`
+      const cards = [...document.querySelectorAll(".card.post")];
+      return {
+        cards: cards.length,
+        ratios: cards.filter((card) => card.querySelector(".card-ratio") !== null).length,
+        counts: cards.map((card) => card.querySelectorAll(".post-count").length),
+        comments: cards.map((card) => card.querySelectorAll(".post-comments").length),
+      };
+    `);
+    if (feed.cards === 0) throw new Error("the thread drew no .card.post — the post half of the law proves nothing on an empty feed");
+    if (feed.ratios !== 0) {
+      throw new Error(`${feed.ratios}/${feed.cards} post card(s) draw a .card-ratio; a post card's footer is likes, dislikes and the comment count (thread.md → Layout)`);
+    }
+    if (feed.counts.some((n) => n !== 2) || feed.comments.some((n) => n !== 1)) {
+      throw new Error(`post cards draw ${JSON.stringify(feed.counts)} .post-count cell(s) and ${JSON.stringify(feed.comments)} .post-comments link(s); the footer is two counts and one link`);
+    }
+
+    return `catalog: ${grid.cards}/${grid.cells} cards, one ratio each (${JSON.stringify(grid.ratios.slice(0, 3))}), 0 counts, ratio a SPAN outside any control · ${ENGAGEMENT_CHARACTER.slice(-6)}: ${JSON.stringify(detail.labels)} = ${JSON.stringify(detail.values)}, votes ${JSON.stringify(detail.votes)} + .save ×${detail.save} · thread: ${feed.cards} post card(s) × 2 counts + 1 comment link, 0 ratio`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -2438,9 +2607,9 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32, T-49: 33, T-50: 34, T-51: 35).
+ * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36).
  */
-const EXPECTED_ROWS = 35;
+const EXPECTED_ROWS = 36;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

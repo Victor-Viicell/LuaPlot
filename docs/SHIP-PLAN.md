@@ -418,6 +418,19 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       **absence** as the other half. The control half opens a real uuid at the same depth and must
       still reach the detail page. Proved red first: `/character/catalog` mounted the detail page
       (`.detail ×1`, title `Character — LuaPlot`) and the row named it. Brief: `docs/NEXT.md`.
+- [x] **T-52 Engagement is a ratio on a card, and counts live on the detail page.** The law *Engagement
+      is metadata on cards (ratio only) and actions on detail pages (counts live there)* is a rule
+      about **where a number lives**, and every existing gate reads presence — `tier-check.mjs` reads
+      colours, `link-check.mjs` reads anchors, row 30 measures a card's links, row 31 a token's
+      contrast. Row **36** (36/36 local and `--live`) reads the engagement surface of every card on
+      `/character/catalog` as data: one `.card-ratio` each, text a whole percent, a `SPAN` outside any
+      `a`/`button`/`[role=button]`, and zero `.count`/`.counts`/`.count-label`/`.count-value`/
+      `.comments` inside it (20/20 cards). The other half opens `/character/[id]` and asserts the four
+      engagement cells and both `.vote` controls, and `/post/thread` is measured as the **other** card
+      on purpose — two `.post-count` cells and one comment link, no ratio, which is what `thread.md`
+      fixes for posts. Proved **red** first: a `<span class="count">{item.likes}</span>` in the card
+      footer made the row report `the card for "The Lamplighter's Widow" … with ["count"] inside it —
+      20/20 card(s) fail`. Brief: `docs/NEXT.md`.
 
 ## Failure bank (the ways this class of product breaks)
 

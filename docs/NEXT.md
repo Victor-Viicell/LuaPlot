@@ -1,64 +1,71 @@
 # Baton — what the next session does
 
-**T-52 is the one ticket.** T-51 landed: `scripts/smoke.mjs` has row **35**, the walk is **35/35**
-locally and live, and the *precedence* law — *IDs carry identity, names never do; fixed segments
-(`catalog`, `create`, `thread`) win over `[id]` params* — now has a row that walks each literal
-sibling as an address. The next law with no mechanical guard is **"Engagement is metadata on cards
-(ratio only) and actions on detail pages (counts live there)"**: it is a rule about *where a number
-lives*, and every gate reads presence — `tier-check.mjs` reads colours, `link-check.mjs` reads
-anchors, rows 30/31 measure a card's links and a token's contrast. Nothing has ever asserted that a
-**card** draws no counts, and nothing that a card's ratio is not a control.
+**T-53 is the one ticket.** T-52 landed: `scripts/smoke.mjs` has row **36** (walk **36/36** locally
+and **36/36 `--live`**), and the law it guards — *Engagement is metadata on cards (ratio only) and
+actions on detail pages (counts live there)* — now has **both halves** measured: 20/20 catalogue
+cards print exactly one `.card-ratio` (a whole percent, a `SPAN`, outside every control) and no
+`.count/.counts/.count-label/.count-value/.comments`, while `/character/[id]` prints its four
+engagement cells and its two `.vote` controls, and `/post/thread` is measured as the *other* card on
+purpose (two `.post-count` cells plus one comment link, no ratio — `thread.md` fixes that footer).
+The next unguarded law is the one `SHIP-PLAN.md`'s failure bank already names and that no row walks:
+**entry 4, "NSFW preference treated as access control (404s) → detail routes always resolve"**.
 
-## T-52 — engagement is a ratio on a card, and counts live on the detail page
+## T-53 — a viewer's filter never blocks a route
 
-**Why it is next.** `CONTRACT.md` → *Product law*: *"Engagement is metadata on cards (ratio only) and
-actions on detail pages (counts live there)."* `src/components/Card.tsrx` even says it in a comment —
-*"No comment count and no vote counts on a card: engagement on a listing is the ratio"* — and the
-component is handed the whole `AuthoredItem`, so a `likes`/`dislikes` pair is one interpolation away
-from every card in the app. The footer draws `<span class="card-ratio">{percent(ratioOf(item))}</span>`
-(line 219) and nothing else; a page that computed a count itself would be invisible to
-`tier-check.mjs`, `link-check.mjs` and every existing row. Row 30 measures the footer's *links* and
-row 31 measures a token's *contrast* — neither has ever asked what numbers a card prints.
+**Why it is next.** `src/specs/systems/nsfw.md` → *Rules*, twice in one breath: *"It is not access
+control. No route is blocked, no 404, no redirect: a direct link still resolves"* and *"**With Show
+off, a detail route still resolves.** The item draws with its chrome intact and the body withheld
+behind the same reveal control a blurred item carries; there is no separate notice page and no empty
+render."* Row 25 (`/dev/state`) proves the **listing** obeys the pair — it flips Show+Blur on, counts
+covered cards on `/character/catalog`, then restores — but **no row has ever opened a detail route
+with Show off**. `character-detail.tsrx` already implements the rule (`const covered = track(() =>
+nsfw.value && !show.value && !revealed.value)`, `.veiled.is-covered` plus a `Reveal` button at
+~line 1134). The obvious "fix" — gating the page on `show` for a viewer who turned NSFW off, or
+answering the not-found sentence — would 404 a route the spec guarantees, and every gate would stay
+green: `spec-routes.mjs` proves the module resolves, never what it renders under a preference.
 
 **Approach**
 
-1. One new row, **row 36** (bump `EXPECTED_ROWS` 35 → 36), read-only, after row 35 and before
-   `sign out`.
-2. On `/character/catalog`: wait for `.skel-card` to be **gone** (the loading grid draws `.card-cell`s
-   too — T-50's find), then for every `.card-cell` that holds a card read the engagement surface:
-   exactly one `.card-ratio`, its text matching `/^\d{1,3}%$/`, and **zero** `.count`, `.counts`,
-   `.count-label`, `.count-value`, `.comments` inside the card. Read the ratio as `textContent`.
-3. Also assert the ratio is **not a control**: `ratio.closest("a, button, [role=button]")` is null and
-   its tag is `SPAN` — the card's only interactive children are the ones row 30 already measures.
-4. The presence half, so an empty grid cannot pass: a card count > 0, and the first card's title and
-   author link exist by name.
-5. The other side of the law: open one real character (`/character/c0a1b2c3-…-02`, *Sonic the
-   Hedgehog* — rows 6, 32 and 35 already read it) and assert `.counts[aria-label="Engagement"]`
-   mounts with at least a Likes and a Dislikes `.count`, each `.count-value` a number, **and** that
-   the vote actions live on that page (press nothing — `vote on it` already proves the write).
-6. `/post/thread` draws a **different** card component: read `src/components/PostCard.tsrx` first and
-   assert the same two facts there, or say in the row's comment that posts carry the ratio through
-   `Card` and no second surface exists.
+1. One new row, **row 37** (bump `EXPECTED_ROWS` 36 → 37), after row 36 and before `sign out`.
+2. The fixture: `/character/c0a1b2c3-0000-4000-8000-000000000004` — *Hollow Saint*, `author: sable`,
+   `nsfw: true` (`src/lib/fixtures/characters.ts`, `CHARACTER(4)`). It is the fixture's only NSFW
+   **character**, and rows 6/32/35/36 all read Sonic (`…002`, SFW), so nothing collides.
+3. **Record the seed pair, never assume it.** Row 25's helpers: `toggleState("Show NSFW content")` and
+   `toggleState("Blur NSFW content")` first, then `setToggle("Show NSFW content", false)`. Blur is
+   irrelevant while Show is off (`nsfw.md`: *Blur only matters while Show is on*).
+4. **Listing half.** `/character/catalog`: wait for `.skel-card` to be **gone** (T-50), read the
+   `.card-title` texts, and assert cards > 0 **and** "Hollow Saint" absent. The listing half is what
+   makes the absence meaningful.
+5. **Route half, by address.** `go()` the id directly — no press: the law is about a *direct link*.
+   Read the page as data and assert: `.detail` mounted, its name reads *Hollow Saint*, `.veiled`
+   carries `is-covered`, `aria-hidden="true"`, a control named **Reveal** is inside `.detail`, and the
+   `.counts[aria-label="Engagement"]` cells still draw their numbers (`nsfw.md`: *the numbers are
+   never hidden*). Then press `Reveal` and assert `is-covered` is gone and the name survives — a
+   reveal is one view, and it writes nothing to the account.
+6. **Restore in `finally` and assert the restore.** Row 25 restores by value; row 31/32/36 assert
+   rather than trust the `finally`. Read `/dev/state` back, compare with the seed, then re-read the
+   catalogue. A leak here makes the *next run's* rows read a flipped account.
 
 **Traps**
 
-- **A card's ratio rounds to whole percent**, so do not pin a number — an earlier row's vote changes
-  it (failure-bank entry: `96% → 96%`). Assert the *shape*, never `96%`.
-- **`/persona` has no ratio at all** (personas are never counted, T-50) and draws `.persona-card`, not
-  `.card-cell` — do not add it here; row 34 already counts that page's absences.
-- **NSFW Show/Blur must be the default when the row runs.** The footer sits outside the blur on
-  purpose (failure bank #1), so a blurred card still prints its ratio — but `/dev/state` is the row
-  that owns the pair and it restores it; do not flip it here.
-- **`.card-ratio` is display formatting** (`percent()` from `lib/format.ts`, via `ratioOf`), so the
-  assertion belongs in the walk, not in `schema.ts`. Nothing in this ticket adds a schema.
-- **The card re-measures its tags on a `ResizeObserver`** — read the ratio only after the grid has
-  settled (one `await sleep(150)` after the skeletons go is enough; row 35's poll shape works too).
+- **This row owns the NSFW pair, and a leak poisons every later run.** Restore from the seed you
+  recorded, never from a hard-coded `true/true`, and assert it before the row returns.
+- **`Reveal` is a `Button` whose accessible name is its label**, and the page also draws *Start a
+  session*, *Bookmark* and *More*. Scope the read to `.detail` and press with `exact: true`, or the
+  row proves a control somewhere else on screen.
+- **The cover is a class, not a colour.** `.veiled.is-covered`, and the `<aside>` holding the counts
+  sits *outside* it — "the body is withheld" and "the numbers stay visible" are two separate reads,
+  and both must be asserted.
+- **A listing's absence says nothing about the route.** The two halves fail independently; report
+  which one moved rather than one combined failure.
+- **A poll timeout is not the proof the accept line asks for (T-36a).** If the page never resolves,
+  catch the wait, re-read `.detail`/the name/`document.title`, and name what actually mounted — a red
+  proof that says "timed out waiting for the name" wastes the next session's run.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **36/36** locally and **36/36 `--live`**; row 36 proved
-**red** first (e.g. append `<span class="count">{item.likes}</span>` to `Card.tsrx`'s footer, watch the
-row name the card and the count it found, then restore the exact bytes); `publish.sh` prints `LIVE`
-and `curl` is 200.
-
+**Accept:** `./scripts/check.sh` GREEN; walk **37/37** locally and **37/37 `--live`**; row 37 proved
+**red** first (gate `character-detail.tsrx`'s `.detail` content on `show.value || !nsfw.value` so a
+Show-off viewer gets an empty render, watch the row name the route and what mounted instead, then
+restore the exact bytes); `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -115,11 +122,12 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Open decisions
 
-- **Row count is 35 (T-51).** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 36 (T-52).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
-  adding a near-copy of it, and bump the count only when a row is genuinely new. **Row 35 is
-  read-only**: it walks nine literal addresses plus one uuid, no write, no CDP override, no shadow
-  left behind.
+  adding a near-copy of it, and bump the count only when a row is genuinely new. **Row 36 is
+  read-only**: it reads the catalogue, one detail page and the thread, so no write, no CDP override,
+  no probe and no NSFW flip left behind. **Row 37 (T-53) will own the NSFW pair** — it must restore
+  from a seed it recorded and assert the restore, or every later run reads a flipped account.
 - **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
   page prints one, and the base rule is the thing under test), measures it resting and through
   `CSS.forcePseudoState`, takes its own 900px `Emulation.setDeviceMetricsOverride` for the rail, and
@@ -150,7 +158,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 35 after T-51; 36 is T-52's.** Row 32 shadows `visualViewport.height`, takes its
+- **Row count is 36 after T-52; 37 is T-53's.** Row 32 shadows `visualViewport.height`, takes its
   own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
   shadow is gone, the token is back to `0px` and the session is back at the browser's own window
   size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
@@ -162,6 +170,22 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **The detail page's engagement list has four cells and one of them is a percent (T-52).** `T-52`'s
+  first run failed on a page that was right: `/character/[id]` draws `Likes`, `Dislikes`, **`Ratio`**,
+  `Comments`, and the Ratio cell's `.count-value` is `percent(ratioOf(...))` (`87%`). "Every
+  `.count-value` is a number" is therefore false; assert the shape **per label**. The ticket's example
+  strings are a hypothesis, the fixture is the fact (T-49's lesson, again).
+- **A count can be injected into a card's footer without moving a pixel of its layout.** `T-52`'s red
+  proof appended `<span class="count">{item.likes}</span>` beside `.card-ratio` inside `.card-foot` and
+  the row read `20/20 card(s) fail` with `["count"] inside it` — the shape to copy for any "this number
+  belongs elsewhere" rule is: read the **class names** inside the card, not the text on it.
+- **A post card is not a catalogue card, and `thread.md` says so.** `PostCard.tsrx` draws
+  `.post-count` × 2 plus a `.post-comments` link and **no** `.card-ratio`, because the post footer is
+  spec'd as likes + dislikes + the comment count. Row 36 measures both sides so a later "let us make
+  the cards consistent" turns red instead of silently editing the product.
+- **`/post/thread`'s loading state draws three `.skel-card`s**, not `.card-cell`s — a row that reads
+  `.post-counts` on the first frame reads zero on a feed that has not loaded (`T-50`'s shape, different
+  markup). Wait for `.skel-card` gone here too.
 - **A precedence law's red proof needs *both* halves (T-51).** Neither edit the ticket suggested is red
   on its own: widening `ID` to `/^[0-9a-z-]{1,36}$/i` still mounts the catalog, because `TABLE` sorts
   fewer-params-first and the literal route is tried before the predicate is ever consulted; dropping the

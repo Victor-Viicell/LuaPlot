@@ -3,6 +3,31 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-52: engagement is a ratio on a card, and counts on the detail page
+
+- **Changed:** walk row **36** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 35 → 36) for the product law
+  *Engagement is metadata on cards (ratio only) and actions on detail pages (counts live there)* — a
+  rule about **where a number lives**, which no gate could see: `tier-check.mjs` reads colours,
+  `link-check.mjs` reads anchors, row 30 measures a card's links, row 31 a token's contrast. The row
+  reads every card on `/character/catalog` as data (one `.card-ratio`, whole percent, a `SPAN` outside
+  any control, zero `.count`/`.counts`/`.count-label`/`.count-value`/`.comments` inside it), opens
+  `/character/…0002` for the other half (four engagement cells, both `.vote` controls, `.save`), and
+  measures `/post/thread` as the **other** card on purpose: two `.post-count` cells plus one
+  `.post-comments` link and no ratio, because `thread.md` → *Layout* fixes that footer.
+- **Verified how:** `./scripts/check.sh` GREEN (build, 30 routes, schema, tauri, links, tiers — 5822
+  declarations); walk **36/36** locally and **36/36 `--live`** against
+  `https://victor-viicell.github.io/LuaPlot/` (curl 200), evidence `catalog: 20/20 cards, one ratio
+  each (["96%","83%","89%"]), 0 counts, ratio a SPAN outside any control · 000002:
+  ["likes","dislikes","ratio","comments"] = ["412","61","87%","0"], votes ["like","dislike"] + .save
+  ×1 · thread: 11 post card(s) × 2 counts + 1 comment link, 0 ratio`. Proved **red** first: a
+  `<span class="count">{item.likes}</span>` in `Card.tsrx`'s footer made the row fail with
+  `the card for "The Lamplighter's Widow" … in a control: no, with ["count"] inside it — 20/20
+  card(s) fail`; `git checkout -- src/components/Card.tsrx` restored the bytes before the green run.
+- **Not verified:** nothing mobile — no Android toolchain on this box (T-35). The row reads the
+  memory adapter's fixture (T-29/T-30 still blocked on a Supabase project ref), and the ratio is
+  asserted by **shape**, never by a value: it rounds to whole percent, so a vote can leave it
+  identical (`96% → 96%`).
+
 ## 2026-11-01 — T-51: a fixed segment wins over an id param
 
 - **Changed:** walk row **35** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 34 → 35) for the product law
