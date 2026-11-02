@@ -2309,6 +2309,113 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-51 — the law about **precedence**: *IDs carry identity, names never do. Fixed segments
+ * (`catalog`, `create`, `thread`) win over `[id]` params* (`docs/CONTRACT.md` →
+ * *Product law*, repeated in `src/specs/luaplot-pages.md`).
+ *
+ * The router gets this from `TABLE`'s sort (fewer params first, then deeper) plus the id predicate
+ * (`src/router.ts` → `/^[0-9a-f-]{36}$/i`). No gate can see it: `spec-routes.mjs` proves each
+ * route's page module resolves, never **which** route the table picks for a path. A sort that loses
+ * its param count, or an id predicate widened to `\w+`, would make `/character/catalog` mount the
+ * character *detail* page with `id="catalog"` — the app would read *not found* on a route the spec
+ * guarantees, and every gate would stay green.
+ *
+ * So each fixed segment is walked as a **literal** (no card press: the address is the thing under
+ * test) and the mounted page is read by a landmark the detail page cannot draw — four of them, all
+ * from the page files, all read as data:
+ *   - the page's own root class (`.catalog`, `.create-page`, `.thread`, `.compose-page`; a detail
+ *     page's root is `.detail`, so its **absence** is the other half of the assertion);
+ *   - its `.kicker` sentence — the string each page writes for itself (`character catalog`,
+ *     `new preset`, `thread`, …);
+ *   - `document.title` = `<Title> — LuaPlot` (`App.tsrx`); and
+ *   - on a create page, a mounted `<form>`. Polled rather than asserted on the first frame (T-40's
+ *     lesson: `CharacterForm` draws its form only in its `ready` branch).
+ * A root class alone would pass on a page that rendered its shell with nothing in it, and the title
+ * alone is a string the code writes twice — hence all four.
+ *
+ * `CommentThread` also draws a `.thread` root, so `/post/thread`'s `.thread` is only half its
+ * landmark: the `.kicker` `thread` and `.detail`'s absence are what make it the thread page.
+ *
+ * The **control** half runs the other direction: a uuid-shaped path of the same depth must still
+ * reach a detail page, because a router that made *every* segment literal would pass every line
+ * above and fail this one.
+ *
+ * `/moderation` has no fixed sibling at depth 2 today (`/moderation/[report.id]` is its only
+ * child), so it is absent from the list rather than invented.
+ *
+ * Read-only, no CDP override (nothing here measures width), and it sits after row 34 and before
+ * `sign out` so `sign out` stays the walk's last row.
+ * -------------------------------------------------------------------------------------------- */
+const FIXED_SEGMENTS = [
+  { path: "/character/catalog", root: ".catalog", kicker: "character catalog", title: "Characters" },
+  { path: "/character/create", root: ".create-page", kicker: "new character", title: "New character", form: true },
+  { path: "/lorebook/catalog", root: ".catalog", kicker: "lorebook catalog", title: "Lorebooks" },
+  { path: "/lorebook/create", root: ".create-page", kicker: "new lorebook", title: "New lorebook", form: true },
+  { path: "/preset/catalog", root: ".catalog", kicker: "preset catalog", title: "Presets" },
+  { path: "/preset/create", root: ".create-page", kicker: "new preset", title: "New preset", form: true },
+  { path: "/persona/create", root: ".create-page", kicker: "new persona", title: "New persona", form: true },
+  { path: "/post/thread", root: ".thread", kicker: "thread", title: "Thread" },
+  { path: "/post/create", root: ".compose-page", kicker: "new post", title: "New post", form: true },
+];
+/** Sonic is `CHARACTER(2)`, a public row this walk already reads by name twice (rows 6 and 32). */
+const CONTROL_CHARACTER = "/character/c0a1b2c3-0000-4000-8000-000000000002";
+
+results.push(
+  await journey("a fixed segment wins over an id param", async () => {
+    /** What is actually mounted, read as data, so a failure names the page instead of "the page". */
+    const mounted = () =>
+      js(`
+        const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+        const roots = {};
+        for (const sel of [".catalog", ".create-page", ".thread", ".compose-page", ".detail"]) {
+          roots[sel] = document.querySelectorAll(sel).length;
+        }
+        return {
+          title: document.title,
+          roots,
+          kickers: [...document.querySelectorAll(".kicker")].map((el) => clean(el.textContent).toLowerCase()),
+          forms: document.querySelectorAll("form").length,
+        };
+      `);
+
+    /** One sentence with every number a reader needs to see what mounted instead. */
+    const describe = (now) =>
+      `title ${JSON.stringify(now.title)}, roots ${JSON.stringify(now.roots)}, kickers ${JSON.stringify(now.kickers)}, forms ${now.forms}`;
+
+    const mountedPaths = [];
+    for (const segment of FIXED_SEGMENTS) {
+      const want = `${segment.title} — LuaPlot`;
+      const probe = `document.title === ${JSON.stringify(want)} && document.querySelector(${JSON.stringify(segment.root)}) !== null && document.querySelectorAll(".detail").length === 0 && [...document.querySelectorAll(".kicker")].some((el) => (el.textContent || "").replace(/\\s+/g, " ").trim().toLowerCase() === ${JSON.stringify(segment.kicker)})${segment.form ? ' && document.querySelector("form") !== null' : ""}`;
+      await go(segment.path);
+      try {
+        await waitFor(probe, `${segment.path} to mount its own page`, 8000);
+      } catch {
+        const now = await mounted();
+        throw new Error(
+          `${segment.path} did not mount its own page — read ${describe(now)}; wanted title ${JSON.stringify(want)}, root ${segment.root}, kicker ${JSON.stringify(segment.kicker)}${segment.form ? ", a mounted form" : ""}`,
+        );
+      }
+      const now = await mounted();
+      // The poll proves all four at once; this restates the one that a shared root could hide.
+      if (now.roots[".detail"] !== 0) throw new Error(`${segment.path} drew the detail page's root too: ${describe(now)}`);
+      mountedPaths.push(`${segment.path} → ${JSON.stringify(segment.kicker)}`);
+    }
+
+    // The control: same depth, a real uuid. The detail route must still win an id-shaped path.
+    await go(CONTROL_CHARACTER);
+    await waitText("Sonic the Hedgehog", 8000);
+    const control = await mounted();
+    if (control.roots[".detail"] !== 1) {
+      throw new Error(`the control id drew ${control.roots[".detail"]} .detail root(s) — read ${describe(control)}`);
+    }
+    if (control.roots[".catalog"] !== 0) throw new Error(`the control id mounted a catalog: ${describe(control)}`);
+    if (control.title !== "Character — LuaPlot") throw new Error(`the control's title reads ${JSON.stringify(control.title)}, not "Character — LuaPlot"`);
+
+    return `${FIXED_SEGMENTS.length} fixed segments each mount their own page (${mountedPaths.map((line) => line.split(" → ")[0]).join(", ")}) · control ${CONTROL_CHARACTER.slice(-12)} → .detail ×1 + "Sonic the Hedgehog"`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -2331,9 +2438,9 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32, T-49: 33, T-50: 34).
+ * T-36a: 32, T-49: 33, T-50: 34, T-51: 35).
  */
-const EXPECTED_ROWS = 34;
+const EXPECTED_ROWS = 35;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

@@ -3,6 +3,37 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-01 — T-51: a fixed segment wins over an id param
+
+- **Changed:** walk row **35** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 34 → 35) for the product law
+  *IDs carry identity, names never do. Fixed segments (`catalog`, `create`, `thread`) win over `[id]`
+  params*, the one law in `CONTRACT.md` that is a **precedence** rule and therefore invisible to every
+  existing gate. The row walks the nine literal siblings **as addresses** (no card press: the address
+  is the thing under test) — `/character/catalog`, `/character/create`, `/lorebook/catalog`,
+  `/lorebook/create`, `/preset/catalog`, `/preset/create`, `/persona/create`, `/post/thread`,
+  `/post/create` — and polls four landmarks read from the page files: its own root class
+  (`.catalog` / `.create-page` / `.thread` / `.compose-page`), its `.kicker` sentence
+  (`character catalog`, `new preset`, …), `document.title` = `<Title> — LuaPlot`, and on a create page
+  a mounted `<form>` (polled, not asserted on the first frame). Each poll also requires `.detail` to be
+  **absent**, which is the half that a shared root class cannot fake. The control half runs the other
+  direction — a real character uuid at the same depth must still reach the detail page — because a
+  router that made every segment literal would pass all nine lines and fail that one.
+  `/moderation` is absent from the list on purpose: `/moderation/[report.id]` is its only child, so it
+  has no fixed sibling at depth 2 to walk.
+- **Verified how:** `./scripts/check.sh` GREEN (build, 30 routes, schema, tauri, links, tiers — 5822
+  declarations, no text takes the mark). Walk **35/35** locally and **35/35 `--live`** against
+  `https://victor-viicell.github.io/LuaPlot/` (curl 200), evidence: `9 fixed segments each mount their
+  own page (/character/catalog, … /post/create) · control 000000000002 → .detail ×1 + "Sonic the
+  Hedgehog"`. Proved **red** first: with `ID` widened to `/^[0-9a-z-]{1,36}$/i` **and** `TABLE`'s sort
+  inverted to params-first, the row failed with `/character/catalog did not mount its own page — read
+  title "Character — LuaPlot", roots {".catalog":0,…,".detail":1}` and eight later rows fell with it;
+  `git checkout -- src/router.ts` restored the bytes (`git diff --stat src/router.ts` empty) before the
+  green runs.
+- **Not verified:** nothing mobile *on device* — headless Chromium at the walk's default 500×653 only;
+  the row measures nothing, so it takes no `Emulation.setDeviceMetricsOverride`. The id predicate itself
+  is still a literal regex in `src/router.ts` with no static gate over it: row 35 catches a router that
+  *routes wrongly*, not one that merely widened the predicate while the sort still saved it.
+
 ## 2026-11-01 — T-50: a persona carries none of the shared-item chrome
 
 - **Changed:** walk row **34** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 33 → 34) for the law *personas

@@ -406,6 +406,18 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       `.persona-card` per `.card-cell`, every card under the served base to a seeded persona id), and
       an unowned id reads the one sentence with no form and a road back to `/persona`. Proved red
       first by injecting a `Report` button. Brief: `docs/NEXT.md`.
+- [x] **T-51 A fixed segment wins over an id param.** The law *IDs carry identity, names never do.
+      Fixed segments (`catalog`, `create`, `thread`) win over `[id]` params* is a **precedence** rule
+      — `spec-routes.mjs` proves every route's page module resolves, never which row of the table
+      wins a path, so no gate could see it break. Row **35** (35/35 local and `--live`) walks the
+      nine literal siblings as addresses (`/character/catalog`, `/character/create`,
+      `/lorebook/catalog`, `/lorebook/create`, `/preset/catalog`, `/preset/create`,
+      `/persona/create`, `/post/thread`, `/post/create`) and reads four landmarks per page: its own
+      root class (`.catalog` / `.create-page` / `.thread` / `.compose-page`), its `.kicker`
+      sentence, `document.title`, and on a create page a mounted `<form>` — with `.detail`'s
+      **absence** as the other half. The control half opens a real uuid at the same depth and must
+      still reach the detail page. Proved red first: `/character/catalog` mounted the detail page
+      (`.detail ×1`, title `Character — LuaPlot`) and the row named it. Brief: `docs/NEXT.md`.
 
 ## Failure bank (the ways this class of product breaks)
 

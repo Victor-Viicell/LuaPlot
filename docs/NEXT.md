@@ -1,63 +1,64 @@
 # Baton — what the next session does
 
-**T-51 is the one ticket.** T-50 landed: `scripts/smoke.mjs` has row **34**, the walk is **34/34**
-locally and live, and *personas are personal (never shared, never moderated, never counted)* — the law
-about absences — now has a row that counts elements inside the page root. The next law with no
-mechanical guard is **"IDs carry identity, names never do. Fixed segments (`catalog`, `create`,
-`thread`) win over `[id]` params"**: it is a *precedence* rule, so no existing gate can see it —
-`spec-routes.mjs` proves each route's page module resolves, never that the table picks it.
+**T-52 is the one ticket.** T-51 landed: `scripts/smoke.mjs` has row **35**, the walk is **35/35**
+locally and live, and the *precedence* law — *IDs carry identity, names never do; fixed segments
+(`catalog`, `create`, `thread`) win over `[id]` params* — now has a row that walks each literal
+sibling as an address. The next law with no mechanical guard is **"Engagement is metadata on cards
+(ratio only) and actions on detail pages (counts live there)"**: it is a rule about *where a number
+lives*, and every gate reads presence — `tier-check.mjs` reads colours, `link-check.mjs` reads
+anchors, rows 30/31 measure a card's links and a token's contrast. Nothing has ever asserted that a
+**card** draws no counts, and nothing that a card's ratio is not a control.
 
-## T-51 — a fixed segment wins over an id
+## T-52 — engagement is a ratio on a card, and counts live on the detail page
 
-**Why it is next.** `CONTRACT.md` → *Product law*: *"IDs carry identity, names never do. Fixed
-segments (`catalog`, `create`, `thread`) win over `[id]` params."* `src/specs/luaplot-pages.md` repeats
-it and adds *"A user may hold several rows with the same name, so every address is an id."* The router
-gets this from `TABLE`'s sort (`src/router.ts`: fewer params first, then deeper) plus the id predicate
-(`/^[0-9a-f-]{36}$/i`), and **no row has ever opened a fixed sibling**: the walk reaches a detail page
-through a card, never by typing `…/catalog` or `…/create` beside an id route of the same depth. A sort
-that loses its param count, or an id predicate that loosens to `\w+`, would make `/character/catalog`
-render the character *detail* page with `id="catalog"` — the app would read *not found* on a route the
-spec guarantees, and every gate would stay green.
+**Why it is next.** `CONTRACT.md` → *Product law*: *"Engagement is metadata on cards (ratio only) and
+actions on detail pages (counts live there)."* `src/components/Card.tsrx` even says it in a comment —
+*"No comment count and no vote counts on a card: engagement on a listing is the ratio"* — and the
+component is handed the whole `AuthoredItem`, so a `likes`/`dislikes` pair is one interpolation away
+from every card in the app. The footer draws `<span class="card-ratio">{percent(ratioOf(item))}</span>`
+(line 219) and nothing else; a page that computed a count itself would be invisible to
+`tier-check.mjs`, `link-check.mjs` and every existing row. Row 30 measures the footer's *links* and
+row 31 measures a token's *contrast* — neither has ever asked what numbers a card prints.
 
 **Approach**
 
-1. One new row, **row 35** (bump `EXPECTED_ROWS` 34 → 35), read-only, placed after row 34 and before
-   `sign out` (so `sign out` stays last). It walks each literal sibling of a param route and asserts
-   the page that mounted is its own, by a landmark the detail page cannot draw:
-   `/character/catalog`, `/character/create`, `/lorebook/catalog`, `/lorebook/create`,
-   `/preset/catalog`, `/preset/create`, `/persona/create`, `/post/thread`, `/post/create`.
-2. Read `document.title` (it is `<Title> — LuaPlot` on a non-root route, `App.tsrx`) **and** one
-   landmark per page — the title alone is a string the code writes twice. For the catalogs that is
-   the grid (`.card-grid`) with a heading; for the create pages it is a mounted `form`; for
-   `/post/thread` check the page's own root class in `src/pages/post-thread.tsrx`. **Read the page
-   files first** — the same rule as row 34: a selector that is not in the file means the row is
-   mis-set, not the page broken.
-3. The **control** half: a uuid-shaped path of the same depth must still reach a detail page — one
-   `go("/character/c0a1b2c3-…-02")` with `waitText("Sonic the Hedgehog")` is enough, because a router
-   that made every segment literal would pass every line above and fail this one.
-4. `/post/thread` and `/post/create` are the pair the law is named for (`thread` is a fixed word at
-   the same depth as `[post.id]`), so they are not optional. `/moderation` has no fixed sibling at
-   depth 2 today — say that in the row's comment rather than inventing one.
+1. One new row, **row 36** (bump `EXPECTED_ROWS` 35 → 36), read-only, after row 35 and before
+   `sign out`.
+2. On `/character/catalog`: wait for `.skel-card` to be **gone** (the loading grid draws `.card-cell`s
+   too — T-50's find), then for every `.card-cell` that holds a card read the engagement surface:
+   exactly one `.card-ratio`, its text matching `/^\d{1,3}%$/`, and **zero** `.count`, `.counts`,
+   `.count-label`, `.count-value`, `.comments` inside the card. Read the ratio as `textContent`.
+3. Also assert the ratio is **not a control**: `ratio.closest("a, button, [role=button]")` is null and
+   its tag is `SPAN` — the card's only interactive children are the ones row 30 already measures.
+4. The presence half, so an empty grid cannot pass: a card count > 0, and the first card's title and
+   author link exist by name.
+5. The other side of the law: open one real character (`/character/c0a1b2c3-…-02`, *Sonic the
+   Hedgehog* — rows 6, 32 and 35 already read it) and assert `.counts[aria-label="Engagement"]`
+   mounts with at least a Likes and a Dislikes `.count`, each `.count-value` a number, **and** that
+   the vote actions live on that page (press nothing — `vote on it` already proves the write).
+6. `/post/thread` draws a **different** card component: read `src/components/PostCard.tsrx` first and
+   assert the same two facts there, or say in the row's comment that posts carry the ratio through
+   `Card` and no second surface exists.
 
 **Traps**
 
-- **A create page is a `<form>`; a catalog is not.** `/character/create` mounts `CharacterForm`, and
-  T-40's lesson applies: it draws its form only in its `ready` branch, so poll for the form rather
-  than asserting it on the first frame.
-- **`/persona/create` is signed-in-only and never walked.** If it fails, that is the ticket's find —
-  record it in PROGRESS and fix the cause (the router's param predicate, or the page), not the row.
-- **Do not assert the not-found screen for a bad id.** `/character/9e45…` is a *bucket* mismatch (a
-  persona id under `/character/`), and an id-shaped path is matched by the detail route on purpose —
-  the page renders its own refusal. Read a real character's page instead.
-- **The walk's tab is 500×653 by default**, and nothing in this row measures width, so no CDP
-  override is needed — do not add one; every override leaks unless it is cleared.
-- **The pages are paged.** A catalog at 360 draws one column of `.card-cell`; count the grid, never
-  the cards, when the assertion is "the catalog is here".
+- **A card's ratio rounds to whole percent**, so do not pin a number — an earlier row's vote changes
+  it (failure-bank entry: `96% → 96%`). Assert the *shape*, never `96%`.
+- **`/persona` has no ratio at all** (personas are never counted, T-50) and draws `.persona-card`, not
+  `.card-cell` — do not add it here; row 34 already counts that page's absences.
+- **NSFW Show/Blur must be the default when the row runs.** The footer sits outside the blur on
+  purpose (failure bank #1), so a blurred card still prints its ratio — but `/dev/state` is the row
+  that owns the pair and it restores it; do not flip it here.
+- **`.card-ratio` is display formatting** (`percent()` from `lib/format.ts`, via `ratioOf`), so the
+  assertion belongs in the walk, not in `schema.ts`. Nothing in this ticket adds a schema.
+- **The card re-measures its tags on a `ResizeObserver`** — read the ratio only after the grid has
+  settled (one `await sleep(150)` after the skeletons go is enough; row 35's poll shape works too).
 
-**Accept:** `./scripts/check.sh` GREEN; walk **35/35** locally and **35/35 `--live`**; row 35 proved
-**red** first (e.g. drop the param count from `TABLE`'s sort, or widen `ID` to `/^[0-9a-z-]{1,36}$/i`,
-watch `/character/catalog` mount the detail page and the row name it, then restore the exact bytes);
-`publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **36/36** locally and **36/36 `--live`**; row 36 proved
+**red** first (e.g. append `<span class="count">{item.likes}</span>` to `Card.tsrx`'s footer, watch the
+row name the card and the count it found, then restore the exact bytes); `publish.sh` prints `LIVE`
+and `curl` is 200.
+
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -114,11 +115,11 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Open decisions
 
-- **Row count is 34 (T-50, after T-49 extended theirs in place).** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 35 (T-51).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
-  adding a near-copy of it, and bump the count only when a row is genuinely new. **Row 34 is
-  read-only**: it opens an own persona, then `/persona`, then an unowned persona id — no write, no CDP
-  override, no shadow left behind.
+  adding a near-copy of it, and bump the count only when a row is genuinely new. **Row 35 is
+  read-only**: it walks nine literal addresses plus one uuid, no write, no CDP override, no shadow
+  left behind.
 - **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
   page prints one, and the base rule is the thing under test), measures it resting and through
   `CSS.forcePseudoState`, takes its own 900px `Emulation.setDeviceMetricsOverride` for the rail, and
@@ -149,7 +150,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 34 after T-50; 35 is T-51's.** Row 32 shadows `visualViewport.height`, takes its
+- **Row count is 35 after T-51; 36 is T-52's.** Row 32 shadows `visualViewport.height`, takes its
   own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
   shadow is gone, the token is back to `0px` and the session is back at the browser's own window
   size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
@@ -160,6 +161,25 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   `--color-accent-contrast`. `DESIGN.md` → *Contrast* carries it.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **A precedence law's red proof needs *both* halves (T-51).** Neither edit the ticket suggested is red
+  on its own: widening `ID` to `/^[0-9a-z-]{1,36}$/i` still mounts the catalog, because `TABLE` sorts
+  fewer-params-first and the literal route is tried before the predicate is ever consulted; dropping the
+  param count from the sort still mounts it, because `Array.prototype.sort` is stable and `ROUTES`
+  declares `catalog`/`create` before `[id]` — depth-only ordering is a no-op. The red proof is the two
+  together (`ID` widened **and** the sort inverted to params-first). Say so in any accept line that
+  offers "either", or the next session burns a walk proving nothing.
+- **A root class shared by a component is not a landmark (T-51).** `CommentThread.tsrx` draws
+  `<div class="thread">`, the same class as `/post/thread`'s page root, and a broken router lands on a
+  *detail* page that renders it. Key a page on its own `.kicker` sentence **plus** the absence of
+  `.detail` — the shared class alone would pass on the wrong page.
+- **`document.title` carries an em dash, not a hyphen.** `App.tsrx` writes `` `${def.title} — LuaPlot` ``
+  (U+2014), so a probe built with `- LuaPlot` never matches and reads as a timed-out page. Copy the
+  literal from `App.tsrx`.
+- **A whitespace collapse needs `\\s` per template level.** `js(\`…\`)` unescapes once, so `\\s` in the
+  file reaches `Runtime.evaluate` as `\s` (whitespace) — while the `\\\\s` written in every older row
+  reaches it as `\\s`, a literal backslash followed by `s`, and collapses nothing. Harmless where those
+  rows compare a value with no inner spaces; a trap for a new probe that needs the collapse to work.
 
 - **A loading state can satisfy an absence count (T-50).** `/persona` draws **three `.card-cell`s of
   skeletons** before it draws a card, so a row that counted cells on the first frame read `3` on a
