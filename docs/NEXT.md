@@ -216,6 +216,13 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   `/\\/character\\/[0-9a-f-]{36}$/` is `SyntaxError: Invalid regular expression flags`, reported at
   the literal itself — `node --check scripts/smoke.mjs` is the two-second gate, as it is for every
   other trap in this file.
+- **`location.pathname` carries the served base; `go()` wants an app path (T-59).** On the preview
+  they are the same (`/session/<id>`), on Pages they are not (`/LuaPlot/session/<id>`), so
+  `go(await url())` **doubles** the base into `/LuaPlot/LuaPlot/session/<id>` — a 404-shaped app whose
+  missing control reads exactly like a broken page (`timed out waiting for the copies disclosure
+  (after the edit)`, live only, 42/42 local the same hour). Keep the id (`pathname.split("/").pop()`)
+  and rebuild the path, and run `--live` before claiming any row that navigates back to a page it
+  read earlier.
 - **A row that publishes leaves a post behind (T-59).** Row 42's cut is the walk's **newest** post, so
   `/post/thread?sort=newest`'s first card is that cut for every row after it — a reasonable way to
   find it by its body (`ownCut` is a module constant), never by an id.

@@ -25,8 +25,11 @@ could not be verified.
   character (`getCharacter(sourceId)` then overwrite the copy) → row 42 read *"the copy followed the
   author's edit: the Character copy read \"Aurelia\" before … and \"Aurelia Rebuilt\" after … character
   detail \"From Aurelia of the Long Tide · version 4\""* (41/42); the exact bytes restored and
-  `sha256sum -c` clean. `publish.sh` printed `LIVE`, the URL answers 200 and the `--live` walk is
-  42/42.
+  `sha256sum -c` clean. The **`--live` run then caught a second, real trap**: the row navigated back
+  with `go(await url())`, and `location.pathname` carries the `/LuaPlot/` base on Pages, so the base
+  was doubled and the row read *"timed out waiting for the copies disclosure (after the edit)"* — the
+  row now keeps the id and rebuilds `/session/<id>` / `/post/<id>`. After that: 42/42 local, 42/42
+  `--live`, `publish.sh` printed `LIVE` and the URL answers 200.
 - **Not verified:** nothing on the Supabase side (T-29/T-30) — the copy rule is proven in the memory
   adapter only; the DB half is the same row's rerun once the project ref exists.
 

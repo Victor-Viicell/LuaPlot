@@ -4016,6 +4016,8 @@ results.push(
     await clickAny(["Continue", "Start a session"]);
     await waitFor(`/\\/session\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the session route", 8000);
     const sessionPath = await js(`return location.pathname;`);
+    /** `location.pathname` carries the served base on Pages — `go()` takes an app path, so keep the id. */
+    const sessionId = sessionPath.split("/").filter(Boolean).pop();
 
     // 2. The copy as the session draws it, and the link back to the item it came from.
     const before = await openCopies("before the edit");
@@ -4089,7 +4091,7 @@ results.push(
     // 4. Back to the session, in ONE reading: the copy's name, state, line of fact and controls are
     //    exactly what step 2 read. A page that refreshes the copy on mount flips the state and is the
     //    bug — and a copy whose name followed the author proves the session joined the live row.
-    await go(sessionPath);
+    await go(`/session/${sessionId}`);
     const after = await openCopies("after the edit");
     const copyAfter = characterRow(after);
     if (!copyAfter) throw new Error(`the session at ${sessionPath} lost its Character copy — ${describe(after, null)}`);
@@ -4139,6 +4141,7 @@ results.push(
     await click("Publish", { exact: true });
     await waitFor(`/\\/post\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the published post's own page", 10000);
     const postPath = await js(`return location.pathname;`);
+    const postId = postPath.split("/").filter(Boolean).pop();
 
     /** The post as the reader sees it: its body, and the cut's stamped lines. */
     const readPost = () =>
@@ -4190,7 +4193,7 @@ results.push(
       8000,
     );
 
-    await go(postPath);
+    await go(`/post/${postId}`);
     try {
       await waitFor(`document.querySelectorAll(".cut-turn").length > 0`, "the cut again", 10000);
     } catch (error) {
