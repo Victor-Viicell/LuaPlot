@@ -3,6 +3,47 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-54: a cover keeps the chrome and the numbers outside it
+
+- **Changed:** walk row **38** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 37 → 38) for failure-bank
+  entry 1 — *Card blur hides the numbers → footer stays outside the blur* — and `nsfw.md` → *Rules*
+  → *Blur is structural*: *"the top header is the title and the bottom footer is a single row holding
+  the author beside the ratio as a percentage … The blurred area is exactly what sits between them …
+  **The numbers are never hidden** — only the body is covered."* No gate had ever rendered a
+  **covered** card (row 36 measures counts with Blur off, row 25 counts `.is-covered` and stops, row
+  37 covers a *detail* page), so `.card-foot` moved one indentation inside `.card-veil` stayed green
+  everywhere. The row records the seed pair from `/dev/state`, turns **Show and Blur on**, and reads
+  every covered catalogue card as data: `.card-head` / `.card-foot` / `.card-ratio` present and
+  `veil.contains(...) === false` for all three, ratio **inside** the footer, `aria-hidden="true"` on
+  the veil, `Reveal` inside `.card-cover` and **outside** the veil, zero
+  `.card-ratio`/`.card-author`/`.count` inside it. One press of the **first covered card's** Reveal
+  (scoped to `.card.is-covered .card-cover button`, `exact`) must drop the covered count by exactly
+  one, uncover that card, remove its control, and leave every other covered card covered **in the
+  same order** — *revealing one item never reveals the rest*. The feed half repeats the split on
+  `.card.post.is-covered`: `.post-head`, two `.post-count` cells and `.post-comments` outside
+  `.post-veil`, `aria-hidden="true"` on the veil, no count inside it. The pair is re-read after the
+  Reveals (a reveal writes no preference) and then restored to the recorded seed with the listing
+  asserted against it.
+- **Found while working (the ticket's fixture was gone):** case 2 targets **post 7**, the only
+  `nsfw: true` post, and row 21 concludes that case as *removed* — so by row 38 the feed drew **11
+  post cards and none `17/6`**. The row now **composes its own flagged post** (composer + **NSFW**
+  toggle on, which `nsfw.md` covers like anyone else's content) rather than passing on an empty set;
+  the false start is recorded in `docs/NEXT.md`.
+- **Verified how:** `./scripts/check.sh` GREEN (build, 30 routes, schema, 52 anchors, tauri, tiers —
+  5822 declarations); walk **38/38** locally, evidence `catalog: 4/24 card(s) covered, chrome + "77%"
+  ratio outside the veil (veil filter "blur(6px)"), 0 numbers inside; Reveal on "Auntie Sorrow" → 3
+  covered, the order kept · thread: 1/12 post card(s) covered, two counts ["0","0"] + a comment link
+  outside .post-veil, 0 numbers inside · restored Show false / Blur false · 20 card(s), "Hollow Saint"
+  absent, 0 covered`; walk **38/38 `--live`** against `https://victor-viicell.github.io/LuaPlot/`
+  (curl 200) after `publish.sh` printed `LIVE`. **Proved red first:** `.card-foot` moved inside
+  `.card-veil` in `Card.tsrx` read `the covered card "Auntie Sorrow" does not keep its chrome outside
+  the veil: head true (title outside the veil true), footer true (outside the veil false), ratio true
+  (in the footer true, outside the veil false), author outside the veil false … numbers inside the
+  veil [".card-author",".card-ratio"] — 4/4 covered card(s) fail`; the file was restored from a copy
+  and `sha256sum -c` confirmed the exact bytes (`f210f3fe…6e5dd8`).
+- **Not verified:** the paging half of the thread (`Load more` never pressed — 12 listed posts against
+  `PAGE_SIZE` 24); no Tauri/Android build on this box.
+
 ## 2026-11-02 — T-53: a viewer's NSFW filter hides a listing, never a route
 
 - **Changed:** walk row **37** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 36 → 37) for the product law

@@ -1,81 +1,77 @@
 # Baton — what the next session does
 
-**T-54 is the one ticket.** T-53 landed: `scripts/smoke.mjs` has row **37** (walk **37/37** locally and
-**37/37 `--live`**), and failure-bank entry 4 — *NSFW preference treated as access control (404s)* — is
-now measured, not asserted by hand: with Show off the catalogue drops *Hollow Saint* (24 cards with
-Show on → 20 with it off) while `/character/…0004` still **resolves** by address, draws its chrome,
-covers only its body (`.veiled.is-covered` + `aria-hidden="true"`) and keeps its four engagement
-cells. The next unguarded law is failure-bank entry **1**, and the T-53 row is what makes it visible:
-**the cover has to leave the numbers outside it** — and no row has ever looked at a *covered* card.
+**T-55 is the one ticket.** T-54 landed: `scripts/smoke.mjs` has row **38** (walk **38/38** locally and
+**38/38 `--live`**), and failure-bank entry 1 — *Card blur hides the numbers* — is now measured on a
+**covered** card: 4 of 24 catalogue cards carry `is-covered`, their `.card-head`/`.card-foot`/
+`.card-ratio` sit **outside** `.card-veil` (`veil.contains(...) === false`), the veil carries
+`aria-hidden="true"` and holds zero numbers, one `Reveal` press drops the covered count by exactly one
+and keeps the rest covered in order, and a seeded flagged post shows the same split on the feed
+(`.post-head` / `.post-counts` ×2 / `.post-comments` outside `.post-veil`). The row proved **red**
+first — `.card-foot` moved inside `.card-veil` read `footer true (outside the veil false), ratio true
+(in the footer true, outside the veil false) … 4/4 covered card(s) fail`. The next unguarded law is
+failure-bank entry **3**, and no row has ever read a query string or pressed Back.
 
-## T-54 — a cover is structural: the chrome and the numbers stay outside it
+## T-55 — the thread's sort is a URL fact, and Back is the proof
 
-**Why it is next.** `src/specs/systems/nsfw.md` → *Rules*, *Blur is structural*: *"The unit keeps its
-chrome. On a catalog card the top header is the title and the bottom footer is a single row holding
-the author beside the ratio as a percentage … The blurred area is exactly what sits between them —
-the avatar, the tagline, and the tags … **The numbers are never hidden** — only the body is
-covered."* And `SHIP-PLAN.md`'s failure bank puts it first: *"Card blur hides the numbers → footer
-stays outside the blur (T-08)"*. `Card.tsrx` implements the split deliberately — `.card-head` (title),
-`.card-middle > .card-veil`, `.card-foot` (author + `.card-ratio`) — with a comment calling it
-load-bearing, and `PostCard.tsrx` mirrors it (`.post-head`, `.post-veil`, `.post-foot` with
-`.post-counts` + `.post-comments`). **No gate can see any of it:** row 36 measures the counts with
-**no blur on**, so it never renders a covered card; row 25 counts `.card.is-covered` and stops; row 37
-reads the *detail* page's cover. Moving `.card-foot` inside `.card-veil` — one indentation — would
-leave every gate green and hide every ratio behind a blur, and the spec calls that the worst thing on
-the page.
+**Why it is next.** `src/specs/pages/post/thread.md` → *URL*: *"Sorting and filtering live in the
+query string, per the conventions, so a filtered thread is shareable"*; → *Layout*: *"**Load more**
+sits at the bottom … paging stays out of the URL"*. `SHIP-PLAN.md`'s failure bank entry 3 is
+*"`Load more` state lost on back → paging in component state, filters in URL"*: the product answer is
+**sort in the URL, paging in component state**. `post-thread.tsrx` implements exactly that
+(`writeSort()` writes `?sort=` by `pushState`, `newest` writes **no** param, `loadMore()` never touches
+the URL) and **no gate can see any of it**: no row calls `choose("select.select-input", …)` on the
+thread, no row reads `location.search`, and no row has ever called `history.back()` — row 4 hops with
+`go()` (a `pushState` + `popstate`), which is the *forward* direction only.
+
+**The suspicion to settle, not assume.** `sort = track(readSort(useQuery()))` is read **once** at
+mount, and `chooseSort()` is the only writer. So a real **Back** from `?sort=liked` to
+`?sort=discussed` may repaint the URL and leave the listing sorted the old way (the `Select` reads its
+own `value` from the same frozen track, so it would agree with the listing and disagree with the URL).
+The row is written to catch that; if it fires, fix `post-thread.tsrx` by following the query (an
+`onQuery`/`useQuery` subscription that calls `chooseSort`-without-push, keeping `seq`), **not** by
+loosening the row.
 
 **Approach**
 
-1. One new row, **row 38** (bump `EXPECTED_ROWS` 37 → 38), after row 37 and before `sign out`.
-2. **Record the pair, never assume it.** Row 25's and row 37's helpers: `toggleState(...)` for the
-   seed, `setToggle("Show NSFW content", true)` + `setToggle("Blur NSFW content", true)` for the
-   state under test. Blur only matters while Show is on (`nsfw.md`), so both are needed here — this
-   is the one row that genuinely wants Blur on.
-3. **Catalogue half.** `/character/catalog`, wait for `.skel-card` **gone**, then read every
-   `.card.is-covered` as data and assert per card: `.card-head .card-title` and `.card-foot` exist
-   and **are not** descendants of `.card-veil` (`veil.contains(...) === false`, not a sibling guess);
-   `.card-ratio` sits inside `.card-foot` and outside `.card-veil`; `.card-veil` carries
-   `aria-hidden="true"`; a `Reveal` button is inside `.card-cover`; and **zero**
-   `.card-ratio`/`.card-author`/`.count` inside the veil. Assert covered cards > 0 or the row proves
-   nothing (T-53's lesson: the seed account has Blur **off**, so this row must turn it on).
-4. **One reveal reveals one item.** With ≥1 covered card, press the *first* card's `Reveal` (scope the
-   press to that card, `exact: true` — a page-level `click("Reveal")` presses whichever card answers
-   first) and assert the covered count drops by exactly **1**, the pressed card is no longer
-   `is-covered`, and every other covered card still is. That is the spec's *"Revealing one item never
-   reveals the rest"*, which nothing measures today.
-5. **Thread half.** `/post/thread`, wait for `.skel-card` **gone** (T-52's find: the thread's loading
-   state draws three `.skel-card`s, not `.card-cell`s), and assert the same split on every
-   `.card.post.is-covered`: `.post-counts` (two `.post-count` cells) and `.post-comments` are outside
-   `.post-veil`, `aria-hidden="true"` is on the veil, and the veil holds no count. Fixture: post 7 is
-   NSFW (`lib/fixtures/posts.ts`) — **verify it is on page one** before pinning anything; if it is
-   not, the row reports it rather than passing on an empty set.
-6. **Restore in a way that cannot mask the failure.** T-53's shape: capture the body error, restore
-   the recorded seed pair in a second `try`, assert the pair and the listing back, then rethrow the
-   body error — a restore failure is reported *with* the body failure, never instead of it.
+1. One new row, **row 39** (bump `EXPECTED_ROWS` 38 → 39), after row 38 and before `sign out`.
+2. **The control and the URL.** `go("/post/thread")`; wait for `.skel-card` **gone** and
+   `select.select-input` present. Read `select.select-input`'s `value` (should be `newest`) and
+   `location.search` (should be `""` — `newest` is written *out* of the URL). Then
+   `choose("select.select-input", "discussed")` (T-41's helper — a native `<select>` needs a `change`
+   event, not a `.click()`), poll until `location.search === "?sort=discussed"`, and assert the feed
+   re-fetched (`.skel-card` appears and goes, or the first card's counts change — do not pin order).
+3. **Shareable.** Open `…/post/thread?sort=discussed` **by address** (a fresh document, `go()` is
+   enough but `newWindow` is not needed): the `select` must already read `discussed` and the URL must
+   keep the param. That is the spec's *shareable* — a loaded page, not a pressed control.
+4. **Back is a history entry.** From `?sort=discussed` choose `liked` (now `?sort=liked`), then
+   `history.back()`, then wait for the URL to read `?sort=discussed` **and** for the `select` to read
+   `discussed`; a second `history.back()` must land on `""` with `newest`. `waitUrl` is a substring
+   match, so assert `location.search` **exactly** (`""` vs `"?sort=..."`), never a `String#includes`.
+   `history.back()` is asynchronous in the router (`popstate` → emit): poll, do not `sleep` once.
+5. **Paging stays out of the URL.** With 12 listed posts (`PAGE_SIZE` 24) the feed **has no Load
+   more** — assert `.pager-action` is absent *and* say so in the evidence, so the row cannot pretend
+   it pressed one. The paging half of failure-bank entry 3 is **not walkable** until a seed with 25+
+   posts exists; file that as a ticket rather than publishing 13 posts inside the walk.
+6. Leave the page clean: end on `/post/thread` with no query (row 39 is read-only — no store write, no
+   CDP override, no probe), then `sign out` stays the walk's last row.
 
 **Traps**
 
-- **This row owns the NSFW pair too, and now two rows do.** Each records its own seed and restores
-  it; never hard-code `true/true`, and re-read `/dev/state` before returning. A leak makes every
-  later run read a flipped account.
-- **`innerText` uppercases `.count-label` and `.post-count-label`** — read labels through
-  `textContent`, and only when the label matters.
-- **The pressed card's Reveal must be scoped by card**, not by index into a page-wide list: the DOM
-  order changes with the sort, and `click()`'s `nth` counts *visible* matches.
-- **`card-cover` is inside `.card-middle`, beside the veil** — a containment assertion built on
-  `.card` descendants would pass even if the Reveal overlay were inside the blurred area. Assert
-  inside `.card-cover` **and** outside `.card-veil`.
-- **A covered card still renders its tags twice**: the real `.card-tags` and an `aria-hidden="true"`
-  measuring mirror (`.card-tags.is-measure`). Counting tags on a card reads double; do not.
-- **Do not assert a blur radius.** Whether the veil is `filter: blur()` or an overlay is a
-  `DESIGN.md` decision that has changed once; the spec's law is *what* is covered, and the DOM split
-  is the honest proof. If a visual check is wanted, measure the veil's computed `filter` and record
-  it in the evidence line — never gate on the number.
+- **`newest` is the absence of a param** (`writeSort` writes `""`), so a `?sort=newest` assertion is
+  wrong in both directions.
+- **`sort` is a one-time read of `useQuery()`.** This is the bug the row exists for; if it goes red,
+  the fix is a query subscription, not a second sort write.
+- **`choose()` sets `.value` then dispatches `change`** — it returns the value it read, so it proves
+  the control, never the page. The URL and the feed need their own reads.
+- **A `history.back()` in the walk goes back through the walk's own hops** unless the row's first
+  action is the `go("/post/thread")` it just made; count entries rather than assuming a single step.
+- **The `Select` repaints from the same frozen track** as the listing, so "the control agrees with the
+  listing" can be true while both disagree with the URL. Read all three.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **38/38** locally and **38/38 `--live`**; row 38 proved
-**red** first (move `.card-foot` inside `.card-veil` in `Card.tsrx`, watch the row name the card, the
-footer's absence and the ratio inside the veil, then restore the exact bytes — sha256 the file before
-and after); `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **39/39** locally and **39/39 `--live`**; row 39 proved
+**red** first (if the Back half is broken, that *is* the red proof — capture the message, fix, and
+re-run; otherwise freeze the sort track by hand, sha256 the file before and after); `publish.sh` prints
+`LIVE` and `curl` is 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -132,14 +128,16 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Open decisions
 
-- **Row count is 37 (T-53).** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 38 (T-54).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
   adding a near-copy of it, and bump the count only when a row is genuinely new. **Rows 36 and 37 are
   read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the thread;
   row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write is left
-  behind. **Row 38 (T-54) will own the NSFW pair as well** — it needs Show + Blur *on* to render a
-  covered card, so it must record its own seed, restore **that**, and assert the restore, or every
-  later run reads a flipped account.
+  behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a covered card, so it
+  records its own seed, restores **that**, and asserts the restore. It also **composes a flagged
+  post** (NSFW toggle on) because row 21 removes the only fixture one, and it presses nothing that
+  writes preferences: the Reveal is per-mount. Anything after it must assume the pair is the seed
+  and the store holds one extra flagged post.
 - **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
   page prints one, and the base rule is the thing under test), measures it resting and through
   `CSS.forcePseudoState`, takes its own 900px `Emulation.setDeviceMetricsOverride` for the rail, and
@@ -170,7 +168,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 37 after T-53; 38 is T-54's.** Row 32 shadows `visualViewport.height`, takes its
+- **Row count is 38 after T-54; 39 is T-55's.** Row 32 shadows `visualViewport.height`, takes its
   own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
   shadow is gone, the token is back to `0px` and the session is back at the browser's own window
   size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
@@ -182,6 +180,21 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **The walk removes the only NSFW post before row 38 can read it (T-54).** Case 2's target is post 7
+  (`lib/fixtures/posts.ts`, the only `nsfw: true` post), and row 21 concludes that case as *removed*,
+  so `livePost` drops it from every listing for the rest of the run: the feed drew **11 post cards and
+  none `17/6`**. A later row that wants a covered post card must compose one (the composer's **NSFW**
+  toggle is `post/create.md`'s own control) — a fixture flag is not a fixture *on the page*.
+- **A row that seeds a post changes what later rows count.** Row 38's composed flagged post makes the
+  feed 12 cards; do not pin a post count anywhere after it.
+- **`.card-veil`, `.card-head` and `.card-foot` are siblings, so `veil.contains(...)` is the only
+  honest containment test.** A "is it a descendant of `.card`" check passes on a footer that was moved
+  *into* the blur — T-54's red proof read `footer true (outside the veil false)` on a page whose card
+  still had a footer.
+- **`.card-cover` is inside `.card-middle`, beside the veil**, so the Reveal needs its own
+  containment check (`coverOutsideVeil`) — a check against `.card` proves nothing.
+- **The cover is a `filter` on the veil, not an overlay, today** (measured `blur(6px)` in row 38's
+  evidence). Record it, never gate on it: `DESIGN.md` has changed this once already.
 - **The walk's account seeds Show **off** / Blur **off** (measured by T-53's seed read).** So an
   absence-only listing assertion is **vacuous**: the catalogue already omits every NSFW row before the
   row touches anything. Measure **both directions** — with Show on the same page prints the row

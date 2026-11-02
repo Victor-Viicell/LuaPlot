@@ -2810,6 +2810,330 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-54 — the law that a cover is **structural**: *Blur is structural. The unit keeps its chrome. On
+ * a catalog card the top header is the title and the bottom footer is a single row holding the
+ * author beside the ratio as a percentage; the bottom line carries no comment count. The blurred
+ * area is exactly what sits between them — the avatar, the tagline, and the tags … **The numbers
+ * are never hidden** — only the body is covered* (`src/specs/systems/nsfw.md` → *Rules*). Failure
+ * bank entry 1. No row had ever looked at a **covered** card: row 36 measures the counts with Blur
+ * off, row 25 counts `.card.is-covered` and stops, row 37 covers a *detail* page.
+ *
+ * Moving `.card-foot` inside `.card-veil` is one indentation and every other gate stays green, so
+ * this row reads the split as a **containment** question per covered card: `.card-head` and
+ * `.card-foot` exist, `.card-ratio` sits in the footer, and `veil.contains(...)` is false for all
+ * three — a sibling guess would pass on a card that drew the footer twice. `.card-veil` must carry
+ * `aria-hidden="true"`, a `Reveal` must sit in `.card-cover` (beside the veil inside `.card-middle`,
+ * so it needs its own containment check), and **zero** `.card-ratio`/`.card-author`/`.count` may
+ * live inside the veil.
+ *
+ * The second half is the spec's *Revealing one item never reveals the rest*: with ≥1 covered card,
+ * press the **first** covered card's Reveal (scoped to `.card.is-covered .card-cover button`, never
+ * a page-level `click("Reveal")`, which presses whichever card answers first), then assert the
+ * covered count fell by exactly one, the pressed card is no longer `is-covered`, and every other
+ * covered title is still there **in the same order**.
+ *
+ * The thread half repeats the split on `/post/thread`: `.post-head`, `.post-counts` (two
+ * `.post-count`) and `.post-comments` outside `.post-veil`, `aria-hidden="true"` on the veil, and
+ * no count inside it. Post 7 (`lib/fixtures/posts.ts`) is the only NSFW post; if the thread draws
+ * no covered card the row says so instead of passing on an empty set.
+ *
+ * **This row owns the NSFW pair too.** It records the seed from `/dev/state`, turns Show **and**
+ * Blur on (Blur only matters while Show is on — `nsfw.md`), re-reads the pair after the Reveals
+ * (a reveal is a look, not a preference), then restores the recorded seed and asserts the listing
+ * agrees with it. The restore runs in its own `try` and reports **with** the body failure.
+ *
+ * Sits after row 37 and before `sign out`, so `sign out` stays the walk's last row.
+ * -------------------------------------------------------------------------------------------- */
+const COVER_CHARACTER_NAME = "Hollow Saint";
+/** The flagged post this row composes for the thread half — row 21 removes the only fixture one. */
+const COVER_POST_BODY = "Smoke walk: the flagged post that measures a covered card's split.";
+
+results.push(
+  await journey("a cover keeps the chrome and the numbers outside it", async () => {
+    await go("/dev/state");
+    await waitFor(`document.querySelectorAll("button.toggle").length === 2`, "/dev/state's two toggles", 8000);
+    const seedShow = (await toggleState("Show NSFW content")) === "true";
+    const seedBlur = (await toggleState("Blur NSFW content")) === "true";
+
+    /**
+     * `/character/catalog` read as data: every card's title, the covered cards in DOM order, and
+     * each covered card's own containment. The reveal press and the restore both re-read through
+     * this, so one definition answers "what is on the page" for the whole row.
+     */
+    const readCatalog = async () => {
+      await go("/character/catalog");
+      await waitFor(
+        `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".card").length > 0`,
+        "the character catalog to leave its skeletons behind",
+        8000,
+      );
+      // The card re-measures its tags on a ResizeObserver; the footer is read once the grid settles.
+      await sleep(150);
+      return js(`
+        const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+        const title = (card) => clean((card.querySelector(".card-head .card-title") || card.querySelector(".card-title") || {}).textContent);
+        const cards = [...document.querySelectorAll(".card")];
+        const covered = cards.filter((card) => card.classList.contains("is-covered"));
+        const read = (card) => {
+          const veil = card.querySelector(".card-veil");
+          const head = card.querySelector(".card-head");
+          const name = card.querySelector(".card-head .card-title");
+          const foot = card.querySelector(".card-foot");
+          const ratio = card.querySelector(".card-ratio");
+          const author = card.querySelector(".card-author");
+          const cover = card.querySelector(".card-cover");
+          return {
+            title: title(card),
+            head: head !== null,
+            titleOutsideVeil: !!name && !!veil && !veil.contains(name),
+            foot: foot !== null,
+            footOutsideVeil: !!foot && !!veil && !veil.contains(foot),
+            ratio: ratio !== null,
+            ratioText: ratio ? clean(ratio.textContent) : "",
+            ratioInFoot: !!ratio && !!foot && foot.contains(ratio),
+            ratioOutsideVeil: !!ratio && !!veil && !veil.contains(ratio),
+            authorOutsideVeil: !!author && !!veil && !veil.contains(author),
+            veilAria: veil ? veil.getAttribute("aria-hidden") : null,
+            veilFilter: veil ? getComputedStyle(veil).filter : "",
+            revealInCover: !!cover && cover.querySelector("button") !== null,
+            coverOutsideVeil: !!cover && !!veil && !veil.contains(cover),
+            insideVeil: [...(veil ? veil.querySelectorAll(".card-ratio, .card-author, .count, .counts, .count-label, .count-value") : [])]
+              .map((el) => "." + String(el.className).split(" ").filter(Boolean).join(".")),
+          };
+        };
+        return {
+          cards: cards.length,
+          titles: cards.map(title),
+          covered: covered.map(read),
+          coveredTitles: covered.map(title),
+        };
+      `);
+    };
+
+    let bodyError = null;
+    let catalogHalf = "";
+    let threadHalf = "";
+    let restoreHalf = "";
+
+    try {
+      // Blur only matters while Show is on, so this row needs the pair — and it owns it.
+      await setToggle("Show NSFW content", true);
+      await setToggle("Blur NSFW content", true);
+
+      const catalog = await readCatalog();
+      if (catalog.covered.length === 0) {
+        throw new Error(
+          `no .card.is-covered on /character/catalog with Show + Blur on — ${catalog.cards} card(s) drawn (${JSON.stringify(catalog.titles.slice(0, 4))}…); a cover rule read over zero covered cards proves nothing`,
+        );
+      }
+      const broken = catalog.covered.filter(
+        (one) =>
+          !one.head ||
+          !one.title ||
+          !one.titleOutsideVeil ||
+          !one.foot ||
+          !one.footOutsideVeil ||
+          !one.ratio ||
+          !one.ratioInFoot ||
+          !one.ratioOutsideVeil ||
+          !one.authorOutsideVeil ||
+          one.veilAria !== "true" ||
+          !one.revealInCover ||
+          !one.coverOutsideVeil ||
+          one.insideVeil.length > 0,
+      );
+      if (broken.length > 0) {
+        const one = broken[0];
+        throw new Error(
+          `the covered card ${JSON.stringify(one.title)} does not keep its chrome outside the veil: head ${one.head} (title outside the veil ${one.titleOutsideVeil}), footer ${one.foot} (outside the veil ${one.footOutsideVeil}), ratio ${one.ratio} (in the footer ${one.ratioInFoot}, outside the veil ${one.ratioOutsideVeil}), author outside the veil ${one.authorOutsideVeil}, veil aria-hidden ${JSON.stringify(one.veilAria)}, Reveal in .card-cover ${one.revealInCover} (outside the veil ${one.coverOutsideVeil}), numbers inside the veil ${JSON.stringify(one.insideVeil)} — ${broken.length}/${catalog.covered.length} covered card(s) fail; nsfw.md → Rules says the numbers are never hidden`,
+        );
+      }
+
+      // One reveal reveals one item — and only the one that was pressed.
+      const beforeTitles = catalog.coveredTitles;
+      await click("Reveal", { exact: true, scope: ".card.is-covered .card-cover button" });
+      const afterReveal = await js(`
+        const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+        const title = (card) => clean((card.querySelector(".card-head .card-title") || card.querySelector(".card-title") || {}).textContent);
+        const cards = [...document.querySelectorAll(".card")];
+        const covered = cards.filter((card) => card.classList.contains("is-covered"));
+        const pressed = ${JSON.stringify(beforeTitles[0])};
+        return {
+          total: cards.length,
+          covered: covered.length,
+          titles: covered.map(title),
+          pressedCovered: cards.filter((card) => title(card) === pressed && card.classList.contains("is-covered")).length,
+          pressedCards: cards.filter((card) => title(card) === pressed).length,
+          pressedReveal: cards.filter((card) => title(card) === pressed).reduce((n, card) => n + card.querySelectorAll(".card-cover button").length, 0),
+        };
+      `);
+      if (afterReveal.covered !== beforeTitles.length - 1) {
+        throw new Error(
+          `Reveal on one card took the covered count to ${afterReveal.covered}, not ${beforeTitles.length - 1} — before ${JSON.stringify(beforeTitles)}, after ${JSON.stringify(afterReveal.titles)}; one reveal reveals one item, never the rest`,
+        );
+      }
+      if (afterReveal.pressedCards !== 1) {
+        throw new Error(`the pressed title ${JSON.stringify(beforeTitles[0])} matches ${afterReveal.pressedCards} card(s) — the reveal assertion needs a unique title`);
+      }
+      if (afterReveal.pressedCovered !== 0) {
+        throw new Error(`the pressed card ${JSON.stringify(beforeTitles[0])} is still is-covered after its own Reveal`);
+      }
+      if (JSON.stringify(afterReveal.titles) !== JSON.stringify(beforeTitles.slice(1))) {
+        throw new Error(
+          `Reveal changed the other cards: covered before ${JSON.stringify(beforeTitles)}, after ${JSON.stringify(afterReveal.titles)}`,
+        );
+      }
+      if (afterReveal.pressedReveal !== 0) {
+        throw new Error(`the pressed card still draws ${afterReveal.pressedReveal} Reveal control(s) — a revealed card offers none`);
+      }
+      catalogHalf = `${catalog.covered.length}/${catalog.cards} card(s) covered, chrome + ${JSON.stringify(catalog.covered[0].ratioText)} ratio outside the veil (veil filter ${JSON.stringify(catalog.covered[0].veilFilter)}), 0 numbers inside; Reveal on ${JSON.stringify(beforeTitles[0])} → ${afterReveal.covered} covered, the order kept`;
+
+      // The thread's card is the other component: `thread.md` fixes counts in its footer.
+      //
+      // **The row seeds its own flagged post.** Case 2 targets post 7 — the only NSFW post in
+      // `lib/fixtures/posts.ts` — and row 21 concludes that case as *removed*, which takes post 7
+      // off every listing before this row runs (measured: 11 post cards, none `17/6`). So the feed
+      // holds no flagged post by now, and a cover rule read over zero covered cards proves nothing.
+      // Composing one with the **NSFW** toggle on is `post/create.md`'s own flag control, and
+      // `nsfw.md` says the viewer's own flagged post is covered like anyone else's — the seed is
+      // also the stricter case.
+      await go("/post/create");
+      await waitFor(`document.querySelector("textarea") !== null`, "the composer", 8000);
+      await type("textarea", COVER_POST_BODY);
+      await click("NSFW", { exact: true });
+      await waitFor(
+        `(() => { const el = [...document.querySelectorAll("button.toggle")].find((e) => ((e.getAttribute("aria-label") || e.innerText || "").trim() === "NSFW")); return el && el.getAttribute("aria-pressed") === "true"; })()`,
+        "the composer's NSFW toggle to read true",
+        6000,
+      );
+      await click("Publish", { exact: true });
+      await waitText(COVER_POST_BODY, 8000);
+
+      await go("/post/thread");
+      await waitFor(
+        `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".post-counts").length > 0`,
+        "the thread to draw its post cards",
+        8000,
+      );
+      const thread = await js(`
+        const clean = (v) => (v || "").replace(/\\s+/g, " ").trim();
+        const cards = [...document.querySelectorAll(".card.post")];
+        const covered = cards.filter((card) => card.classList.contains("is-covered"));
+        const read = (card) => {
+          const veil = card.querySelector(".post-veil");
+          const head = card.querySelector(".post-head");
+          const foot = card.querySelector(".post-foot");
+          const counts = card.querySelector(".post-counts");
+          const comments = card.querySelector(".post-comments");
+          const cover = card.querySelector(".card-cover");
+          return {
+            headOutsideVeil: !!head && !!veil && !veil.contains(head),
+            foot: foot !== null,
+            footOutsideVeil: !!foot && !!veil && !veil.contains(foot),
+            countCells: card.querySelectorAll(".post-count").length,
+            countsOutsideVeil: !!counts && !!veil && !veil.contains(counts),
+            values: [...card.querySelectorAll(".post-count-value")].map((el) => clean(el.textContent)),
+            comments: comments !== null,
+            commentOutsideVeil: !!comments && !!veil && !veil.contains(comments),
+            veilAria: veil ? veil.getAttribute("aria-hidden") : null,
+            revealInCover: !!cover && cover.querySelector("button") !== null,
+            coverOutsideVeil: !!cover && !!veil && !veil.contains(cover),
+            insideVeil: [...(veil ? veil.querySelectorAll(".post-count, .post-counts, .post-count-value, .post-comments") : [])]
+              .map((el) => "." + String(el.className).split(" ").filter(Boolean).join(".")),
+          };
+        };
+        return {
+          cards: cards.length,
+          covered: covered.map(read),
+          // When no card is covered this is the evidence that says why: each card's own class
+          // string, and the pair the page's own control renders (it mirrors the store).
+          classes: cards.map((card) => card.className),
+          counts: cards.map((card) => [...card.querySelectorAll(".post-count-value")].map((el) => el.textContent.trim()).join("/")),
+          veils: cards.map((card) => {
+            const veil = card.querySelector(".post-veil");
+            return veil ? veil.getAttribute("aria-hidden") : "no-veil";
+          }),
+          covers: document.querySelectorAll(".card.post .card-cover").length,
+          toggles: [...document.querySelectorAll("button.toggle")].map((el) => [
+            (el.querySelector(".toggle-label") || el).textContent.trim(),
+            el.getAttribute("aria-pressed"),
+          ]),
+        };
+      `);
+      if (thread.cards === 0) throw new Error("the thread drew no .card.post — the post half of the law proves nothing on an empty feed");
+      if (thread.covered.length === 0) {
+        throw new Error(
+          `the thread draws ${thread.cards} post card(s) and none is .is-covered with Show + Blur on — post 7 is the only NSFW post (lib/fixtures/posts.ts); the page's own toggles read ${JSON.stringify(thread.toggles)}, its veils ${JSON.stringify(thread.veils)} with ${thread.covers} cover(s) and its counts ${JSON.stringify(thread.counts)}`,
+        );
+      }
+      const threadBroken = thread.covered.filter(
+        (one) =>
+          !one.headOutsideVeil ||
+          !one.foot ||
+          !one.footOutsideVeil ||
+          one.countCells !== 2 ||
+          !one.countsOutsideVeil ||
+          !one.comments ||
+          !one.commentOutsideVeil ||
+          one.veilAria !== "true" ||
+          !one.revealInCover ||
+          !one.coverOutsideVeil ||
+          one.insideVeil.length > 0,
+      );
+      if (threadBroken.length > 0) {
+        const one = threadBroken[0];
+        throw new Error(
+          `a covered post card keeps its chrome outside .post-veil: head outside ${one.headOutsideVeil}, footer ${one.foot} (outside the veil ${one.footOutsideVeil}), ${one.countCells} .post-count cell(s) (outside the veil ${one.countsOutsideVeil}) reading ${JSON.stringify(one.values)}, .post-comments ${one.comments} (outside the veil ${one.commentOutsideVeil}), veil aria-hidden ${JSON.stringify(one.veilAria)}, Reveal in .card-cover ${one.revealInCover} (outside the veil ${one.coverOutsideVeil}), numbers inside the veil ${JSON.stringify(one.insideVeil)} — ${threadBroken.length}/${thread.covered.length} covered post card(s) fail`,
+        );
+      }
+      threadHalf = `${thread.covered.length}/${thread.cards} post card(s) covered, two counts ${JSON.stringify(thread.covered[0].values)} + a comment link outside .post-veil, 0 numbers inside`;
+    } catch (error) {
+      bodyError = error;
+    }
+
+    try {
+      await go("/dev/state");
+      await waitFor(`document.querySelectorAll("button.toggle").length === 2`, "/dev/state's two toggles after the cover halves", 8000);
+      // A reveal is a single look and writes nothing to the account (`nsfw.md` → *Rules*): the pair
+      // must still be the one this row set, read **before** the restore puts the seed back.
+      const heldShow = (await toggleState("Show NSFW content")) === "true";
+      const heldBlur = (await toggleState("Blur NSFW content")) === "true";
+      if (!heldShow || !heldBlur) {
+        throw new Error(`the pair moved under the Reveals: Show ${heldShow} / Blur ${heldBlur} — a reveal must not write the preference`);
+      }
+      await setToggle("Show NSFW content", seedShow);
+      await setToggle("Blur NSFW content", seedBlur);
+      const backShow = (await toggleState("Show NSFW content")) === "true";
+      const backBlur = (await toggleState("Blur NSFW content")) === "true";
+      if (backShow !== seedShow || backBlur !== seedBlur) {
+        throw new Error(
+          `the NSFW pair did not come back: Show ${backShow} / Blur ${backBlur}, seed Show ${seedShow} / Blur ${seedBlur} (strip reads ${await storeCell("Show")}/${await storeCell("Blur")})`,
+        );
+      }
+      const back = await readCatalog();
+      const listed = back.titles.includes(COVER_CHARACTER_NAME);
+      if (listed !== seedShow) {
+        throw new Error(
+          `after restoring Show ${seedShow} the catalogue ${listed ? "still lists" : "loses"} ${JSON.stringify(COVER_CHARACTER_NAME)} — ${back.cards} card(s), first ${JSON.stringify(back.titles.slice(0, 3))}`,
+        );
+      }
+      const coveredBack = back.covered.length > 0;
+      if (coveredBack !== (seedShow && seedBlur)) {
+        throw new Error(
+          `after restoring Show ${seedShow} / Blur ${seedBlur} the catalogue draws ${back.covered.length} covered card(s) — Blur only covers what Show lets through`,
+        );
+      }
+      restoreHalf = `Show ${backShow} / Blur ${backBlur} · ${back.cards} card(s), ${JSON.stringify(COVER_CHARACTER_NAME)} ${listed ? "listed" : "absent"}, ${back.covered.length} covered`;
+    } catch (error) {
+      throw new Error(bodyError ? `${bodyError.message} — and the restore failed: ${error.message}` : error.message);
+    }
+    if (bodyError) throw bodyError;
+
+    return `catalog: ${catalogHalf} · thread: ${threadHalf} · restored ${restoreHalf}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -2832,9 +3156,9 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37).
+ * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38).
  */
-const EXPECTED_ROWS = 37;
+const EXPECTED_ROWS = 38;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

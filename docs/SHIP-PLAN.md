@@ -446,10 +446,26 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       `@else if (nsfw.value && !show.value) { <p class="prose"></p> }` arm in `character-detail.tsrx`
       made the row report `resolved nothing with Show off — title "Character — LuaPlot", roots
       {".detail":1,…}, headings []` at 36/37. Brief: `docs/NEXT.md`.
+- [x] **T-54 A cover is structural: the chrome and the numbers stay outside it.** Failure-bank entry 1:
+      *Card blur hides the numbers → footer stays outside the blur*. `nsfw.md` → *Blur is structural*
+      says the top header is the title, the bottom footer is author + ratio, the blurred area is
+      exactly what sits between them, and *the numbers are never hidden*. No gate had ever rendered a
+      **covered** card — row 36 measures the counts with Blur off, row 25 counts `.is-covered` and
+      stops, row 37 covers a *detail* page — so moving `.card-foot` one indentation inside
+      `.card-veil` would have stayed green. Row **38** (38/38 local and `--live`) records the seed
+      pair, turns Show **and** Blur on, and reads every covered catalogue card as data (4/24):
+      `veil.contains(...)` false for `.card-head`, `.card-foot` and `.card-ratio`, ratio inside the
+      footer, `aria-hidden="true"` on the veil, Reveal inside `.card-cover` **and** outside the veil,
+      zero numbers inside it; then presses the **first covered card's** Reveal (scoped, exact) and
+      asserts the covered count falls by exactly one, that card uncovers, and the rest keep their
+      order. The feed half repeats the split on a post card the row **composes with NSFW on**, because
+      row 21's concluded case removes the only flagged fixture post. Proved **red** first: `.card-foot`
+      moved inside `.card-veil` read `footer true (outside the veil false), ratio true (in the footer
+      true, outside the veil false) … 4/4 covered card(s) fail`. Brief: `docs/NEXT.md`.
 
 ## Failure bank (the ways this class of product breaks)
 
-1. Card blur hides the numbers → footer stays outside the blur (T-08).
+1. Card blur hides the numbers → footer stays outside the blur (T-08; walked by T-54).
 2. Session reads live items, so author edits corrupt running chats → copies only (T-15).
 3. `Load more` state lost on back → paging in component state, filters in URL (T-09).
 4. NSFW preference treated as access control (404s) → detail routes always resolve (T-25; walked by T-53).
