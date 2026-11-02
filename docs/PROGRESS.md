@@ -3,6 +3,33 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-59: an author's edit never reaches a running session, and a cut is a snapshot
+
+- **Changed:** `scripts/smoke.mjs` — new walk **row 42**, `EXPECTED_ROWS` 41 → 42, placed after
+  T-58's row 41 and before `sign out` (it renames a live character twice and publishes a post, so it
+  is mutating and final). The row opens the seed's **character** (`…0001`, Aurelia) and presses its
+  own **Continue**, so no session id is pinned; reads the session's Character copy (`Aurelia`,
+  `untouched`, `From Aurelia of the Tides · version 4`, one link, *Update from original*), then walks
+  to the original **through the copy's own `a.copy-link`**, renames the **live** character on
+  `/character/<id>/edit` — **both** its `name` and its in-session name, because the copy row prints
+  `inSessionName || name` — saves, asserts the detail reads the new name, then `go()`s back to the
+  session and asserts the copy's name, state, line of fact, controls and the disclosure's sentence
+  are **unchanged**. Then publishes a **cut**: dock's `Publish a cut` → range → `Continue` → the
+  composer's locked note (*published as text, not a link to the session*) → `Publish`, and reads the
+  post's own page (8 messages, the transcript's first turn verbatim, the first line stamped
+  `Aurelia · character`). Last: a **second** rename of the live character, then the post again — body
+  and cut identical, and the post's HTML carries neither new name.
+- **Verified:** `./scripts/check.sh` GREEN (typecheck, build, 30 routes, schema, tauri, links, tiers);
+  `./scripts/smoke.sh` **42/42** locally, row 42's evidence naming the copy before/after, all 8
+  messages and the post path; **red first** by making `load()` in `session-detail.tsrx` join the live
+  character (`getCharacter(sourceId)` then overwrite the copy) → row 42 read *"the copy followed the
+  author's edit: the Character copy read \"Aurelia\" before … and \"Aurelia Rebuilt\" after … character
+  detail \"From Aurelia of the Long Tide · version 4\""* (41/42); the exact bytes restored and
+  `sha256sum -c` clean. `publish.sh` printed `LIVE`, the URL answers 200 and the `--live` walk is
+  42/42.
+- **Not verified:** nothing on the Supabase side (T-29/T-30) — the copy rule is proven in the memory
+  adapter only; the DB half is the same row's rerun once the project ref exists.
+
 ## 2026-11-02 — T-58: deleting the default persona hands the mark to one heir, in one step
 
 - **Changed:** `scripts/smoke.mjs` — new walk **row 41**, `EXPECTED_ROWS` 40 → 41, placed after

@@ -3928,6 +3928,291 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-59 — failure bank 2: *"Session reads live items, so author edits corrupt running chats →
+ * copies only"*. `session/detail.md` → **Purpose** is the law twice over: *the character, every
+ * lorebook attached to that character, and the preset are snapshotted when the session starts, and
+ * the session reads only its own copies from then on*, and *a cut already published is a snapshot
+ * no later change in the session touches*.
+ *
+ * T-15 implemented the copies and row 33 reads session 2's copy *states* — but no row had ever
+ * edited a live item and then looked at a session, and no row had ever published a cut. A
+ * `getSession()` that joined the character by id, or a cut stamped from the live item, was green in
+ * every gate and in all 41 rows.
+ *
+ * **Session 1, not session 2.** Row 33 pressed **Restore copy** on session 2, so its character copy
+ * is `untouched` for the rest of the run; session 1's copies are the ordinary state and its
+ * character copy links to the seed's first character. The session id is **read from the page** (the
+ * character's own *Continue*), never pinned.
+ *
+ * **Both names move.** The row edits the character's `name` **and** its in-session name, because
+ * the copy row prints `inSessionName || name` — an edit to `name` alone would leave a live-join
+ * page reading the same string and the row would pass on the bug it exists to catch.
+ *
+ * **Mutating and final.** It renames the character twice through `/character/<id>/edit`, which
+ * writes the live row (the character catalog, its detail page and every later card now read the new
+ * name), and it publishes one post. That is why it is the walk's last but one: nothing after it
+ * reads a character except `sign out`.
+ * ---------------------------------------------------------------------------------------------- */
+const SNAPSHOT_CHARACTER = "/character/c0a1b2c3-0000-4000-8000-000000000001";
+/** The seed (`lib/fixtures/characters.ts`, `lib/fixtures/sessions.ts`): the copy is called this. */
+const SNAPSHOT_SEED_NAME = "Aurelia of the Tides";
+const SNAPSHOT_COPY_NAME = "Aurelia";
+/** What the author writes over the live item — a name the copy must never pick up. */
+const SNAPSHOT_EDIT_NAME = "Aurelia of the Long Tide";
+const SNAPSHOT_EDIT_INSESSION = "Aurelia Rebuilt";
+/** The second edit, made *after* the cut went out, so the post's own text is the only witness. */
+const SNAPSHOT_SECOND_NAME = "Aurelia of the Second Tide";
+const SNAPSHOT_SECOND_INSESSION = "Aurelia Rebuilt Twice";
+const ownCut = `Smoke cut ${stamp.slice(11, 19)}: a stretch of the transcript, published as text.`;
+
+results.push(
+  await journey("an author's edit never reaches a running session, and a cut stays a snapshot", async () => {
+    /** Every copy row as the reader sees it — the same reader row 33 uses, plus the link's target. */
+    const readCopies = () =>
+      js(`
+        const rows = [...document.querySelectorAll(".copy")].map((row) => ({
+          kind: (row.querySelector(".copy-kind")?.textContent || "").trim(),
+          name: (row.querySelector(".copy-name")?.textContent || "").trim(),
+          state: (row.querySelector(".copy-state")?.textContent || "").trim(),
+          detail: (row.querySelector(".copy-detail")?.textContent || "").replace(/\\s+/g, " ").trim(),
+          links: row.querySelectorAll("a.copy-link").length,
+          href: row.querySelector("a.copy-link")?.getAttribute("href") || "",
+          actions: [...row.querySelectorAll(".copy-action")].map((b) => (b.textContent || "").trim()),
+        }));
+        const spans = [...document.querySelectorAll(".copies-toggle span")];
+        return {
+          path: location.pathname,
+          summary: (spans[spans.length - 1]?.textContent || "").replace(/\\s+/g, " ").trim(),
+          rows,
+        };
+      `);
+
+    const characterRow = (panels) => panels?.rows.find((row) => row.kind === "Character") ?? null;
+    const describe = (panels, row) =>
+      `${panels?.rows.length ?? 0} copy row(s) ${JSON.stringify((panels?.rows ?? []).map((r) => `${r.kind}:${r.name}:${r.state}`))}, character detail ${JSON.stringify(row?.detail)}`;
+
+    /** Open the disclosure (closed by default) and read it — a fresh mount closes it again. */
+    const openCopies = async (label) => {
+      await waitFor(`!!document.querySelector(".copies-toggle")`, `the copies disclosure (${label})`, 8000);
+      await clickSelector(".copies-toggle");
+      await waitFor(`document.querySelectorAll(".copy").length > 0`, `the copy rows (${label})`);
+      return readCopies();
+    };
+
+    // 1. The character and its own session entry — the route's *Continue*, not a pinned id.
+    await go(SNAPSHOT_CHARACTER);
+    try {
+      await waitFor(
+        `(document.querySelector(".detail h1.title")?.textContent || "").trim() === ${JSON.stringify(SNAPSHOT_SEED_NAME)}`,
+        `the character's heading to read ${JSON.stringify(SNAPSHOT_SEED_NAME)}`,
+        8000,
+      );
+    } catch (error) {
+      const head = await js(`return (document.querySelector(".detail h1.title")?.textContent || "").trim();`);
+      throw new Error(`${error.message} — read ${JSON.stringify(head)} at ${await url()} (an earlier row renamed this character?)`);
+    }
+
+    await clickAny(["Continue", "Start a session"]);
+    await waitFor(`/\\/session\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the session route", 8000);
+    const sessionPath = await js(`return location.pathname;`);
+
+    // 2. The copy as the session draws it, and the link back to the item it came from.
+    const before = await openCopies("before the edit");
+    const copyBefore = characterRow(before);
+    if (!copyBefore) throw new Error(`the session at ${sessionPath} drew no Character copy — ${describe(before, null)}`);
+    if (copyBefore.name !== SNAPSHOT_COPY_NAME) {
+      throw new Error(`the character copy reads ${JSON.stringify(copyBefore.name)}, not the seed's ${JSON.stringify(SNAPSHOT_COPY_NAME)} — ${describe(before, copyBefore)}`);
+    }
+    if (!/\/character\/[0-9a-f-]{36}$/.test(copyBefore.href || "")) {
+      throw new Error(`the copy's link to its original is ${JSON.stringify(copyBefore.href)}, not a /character/<uuid>`);
+    }
+    if (copyBefore.links !== 1 || !copyBefore.actions.includes("Update from original")) {
+      throw new Error(`the linked copy draws ${copyBefore.links} link(s) and offers ${JSON.stringify(copyBefore.actions)} — the original must be reachable before the row edits it`);
+    }
+
+    /** The transcript as it stands, so the published cut can be compared against its own source. */
+    const transcript = await js(`return [...document.querySelectorAll(".turn-text")].map((el) => (el.textContent || "").trim());`);
+    if (transcript.length === 0) throw new Error(`the session at ${sessionPath} draws no .turn-text — a cut needs a transcript`);
+
+    // Walk to the original **through the copy's own link**: that is the route the page offers.
+    const walked = await js(`
+      const row = [...document.querySelectorAll(".copy")].find((r) => (r.querySelector(".copy-kind")?.textContent || "").trim() === "Character");
+      const a = row ? row.querySelector("a.copy-link") : null;
+      if (!a) return "";
+      a.scrollIntoView({ block: "center" });
+      a.click();
+      return a.getAttribute("href") || "";
+    `);
+    if (!walked) throw new Error("the Character copy offered no link to its original to press");
+    await waitFor(`!!document.querySelector(".detail h1.title")`, "the original's page", 8000);
+    const landed = await js(`return location.pathname;`);
+    const characterId = (landed || "").split("/").filter(Boolean).pop();
+    if (!/^[0-9a-f-]{36}$/.test(characterId || "")) {
+      throw new Error(`the copy's link landed on ${JSON.stringify(landed)}, not a character detail page`);
+    }
+
+    // 3. The author edits the **live item**: name and in-session name, through its own edit form.
+    await go(`/character/${characterId}/edit`);
+    await waitFor(`!!document.querySelector("form input")`, "the character edit form", 8000);
+    await retype("form input", SNAPSHOT_EDIT_NAME, 0);
+    await retype("form input", SNAPSHOT_EDIT_INSESSION, 1);
+    await click("Save changes", { exact: true });
+    try {
+      await waitFor(
+        `(document.querySelector(".detail h1.title")?.textContent || "").trim() === ${JSON.stringify(SNAPSHOT_EDIT_NAME)}`,
+        "the detail to read the author's new name",
+        8000,
+      );
+    } catch (error) {
+      const head = await js(`
+        return {
+          path: location.pathname,
+          title: (document.querySelector(".detail h1.title")?.textContent || "").trim(),
+          inSession: (document.querySelector(".detail .in-session")?.textContent || "").replace(/\\s+/g, " ").trim(),
+          alerts: [...document.querySelectorAll("[role=alert]")].map((el) => (el.textContent || "").trim()).filter(Boolean),
+        };
+      `);
+      throw new Error(`${error.message} — the edit did not land: ${JSON.stringify(head)}`);
+    }
+
+    const edited = await js(`
+      return {
+        title: (document.querySelector(".detail h1.title")?.textContent || "").trim(),
+        inSession: (document.querySelector(".detail .in-session")?.textContent || "").replace(/\\s+/g, " ").trim(),
+      };
+    `);
+    if (!edited.inSession.includes(SNAPSHOT_EDIT_INSESSION)) {
+      throw new Error(`the character page reads ${JSON.stringify(edited.inSession)}, not the new in-session name ${JSON.stringify(SNAPSHOT_EDIT_INSESSION)} — the edit did not reach the live item`);
+    }
+
+    // 4. Back to the session, in ONE reading: the copy's name, state, line of fact and controls are
+    //    exactly what step 2 read. A page that refreshes the copy on mount flips the state and is the
+    //    bug — and a copy whose name followed the author proves the session joined the live row.
+    await go(sessionPath);
+    const after = await openCopies("after the edit");
+    const copyAfter = characterRow(after);
+    if (!copyAfter) throw new Error(`the session at ${sessionPath} lost its Character copy — ${describe(after, null)}`);
+
+    if (copyAfter.name !== copyBefore.name) {
+      throw new Error(
+        `the copy followed the author's edit: the Character copy read ${JSON.stringify(copyBefore.name)} before the live item was renamed and ${JSON.stringify(copyAfter.name)} after (the author wrote ${JSON.stringify(SNAPSHOT_EDIT_INSESSION)}) — ${describe(after, copyAfter)}`,
+      );
+    }
+    if (copyAfter.state !== copyBefore.state) {
+      throw new Error(
+        `the copy's state moved from ${JSON.stringify(copyBefore.state)} to ${JSON.stringify(copyAfter.state)} — an author's edit is not an "updated from original", and nothing refreshed it — ${describe(after, copyAfter)}`,
+      );
+    }
+    if (copyAfter.detail !== copyBefore.detail) {
+      throw new Error(
+        `the copy's own line moved from ${JSON.stringify(copyBefore.detail)} to ${JSON.stringify(copyAfter.detail)} — the session re-read the live item on mount`,
+      );
+    }
+    if (copyAfter.actions.join("|") !== copyBefore.actions.join("|") || copyAfter.links !== copyBefore.links) {
+      throw new Error(
+        `the copy's controls moved to ${JSON.stringify(copyAfter.actions)} (${copyAfter.links} link(s)) from ${JSON.stringify(copyBefore.actions)} (${copyBefore.links} link(s))`,
+      );
+    }
+    if (after.summary !== before.summary) {
+      throw new Error(`the disclosure's sentence moved from ${JSON.stringify(before.summary)} to ${JSON.stringify(after.summary)}`);
+    }
+
+    // 5. Publish a cut: the dock's quiet text action, the range, then the composer.
+    await click("Publish a cut", { exact: true });
+    await waitFor(`!!document.querySelector(".range")`, "the cut's range picker", 8000);
+    await click("Continue", { exact: true });
+
+    let lockedNote = "";
+    try {
+      await waitFor(`!!document.querySelector(".compose.is-locked")`, "the composer holding the cut", 8000);
+      lockedNote = await js(`return (document.querySelector(".locked-note")?.textContent || "").replace(/\\s+/g, " ").trim();`);
+    } catch (error) {
+      const seen = await js(`return { path: location.pathname, buttons: [...document.querySelectorAll("button")].map((b) => (b.textContent || "").trim()).filter(Boolean).slice(0, 12) };`);
+      throw new Error(`${error.message} — the cut never reached the composer: ${JSON.stringify(seen)}`);
+    }
+    if (!/published as text, not a link to the session/i.test(lockedNote)) {
+      throw new Error(`the composer's cut note reads ${JSON.stringify(lockedNote)}, not the snapshot sentence`);
+    }
+
+    await retype('textarea[placeholder^="What happened"]', ownCut, 0);
+    await click("Publish", { exact: true });
+    await waitFor(`/\\/post\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the published post's own page", 10000);
+    const postPath = await js(`return location.pathname;`);
+
+    /** The post as the reader sees it: its body, and the cut's stamped lines. */
+    const readPost = () =>
+      js(`
+        const clean = (el) => (el?.textContent || "").replace(/\\s+/g, " ").trim();
+        return {
+          path: location.pathname,
+          body: clean(document.querySelector(".post-body")),
+          who: [...document.querySelectorAll(".cut-who")].map(clean),
+          texts: [...document.querySelectorAll(".cut-text")].map(clean),
+          turns: document.querySelectorAll(".cut-turn").length,
+          attachLinks: document.querySelectorAll("a.post-attach").length,
+          html: (document.querySelector(".card.post") || document.body).innerHTML || "",
+        };
+      `);
+
+    try {
+      await waitFor(`document.querySelectorAll(".cut-turn").length > 0`, "the cut's messages on the post", 10000);
+    } catch (error) {
+      const now = await readPost().catch(() => null);
+      throw new Error(`${error.message} — the post at ${postPath} reads ${JSON.stringify({ body: now?.body, turns: now?.turns })}`);
+    }
+
+    const post = await readPost();
+    if (post.body !== ownCut) throw new Error(`the post's body reads ${JSON.stringify(post.body)}, not what the composer wrote`);
+    if (post.turns !== transcript.length) {
+      throw new Error(`the post drew ${post.turns} cut message(s), but the cut was the whole transcript (${transcript.length})`);
+    }
+    if (post.texts[0] !== transcript[0]) {
+      throw new Error(`the cut's first message reads ${JSON.stringify((post.texts[0] || "").slice(0, 80))}, not the transcript's ${JSON.stringify(transcript[0].slice(0, 80))}`);
+    }
+    if (!(post.who[0] || "").includes(SNAPSHOT_COPY_NAME)) {
+      throw new Error(`the cut's first line is stamped ${JSON.stringify(post.who[0])}, not the in-session name ${JSON.stringify(SNAPSHOT_COPY_NAME)}`);
+    }
+    if (post.html.includes(SNAPSHOT_EDIT_INSESSION)) {
+      throw new Error(`the published cut prints the live item's new in-session name ${JSON.stringify(SNAPSHOT_EDIT_INSESSION)} — a cut must carry the copy's own text`);
+    }
+
+    // 6. Rename the live character a **second** time, then read the post again: a snapshot does not
+    //    move when the item it was cut from does.
+    await go(`/character/${characterId}/edit`);
+    await waitFor(`!!document.querySelector("form input")`, "the character edit form (second pass)", 8000);
+    await retype("form input", SNAPSHOT_SECOND_NAME, 0);
+    await retype("form input", SNAPSHOT_SECOND_INSESSION, 1);
+    await click("Save changes", { exact: true });
+    await waitFor(
+      `(document.querySelector(".detail h1.title")?.textContent || "").trim() === ${JSON.stringify(SNAPSHOT_SECOND_NAME)}`,
+      "the detail to read the second name",
+      8000,
+    );
+
+    await go(postPath);
+    try {
+      await waitFor(`document.querySelectorAll(".cut-turn").length > 0`, "the cut again", 10000);
+    } catch (error) {
+      throw new Error(`${error.message} — the post at ${postPath} lost its cut after the second edit`);
+    }
+    const later = await readPost();
+    if (later.body !== post.body) {
+      throw new Error(`the post's body moved from ${JSON.stringify(post.body)} to ${JSON.stringify(later.body)} after the character was renamed`);
+    }
+    if (later.who.join("|") !== post.who.join("|") || later.texts.join("|") !== post.texts.join("|")) {
+      throw new Error(
+        `the cut moved after the second edit: was ${JSON.stringify(post.who[0])} / ${JSON.stringify((post.texts[0] || "").slice(0, 60))}, reads ${JSON.stringify(later.who[0])} / ${JSON.stringify((later.texts[0] || "").slice(0, 60))}`,
+      );
+    }
+    if (later.html.includes(SNAPSHOT_SECOND_NAME) || later.html.includes(SNAPSHOT_SECOND_INSESSION)) {
+      throw new Error(`the post prints the live character's newest name (${JSON.stringify(SNAPSHOT_SECOND_INSESSION)}) — the cut is joined to the item, not a snapshot`);
+    }
+
+    return `session ${sessionPath} · the Character copy read ${JSON.stringify(copyBefore.name)}/${copyBefore.state} (${JSON.stringify(copyBefore.detail)}) and still reads ${JSON.stringify(copyAfter.name)}/${copyAfter.state} after the author renamed the live item to ${JSON.stringify(SNAPSHOT_EDIT_NAME)} + ${JSON.stringify(SNAPSHOT_EDIT_INSESSION)} · ${lockedNote} · cut → ${postPath}: ${post.turns} message(s), body ${JSON.stringify(post.body)}, first line ${JSON.stringify(post.who[0])} / ${JSON.stringify((post.texts[0] || "").slice(0, 40))}… · renamed twice to ${JSON.stringify(SNAPSHOT_SECOND_NAME)} + ${JSON.stringify(SNAPSHOT_SECOND_INSESSION)}, the post unchanged`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -3951,9 +4236,9 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41).
+ * T-58: 41, T-59: 42).
  */
-const EXPECTED_ROWS = 41;
+const EXPECTED_ROWS = 42;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

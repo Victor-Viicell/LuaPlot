@@ -502,6 +502,32 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       stamps **survived** that inversion, so node identity alone would have been green — the order
       half is what caught it). 40/40 local and 40/40 `--live`. Brief: `docs/NEXT.md` (T-57).
 
+- [x] **T-59 An author's edit never reaches a running session, and a published cut is a snapshot.**
+      Failure-bank entry 2: *Session reads live items, so author edits corrupt running chats → copies
+      only*. `session/detail.md` → **Purpose**: *the character, every lorebook attached to that
+      character, and the preset are snapshotted when the session starts, and the session reads only its
+      own copies from then on*, and → *Data* → *Transcript*: *a cut already published is a snapshot no
+      later change in the session touches*. T-15 implemented the copies and row 33 read session 2's copy
+      *states*, but **no row had ever edited a live item and looked at a session**, and **no row had
+      ever published a cut** — a `getSession()` that joined the character by id, or a cut stamped from
+      the live item, was green in every gate and all 41 rows. Row **42** (`EXPECTED_ROWS` 42) opens the
+      seed's character (`…0001`) and presses **its own Continue** (no pinned session id), reads the
+      Character copy (`Aurelia`, `untouched`, `From Aurelia of the Tides · version 4`, 1 link,
+      *Update from original*), walks to the original **through the copy's `a.copy-link`**, renames the
+      **live** character on `/character/<id>/edit` — **name and in-session name**, because the row
+      prints `inSessionName || name` and a `name`-only edit would leave a live-join page reading the
+      same string — saves, reads the detail's new name and `.in-session` line, then `go()`s back and
+      asserts the copy's **name, state, detail, controls and summary are unchanged**. Then publishes
+      the whole transcript as a **cut** (`Publish a cut` → range → `Continue` → the locked note
+      *published as text, not a link to the session* → `Publish`) and reads the post's own page: 8
+      messages, the transcript's first turn verbatim, the first line stamped `Aurelia · character`,
+      and no trace of the live item's new name. Last, a **second** live rename, then the post again —
+      body and cut identical. Proved **red** first by making `load()` join the live character in
+      `session-detail.tsrx` → *"the copy followed the author's edit: the Character copy read
+      \"Aurelia\" before … and \"Aurelia Rebuilt\" after … character detail \"From Aurelia of the Long
+      Tide · version 4\""* (41/42); bytes restored, `sha256sum -c` clean. 42/42 local and 42/42
+      `--live`. Brief: `docs/NEXT.md` (T-59).
+
 - [x] **T-58 Deleting the default persona hands the mark to exactly one heir, in one step.** Failure-bank
       entry 8: *Deleting a persona leaves the collection without a default → reassign in one step*.
       `persona/collection.md` → *States* → **Populated**: *"exactly one carrying the default mark"*, and
@@ -541,7 +567,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 ## Failure bank (the ways this class of product breaks)
 
 1. Card blur hides the numbers → footer stays outside the blur (T-08; walked by T-54).
-2. Session reads live items, so author edits corrupt running chats → copies only (T-15; being walked by
+2. Session reads live items, so author edits corrupt running chats → copies only (T-15; walked by
    T-59).
 3. `Load more` state lost on back → paging in component state, filters in URL (T-09; the URL/sort half
    is walked by T-55, the paging half by T-57).

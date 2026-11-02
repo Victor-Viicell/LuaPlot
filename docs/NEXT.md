@@ -1,78 +1,74 @@
 # Baton — what the next session does
 
-**T-58 landed.** Row **41** (`EXPECTED_ROWS` 41) presses **Delete** on a persona for the first time:
-the seed's default (**Nell**, `PERSONA(1)`) is opened by **its own card's link** (not `nth 0`), the
-detail's `h1.name` + `.mark` are read, then two presses (`Delete` in `.delete-row`, `Confirm delete`
-scoped to `.delete-actions`) land back on `/persona` with **2** cards, Nell absent, exactly **one**
-`.is-default` — and it is **Ash** (`PERSONA(3)`, newest by `createdAt`), not The Correspondent (the
-second card, the oldest). `go()` back to the deleted id mounts the spec's **Not found** sentence with
-its `/persona` road out. Red first: disabling the hand-off read *"the collection was left with 2
-persona(s) and 0 default(s)"*. 41/41 local, 41/41 `--live`.
+**T-59 landed.** Row **42** (`EXPECTED_ROWS` 42) walks failure-bank entry 2 end to end: the seed's
+character (`…0001`, **Aurelia**) is opened and its own **Continue** pressed (no pinned session id),
+the session's Character copy is read (`Aurelia`, `untouched`, `From Aurelia of the Tides · version
+4`), the original is reached **through the copy's own `a.copy-link`**, the **live** character is
+renamed — **name and in-session name**, because the row prints `inSessionName || name` — and the
+session, read again, is byte-for-byte what it was. Then the whole transcript is published as a
+**cut**, read on the post's own page, and the live character is renamed a **second** time: the post
+does not move. Red first: `load()` joining the live character read *"the copy followed the author's
+edit: the Character copy read \"Aurelia\" … and \"Aurelia Rebuilt\" after"*. 42/42 local, 42/42
+`--live`.
 
-T-58 was the last failure-bank entry whose machinery already existed — but **entry 2 was never
-walked at all**, and its machinery also exists. That is the ticket now.
+Entry 2 was the last failure-bank entry whose machinery existed and had never been walked. The one
+session law still unwalked is the **other** half of the same spec section: what a session delete does,
+and what it must *not* touch.
 
-## T-59 — an author's edit never reaches a running session, and a published cut is a snapshot
+## T-60 — deleting a session takes its transcript and its copies, and a published cut outlives it
 
-**Why it is next.** Failure bank entry 2 is *"Session reads live items, so author edits corrupt
-running chats → copies only"*. `session/detail.md` → **Purpose** makes it law: *"the character, every
-lorebook attached to that character, and the preset are snapshotted when the session starts, and the
-session reads only its own copies from then on. So an author editing a character never changes a
-session already running, and the session owner editing a copy never changes the character for anyone
-else."* And → *Layout* → **Transcript**: *"a cut already published is a snapshot no later change in
-the session touches."* T-15 implemented copies, `SESSION_COPIES` (session 2) is already read by row
-**33** for its **states** and for **Restore copy** — but **no row has ever edited a live item and then
-looked at a session**. A session that joined straight to `getCharacter()` by id, or a `publishCut()`
-that stored an id instead of the copy's text, is green in every gate and in all 41 rows today.
+**Why it is next.** `session/detail.md` → *Actions* → **Delete session** is law: *"the settings
+menu's only other option, with confirmation: it removes the transcript and the session's copies,
+while a cut already published stays as it was."* Three rows now read a session (33, 42) and one
+publishes a cut (42), but **no row has ever pressed Delete session** — the settings menu has only
+ever been read for its two labels (`docs/DESIGN.md` → *Session*). A `deleteSession()` that forgot the
+copies, that left the session resolvable, or that cascaded into the post the cut became is green in
+every gate and in all 42 rows.
 
 **Approach**
 
-1. **Row 42**, `EXPECTED_ROWS` 41 → 42, placed **after row 41 and before `sign out`** (row 41 is the
-   walk's last-but-one and `sign out` must stay last).
-2. Open **session 1** (the ordinary one: character copy `edited`, lorebook copy `unlinked` — read its
-   id from the page, do not pin it), and record the **copy's own name** and the copy **state** line per
-   participant (row 33's reader is the shape to copy: `.copy-kind`, the summary sentence, the state).
-3. Walk to that copy's **original** — the session page offers *Open participant* / a link back while
-   the link resolves — and change its **name** on `/character/<id>/edit` (the form is the live item,
-   not a copy). Save, land on the detail page, and assert the detail reads the new name (the author's
-   edit really happened).
-4. **Assert the session did not move, in one reading**: `go()` back to the session, the copy's name is
-   still the **old** one, its state line still reads what it read in step 2 (**an author's edit is not
-   an *updated from original*** — a page that refreshes the copy on mount flips the state and that is
-   the bug), and its *Update from original* action is still offered (the link still resolves).
-5. Publish a **cut** from the session (the transcript's publish-a-cut control), then edit the
-   character's name a **second** time and assert the published post still reads the cut's own text —
-   a snapshot, not a live join. Read the post by the URL the publish landed on or the toast/link it
-   offers; do not search the feed by the new name.
-6. Leave the store in a state a later session can read: name the character you edited **in the
-   message** and the two names (copy's and post's), because the fixtures now differ from
-   `lib/fixtures/characters.ts` for the rest of the run.
+1. **Row 43**, `EXPECTED_ROWS` 42 → 43, placed **after row 42 and before `sign out`**.
+2. Find the post **row 42** published, without pinning its id: `/post/thread` with `sort=newest`
+   (row 39 leaves the thread at page 1 with no query, so `go("/post/thread?sort=newest")` is a fresh
+   mount) and read the **first** `.card.post`'s `.post-body` — it must be row 42's `ownCut` (the
+   walk's own constant, so this is a legal cross-row read). Take that card's permalink
+   (`.post-time`'s href) as the post's own path, and its `.cut-turn` count.
+3. Open the session that published it: the seed character's own **Continue** (`…0001`). Read the
+   transcript's `.turn-text` count and the copies disclosure (`4 copies`, no ` · N edited`).
+4. **Delete in the settings menu**: `Session settings` (`aria-label`) → the danger row reading
+   `Delete session` → the confirmation. Assert the confirmation's own sentence names the transcript,
+   the copies and the kept cut (`This removes the transcript and every copy in it. A cut you already
+   published stays, because a post is a snapshot of what was said.`), then press the confirmation's
+   `Delete session` — **scoped to `.menu-actions`**, because the opener carries the same label.
+5. Read the landing in one pass: it is the character's page (`/character/…0001`), the primary control
+   now reads **`Start a session`** (not `Continue` — one session per character per user), and
+   `go(sessionPath)` mounts the spec's **Not found** sentence (`This session doesn't exist.`) with its
+   road out. Note the new name the character carries (row 42's second rename) in the message.
+6. `go(postPath)`: the cut **still reads its own text** — same body, same `.cut-who`/`.cut-text`
+   lines, same count. A `deleteSession()` that cascaded into `posts` is the bug this half catches.
 
 **Traps**
 
-- **`Update from original` is a different law.** Step 4 asserts the copy did **not** refresh; do not
-  press the control, and do not read *Restore* as the proof — *Restore* discards the session's edits,
-  it never pulls the author's.
-- **Session 1's character copy is `edited`**, so *Restore* is offered and the state is already not
-  `untouched`: assert the **state line is unchanged**, never a literal `untouched`.
-- **Session 2's copy is the one row 33 restores.** Use session **1** (or re-read row 33's row for what
-  session 2 can no longer prove — it pressed **Restore copy** on the character, so session 2's copy is
-  `untouched` for the rest of the run).
-- **`/character/<id>/edit` writes the live row through the repo**, so the *character* catalog, its
-  detail page and every card in a later row now read the edited name. That is why the row is
-  last-but-one; nothing after it reads a character except `sign out`.
-- **Two names is not a flake, it is the proof.** A row that reads the same name on both sides proves
-  nothing about copies; assert the **difference** and name both strings in the message.
-- **`publishCut()` may return the post id, not the post** — read the page's own destination
-  (`location.pathname` after the publish, or the control's link) rather than assuming a route.
-- **The walk's account seeds Show off.** If the character is flagged NSFW the session still resolves
-  (NSFW never blocks a route), so do not read any listing to prove the session; read the session.
+- **Row 42 renamed the character twice.** `/character/…0001` now reads **`Aurelia of the Second
+  Tide`** with in-session **`Aurelia Rebuilt Twice`**, so a row that asserts the seed's name is red on
+  a right page. Read the name from the page and put it in the message.
+- **Row 42 published a post.** `/post/thread?sort=newest`'s first card is that cut; the thread is 32
+  posts now. Never pin a post count anywhere after row 8.
+- **`deleteSession()` splices the session out of the memory store**, so a re-run of the walk is the
+  only way to get it back — this row mutates for the rest of the run, which is why it is last but one.
+- **The two `Delete session` labels are one opener and one confirmation.** A `startsWith("Delete")`
+  or an unscoped match presses the wrong one and proves the dialog only — scope the second press to
+  `.menu-actions`.
+- **The session page hides the shell but not the toast.** Nothing here should read body text for an
+  absence; read the character page's own control (`Start a session`) instead.
+- **A cut post carries no attachment link** (`PostCard` draws no `a.post-attach` for a cut), so do not
+  read one to identify it — read `.post-body` against `ownCut` and the `.cut-turn`s.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **42/42** locally and **42/42 `--live`**; the assertion
-proved **red** first — make the session page read the live character (join by id in
-`session-detail.tsrx`, or have `publishCut()` store the item rather than the copy) — the message must
-read that the **copy followed the author's edit**, capture it, then restore the exact bytes and
-`sha256sum -c` them; `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **43/43** locally and **43/43 `--live`**; the assertion
+proved **red** first — make `deleteSession()` return `true` without splicing the row (or leave the
+cut's post behind by removing the post from the store) — the message must read that the session
+survived (or that the post left with it), capture it, restore the exact bytes and `sha256sum -c`
+them; `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Blocked — what a human must do
 
@@ -100,17 +96,15 @@ read that the **copy followed the author's edit**, capture it, then restore the 
 
 ## Open decisions
 
-- **T-59 is the ticket: failure-bank entry 2, the one entry that was never walked at all.** Entries 1
-  (T-54), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked. Entry 2 (*session reads live
-  items → copies only*) is **implemented in the memory adapter** (T-15) and **never asserted**: row 33
-  reads session 2's copy *states* and presses **Restore copy**, but no row has ever edited a live item
-  and looked at a session, and no row has ever published a cut. Its **DB** half stays blocked on T-29;
-  the adapter's behaviour is walkable today. After it, the remaining entries are blocked on the backend
-  or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 → T-32, 11 → T-16, 12 → T-01,
-  13 → `check.sh`).
-- **Row count is 41 after T-58.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+- **T-60 is the ticket: the session's own delete, the last session law with no row.** Failure-bank
+  entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
+  are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27,
+  10 → T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). `session/detail.md` still has one action no row
+  has pressed — **Delete session** — and its law is a *cascade plus a non-cascade*: the transcript
+  and the copies go, a published cut stays.
+- **Row count is 42 after T-59.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
-  it, and bump the count only when a row is genuinely new (**T-59 adds row 42**). **Rows 36 and 37
+  it, and bump the count only when a row is genuinely new (**T-60 adds row 43**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -121,6 +115,11 @@ read that the **copy followed the author's edit**, capture it, then restore the 
 - **Row 41 (T-58) is mutating and final.** `deletePersona()` splices the row out of the memory store,
   so every later row sees **two** personas — a later row that wants a persona must seed or create one,
   and a collection count must be read, not pinned. Row 42 comes after it and reads none.
+- **Row 42 (T-59) is mutating and final too.** It renames `/character/…0001` **twice** (the row now
+  reads **`Aurelia of the Second Tide`**, in-session **`Aurelia Rebuilt Twice`**) and publishes the
+  walk's **last** post — the whole session-1 transcript, whose first card is now the **newest** in
+  `/post/thread?sort=newest`. Anything after it must read a character's name from the page and must
+  not pin a post count.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.
@@ -198,6 +197,28 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   arithmetic, write a `.py` under `$TMPDIR` and run `python3 <file>`.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **A row that returns to a page must `go()` there first (T-59).** Row 42's first run failed with
+  *"timed out waiting for the copies disclosure (after the edit)"* on a page that was right: the row
+  had saved the character and read the copy as if the session had come back by itself. Nine seconds
+  of a green page reads as a broken one — the step that navigates back is a **line**, not a side
+  effect of leaving a page.
+- **The copy row prints `inSessionName || name` (T-59).** A red proof that renames only the live
+  character's `name` leaves the session's copy row reading the same string, so the row stays green on
+  the bug it exists to catch. Edit **both** fields, and assert the copy's own name in the failure
+  message (T-59 read `"Aurelia"` before and `"Aurelia Rebuilt"` after).
+- **A textarea behind a `Sheet` is still mounted and still "visible" to a selector (T-59).** The
+  session's `.say` field sits under the publish dialog, so `retype("textarea", …, 0)` can land in the
+  composer that is behind the sheet and the row then reads a blank draft. Key the cut's body on its
+  own `textarea[placeholder^="What happened"]`.
+- **One regex, two escaping levels (T-59).** Inside a `js(\`…\`)` template the file needs `\\/` (one
+  unescape reaches `\/`); the **same** pattern written as a plain `.mjs` regex literal needs `\/`.
+  `/\\/character\\/[0-9a-f-]{36}$/` is `SyntaxError: Invalid regular expression flags`, reported at
+  the literal itself — `node --check scripts/smoke.mjs` is the two-second gate, as it is for every
+  other trap in this file.
+- **A row that publishes leaves a post behind (T-59).** Row 42's cut is the walk's **newest** post, so
+  `/post/thread?sort=newest`'s first card is that cut for every row after it — a reasonable way to
+  find it by its body (`ownCut` is a module constant), never by an id.
 
 - **A `prepend` survives node identity, so an append row needs the ORDER assertion (T-57).**
   Inverting `post-thread.tsrx`'s append to `[...listing.items, ...items.value]` kept **all 23** stamps
