@@ -526,6 +526,24 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       5e551000-…0001 (8 turn(s), 4 copies)"* (42/43); bytes restored, `sha256sum -c` clean. 43/43 local
       and 43/43 `--live`. Brief: `docs/NEXT.md` (T-60).
 
+- [x] **T-61 Claiming a handle on /onboarding is a gate, a refusal and one draft write.**
+      `onboarding.md` was law in four places nothing executed (the case-insensitive uniqueness gate
+      with **Finish** disabled, the `[a-z0-9_]` 3–24 rule lowercased on save, *only Username and
+      Display name block Finish*, and *the whole form is written in one save, so an abandoned first
+      run keeps what was typed*), and `/onboarding` was the **only** route in `src/router.ts` that
+      `scripts/smoke.mjs` never mentioned. Row **44** (`EXPECTED_ROWS` 44) borrows `@you`, asserts a
+      first visit is blank with the rule as help, reads `"ab"` → the schema's sentence and `"Ada"` →
+      **`Username taken`** (uppercase, so case-insensitivity is the proof) with Finish disabled both
+      times, claims a free handle and reads the landing and `/`, then revisits the form (the saved
+      pair restored) and hands `@you` back. Two bugs found and fixed in the same commit:
+      `saveProfile` wrote only the session record (so `/user/<handle>` read *This user doesn't
+      exist.* while the old handle stayed claimed) — `renameAccount()` is now the one body for a
+      claim and a rename, shared with `saveProfileEdit`; and the uniqueness verdict rode the draft
+      write (silent until a name existed) — `askUniqueness()` asks on the handle's own settle. Red
+      first by dropping `&& !taken.value` from `canFinish` → *"Finish stayed enabled on a taken
+      handle …"*; bytes restored, `sha256sum -c` clean. 44/44 local and 44/44 `--live`. Brief:
+      `docs/NEXT.md` (T-61).
+
 - [x] **T-59 An author's edit never reaches a running session, and a published cut is a snapshot.**
       Failure-bank entry 2: *Session reads live items, so author edits corrupt running chats → copies
       only*. `session/detail.md` → **Purpose**: *the character, every lorebook attached to that

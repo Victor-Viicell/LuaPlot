@@ -144,12 +144,28 @@ export function Onboarding() @{
 
   let timer: ReturnType<typeof setTimeout> | undefined;
 
+  /**
+   * Ask the adapter whether the handle is free, on the handle's own settle.
+   *
+   * It deliberately does **not** ride the draft: `onboarding.md` → *States* makes both refusals
+   * inline on the field, and a taken handle must say `Username taken` before a display name
+   * exists — the draft's write is a different concern (it also needs a name) and keeps its own
+   * guard. Finish's gate reads the verdict either way, so a form with no name yet is still blocked.
+   */
+  function askUniqueness(): void {
+    const reading = handle.value;
+    if (reading.problem) return;
+    void checkHandle(reading.handle);
+  }
+
   function settle(field: "handle" | "name") {
     failure.value = "";
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
-      if (field === "handle") handleSettled.value = true;
-      else nameSettled.value = true;
+      if (field === "handle") {
+        handleSettled.value = true;
+        askUniqueness();
+      } else nameSettled.value = true;
       persistDraft();
     }, 250);
   }

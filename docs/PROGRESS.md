@@ -3,6 +3,34 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-61: claiming a handle on /onboarding is a gate, a refusal and one draft write
+
+- **Changed:** `scripts/smoke.mjs` — new walk **row 44**, `EXPECTED_ROWS` 43 → 44, after row 43 and
+  before `sign out` (mutating: the draft is a real `repo.saveProfile` write). It borrows `@you` from
+  `/user/you`, asserts a **first visit is blank** (both fields, the rule as the handle's help line,
+  the Show/Blur pair, Finish disabled, no error before a settle), reads `"ab"` → `HANDLE_RULE` with
+  Finish disabled and the help gone, types the display name and proves a name alone opens nothing,
+  reads `"Ada"` → **`Username taken`** with Finish disabled and no alternative named, claims
+  `onboarding_walk` → `/user/onboarding_walk` (`Walk Through` / `@onboarding_walk`) and `/` reading
+  `signed in as Walk Through` with *Open profile* at the new handle, revisits `/onboarding` (the pair
+  **restored**), and hands `@you` back with `/` read again. Two product fixes found by the row:
+  `src/lib/data/memory.ts` → new `renameAccount()` is the one body for a claim *and* a rename (profile
+  row, every authored `author`, both sides of the follow graph, `CLAIMED_HANDLES`; a claim with no row
+  creates one), shared by `saveProfile` and `saveProfileEdit`; `src/pages/onboarding.tsrx` → the
+  uniqueness ask moved out of the draft to `askUniqueness()`, on the handle's own settle.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30 routes, schema, tauri, 52 anchors, 5822
+  declarations); `./scripts/smoke.sh` **44/44** locally — row 44's evidence names `@you ("You")`, the
+  blank form, both refusals with Finish disabled, the claim (`/user/onboarding_walk`,
+  `signed in as Walk Through`, `Open profile` at the new handle) and the restore (`/user/you`,
+  `signed in as You`); **red first** by dropping `&& !taken.value` from `canFinish` → *"Finish stayed
+  enabled on a taken handle — @ada is a fixture handle and \"Ada\" must read taken case-insensitively"*
+  (43/44), and (before that) by `blocked = track(() => false)` → *"Finish is enabled with both
+  required fields blank"*; the bytes restored and `sha256sum -c` clean; `publish.sh` printed `LIVE`
+  (`assets/index-CJXWGVpG.js`) and `curl` is **200**; `./scripts/smoke.sh --live` **44/44**.
+- **Not verified:** nothing on this ticket — no Android/desktop half to it. The rename that
+  `renameAccount` now serves from `/user/edit` is **written but not walked** (row 45 / T-62), and
+  personas' `owner` is deliberately not moved by it (raised in the baton as T-62's likeliest find).
+
 ## 2026-11-02 — T-60: deleting a session takes its transcript and copies, and a published cut outlives it
 
 - **Changed:** `scripts/smoke.mjs` — new walk **row 43**, `EXPECTED_ROWS` 42 → 43, placed after

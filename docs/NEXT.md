@@ -1,98 +1,84 @@
 # Baton — what the next session does
 
-**T-60 landed.** Row **43** (`EXPECTED_ROWS` 43) presses the settings menu's dangerous row end to end:
-it finds row 42's cut as `/post/thread?sort=newest`'s first `.card.post` **by its body**, reads the whole
-cut on its own page (the card folds at 2 of 8), opens the seed character and presses its own
-**Continue**, reads 8 `.turn-text` and `4 copies`, then *Session settings* → `.menu-row.is-danger` → the
-confirmation's sentence → `Delete session` **scoped to `.menu-actions button`**. The landing reads
-`Aurelia of the Second Tide` with **`Start a session`**, `go("/session/<id>")` mounts *This session
-doesn't exist.* with its road and no transcript, and the post still reads all 8 messages. Red first:
-removing the `store.sessions.splice(…)` line made the row read *"the session survived the delete …
-primary control at \"Continue\", not \"Start a session\""*. 43/43 local, 43/43 `--live`. **Session 1 is
-gone** for the rest of the run (`session 2` and its copies are untouched).
+**T-61 landed.** Row **44** (`EXPECTED_ROWS` 44) walks `/onboarding` — the one route in
+`src/router.ts` that `scripts/smoke.mjs` had never mentioned. It borrows `@you` from `/user/you`,
+opens the form (a first visit is **both fields blank**, the rule as the handle's help line, the
+Show/Blur pair, Finish disabled), reads `"ab"` → the schema's own `HANDLE_RULE` sentence with Finish
+shut, types the display name and proves a name alone opens nothing, reads `"Ada"` → **`Username
+taken`** with Finish shut (uppercase, so the comparison is case-insensitive), then claims
+`onboarding_walk` → `/user/onboarding_walk` reads `Walk Through` / `@onboarding_walk` and `/` reads
+`signed in as Walk Through` with *Open profile* at the new handle, revisits `/onboarding` (the pair
+**restored**, not blank), and hands `@you` back with `/` read again. Red first twice: the whole gate
+ignored (*"Finish is enabled with both required fields blank"*, step 2) and, surgically,
+`&& !taken.value` dropped from `canFinish` → *"Finish stayed enabled on a taken handle — @ada is a
+fixture handle and \"Ada\" must read taken case-insensitively"*; bytes restored, `sha256sum -c`
+clean. 44/44 local, 44/44 `--live`.
 
-That closes the last session law and the failure bank's walkable half. Every remaining ticket in
-`SHIP-PLAN.md` is blocked (Supabase T-29–T-32, the Android toolchain T-35/T-36/T-39, T-33B(b)'s
-dependency, T-33B(c)'s decision), so the baton turns to the one **page** in the route table that no row
-has ever mounted.
+**Two product bugs the row found and this tick fixed.** (1) `saveProfile` wrote only the session
+record, so the landing after **Finish** read *This user doesn't exist.* and the old handle stayed
+claimed — `renameAccount()` in `memory.ts` is now the one body for a claim *and* a rename (profile
+row, every authored edge, both sides of the follow graph; a claim with no row creates one). (2) The
+uniqueness verdict rode the draft write, so a taken handle read **silent** until a display name
+existed; `askUniqueness()` now asks on the handle's own settle.
 
-## T-61 — `/onboarding` has never been walked: the handle rule is a gate, the refusal is one sentence, and a draft is a write
+## T-62 — `/user/you/edit` has never been saved: the rename moves the account, the content and the graph
 
-**Why it is next.** `/onboarding` appears **zero times** in `scripts/smoke.mjs`. Every other page in
-`src/router.ts` has at least one row; this one has none. `onboarding.md` is law in four places nothing
-executes: *"Unique across accounts, compared case-insensitively; a handle already taken blocks **Finish**
-with **Username taken** and names no alternative"*, *"Lowercase letters, digits, and underscores, 3–24
-characters, lowercased on save"*, *"Only **Username** and **Display name** block **Finish**"*, and
-*"Enabled once the two required fields are valid; the whole form is written in one save, so an abandoned
-first run keeps what was typed"* (→ *States* → **Resumed after abandonment**: *"the entered values are
-restored"*). T-07B then moved the one sentence into `schema.ts` (`HANDLE_RULE`) and the classification
-into `lib/validate.ts`, so the inline error, the Finish gate and a failed save have three seams and no
-witness: a page that trims or regexes on its own, or a gate that enables on a taken handle, is green in
-every gate and in all 43 rows.
+**Why it is next.** Row 3 mounts the account form and stops at the push proof (T-45). **No row has
+ever pressed Save** on it, so the one write that can *move* an account — `saveProfileEdit()`, which
+moves the profile row, `author` on every character/lorebook/preset/post the account signed, and both
+sides of the follow graph — has never been exercised. T-61 made onboarding's claim share that body
+(`renameAccount`), and the claim half is walked; the edit half is not. A rename that moved the row
+but not the authored rows, that re-created rather than moved the row (losing bio/joinedAt), that
+left the old handle claimed, or that failed to re-point the session is green in every gate and in
+all 44 rows.
 
 **Approach**
 
-1. **Row 44**, `EXPECTED_ROWS` 43 → 44, placed **after row 43 and before `sign out`**. It is
-   **mutating**: the form's draft is a real `repo.saveProfile` write.
-2. `go("/onboarding")` and wait for `input[name="handle"]` and `input[name="displayName"]` (a `Field`
-   with `name=`; the page is a form of fields, not a `<form>` submit). Read the two prefilled values —
-   the walk's account is `you` / `You`, but **read them, never pin** (row 3 edits the display name).
-   Assert `Show NSFW content` / `Blur NSFW content` toggles exist and that **Finish** is **enabled**
-   with the prefilled pair (both required fields are already valid: this is the "only the two fields
-   block Finish" half).
-3. **The format refusal, priced against the gate.** `retype('input[name="handle"]', "ab")`, then poll
-   the field's error and the button: the error must be the schema's `HANDLE_RULE` sentence and
-   **Finish must be `disabled`**. Read `disabled` on the button element (`.props`), not a style.
-4. **The uniqueness refusal, case-insensitively.** `retype('input[name="handle"]', "Ada")` — `ada` is a
-   fixture handle and the value is **uppercase on purpose**, because the spec compares
-   case-insensitively *and* lowercases on save: the field's error must read **`Username taken`** and
-   Finish must stay `disabled`. Poll (the check is async and 250 ms-settled); a stale verdict is the bug
-   this half catches.
-5. **The save.** `retype('input[name="handle"]', <a free handle the walk owns>)`, keep the display name,
-   then press **Finish** and wait for `/user/<handle>`. This is *"the whole form is written in one
-   save"*: the landing must be the new handle's own profile, and the shell must read `signed in as
-   @<handle>` — the account moved.
-6. **The resume, and the restore in one gesture.** `go("/onboarding")` again: the two fields must come
-   back holding **what was saved** (that is the draft read — *"the entered values are restored"*), not
-   blanks. Then `retype` handle `you` and display name **the display name read in step 2** (not a
-   pinned `You`), press **Finish**, wait for `/user/you`, and assert the shell reads `signed in as
-   @you` again. Row 44 hands the walk back exactly the account it borrowed — both the landing and the
-   shell are read before it returns.
+1. **Row 45**, `EXPECTED_ROWS` 44 → 45, placed **after row 44 and before `sign out`**. Mutating: it
+   renames the walk's account out and back.
+2. `go("/user/you")` — read the account's `h1.name`, `.handle`, its bio and its two figures, plus
+   the Creations tab's card count. These are the four things a rename must not lose.
+3. `go("/user/you/edit")`; wait for `input[name="handle"]` and `input[name="displayName"]`, read what
+   they prefill (the URL's handle and the row's name — read, never pin), and assert **Save** is
+   enabled with them.
+4. `retype('input[name="handle"]', <a free walk handle>)`, press **Save**, poll `/user/<handle>`.
+   Read the head again: same `h1.name`, `@<new>`, the same bio, the same followers/following
+   figures, the same creations count — *"the old one not-found, with no redirect offered"* is the
+   spec's other half.
+5. `go("/user/you")`: the **old handle answers Not found** (`This user doesn't exist.`), and it must
+   not render the profile. `/` then reads `signed in as <name>` with *Open profile* at the new
+   handle.
+6. The way back: `/user/<new>/edit` → handle `you`, Save → `/user/you`, then `/` again. Row 45 hands
+   the account back exactly as row 44 does; `sign out` still stays the walk's last row.
 
 **Traps**
 
-- **The draft is a write, ~250 ms after a valid pair settles.** `persistDraft()` calls
-  `repo.saveProfile` (plus `savePreferences`) for any value that is *valid and free* — so a row that
-  types a plausible handle early and then does something else for 300 ms has **already renamed the
-  walk's account** and every later assertion about `@you` reads a stranger. Order the probes so every
-  intermediate value is **invalid or taken** (steps 3 and 4), and make step 5 the only free value.
-  `ada` is safe because the draft skips a taken handle (it re-checks with `isHandleTaken`).
-- **The route has no guard for an onboarded account** (`onboarding.tsrx` reads `currentProfile()` and
-  prefills; it never redirects a finished account away), which is the only reason this page is
-  walkable at all. Do not add a guard in this ticket — the spec has no such state.
-- **Finish is disabled by a `Derived`** (`blocked = track(() => !canFinish.value)`), and `Button`
-  reads it live. Poll `disabled` **after** the 250 ms settle + the async `isHandleTaken` answer; a read
-  on the next frame catches the old value and reads as a broken gate.
-- **The two error texts are different shapes**: format comes from `HANDLE_RULE` (the schema's own
-  sentence), uniqueness is the literal **`Username taken`** (which *"names no alternative"* — assert
-  the sentence has no `try`/`instead`/`use` suggestion, or at least that it equals the spec's two
-  words). Read the field's error node, not body text: a toast from row 43 could contain either word.
-- **`Field` renders its error node only when `error` is set**, so an absence read must be paired with
-  the presence half (a page that never mounts the field would otherwise pass an "no error" check).
-- **The restore is the last thing this row does.** If the second Finish is never reached the account
-  is left under a walk handle; `sign out` still passes (it reads `signed out` and the Profile tab),
-  so nothing after this row would catch it — assert `/user/you` **and** the shell's own line, and put
-  both in the message.
-- **`/user/<handle>` for a fresh handle has no posts** and must still render (the profile page is
-  spec'd for it); if it reads Not found, that is a product bug — do not paper over it by landing on
-  `/`.
+- **`saveProfileEdit` returns `null`, it does not throw.** A missing row or a taken handle leaves the
+  page printing *"Your changes couldn't be saved. Try again."* and staying put — a row that only
+  polls the path reads a timeout when the message is the fact. Poll the path **and** surface
+  `document.body.innerText` in the failure.
+- **A rename rewrites the avatar's initials** from the display name (`initialsOf`), so the avatar is
+  the page's own derivation, never the fixture's — do not assert it as unchanged.
+- **Personas are `owner`, not `author`, and `renameAccount` does not move them.** After a rename
+  `/persona` would list none of the account's personas, and nothing after row 34 (T-50) reads one.
+  Decide against `personas.md` (*a persona belongs to its owner*) whether `owner` belongs in the
+  same body or in its own ticket — **this is row 45's likeliest find**.
+- **The claim and the rename are now one body.** A red proof that edits only `saveProfileEdit`'s
+  copy of the move proves nothing: `renameAccount` is shared, so aim the red at the shared function
+  (drop the `store.profiles` move and watch `/user/<new>` read Not found; drop the authored-row loop
+  and watch the creations count fall to 0).
+- **`/user/you/edit` is not a `<form>`** — a `div.form` of `Field`s, so a row must key on
+  `input[name="..."]`, never `querySelector("form")`.
+- **The session is not the page.** `setAccount()` runs before `navigate()`, so a rename that landed
+  on the right URL with a stale session would read `@you` in the shell — assert both ends, as row 44
+  does.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **44/44** locally and **44/44 `--live`**; the assertion
-proved **red** first — make the gate ignore the verdict (`blocked = track(() => false)` in
-`onboarding.tsrx`) and watch step 4 read *"Finish stayed enabled on a taken handle"*; capture it,
-restore the exact bytes and `sha256sum -c` them; `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **45/45** locally and **45/45 `--live`**; the assertion
+proved **red** first (name the edit and the message in PROGRESS); `publish.sh` prints `LIVE` and
+`curl` is 200.
 
 ## Blocked — what a human must do
+
 
 - **T-29/T-30/T-31/T-32 (Supabase):** create a project and export `SUPABASE_URL` +
   `SUPABASE_ANON_KEY` (server key stays out of the client). Nothing about the data seam can move past
@@ -126,9 +112,9 @@ restore the exact bytes and `sha256sum -c` them; `publish.sh` prints `LIVE` and 
   in `src/router.ts` that `scripts/smoke.mjs` never mentions (grep it — zero hits). Its law is a gate
   (a taken handle disables **Finish** and says `Username taken`, case-insensitively), a format rule
   (`[a-z0-9_]` 3–24, lowercased on save) and a **draft that is a real write**.
-- **Row count is 43 after T-60.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+- **Row count is 44 after T-61.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
-  it, and bump the count only when a row is genuinely new (**T-61 adds row 44**). **Rows 36 and 37
+  it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 adds 45**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -149,6 +135,13 @@ restore the exact bytes and `sha256sum -c` them; `publish.sh` prints `LIVE` and 
   every later row and `/session/5e551000-…0001` mounts the Not found sentence; session 2 (the
   adapter's second session) is untouched. It also leaves the reader on the cut's post page, and it
   takes **no** override and writes no preference.
+- **Row 44 (T-61) is mutating and hands the account back, twice over.** Its draft is a real
+  `repo.saveProfile` write ~250 ms after a valid pair settles, so every intermediate value it
+  types is **invalid or taken** and the only free value is the one it claims; it leaves the
+  account as `@you` (`You`) again, both `/user/you` and `/`'s sentence read before it returns.
+  It also renames the account for the length of the row, which **moves every authored row's
+  `author` to `onboarding_walk` and back** — anything after it may read a creation count, but
+  must not pin an author handle mid-row.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.
@@ -227,6 +220,28 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A first visit's two fields are both blank, and the ticket's prefill hypothesis was wrong
+  (T-61).** `onboarding.tsrx`'s `load()` only prefills from a *saved* profile, and the mock ships no
+  provider display name, so `/onboarding` opens with an empty handle and an empty name — the account
+  being `@you` does not prefill the claim. The row's order therefore has to be **blank → `"ab"` →
+  name → `"Ada"` → free handle**: the only free value is the claimed one, so no intermediate
+  keystroke can rename the walk's account.
+- **Onboarding's uniqueness verdict used to ride the draft write (T-61).** `persistDraft()` is the
+  only caller of `checkHandle` on a settle and it needs a valid handle *and* a display name, so a
+  taken handle read **silent** until the name was filled — and a row that checked `"Ada"` before
+  typing a name timed out on an error that would never appear. The ask now lives in
+  `askUniqueness()`, on the handle's own settle; the draft write keeps its own guard.
+- **A claim wrote the session and nothing else (T-61).** `/user/<handle>` after **Finish** read
+  *This user doesn't exist.* while the old handle stayed claimed in `CLAIMED_HANDLES` — the landing
+  is what a reader sees, so it is what a row must assert (`readHead()`'s `missing` flag), never the
+  store. `renameAccount()` is now the one body for a claim and a rename; `saveProfileEdit` lost its
+  private copy of the move.
+- **`blocked = track(() => false)` is the wrong red proof for a gate (T-61).** Row 44 goes red at
+  its **first** gate assertion (*"Finish is enabled with both required fields blank"*), not on the
+  taken handle the accept line names. The surgical edit is dropping `&& !taken.value` from
+  `canFinish` — that produced *"Finish stayed enabled on a taken handle — @ada is a fixture handle
+  and \"Ada\" must read taken case-insensitively"*. Aim a red proof at the one clause the
+  assertion exists for.
 - **A thread card folds a cut at two messages, so `.cut-turn` on the feed is not the cut's length
   (T-60).** `PostCard` takes `fold`, and `/post/thread` folds (`FOLD = 2`) while the post's own page
   does not: row 43 read **2** `.cut-turn` on the newest card and **8** on `/post/<id>` for the same

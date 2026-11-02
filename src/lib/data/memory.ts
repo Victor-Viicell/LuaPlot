@@ -53,6 +53,7 @@ import {
   personaWriteSchema,
   profileEditSchema,
   profileSchema,
+  profileSeedSchema,
   reportSchema,
   reportWriteSchema,
   seedSchemas,
@@ -304,6 +305,66 @@ function profileRow(handle: Handle): Omit<Profile, "followers" | "following"> | 
 /** The handle the preview's own account holds: onboarding's claim, else the fixture's `you`. */
 function ownHandle(): Handle {
   return profile?.handle ?? VIEWER;
+}
+
+/**
+ * Move the account's own handle — the profile row, the author on every row it signed, the follow
+ * edges and the claim set — in one body, because **a claim and a rename are the same write**:
+ * `/onboarding` takes the handle (`pages/onboarding.md` → *Data*), `/user/[user.username]` is built
+ * from it, and `/user/edit` renames it (`pages/user/edit.md` → *Handle changed*).
+ *
+ * Onboarding's claim used to write only the session record, so the landing after **Finish** read
+ * *This user doesn't exist.* while the old handle stayed claimed — row 44 of the walk is that bug's
+ * witness. A rename moves rather than copies: the old handle answers not-found with no alias.
+ *
+ * A row is created when the account had none (a genuine first run authors nothing), so the claim's
+ * own landing renders; the initials come from the display name because the provider supplies none.
+ */
+function renameAccount(from: Handle, to: Handle, displayName: string): void {
+  // Content is addressed by id, so it keeps its rows and only its author handle follows.
+  for (const collection of [store.characters, store.lorebooks, store.presets, store.posts]) {
+    for (const item of collection) {
+      if (item.author === from) item.author = to;
+    }
+  }
+  for (const key of [...follows]) {
+    const [follower, followee] = key.split(":");
+    if (follower !== from && followee !== from) continue;
+    follows.delete(key);
+    const moved = edgeOf(
+      follower === from ? to : (follower as Handle),
+      followee === from ? to : (followee as Handle),
+    );
+    // A rename never creates a self-edge: the account still follows the same people.
+    if (moved !== edgeOf(to, to)) follows.add(moved);
+  }
+
+  CLAIMED_HANDLES.delete(from);
+  CLAIMED_HANDLES.add(to);
+
+  const index = store.profiles.findIndex((entry) => entry.handle === from);
+  if (index >= 0) {
+    store.profiles[index] = profileSeedSchema.parse({ ...store.profiles[index], handle: to, displayName });
+  } else {
+    store.profiles.push(
+      profileSeedSchema.parse({
+        handle: to,
+        displayName,
+        avatar: { initials: initialsOf(displayName, to) },
+        bio: "",
+        joinedAt: new Date().toISOString(),
+      }),
+    );
+  }
+
+  if (profile && profile.handle === from) profile = { ...profile, handle: to };
+}
+
+/** Two letters for a claim that has no avatar yet: the name's initials, else the handle's first two. */
+function initialsOf(displayName: string, handle: Handle): string {
+  const words = displayName.split(/\s+/).filter(Boolean);
+  const letters = words.length > 1 ? `${words[0][0]}${words[1][0]}` : (words[0] ?? handle).slice(0, 2);
+  return letters.toUpperCase();
 }
 
 /**
@@ -2435,6 +2496,18 @@ export const memoryRepo: Repo = {
       displayName: write.displayName,
       isAdmin: profile?.isAdmin ?? false,
     });
+
+    // **The claim is a rename.** The handle is the account's only one and `/user/<handle>` is built
+    // from it, so the profile row and every edge that names it move in the same write — otherwise
+    // the landing after Finish reads *This user doesn't exist.* and the old handle stays claimed.
+    const held = ownHandle();
+    if (write.handle !== held && (profileRow(write.handle) || CLAIMED_HANDLES.has(write.handle))) {
+      // Another account holds it. The field error and Finish's own re-check both refuse before this
+      // point, so a write that arrives anyway is a stale verdict: it must not steal the handle.
+      throw new Error(`the handle @${write.handle} is taken`);
+    }
+    renameAccount(held, write.handle, write.displayName);
+
     profile = next;
     return { ...next };
   },
@@ -2537,33 +2610,11 @@ export const memoryRepo: Repo = {
 
     if (write.handle !== old) {
       if (profileRow(write.handle) || CLAIMED_HANDLES.has(write.handle)) return null;
-
-      // A rename moves the row and every edge that names it. Content is addressed by id, so it
-      // keeps its rows and only its author handle follows; the old handle answers not-found with
-      // no alias (`pages/user/edit.md` → *Handle changed*).
-      for (const collection of [store.characters, store.lorebooks, store.presets, store.posts]) {
-        for (const item of collection) {
-          if (item.author === old) item.author = write.handle;
-        }
-      }
-      for (const key of [...follows]) {
-        const [follower, followee] = key.split(":");
-        if (follower !== old && followee !== old) continue;
-        follows.delete(key);
-        const moved = edgeOf(
-          follower === old ? write.handle : (follower as Handle),
-          followee === old ? write.handle : (followee as Handle),
-        );
-        // A rename never creates a self-edge: the account still follows the same people.
-        if (moved !== edgeOf(write.handle, write.handle)) follows.add(moved);
-      }
-
-      CLAIMED_HANDLES.delete(old);
-      CLAIMED_HANDLES.add(write.handle);
-      if (profile && profile.handle === old) profile = { ...profile, handle: write.handle };
+      // One body for both writes that can move the handle (see `renameAccount`).
+      renameAccount(old, write.handle, write.displayName);
     }
 
-    const index = store.profiles.findIndex((entry) => entry.handle === old);
+    const index = store.profiles.findIndex((entry) => entry.handle === write.handle);
     const next = {
       handle: write.handle,
       displayName: write.displayName,

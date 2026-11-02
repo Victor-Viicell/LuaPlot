@@ -4420,6 +4420,207 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-61 — `pages/onboarding.md` was law in four places nothing executed: *"Unique across accounts,
+ * compared case-insensitively; a handle already taken blocks Finish with Username taken and names no
+ * alternative"*, *"Lowercase letters, digits, and underscores, 3–24 characters, lowercased on save"*,
+ * *"Only Username and Display name block Finish"* and *"the whole form is written in one save, so an
+ * abandoned first run keeps what was typed"*. `/onboarding` was the only route in `src/router.ts`
+ * that `scripts/smoke.mjs` never mentioned, so a page that regexed on its own, a gate that enabled
+ * on a taken handle, or a draft that was not a write were green in every gate and in all 43 rows.
+ *
+ * **Mutating.** The form's draft is a real `repo.saveProfile` write ~250ms after a valid pair
+ * settles, so every intermediate value this row types is **invalid or taken** and the only free
+ * value is the one it claims. It hands the account back at the end — the landing and `/`'s own
+ * sentence are both read before it returns — because `sign out` follows it and would not notice.
+ * ---------------------------------------------------------------------------------------------- */
+const ONBOARDING_HANDLE = "onboarding_walk";
+const ONBOARDING_NAME = "Walk Through";
+const HANDLE_RULE_SENTENCE = "Lowercase letters, digits and underscores, 3–24 characters.";
+
+results.push(
+  await journey("claiming a handle on /onboarding is a gate, a refusal and one draft write", async () => {
+    /** The form read once: both fields' value/help/error, the Finish button's own flag, the pair. */
+    const readForm = () =>
+      js(`
+        const input = (name) => document.querySelector('input[name="' + name + '"]');
+        const fieldOf = (name) => { const el = input(name); return el ? el.closest(".field") : null; };
+        const cell = (name) => ({
+          present: !!input(name),
+          value: input(name) ? input(name).value : "",
+          error: ((fieldOf(name)?.querySelector(".field-error") || {}).textContent || "").trim(),
+          help: ((fieldOf(name)?.querySelector(".field-help") || {}).textContent || "").trim(),
+        });
+        const finish = [...document.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Finish");
+        return {
+          path: location.pathname,
+          handle: cell("handle"),
+          name: cell("displayName"),
+          finish: finish ? finish.disabled : null,
+          toggles: [...document.querySelectorAll(".toggle .toggle-label")].map((el) => (el.textContent || "").trim()),
+        };
+      `);
+
+    /** A poll that always throws with the whole form it last read, never a bare timeout. */
+    const until = async (label, check, timeout = 8000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await readForm();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${label} — read ${JSON.stringify(last)}`);
+    };
+
+    const readHead = () =>
+      js(`
+        return {
+          name: (document.querySelector(".profile-head h1.name")?.textContent || "").trim(),
+          handle: (document.querySelector(".profile-head .handle")?.textContent || "").trim(),
+          missing: document.body.innerText.includes("This user doesn't exist."),
+        };
+      `);
+
+    const readShell = () =>
+      js(`
+        const link = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Open profile");
+        return {
+          sentence: (document.querySelector(".reading-value")?.textContent || "").trim(),
+          profile: link ? link.getAttribute("href") || "" : "",
+        };
+      `);
+
+    // 1. The account this row borrows, read from the page it will be handed back to.
+    await go("/user/you");
+    await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the account's profile header", 10000);
+    const account = await readHead();
+    if (!account.name || !account.handle) {
+      throw new Error(`/user/you reads name ${JSON.stringify(account.name)} / handle ${JSON.stringify(account.handle)} — the walk has no account to hand back`);
+    }
+    const accountHandle = account.handle.replace(/^@/, "");
+
+    // 2. The form: a first visit is a **claim** — both fields are blank (the provider supplied no
+    //    name and the account has not claimed a handle), the rule is the help line, and the only
+    //    thing between the reader and Finish is the pair.
+    await go("/onboarding");
+    let form = await until("the onboarding form to mount", (f) => f.handle.present && f.name.present, 12000);
+    if (form.handle.value !== "") {
+      throw new Error(`the first visit prefills the handle as ${JSON.stringify(form.handle.value)} — the spec's first-run field is a claim, not the account's existing handle`);
+    }
+    if (form.name.value !== "") {
+      throw new Error(`the form prefills the display name as ${JSON.stringify(form.name.value)} — a first visit has no provider name, so it must be blank`);
+    }
+    if (form.handle.help !== HANDLE_RULE_SENTENCE || form.handle.error !== "") {
+      throw new Error(`the handle field reads help ${JSON.stringify(form.handle.help)} / error ${JSON.stringify(form.handle.error)}, not the rule as help and no error`);
+    }
+    if (form.name.error !== "") {
+      throw new Error(`the display name prints ${JSON.stringify(form.name.error)} before anything was typed — an error appears once a field has settled, never on the first frame`);
+    }
+    if (form.toggles.join(" | ") !== "Show NSFW content | Blur NSFW content") {
+      throw new Error(`the preferences read ${JSON.stringify(form.toggles)}, not the Show/Blur pair`);
+    }
+    if (form.finish !== true) {
+      throw new Error(`Finish is enabled with both required fields blank — only the two fields block it, and neither is filled`);
+    }
+
+    // 3. A handle the rule rejects: the schema's own sentence, and Finish stays shut.
+    await retype('input[name="handle"]', "ab");
+    form = await until("the field to print the handle rule", (f) => f.handle.error === HANDLE_RULE_SENTENCE);
+    if (form.finish !== true) {
+      throw new Error(`Finish stayed enabled on a two-character handle (${JSON.stringify(form.handle.value)}) — the inline error and the gate disagree`);
+    }
+    if (form.handle.help !== "") {
+      throw new Error(`the field prints the rule twice (help ${JSON.stringify(form.handle.help)} beside the error)`);
+    }
+
+    // 4. The display name is valid before the handle is: a name alone must not open the gate.
+    await retype('input[name="displayName"]', ONBOARDING_NAME);
+    form = await until("the display name to settle", (f) => f.name.value === ONBOARDING_NAME && f.name.error === "");
+    await sleep(400);
+    form = await readForm();
+    if (form.finish !== true) {
+      throw new Error(`Finish enabled on a display name alone — the handle still reads ${JSON.stringify(form.handle.value)} and only the pair may open the gate`);
+    }
+
+    // 5. A handle another account holds, typed **uppercase**: the comparison is case-insensitive
+    //    and the save lowercases, so `Ada` must read taken and Finish must stay shut.
+    await retype('input[name="handle"]', "Ada");
+    form = await until(`the field to print "Username taken"`, (f) => f.handle.error === "Username taken");
+    if (form.finish !== true) {
+      throw new Error(`Finish stayed enabled on a taken handle — @ada is a fixture handle and ${JSON.stringify(form.handle.value)} must read taken case-insensitively`);
+    }
+    if (/\b(try|instead|use)\b/i.test(form.handle.error)) {
+      throw new Error(`the refusal names an alternative (${JSON.stringify(form.handle.error)}) — the spec says it names none`);
+    }
+
+    // 6. The claim: one free handle, one save, and the landing is that handle's own profile.
+    await retype('input[name="handle"]', ONBOARDING_HANDLE);
+    form = await until("Finish to enable on a free handle", (f) => f.handle.error === "" && f.finish === false);
+    await click("Finish", { exact: true });
+    try {
+      await expectPath(`/user/${ONBOARDING_HANDLE}`, "Finish", 10000);
+    } catch (error) {
+      const seen = await js(`return { path: location.pathname, text: document.body.innerText.replace(/\\s+/g, " ").trim().slice(0, 140) };`);
+      throw new Error(`${error.message} — Finish left the reader at ${JSON.stringify(seen)}`);
+    }
+    await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the claimed handle's profile", 10000);
+    const claimed = await readHead();
+    if (claimed.missing) {
+      throw new Error(`/user/${ONBOARDING_HANDLE} after Finish reads "This user doesn't exist." — the claim wrote the account but not the profile row it addresses`);
+    }
+    if (claimed.handle !== `@${ONBOARDING_HANDLE}` || claimed.name !== ONBOARDING_NAME) {
+      throw new Error(`the claimed profile reads ${JSON.stringify([claimed.name, claimed.handle])}, not ${JSON.stringify([ONBOARDING_NAME, `@${ONBOARDING_HANDLE}`])}`);
+    }
+
+    await go("/");
+    await waitText("signed in as", 8000);
+    const shell = await readShell();
+    if (shell.sentence !== `signed in as ${ONBOARDING_NAME}`) {
+      throw new Error(`/ reads ${JSON.stringify(shell.sentence)} after the claim, not ${JSON.stringify(`signed in as ${ONBOARDING_NAME}`)} — the account did not move`);
+    }
+    if (!shell.profile.endsWith(`/user/${ONBOARDING_HANDLE}`)) {
+      throw new Error(`the shell's Open profile points at ${JSON.stringify(shell.profile)}, not /user/${ONBOARDING_HANDLE}`);
+    }
+
+    // 7. The resume, then the hand-back. A second visit must restore the saved pair, not a blank.
+    await go("/onboarding");
+    form = await until("the resumed form's fields", (f) => f.handle.present && f.name.present, 12000);
+    const resumed = { handle: form.handle.value, name: form.name.value };
+    if (resumed.handle !== ONBOARDING_HANDLE || resumed.name !== ONBOARDING_NAME) {
+      throw new Error(
+        `a resumed first run reads handle ${JSON.stringify(resumed.handle)} / name ${JSON.stringify(resumed.name)}, not the saved pair ${JSON.stringify([ONBOARDING_HANDLE, ONBOARDING_NAME])} — "the entered values are restored" is a write, not a blank form`,
+      );
+    }
+
+    try {
+      await retype('input[name="handle"]', accountHandle);
+      await retype('input[name="displayName"]', account.name);
+      form = await until(`Finish to enable on @${accountHandle}`, (f) => f.finish === false && f.handle.error === "");
+      await click("Finish", { exact: true });
+      await expectPath(`/user/${accountHandle}`, "the restore's Finish", 10000);
+      await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the borrowed account's profile", 10000);
+      const back = await readHead();
+      if (back.missing || back.handle !== `@${accountHandle}` || back.name !== account.name) {
+        throw new Error(`the restore landed on ${JSON.stringify([back.name, back.handle, back.missing])}, not ${JSON.stringify([account.name, `@${accountHandle}`])}`);
+      }
+      await go("/");
+      await waitText("signed in as", 8000);
+      const home = await readShell();
+      if (home.sentence !== `signed in as ${account.name}` || !home.profile.endsWith(`/user/${accountHandle}`)) {
+        throw new Error(`/ reads ${JSON.stringify([home.sentence, home.profile])} after the restore, not ${JSON.stringify([`signed in as ${account.name}`, `/user/${accountHandle}`])}`);
+      }
+
+      return `@${accountHandle} (${JSON.stringify(account.name)}) · a first visit opens blank with the rule as the handle's help line, and Finish enables on the pair only once the settle asked the adapter · "ab" → ${JSON.stringify(HANDLE_RULE_SENTENCE)} with Finish disabled · "Ada" → "Username taken" with Finish disabled · Finish → /user/${ONBOARDING_HANDLE} reads ${JSON.stringify([claimed.name, claimed.handle])}, / reads ${JSON.stringify(shell.sentence)} with Open profile at ${shell.profile} · a second visit restored ${JSON.stringify([resumed.handle, resumed.name])} → Finish back to /user/${accountHandle}, / reads ${JSON.stringify(home.sentence)}`;
+    } catch (error) {
+      throw new Error(
+        `${error.message} — the account was left as @${ONBOARDING_HANDLE} (${JSON.stringify(ONBOARDING_NAME)}); the walk's borrowed @${accountHandle} was not handed back`,
+      );
+    }
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -4443,9 +4644,9 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41, T-59: 42, T-60: 43).
+ * T-58: 41, T-59: 42, T-60: 43, T-61: 44).
  */
-const EXPECTED_ROWS = 43;
+const EXPECTED_ROWS = 44;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");
