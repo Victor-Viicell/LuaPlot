@@ -735,10 +735,11 @@ the card's parts and the loads; these are the choices the spec left open.
   lookup answered (a prop expression is evaluated once — the same trap as T-08's `blur`).
 - **A post's image is not drawn.** The spec's *body with its inline images* has no field on
   `postSchema` yet; nothing invents one, and a body-only card is not a broken card.
-- **End of feed** is a centred 12px line, drawn whenever `hasMore` is false and the feed has rows —
-  including page 1, because the fixtures hold 12 posts. Load more is therefore **unreachable in the
-  preview**: the control is mounted from `hasMore` and its append path is unverified until the
-  fixtures grow past 24.
+- **End of feed** is a centred 12px line, drawn whenever `hasMore` is false and the feed has rows.
+  **Load more** is mounted from `hasMore` and its append path is walked (row 39, T-57): the fixtures
+  hold **30 posts** (29 listed — post 6 is `removed`), so page 1 is 24 cards, the control draws, page
+  2 is the remaining five, and `End of feed.` appears only once the rest is appended. Paging is
+  component state: it writes nothing into the URL, and a remount re-reads page 1.
 
 ## Post detail and composer (decided in T-14, do not re-invent)
 

@@ -1,85 +1,158 @@
 # Baton — what the next session does
 
-**T-57 is the one ticket.** T-56 landed: `scripts/smoke.mjs` has row **40** (walk **40/40** locally and
-**40/40 `--live`**), and failure-bank entry **5** is now measured — the detail page's Likes/Dislikes
-cells read `412/61` at the seed, `413/61` after one Like, still `413/61` after a **repeat** (twice,
-300 ms apart), `412/62` after a switch with exactly one `.vote` pressed, the same after a remount
-through `/character/catalog`, and `413/61` at the end — one vote, not two. **The ticket's red proof was
-wrong and is corrected:** deleting only `if (previous === direction) return row` leaves the walk
-**green**, because the decrement/increment pair is symmetric and a repeat nets zero; the honest red is
-that guard **and** the two decrements removed (a repeat then reads `414`), or the decrements alone (the
-switch then leaves the like counted). Both messages are recorded in `PROGRESS.md` and `SHIP-PLAN.md`.
-The next unguarded law is failure-bank entry **3**'s other half, and it is blocked on a fixture: the
-thread lists 11–12 posts against `PAGE_SIZE` 24, so **Load more** is correctly absent and no row has
-ever pressed it.
+**T-58 is the one ticket.** T-57 landed: `lib/fixtures/posts.ts` is **30 rows** (29 listed — post 6 is
+`removed`), so `/post/thread` draws **Load more** for the first time and walk **row 39** presses it.
+The measured shape, keep it: page 1 is **24 rows / 23 visible cards** (post 7 is the only `nsfw` post
+and the walk's account seeds Show **off**), the press appended the remainder to **29 cards**, the
+first page's **23 stamps and its order survived**, `location.search` stayed `""`, the pager then read
+`End of feed.` (page 2 *was* the whole remainder, so there was no second press to make — say that in
+the message rather than inventing one), and `history.back()` **left the thread** — paging pushed no
+entry — with a return re-reading page 1 (23 cards, 0 stamps, Load more back). Both red proofs are in
+`PROGRESS.md`; the second one matters: inverting the append to a prepend **kept all 23 stamps**, so
+node identity alone runs green on that bug and the **order** assertion is what carries the row.
 
-## T-57 — seed a real second page, then press Load more and prove paging stays out of the URL
+T-57 also leaves failure bank entry **8** as the only unwalked entry whose machinery already exists.
 
-**Why it is next.** `post/thread.md` → *Layout* says *"paging stays out of the URL"*, and
-`post-thread.tsrx` keeps `page` in component state (`loadMore()` fetches `page + 1` and never pushes an
-address). Failure bank entry 3 is *"`Load more` state lost on back → paging in component state, filters
-in URL"* — T-55 walked the URL/sort half; the paging half has never run, because
-`lib/fixtures/posts.ts` holds **12** posts (`POST(1..12)`, post 6 `status:"removed"`, post 7 the only
-`nsfw:true`), `PAGE_SIZE` is **24**, and `pageOf()` answers `hasMore: start + items.length <
-rows.length`. So `/post/thread` draws **no** `.pager-action` and row 39 asserts that **absence** plus
-the `End of feed.` note. A pager that wrote the page into `location.search`, or an append that replaced
-the first page instead of extending it, would stay green in every gate and in the whole walk.
+## T-58 — deleting the default persona hands the mark to exactly one heir, in one step
+
+**Why it is next.** Failure bank entry 8 is *"Deleting a persona leaves the collection without a
+default → reassign in one step"*. `persona/collection.md` → *States* → **Populated**: *"every persona
+listed, exactly one carrying the default mark"*, and *Actions*: *"the collection is never left with
+personas and no default"*. `persona/detail.md` → *States* fixes the **Not found** sentence
+(*"This persona doesn't exist in your collection."*) and *Actions* fixes **Delete** *"with
+confirmation"*. `memory.ts` `deletePersona()` already implements the hand-off (the heir is the
+**newest remaining** persona by `createdAt`), and the detail page's delete copy states the rule in
+the product's own words — but **no row has ever pressed Delete on a persona**. The collection is only
+ever *read* (row 34, T-50), so a delete that dropped the mark, handed it to two rows, or emptied the
+collection is green in every gate and every row today.
 
 **Approach**
 
-1. Seed the fixture, not the walk: `src/lib/fixtures/posts.ts` grows to **30 listed** posts — keep
-   `POST(1..12)` exactly as they are (rows 21, 30, 38 and 39 name ids), and add `POST(13..30)` in a
-   **loop** with distinct `createdAt` values (the thread's default sort is `newest`, so an equal clock
-   makes the order — and the walk — non-deterministic), distinct bodies, `nsfw: false`,
-   `status: "visible"`, and the same author shape the twelve use. 30 listed ⇒ page 1 is 24 cards and
-   page 2 is **6**, enough to prove an append without a 49-post fixture. Do **not** change `PAGE_SIZE`.
-2. Change nothing else in the fixture: post 6 stays the seeded `removed` row (row 21's case), post 7
-   stays the only `nsfw` one (row 38 composes its own flagged post because row 21 removes this one).
-3. **Row 39 is the row that extends** (do not add row 41): its last block currently **throws** on
-   `end.cards >= 24` with a message saying the paging half is stale — that guard is exactly what fires
-   once the seed lands, so replace it with the paging proof rather than deleting it. After the two
-   `history.back()` steps: assert `location.search === ""`, that `.pager-action` **exists** and the
-   `End of feed.` note does **not**; press the pager's own control (`.pager-action button`, scoped — this
-   page also draws Create, the sort `select` and a card link), then assert:
-   - the card count grows by the second page (read the count, do not pin it),
-   - the **first page's cards keep their order and their stamps** (row 39's `stamp()`/`state()` already
-     carry node identity: an append must leave them, a replace must not),
-   - `location.search` is still `""` — **paging writes no URL**,
-   - a second press either appends the rest or leaves `End of feed.` — assert whichever the fixture's
-     size makes true, and name it in the message.
-4. The "state lost on back" half: press Load more, then `history.back()` (paging pushed no entry, so it
-   leaves the thread) and return — the listing must be the **first page** again and the address what it
-   was. If that is the honest product behaviour, assert it and say so in the evidence; if the spec wants
-   the page kept, that is a product decision for the owner, not a walk row.
-5. Re-derive every post count the walk already asserts — the seeding *is* the ticket. Grep
-   `scripts/smoke.mjs` for the rows that count `.card.post` / `.post-count` and re-read them against the
-   new fixture: row 21's moderation case, row 36's `thread: N post card(s)` line, row 38's
-   `1/12 post card(s) covered`, row 39's `11 cards`. The walk's own rows still add two posts (`publish a
-   post`, row 38's composed flagged one), so nothing may pin a total.
-6. `Counts` below says `posts 12 (11 listed…)` — update it in the same commit as the fixture, or the
-   next session re-derives it from a stale note.
+1. **Row 41**, `EXPECTED_ROWS` 40 → 41. This one *is* a new row: row 40 is T-56's vote and reads a
+   character, so nothing existing can host a persona delete. Place it **after row 40 and before
+   `sign out`**, so `sign out` stays the walk's last row.
+2. Read the collection **before**: `/persona` (wait for `.skel-card` **gone** — three skeleton
+   `.card-cell`s look like cards on the first frame) draws **3** `.persona-card`, exactly **one**
+   `.persona-card.is-default` / one `.persona-card-mark` reading `default`. Record the default's
+   **name** (the seed's default is **Nell**, `PERSONA(1)`) and its `href`. Read `textContent`, not
+   `innerText`: the mark and the labels are uppercased in CSS (T-49).
+3. Open **that card** — its `.persona-card-name` link or **Open**, never `nth 0` by habit, so the row
+   still proves *the default* was opened if the grid order ever moves. Land on `/persona/<id>`;
+   the heading is **`h1.name`** on this page (a character's is `h1.title`).
+4. Delete in **two presses**: `.delete-row`'s opener reads **`Delete`**; the confirmation's button
+   reads **`Confirm delete`** inside `.delete-actions`. Two different buttons — the T-49 trap
+   (*Restore* vs *Restore copy*) — so scope the second press or it hits nothing.
+5. Assert **after**, in one reading: the page pushed to `/persona` (path ends `/persona`, no query),
+   **2** `.persona-card`, the deleted name **absent**, exactly **one** default mark, and it is
+   **Ash** — the heir is the *newest remaining* by `createdAt` (`PERSONA(3)`, `at(16,4,10)`), not The
+   Correspondent, which is the second card but the oldest (`at(8,…)`). Read the heir's name from the
+   page and name it in the evidence; a row that pins "the first remaining card" is red on a right
+   page.
+6. Last half: `go()` back to the deleted persona's URL. It must mount the **Not found** state with
+   the spec's exact sentence (and the road out to `/persona`), not a crash and not a blank page.
 
 **Traps**
 
-- **Do not delete row 39's stale guard, replace it.** `if (end.cards >= 24) throw … "the paging half of
-  this row is stale and needs its own .pager-action step"` is this ticket, written into the walk three
-  ticks early; a session that deletes it gets a green run that proves nothing.
-- **`.pager-action` is a wrapper, not the control** (`post-thread.tsrx`: a `<div class="pager-action">`
-  around a `Button`), so the press targets `.pager-action button`.
-- **`appending` disables the pager during the await** — the same trap as T-56's vote pair: poll for a
-  not-disabled control before the press, or the row reads "nothing was appended" on a page that is right.
-- **`hasMore` false after the first page means the seed did not land**: say so
-  (`0 .pager-action with N listed cards`) rather than press nothing.
-- **Seeding 30 posts changes the preview classifier's `hash("jev:post:" + body) % 5` buckets** for the
-  new bodies; the report row names `POST_REPORTED` by id and body, so leave both intact.
-- **`schema:check` parses every fixture** — a generated row must satisfy `postSchema` (uuid-shaped
-  `POST(n)` id, real ISO-8601 `createdAt`, the same author field). A fixture that fails its schema is
-  fixed against the spec, never by loosening the schema.
+- **The default is Nell; the heir is Ash** (newest by `createdAt`). The second card is not the heir.
+- **Two Delete buttons** (opener + `Confirm delete`); a `startsWith("Delete")` match hits the opener.
+- **The row is mutating and final.** `deletePersona()` splices the row out of the memory store, so
+  every later row sees two personas. Rows 34/T-50's persona reads and the collection count sit
+  **before** it; nothing after it reads a persona except `sign out`. Keep it last-but-one and say so
+  in the row's comment.
+- **`deletePersona` answers `false` for a non-owner and the page keeps the row** — that is a
+  different law (refusal), already covered for items by row 24-ish; do not re-walk it here, walk the
+  **owner's** own default.
+- **The default mark is a class plus its own element** (`.persona-card.is-default`,
+  `.persona-card-mark`), and the button beside it reads **`Default persona`** (disabled) vs
+  **`Set as default`** — never key the proof on button text alone.
+- **`schema:check` parses personas too**; if a fixture must change, fix it against the spec, never
+  the schema.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **40/40** locally and **40/40 `--live`** (row 39 extended,
-row count unchanged); the paging block proved **red** first — make `loadMore()` write `?page=2` into
-`location.search` (or make it replace the listing instead of appending) and capture the message, then
-restore the exact bytes and `sha256sum -c` them; `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **41/41** locally and **41/41 `--live`**; the assertion
+proved **red** first — delete the hand-off (`if (row.isDefault) { … heir … }` in
+`deletePersona()`) or set the heir's `isDefault` back to `false` — and the message must read that the
+collection was left with personas and **no** default (capture it, then restore the exact bytes and
+`sha256sum -c` them); `publish.sh` prints `LIVE` and `curl` is 200.
+
+## Blocked — what a human must do
+
+- **T-29/T-30/T-31/T-32 (Supabase):** create a project and export `SUPABASE_URL` +
+  `SUPABASE_ANON_KEY` (server key stays out of the client). Nothing about the data seam can move past
+  the memory adapter until then. T-30 also owns the real auth body (`lib/auth.ts` writes no session
+  today) and the redirect matrix; T-29's migration is the first thing after the ref lands.
+- **T-33B(b) deep link (desktop):** needs `tauri-plugin-deep-link` + a `luaplot://` scheme in the
+  bundle config — a dependency, and the contract forbids one the ticket does not name.
+- **T-33B(c) `Ctrl/Cmd+K`:** a decision, not work — no spec file describes a command palette, and
+  `luaplot-pages.md` is product law, so nothing may invent it. The owner must either record it in
+  `docs/DESIGN.md` (what it lists, what it does, what it costs at 360px) or strike it from the ticket.
+- **T-35/T-39 (Android + release):** install cmdline-tools + platform 35 + NDK, the four rust
+  android targets, then `tauri android init`. T-39 also needs a signing key and a `v0.1.0` tag, so it
+  follows T-35 and stays blocked. **T-36 is split:** (a) — the keyboard inset — **landed as T-36a**
+  (`lib/viewport.ts` + walk row 32); the rest of T-36 — no clipped input **on a real APK**, hardware
+  back-button mapping, 60fps transcript scroll on device — still needs the toolchain above and stays
+  blocked.
+- **Tauri on this box is NOT blocked — and the webview session proof is done.** `bun run tauri dev`
+  opens, the account survives a restart in both directions, and the recipe below reproduces it.
+
+## Open decisions
+
+- **T-58 is the ticket, and it is the last walkable failure-bank entry.** Entries 1 (T-54), 3 (T-55 +
+  T-57), 4 (T-53) and 5 (T-56) are walked; 8 becomes walked by T-58. The rest are blocked on the
+  backend or the toolchain (2 → T-29's copies, 6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). After T-58 the rotation should stop inventing
+  law-walks and take a **page** instead: `docs/NEXT.md`'s *Found while working* list is the source of
+  the gaps a page owes.
+- **Row count is 40 after T-57.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+  row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
+  it, and bump the count only when a row is genuinely new (**T-58 adds row 41**). **Rows 36 and 37
+  are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
+  thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
+  is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
+  covered card, so it records its own seed, restores **that**, and asserts the restore. It also
+  **composes a flagged post** (NSFW toggle on) because row 21 removes the only fixture one, and it
+  presses nothing that writes preferences: the Reveal is per-mount. Anything after it must assume the
+  pair is the seed and the store holds one extra flagged post.
+- **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
+  once, so anything after it must assume the component state — not the store — held a second page,
+  and that a fresh mount re-reads page 1. It writes nothing and takes no override.
+- **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
+  page prints one, and the base rule is the thing under test), measures it resting and through
+  `CSS.forcePseudoState`, takes its own 900px `Emulation.setDeviceMetricsOverride` for the rail, and
+  clears the media emulation, the metrics override *and* the probe in one `finally`. Anything added
+  after it must assume 360×740 and no probe in the DOM.
+- **The breakpoint row owns a CDP override.** Anything added after it must assume the session is back
+  at 360×740; the row asserts that it cleared (`window.innerWidth === restore`) rather than trusting
+  the `finally`. T-47's row 30 takes its own 360×740 override and clears it for the same reason.
+- **`follow()` drops the fragment on purpose** — a `/terms#anchor` link must stay a real document
+  navigation (or gain scroll handling nothing needs yet). `ARCHITECTURE.md` → Router carries the rule
+  and the three exemptions `scripts/link-check.mjs` encodes (fragment, `target=`, external).
+- **A card's ratio rounds to whole percent**, so a one-vote change can leave the printed number
+  identical (96% → 96%). A journey proving an engagement write must read a count (the detail page's
+  Likes/Dislikes cells), never a card's percentage.
+- **`/dev/data`'s vote is order-dependent but not fragile.** The row votes on whatever the adapter's
+  newest character is *at that moment* (earlier journeys re-save rows), and it reads the name back
+  from the log before comparing. Do not pin a character id.
+- **A 44px band is `line-height`/`min-height`, not `padding`.** Vertical padding on an inline `<a>` is
+  hit-testable but invisible to layout, so a row that measures `getBoundingClientRect()` would pass
+  while the row still collapsed; a flex item with `line-height: 44px` is the band the walk can see.
+  A band that only hugs its text is still a small target: `flex: 1 1 auto` is what makes it 44 **wide**
+  (T-47's first run failed at 36px wide on `@you`).
+- **A token tier has a *surface* limit, not just a flavour limit.** `--color-accent-text` clears AA on
+  `--color-bg` (5.20) and `--color-bg-elevated` (4.83) in Latte, and does **not** on
+  `--color-surface` (3.81) — the same surface where `--color-text-muted` already fails (4.05). Latte's
+  `surface-0` (`#ccd0da`) is the app's worst backplate; **a surface that cannot hold AA text loses the
+  text, not the token** — that is what happened to the `md` rail's fill in T-37C, and the hover tier
+  exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
+  and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
+- **Row 32 shadows `visualViewport.height`, takes its own 360×740 metrics override, and clears both in
+  `finally`**; anything added after it must assume the shadow is gone, the token is back to `0px` and
+  the session is back at the browser's own window size (assert `innerWidth` returned, never trust the
+  `finally`). **Row 33 is mutating**: it presses **Restore copy** on session 2, so session 2's
+  character copy is `untouched` for the rest of the run — a later row that wants an `edited` copy
+  must seed or edit its own.
+- **The pressed-pill fill is a rule, not a one-off (T-48).** A control whose own background is
+  `--color-surface` cannot hold static accent text in Latte; pressed means accent **fill** +
+  `--color-accent-contrast`. `DESIGN.md` → *Contrast* carries it.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -115,87 +188,29 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   `$TMPDIR` (`~/.hermes/cache/scratch`). **`execute_code` is blocked in this cron profile** — for
   arithmetic, write a `.py` under `$TMPDIR` and run `python3 <file>`.
 
-## Blocked — what a human must do
-
-- **T-29/T-30/T-31/T-32 (Supabase):** create a project and export `SUPABASE_URL` +
-  `SUPABASE_ANON_KEY` (server key stays out of the client). Nothing about the data seam can move past
-  the memory adapter until then. T-30 also owns the real auth body (`lib/auth.ts` writes no session
-  today) and the redirect matrix; T-29's migration is the first thing after the ref lands.
-- **T-33B(b) deep link (desktop):** needs `tauri-plugin-deep-link` + a `luaplot://` scheme in the
-  bundle config — a dependency, and the contract forbids one the ticket does not name.
-- **T-33B(c) `Ctrl/Cmd+K`:** a decision, not work — no spec file describes a command palette, and
-  `luaplot-pages.md` is product law, so nothing may invent it. The owner must either record it in
-  `docs/DESIGN.md` (what it lists, what it does, what it costs at 360px) or strike it from the ticket.
-- **T-35/T-39 (Android + release):** install cmdline-tools + platform 35 + NDK, the four rust
-  android targets, then `tauri android init`. T-39 also needs a signing key and a `v0.1.0` tag, so it
-  follows T-35 and stays blocked. **T-36 is split:** (a) — the keyboard inset — **landed as T-36a** (`lib/viewport.ts`
-  + walk row 32); the rest of T-36 — no clipped input **on a real APK**, hardware back-button mapping,
-  60fps transcript scroll on device — still needs the toolchain above and stays blocked.
-- **Tauri on this box is NOT blocked — and the webview session proof is done.** `bun run tauri dev`
-  opens, the account survives a restart in both directions, and the recipe above reproduces it.
-
-## Open decisions
-
-- **T-57 is the ticket, and it changes the walk's post counts — deliberately.** Failure-bank entry 3's
-  paging half needs **25+ listed posts** so the thread draws **Load more**: `lib/fixtures/posts.ts`
-  holds 12 (11 listed at the seed; row 21 removes the only `nsfw` one), `PAGE_SIZE` is 24, so
-  `hasMore` is false and `/post/thread` correctly draws no `.pager-action` — row 39 asserts that
-  absence plus the `End of feed.` note instead of pressing a control that is not there. Seeding 25+
-  rows is one commit of fixtures **plus** every post count in the walk (row 21's moderation case, row
-  36's feed read, row 38's composed flagged post, row 39's 11-card reading), so it is a ticket of its
-  own and not a side-edit. Nothing may pin a total after it: the walk itself publishes two posts.
-- **Row count is 40 (T-56).** `scripts/smoke.mjs` keeps it in an explicit
-  `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
-  adding a near-copy of it, and bump the count only when a row is genuinely new. **Rows 36 and 37 are
-  read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the thread;
-  row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write is left
-  behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a covered card, so it
-  records its own seed, restores **that**, and asserts the restore. It also **composes a flagged
-  post** (NSFW toggle on) because row 21 removes the only fixture one, and it presses nothing that
-  writes preferences: the Reveal is per-mount. Anything after it must assume the pair is the seed
-  and the store holds one extra flagged post.
-- **Row 31 owns two CDP overrides and one probe.** It installs a classless `<a>` in the first card (no
-  page prints one, and the base rule is the thing under test), measures it resting and through
-  `CSS.forcePseudoState`, takes its own 900px `Emulation.setDeviceMetricsOverride` for the rail, and
-  clears the media emulation, the metrics override *and* the probe in one `finally`. Anything added
-  after it must assume 360×740 and no probe in the DOM.
-- **The breakpoint row owns a CDP override.** Anything added after it must assume the session is back
-  at 360×740; the row asserts that it cleared (`window.innerWidth === restore`) rather than trusting
-  the `finally`. T-47's row 30 takes its own 360×740 override and clears it for the same reason.
-- **`follow()` drops the fragment on purpose** — a `/terms#anchor` link must stay a real document
-  navigation (or gain scroll handling nothing needs yet). `ARCHITECTURE.md` → Router carries the rule
-  and the three exemptions `scripts/link-check.mjs` encodes (fragment, `target=`, external).
-- **A card's ratio rounds to whole percent**, so a one-vote change can leave the printed number
-  identical (96% → 96%). A journey proving an engagement write must read a count (the detail page's
-  Likes/Dislikes cells), never a card's percentage.
-- **`/dev/data`'s vote is order-dependent but not fragile.** The row votes on whatever the adapter's
-  newest character is *at that moment* (earlier journeys re-save rows), and it reads the name back
-  from the log before comparing. Do not pin a character id.
-- **A 44px band is `line-height`/`min-height`, not `padding`.** Vertical padding on an inline `<a>` is
-  hit-testable but invisible to layout, so a row that measures `getBoundingClientRect()` would pass
-  while the row still collapsed; a flex item with `line-height: 44px` is the band the walk can see.
-  A band that only hugs its text is still a small target: `flex: 1 1 auto` is what makes it 44 **wide**
-  (T-47's first run failed at 36px wide on `@you`).
-- **A token tier has a *surface* limit, not just a flavour limit.** `--color-accent-text` clears AA on
-  `--color-bg` (5.20) and `--color-bg-elevated` (4.83) in Latte, and does **not** on
-  `--color-surface` (3.81) — the same surface where `--color-text-muted` already fails (4.05). Latte's
-  `surface-0` (`#ccd0da`) is the app's worst backplate; **a surface that cannot hold AA text loses the
-  text, not the token** — that is what happened to the `md` rail's fill in T-37C, and the hover tier
-  exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
-  and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
-
-- **Row count is 40 after T-56; 41 is T-57's only if a new row is genuinely needed (it extends row 39,
-  so it is not).** Row 32 shadows `visualViewport.height`, takes its
-  own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
-  shadow is gone, the token is back to `0px` and the session is back at the browser's own window
-  size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
-  **Restore copy** on session 2, so session 2's character copy is `untouched` for the rest of the
-  run — a later row that wants an `edited` copy must seed or edit its own.
-- **The pressed-pill fill is a rule, not a one-off (T-48).** A control whose own background is
-  `--color-surface` cannot hold static accent text in Latte; pressed means accent **fill** +
-  `--color-accent-contrast`. `DESIGN.md` → *Contrast* carries it.
-
 ## Found while working (carried forward — keep this list growing)
+
+- **A `prepend` survives node identity, so an append row needs the ORDER assertion (T-57).**
+  Inverting `post-thread.tsrx`'s append to `[...listing.items, ...items.value]` kept **all 23** stamps
+  (the keys are stable, only their position moved) and the row only went red on
+  `Load more reordered the first page — wanted [95d85e7b…, …000c, …000b]…, read […0012, …0011,
+  …0010]…`. A "the stamps survived" check proves *not remounted*; it never proves *appended*. Keep
+  both, and know which one carries which bug.
+- **`.pager-action` is a wrapper and its `Button` is disabled while `appending` is true (T-57).** The
+  press must poll `document.querySelector(".pager-action button")` for `!disabled` first, or the row
+  reads "appended nothing" on a page that is right — the same shape as T-56's vote pair.
+- **`scripts/*.mjs` take no type annotations.** `let secondHalf: string;` inside a `journey()` body is
+  a `SyntaxError: Unexpected token ':'` from `node --check`, reported at the *declaration*, not at the
+  `.mjs` extension. `node --check scripts/smoke.mjs` is a two-second gate before any walk run.
+- **A generated fixture row needs the annotated `map` callback or `status` widens to `string`.**
+  `SEED_BODIES.map((body, index): Post => ({ … status: "visible" … }))` type-checks against
+  `Post[]`; the bare arrow infers `string` and the array stops being assignable. And a schema-valid
+  fan-out needs a **distinct clock per row** — `newest` over equal `createdAt` is a
+  non-deterministic listing (T-57 gave each generated post its own October day).
+- **Seeding a listing rewrites every count in that listing's rows.** T-57's 12 → 30 posts turned
+  row 39's `End of feed.`-plus-no-pager assertion into "press the control and append"; rows 21, 36 and
+  38 read counts dynamically and needed nothing. Grep the walk for the *page* it reads before
+  changing a fixture, not just for the number.
 
 - **The uniqueness guard is not what makes a repeat a no-op (T-56).** `vote()`'s
   `if (previous === direction) return row` only saves a write: delete it and the walk stays **green**,
@@ -238,18 +253,22 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **`choose()` returns the value it read, so it never proves the page.** T-41's helper sets `.value`
   and dispatches `change`; a page that ignores the event still returns the value. Assert the
   consequence (URL, listing), never the helper's return value.
-- **The paging half of failure bank 3 cannot be walked on this fixture.** 11–12 posts are listed
-  against `PAGE_SIZE` 24, so `hasMore` is false and `/post/thread` correctly draws no
-  `.pager-action` — a row that "pressed Load more" would have to publish 13 posts inside the walk.
-  Row 39 asserts the absence **plus** the `End of feed.` note instead, and T-57 owns the seed.
+- **The paging half is walkable now, and the numbers are 24 / 23 / 5 (T-57).** With 30 fixture rows
+  (29 listed) page 1 is **24 rows** but only **23 `.card.post`** — post 7 is the only `nsfw` post and
+  the walk's account seeds Show **off**, so a row that treats the card count as `PAGE_SIZE` is off by
+  one. Page 2 is the **whole remainder**, so **one** press takes the pager to `End of feed.` and a
+  row that expects a second press is red on a right page: assert whichever the size makes true and
+  **name it in the message**.
 
 - **The walk removes the only NSFW post before row 38 can read it (T-54).** Case 2's target is post 7
   (`lib/fixtures/posts.ts`, the only `nsfw: true` post), and row 21 concludes that case as *removed*,
   so `livePost` drops it from every listing for the rest of the run: the feed drew **11 post cards and
   none `17/6`**. A later row that wants a covered post card must compose one (the composer's **NSFW**
   toggle is `post/create.md`'s own control) — a fixture flag is not a fixture *on the page*.
-- **A row that seeds a post changes what later rows count.** Row 38's composed flagged post makes the
-  feed 12 cards; do not pin a post count anywhere after it.
+- **A row that seeds a post changes what later rows count.** Row 38's composed flagged post and the
+  `publish a post` row are both in the store before row 39 runs, so its page 1 is 24 rows of a
+  31-row store and its append lands at 29 cards — measured, not pinned. Never pin a post count
+  anywhere after row 8.
 - **`.card-veil`, `.card-head` and `.card-foot` are siblings, so `veil.contains(...)` is the only
   honest containment test.** A "is it a descendant of `.card`" check passes on a footer that was moved
   *into* the blur — T-54's red proof read `footer true (outside the veil false)` on a page whose card
@@ -498,7 +517,7 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **T-28B is done**: `postStatusSchema` (`visible | removed`), `removePost()`, `livePost()`,
   `getPost` still answers by id.
 - **Counts** (memory adapter; the walk's own journeys add rows as they run, so never assert a bare
-  total): characters 28 (27 public), lorebooks 6 (5 public), presets 5, personas 3, posts 12 (11 listed,
+  total): characters 28 (27 public), lorebooks 6 (5 public), presets 5, personas 3, posts 30 (29 listed,
   post 6 removed), reports 5 (3 open, 2 concluded), comments 22, sessions 2, bookmarks 8 (one dead),
   notifications 6 (3 unread), profiles 7, follow edges 15. `/dev/data`'s *Characters* cell reads the
   **page** count (24 = `PAGE_SIZE`), not the fixture total.

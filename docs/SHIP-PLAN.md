@@ -483,6 +483,33 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       search "?sort=discussed", sort control "newest", 11 post card(s) … at /post/thread`. Brief:
       `docs/NEXT.md`. **Paging half not walked:** needs 25+ posts (filed as T-57).
 
+- [x] **T-57 Seed a real second page, then press Load more and prove paging stays out of the URL.**
+      Failure-bank entry 3's other half and `post/thread.md` → *Layout*: *"paging stays out of the
+      URL"*. `lib/fixtures/posts.ts` was **12 rows** against `PAGE_SIZE` 24, so `hasMore` was false,
+      `/post/thread` drew no `.pager-action`, and row 39 asserted that *absence* plus `End of feed.`
+      — a pager that wrote `?page=2`, or an append that replaced the listing, stayed green in every
+      gate and every row. The fixture is now **30 rows** (`POST(1..12)` untouched; `POST(13..18…30)`
+      generated in a loop, `POST(13..30)`, with a distinct October day each, so `newest` is
+      deterministic) = 24 on page 1, 5 on page 2. Row **39 extends** (no row 41, `EXPECTED_ROWS` stays 40): it presses
+      `.pager-action button` after polling it *not disabled* (`appending` disables it), asserts the
+      count grows, the first page's **order and node stamps survive** (an append extends, a replace
+      drops every node), `location.search` is still `""`, page 2 was the whole remainder so the pager
+      reads `End of feed.` at 29 cards, then `history.back()` **leaves the thread** (paging pushed no
+      entry) and a return re-reads page 1 (same card count, 0 stamps, Load more back). Proved **red**
+      twice, bytes restored and `sha256sum -c` clean: `loadMore()` writing `?page=2` → *"Load more
+      wrote \"?page=2\" into the address — paging stays out of the URL"*; the append inverted to
+      `[...listing.items, ...items.value]` → *"Load more reordered the first page"* (note: the 23
+      stamps **survived** that inversion, so node identity alone would have been green — the order
+      half is what caught it). 40/40 local and 40/40 `--live`. Brief: `docs/NEXT.md` (T-57).
+
+- [ ] **T-58 Deleting the default persona leaves the collection with exactly one default.**
+      Failure-bank entry 8: *Deleting a persona leaves the collection without a default → reassign in
+      one step*. `persona/collection.md` → *States* → **Populated**: *"exactly one carrying the
+      default mark"*, and *"the collection is never left with personas and no default"*.
+      `memory.ts` `deletePersona()` hands the mark to the **newest remaining** persona, but no row
+      has ever pressed **Delete** on a persona — the collection is only ever read. Row **41** as
+      briefed in `docs/NEXT.md`.
+
 - [x] **T-56 One vote per viewer: a repeat is not a vote, a switch moves one count.** Failure-bank
       entry 5: *Voting allows multiple votes per viewer → uniqueness in adapter and DB*.
       `character/detail.md` → *Actions*: *"one vote per viewer; switching replaces the previous
@@ -506,12 +533,13 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 1. Card blur hides the numbers → footer stays outside the blur (T-08; walked by T-54).
 2. Session reads live items, so author edits corrupt running chats → copies only (T-15).
 3. `Load more` state lost on back → paging in component state, filters in URL (T-09; the URL/sort half
-   is walked by T-55 — the paging half needs a 25+ post seed, T-57).
+   is walked by T-55, the paging half by T-57).
 4. NSFW preference treated as access control (404s) → detail routes always resolve (T-25; walked by T-53).
 5. Voting allows multiple votes per viewer → uniqueness in adapter and DB (T-03, T-29; walked by T-56).
 6. Report piles create one scan per report → cumulative case joins (T-27).
 7. Deleting an item orphans its thread → cascade delete (T-29).
-8. Deleting a persona leaves the collection without a default → reassign in one step (T-20).
+8. Deleting a persona leaves the collection without a default → reassign in one step (T-20; being
+   walked by T-58).
 9. JEV deletes authored content → visibility only, ever (T-27).
 10. API keys end up in the client bundle → server-only Edge Functions (T-32).
 11. Preview build looks produced but is mock → `Preview mode` chip stays until real backend (T-16).

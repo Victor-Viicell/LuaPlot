@@ -2,7 +2,63 @@ import type { Comment, Post } from "../data/types.ts";
 import { at, CHARACTER, COMMENT, LOREBOOK, POST } from "./ids.ts";
 
 /**
- * Twelve posts and their comments.
+ * **T-57 — eighteen more posts, so a second page exists at all.**
+ *
+ * `PAGE_SIZE` is 24 and `pageOf()` answers `hasMore` from the row count, so twelve posts left
+ * `/post/thread` with a pager that could never draw: `Load more` was an absence no row could press.
+ * This seed is **30 rows**: 29 listed (post 6 is `removed`), so page 1 holds 24 and page 2 holds 5 —
+ * enough to prove an append without a 49-post fixture.
+ *
+ * The twelve above are untouched: walk rows 21, 30, 38 and 39 name their ids, post 6 stays the
+ * seeded `removed` row and post 7 the only `nsfw` one. These rows are **generated, not written by
+ * hand**, and their `createdAt` is a distinct October day each — the thread's default sort is
+ * `newest`, so an equal clock would make the listing (and every row that reads it) non-deterministic.
+ * The days are 1–18, i.e. older than the twelve, so the appended page is the tail rather than a
+ * reshuffle of what page 1 already shows.
+ */
+const SEED_BODIES: string[] = [
+  "Wrote the innkeeper so she never answers the question she was asked. Two sessions in, the table has worked out that her answers are a ledger of what she owes.",
+  "The rule I keep relearning: a lorebook entry is a promise the session can spend. Mine had three unused paragraphs and the character read as a stranger.",
+  "Gave a persona a limp and a habit of counting stairs. The engine never described either, and every scene still knew which room it was in.",
+  "Rewrote the antagonist's first line eleven times. The twelfth worked because it was an instruction, not a threat.",
+  "A cut is the only way I have found to show a friend why a scene worked. The transcript argues better than I do.",
+  "Deleted a lorebook entry that four characters shared. All four got worse in the same way, which is the best argument for references I can make.",
+  "My preset had one sentence too many about tone. The session took it as licence and wrote three paragraphs of weather.",
+  "She keeps a list of everyone who has borrowed the boat. Nothing in it is important and that is exactly what makes the scene work.",
+  "Started a session with no character at all — just a room, a bad lamp and a letter. Best three turns of the month.",
+  "The character knew the ending before I did. I have stopped planning the second act and started planning the last image.",
+  "Reported a cover image that clearly was not the item's avatar. The confirmation is deliberately blank, and it still felt good.",
+  "Two personas, one scene, alternating turns. The engine kept both voices apart without a single instruction about who was speaking.",
+  "I write the silence first now. Whatever the character says into it is usually better than what I had planned.",
+  "The lorebook's newest entry is a rule about not being quoted. It fires more than any of the descriptive ones.",
+  "Trimmed a cut to four turns before publishing. The reply I got was about the fourth turn, which never would have happened at nine.",
+  "Everything I have written that works came from a constraint I could not argue with. A vow, a debt, a shift that starts in six minutes.",
+  "The hedgehog character finally has a setting that is not a joke. It took a lorebook entry about salt prices of all things.",
+  "A stranger read my thread and asked what system I was using. There is no system, and that is the whole answer.",
+];
+
+const SEED_AUTHORS: string[] = ["bram", "ada", "quill", "mira", "orin", "sable", "you"];
+
+const SEEDED_POSTS: Post[] = SEED_BODIES.map(
+  (body, index): Post => ({
+    id: POST(13 + index),
+    author: SEED_AUTHORS[index % SEED_AUTHORS.length],
+    body,
+    createdAt: at(index + 1, 9 + (index % 6), (index * 11) % 60),
+    nsfw: false,
+    attachment: null,
+    verified: index % 4 === 0,
+    status: "visible",
+    likes: 8 + index * 3,
+    dislikes: index % 5,
+    bookmarks: 2 + index,
+    commentCount: 0,
+  }),
+);
+
+/**
+ * Thirty posts and their comments: the twelve hand-written ones, then the eighteen generated rows
+ * `SEEDED_POSTS` adds for the second page.
  *
  * A post is a body plus at most one optional attachment and no kind field: post 2 carries a
  * character (the author's own), post 3 carries a cut (a published snapshot of a session), and the
@@ -209,6 +265,7 @@ export const POSTS: Post[] = [
     bookmarks: 27,
     commentCount: 0,
   },
+  ...SEEDED_POSTS,
 ];
 
 /**

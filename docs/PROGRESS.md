@@ -3,6 +3,37 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-57: a real second page, and Load more writes no URL
+
+- **Changed:** `src/lib/fixtures/posts.ts` is **30 posts** — `POST(1..12)` byte-untouched (walk rows
+  21, 30, 38, 39 name their ids; post 6 stays `removed`, post 7 the only `nsfw`), plus
+  `SEEDED_POSTS`: 18 generated rows (`POST(13..30)`) from an 18-line body list, authors cycling
+  through the seven existing handles, **a distinct October day each** (`at(1..18)`, i.e. older than
+  the twelve) because `newest` sort over an equal clock would make the listing non-deterministic.
+  29 listed against `PAGE_SIZE` 24 ⇒ page 1 = 24, page 2 = 5. **Walk row 39 extended, no row 41**
+  (`EXPECTED_ROWS` still 40): it polls `.pager-action button` **not disabled** (`appending` disables
+  it during the await), presses it, and asserts the count grows, the first page's **stamps and order
+  survive**, `location.search` is still `""`, the pager reads `End of feed.` once page 2 is in
+  (29 cards — page 2 *was* the remainder, so there is no second press to make and the message says
+  so), then `history.back()` **leaves the thread** (paging pushed no entry) and returning re-reads
+  page 1 (23 cards again, 0 stamps, Load more back). `docs/DESIGN.md` → *Thread* and
+  `SHIP-PLAN.md` (T-57 entry + failure bank 3) carry the new seed count in this commit.
+- **Verified how:** `./scripts/check.sh` → **GREEN**; `./scripts/smoke.sh` → **40/40** locally; row 39
+  evidence: *"Load more: 23 → 29 card(s), first page's 23 stamp(s) and order kept, search still "" ·
+  page 2 was the whole remainder, so the pager read End of feed at 29 card(s) · Back from a loaded
+  page left the thread (23 card(s) at ?sort=discussed), returning re-read page 1 (23 card(s), 0
+  stamps, Load more back)"*. Proved **red twice** on `src/pages/post-thread.tsrx`, bytes restored and
+  `sha256sum -c` clean (`840fc9b6…`): (a) `loadMore()` writing
+  `?page=${nextPage}` → *"Load more wrote \"?page=2\" into the address — paging stays out of the URL
+  (thread.md → Layout) and component state owns the page"* (39/40); (b) the append inverted to
+  `[...listing.items, ...items.value]` → *"Load more reordered the first page — wanted
+  [95d85e7b…, …000c, …000b]…, read […0012, …0011, …0010]… (29 post card(s), 23 still stamped)"*
+  (39/40). **The inversion kept all 23 stamps**, so node identity alone would have run green — the
+  order half is the assertion that carries this row.
+- **Not verified:** the append's behaviour against a **server** page (the adapter answers from one
+  array; Supabase paging is T-29's), and a second press when page 2 is *not* the whole remainder —
+  the fixture is 30 by design, so that branch exists in the row but has never been taken.
+
 ## 2026-11-02 — T-56: a repeat is not a vote, a switch moves one count
 
 - **Changed:** walk row **40** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 39 → 40) for failure-bank

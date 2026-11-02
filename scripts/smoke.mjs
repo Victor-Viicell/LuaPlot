@@ -3164,9 +3164,13 @@ results.push(
  * gone after it — an assertion "the address changed" cannot make. A `Select` value read back from
  * `choose()` proves the control, never the page, so it is never the evidence here.
  *
- * The paging half is an **absence**: 12 listed posts are under `PAGE_SIZE` 24, so the feed draws no
- * `.pager-action` and its pager reads *End of feed.* Walking a real **Load more** needs a seed of
- * 25+ posts, which is filed as a ticket instead of publishing 13 posts inside the walk.
+ * The paging half used to be an **absence**: twelve posts were under `PAGE_SIZE` 24, so the feed
+ * drew no `.pager-action` and its pager read *End of feed.* **T-57 grows the fixture to 30 rows**
+ * (29 listed — post 6 is `removed`), which is 24 on page 1 and 5 on page 2, so this row now
+ * **presses the control** it used to only look for: one append, the first page's node identity and
+ * order kept, `location.search` still empty, then a `history.back()` that proves paging pushed no
+ * entry at all (it leaves the thread instead of returning to a loaded page), and a return that reads
+ * the first page again.
  *
  * Read-only: no store write, no CDP override, no probe. Ends on `/post/thread` with no query, and
  * sits after row 38 and before `sign out`, so `sign out` stays the walk's last row.
@@ -3295,29 +3299,141 @@ results.push(
     const home = await expectSort("", "newest", "a second history.back() to no query");
     await expectRerender(beforeSecondBack, "a second history.back()");
 
-    // 5. **Paging stays out of the URL** — and 12 listed posts give Load more nothing to load.
-    const end = await state();
-    if (end.cards === 0) throw new Error(`the feed is empty at the end of the Back walk (${describe(end)})`);
-    if (end.cards >= 24) {
+    // 5. **Paging stays out of the URL** — and the seed now gives Load more a real second page.
+    const first = await state();
+    if (first.cards === 0) throw new Error(`the feed is empty at the end of the Back walk (${describe(first)})`);
+    if (first.search !== "" || !/\/post\/thread$/.test(first.path)) {
+      throw new Error(`the row did not leave the thread at no query (${describe(first)})`);
+    }
+    if (first.pager === 0) {
       throw new Error(
-        `/post/thread now lists ${end.cards} posts, at or past PAGE_SIZE 24 — the paging half of this row is stale and needs its own .pager-action step`,
+        `0 .pager-action with ${first.cards} listed card(s) — the seed is under PAGE_SIZE 24, so Load more has nothing to append and the pager reads ${JSON.stringify(first.note)} (lib/fixtures/posts.ts should hold 29 listed posts: 30 rows, one removed)`,
       );
     }
-    if (end.pager !== 0) {
+    if (/end of feed/i.test(first.note)) {
       throw new Error(
-        `/post/thread draws ${end.pager} .pager-action control(s) with ${end.cards} listed post(s), well under PAGE_SIZE 24 — Load more has nothing to append, and its own note reads ${JSON.stringify(end.note)}`,
+        `the pager draws a Load more control *and* reads ${JSON.stringify(first.note)} with ${first.cards} card(s) — hasMore and the note disagree`,
       );
-    }
-    if (!/end of feed/i.test(end.note)) {
-      throw new Error(
-        `the pager reads ${JSON.stringify(end.note)}, not an end-of-feed note — an absent Load more must be the pager's *end*, not a missing pager`,
-      );
-    }
-    if (end.search !== "" || !/\/post\/thread$/.test(end.path)) {
-      throw new Error(`the row did not leave the thread at no query (${describe(end)})`);
     }
 
-    return `?sort=discussed loads by address with the control on discussed (${shared.cards} cards) · newest writes no param (search "") · press discussed → ?sort=discussed, ${discussed.cards} card(s) re-rendered · press liked → ?sort=liked, ${liked.cards} · Back → ?sort=discussed with the control and the listing (${back.cards}) · Back → "" + newest (${home.cards}) · ${end.cards} listed < PAGE_SIZE 24, so 0 .pager-action and the pager reads ${JSON.stringify(end.note)} — the paging half needs a 25+ seed`;
+    /** The first page's order and node identity, taken before anything is appended. */
+    if ((await stamp()) !== first.cards) {
+      throw new Error(`no post card could be stamped before Load more (${describe(await state())})`);
+    }
+
+    /**
+     * `appending` disables the control during the await (`post-thread.tsrx`), so poll for a
+     * **not-disabled** one before the press — the same trap T-56 hit on the vote pair.
+     */
+    async function pressLoadMore(label) {
+      const deadline = Date.now() + 8000;
+      let armed = false;
+      while (Date.now() < deadline) {
+        armed = await js(`
+          const button = document.querySelector(".pager-action button");
+          return button ? !button.disabled : false;
+        `);
+        if (armed) break;
+        await sleep(100);
+      }
+      if (!armed) {
+        throw new Error(`${label}: no enabled .pager-action button — ${describe(await state())}`);
+      }
+      await clickSelector(".pager-action button");
+    }
+
+    /** Wait for the card count to grow: an append extends the listing, it does not swap it. */
+    async function expectAppend(before, label, timeout = 10000) {
+      const deadline = Date.now() + timeout;
+      let now = await state();
+      while (Date.now() < deadline && now.cards <= before.cards) {
+        await sleep(100);
+        now = await state();
+      }
+      if (now.cards <= before.cards) {
+        throw new Error(
+          `${label}: pressing Load more appended nothing — ${describe(now)}, from ${before.cards} card(s)`,
+        );
+      }
+      return now;
+    }
+
+    await pressLoadMore("pressing Load more");
+    const appended = await expectAppend(first, "pressing Load more");
+    if (appended.search !== "") {
+      throw new Error(
+        `Load more wrote ${JSON.stringify(appended.search)} into the address — paging stays out of the URL (thread.md → Layout) and component state owns the page`,
+      );
+    }
+    const keptOrder = appended.order.slice(0, first.order.length);
+    if (JSON.stringify(keptOrder) !== JSON.stringify(first.order)) {
+      throw new Error(
+        `Load more reordered the first page — wanted ${JSON.stringify(first.order.slice(0, 3))}…, read ${JSON.stringify(keptOrder.slice(0, 3))}… (${describe(appended)})`,
+      );
+    }
+    if (appended.marks !== first.cards) {
+      throw new Error(
+        `Load more remounted the first page: ${appended.marks}/${first.cards} stamped card(s) survived — an append extends the listing, a replace drops every node`,
+      );
+    }
+
+    /** A second press: whatever the fixture's size makes true, say which. */
+    let secondHalf;
+    if (appended.pager === 1) {
+      await pressLoadMore("a second Load more");
+      const rest = await expectAppend(appended, "a second Load more");
+      if (rest.pager !== 0 || !/end of feed/i.test(rest.note)) {
+        throw new Error(
+          `a second Load more left the pager at ${rest.pager} .pager-action reading ${JSON.stringify(rest.note)} with ${rest.cards} card(s) — after the rest of the fixture is appended the pager must end`,
+        );
+      }
+      if (rest.search !== "") {
+        throw new Error(`a second Load more wrote ${JSON.stringify(rest.search)} into the address`);
+      }
+      secondHalf = `a second press appended the rest to ${rest.cards} card(s) and the pager read End of feed`;
+    } else {
+      if (!/end of feed/i.test(appended.note)) {
+        throw new Error(
+          `after one append the pager draws no control and reads ${JSON.stringify(appended.note)}, not an end-of-feed note (${describe(appended)})`,
+        );
+      }
+      secondHalf = `page 2 was the whole remainder, so the pager read End of feed at ${appended.cards} card(s) (no second press to make)`;
+    }
+
+    // 6. **The loaded page is not a history entry.** Paging pushed nothing, so a Back leaves the
+    //    thread rather than returning to it, and coming back re-reads page 1 from scratch.
+    const loaded = await state();
+    await js(`history.back(); return true;`);
+    const left = await expectSort("?sort=discussed", "discussed", "history.back() from a loaded second page");
+    if (left.cards >= loaded.cards) {
+      throw new Error(
+        `history.back() from ${loaded.cards} loaded card(s) landed on ${left.cards} at ${JSON.stringify(left.search)} — paging pushed an entry it must not push, or the Back did not leave the page`,
+      );
+    }
+
+    await go(THREAD_PATH);
+    await expectSort("", "newest", "returning to /post/thread after a loaded page");
+    const deadline = Date.now() + 8000;
+    let rebound = await state();
+    while (Date.now() < deadline && rebound.cards !== first.cards) {
+      await sleep(100);
+      rebound = await state();
+    }
+    if (rebound.cards !== first.cards) {
+      throw new Error(
+        `returning to /post/thread drew ${rebound.cards} card(s), not the first page's ${first.cards} — the loaded second page is component state, so it must not survive a mount (${describe(rebound)})`,
+      );
+    }
+    if (rebound.marks !== 0) {
+      throw new Error(`${rebound.marks} stamped card(s) survived a fresh mount of the thread — the listing was not re-read`);
+    }
+    if (rebound.pager !== 1) {
+      throw new Error(
+        `the freshly mounted thread draws ${rebound.pager} .pager-action with ${rebound.cards} card(s) — the pager must be back at the first page's Load more, not an end-of-feed note reading ${JSON.stringify(rebound.note)}`,
+      );
+    }
+
+    return `?sort=discussed loads by address with the control on discussed (${shared.cards} cards) · newest writes no param (search "") · press discussed → ?sort=discussed, ${discussed.cards} card(s) re-rendered · press liked → ?sort=liked, ${liked.cards} · Back → ?sort=discussed with the control and the listing (${back.cards}) · Back → "" + newest (${home.cards}) · Load more: ${first.cards} → ${appended.cards} card(s), first page's ${appended.marks} stamp(s) and order kept, search still "" · ${secondHalf} · Back from a loaded page left the thread (${left.cards} card(s) at ?sort=discussed), returning re-read page 1 (${rebound.cards} card(s), 0 stamps, Load more back)`;
   }),
 );
 
