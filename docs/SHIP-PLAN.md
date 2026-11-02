@@ -483,6 +483,24 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       search "?sort=discussed", sort control "newest", 11 post card(s) … at /post/thread`. Brief:
       `docs/NEXT.md`. **Paging half not walked:** needs 25+ posts (filed as T-57).
 
+- [x] **T-56 One vote per viewer: a repeat is not a vote, a switch moves one count.** Failure-bank
+      entry 5: *Voting allows multiple votes per viewer → uniqueness in adapter and DB*.
+      `character/detail.md` → *Actions*: *"one vote per viewer; switching replaces the previous
+      vote"*, and *States* → **Voted** is a state that has to survive. Nothing had ever read a count
+      around a vote: row 8 presses a brand-new post's Like and reads `aria-pressed`, which a doubled
+      count leaves exactly where it was. Row **40** (40/40 local and `--live`) opens Sonic
+      (`…0002` — opened by five earlier rows, voted on by none), reads the four engagement cells
+      **per label** (Ratio is a percent), and asserts **deltas** from a recorded seed: Like →
+      +1 like; Like **again** → the same numbers, re-read 300 ms later; Dislike → the like is
+      *replaced* (like back to the seed, dislike +1, exactly one `.vote` pressed); a remount through
+      `/character/catalog` keeps the Dislike pressed and the numbers; then back onto Like, one vote.
+      Proved **red** first — and the ticket's suggested edit was wrong: deleting only
+      `if (previous === direction) return row` stays **green** (the decrement/increment pair is
+      symmetric, so a repeat nets zero). Removing **both** read `a repeated Like moved Likes to 414;
+      one vote per viewer means it stays at the seed's 412 + 1`, and removing only the two decrements
+      read `Likes read 413 after the switch; the Like was replaced, so it must be back at the seed's
+      412`. Brief: `docs/NEXT.md`.
+
 ## Failure bank (the ways this class of product breaks)
 
 1. Card blur hides the numbers → footer stays outside the blur (T-08; walked by T-54).
@@ -490,7 +508,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
 3. `Load more` state lost on back → paging in component state, filters in URL (T-09; the URL/sort half
    is walked by T-55 — the paging half needs a 25+ post seed, T-57).
 4. NSFW preference treated as access control (404s) → detail routes always resolve (T-25; walked by T-53).
-5. Voting allows multiple votes per viewer → uniqueness in adapter and DB (T-03, T-29).
+5. Voting allows multiple votes per viewer → uniqueness in adapter and DB (T-03, T-29; walked by T-56).
 6. Report piles create one scan per report → cumulative case joins (T-27).
 7. Deleting an item orphans its thread → cascade delete (T-29).
 8. Deleting a persona leaves the collection without a default → reassign in one step (T-20).

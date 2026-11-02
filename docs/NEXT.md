@@ -1,82 +1,85 @@
 # Baton — what the next session does
 
-**T-56 is the one ticket.** T-55 landed: `scripts/smoke.mjs` has row **39** (walk **39/39** locally and
-**39/39 `--live`**), and failure-bank entry 3's **URL half** is now measured — the thread's sort is a
-`location.search` fact, asserted **exactly** at every step, with `?sort=discussed` loading by address
-(shareable), `newest` writing **no** param, a press writing `?sort=`, and two real `history.back()`
-steps landing on `?sort=discussed` and then `""` with the `Select` **and** the listing following (the
-refetch proved by node identity: the fetch's `epoch` rides in every row's key). The suspicion — that
-a one-time `readSort(useQuery())` would leave the listing sorted the old way after a Back — was
-settled, not assumed: `App.tsrx` remounts on a `path + search` change, and row 39 is what keeps that
-true. The paging half needs a 25+ post seed and is filed as **T-57**. The next unguarded law is
-failure-bank entry **5**, and it is only half-guarded: row 8 reads a post's `aria-pressed` and never a
-number.
+**T-57 is the one ticket.** T-56 landed: `scripts/smoke.mjs` has row **40** (walk **40/40** locally and
+**40/40 `--live`**), and failure-bank entry **5** is now measured — the detail page's Likes/Dislikes
+cells read `412/61` at the seed, `413/61` after one Like, still `413/61` after a **repeat** (twice,
+300 ms apart), `412/62` after a switch with exactly one `.vote` pressed, the same after a remount
+through `/character/catalog`, and `413/61` at the end — one vote, not two. **The ticket's red proof was
+wrong and is corrected:** deleting only `if (previous === direction) return row` leaves the walk
+**green**, because the decrement/increment pair is symmetric and a repeat nets zero; the honest red is
+that guard **and** the two decrements removed (a repeat then reads `414`), or the decrements alone (the
+switch then leaves the like counted). Both messages are recorded in `PROGRESS.md` and `SHIP-PLAN.md`.
+The next unguarded law is failure-bank entry **3**'s other half, and it is blocked on a fixture: the
+thread lists 11–12 posts against `PAGE_SIZE` 24, so **Load more** is correctly absent and no row has
+ever pressed it.
 
-## T-56 — one vote per viewer: a repeat is not a vote, a switch moves one count
+## T-57 — seed a real second page, then press Load more and prove paging stays out of the URL
 
-**Why it is next.** `repo.ts` → `vote()`: *"One vote per viewer per item, and a switch replaces the
-earlier vote — the adapter owns that rule"*, and `memory.ts` implements it as
-`if (previous === direction) return row` then *"Replacing a vote moves one count and leaves the other
-where it is"*. Failure bank entry 5 is *"Voting allows multiple votes per viewer → uniqueness in
-adapter and DB"*. **Nothing has ever read a count around a vote**: row 8 presses a brand-new post's
-**Like** and asserts `aria-pressed="true"` — a page-local boolean that a doubled count would leave
-exactly where it was. `character/detail.md` → *States* makes the reader's contract concrete: the
-**Voted** state has to survive a remount, and the counts are the adapter's (`castVote()` renders what
-came back and never recomputes). A `vote()` that lost its `previous === direction` guard, or that
-incremented before it decremented, would double a like or leave a like **and** a dislike counted —
-green in every gate, green in the walk, and wrong for every reader.
+**Why it is next.** `post/thread.md` → *Layout* says *"paging stays out of the URL"*, and
+`post-thread.tsrx` keeps `page` in component state (`loadMore()` fetches `page + 1` and never pushes an
+address). Failure bank entry 3 is *"`Load more` state lost on back → paging in component state, filters
+in URL"* — T-55 walked the URL/sort half; the paging half has never run, because
+`lib/fixtures/posts.ts` holds **12** posts (`POST(1..12)`, post 6 `status:"removed"`, post 7 the only
+`nsfw:true`), `PAGE_SIZE` is **24**, and `pageOf()` answers `hasMore: start + items.length <
+rows.length`. So `/post/thread` draws **no** `.pager-action` and row 39 asserts that **absence** plus
+the `End of feed.` note. A pager that wrote the page into `location.search`, or an append that replaced
+the first page instead of extending it, would stay green in every gate and in the whole walk.
 
 **Approach**
 
-1. One new row, **row 40** (bump `EXPECTED_ROWS` 39 → 40), after row 39 and before `sign out`.
-2. Open the **read** surface, not a card: `/character/c0a1b2c3-0000-4000-8000-000000000002` (Sonic —
-   rows 6, 32, 35, 36 and 37 already open it, and **no row has ever voted on it**, so its seed is the
-   fixture's). Wait for `.detail .counts[aria-label="Engagement"]` and for both `button.vote`
-   controls, then read the four cells **per label** through `textContent` — `.count-label` is
-   uppercased in CSS, so `innerText` reads `LIKES` (T-49), and the **Ratio** cell is a percent
-   (T-52), so a blanket "every value is a number" is false on a correct page.
-3. Record the seed: `{likes, dislikes}` plus each `.vote`'s `aria-pressed`. Assert a **delta**, never
-   a value — the walk's own rows add rows (a post, a character copy) and no count is pinned anywhere
-   else either.
-4. **A press is one vote.** Press **Like**, wait until `busy` clears (`button.vote:not(:disabled)`),
-   and poll the numbers: `likes === seed.likes + 1`, `dislikes === seed.dislikes`, Like
-   `aria-pressed="true"`, Dislike `"false"`.
-5. **A repeat is not a second vote.** Press **Like** again and poll for the cleared state, then read
-   the counts **twice** ~300ms apart and assert both readings equal the *first* press's numbers. This
-   is the assertion the ticket exists for; it must read the **numbers**, because the pressed state
-   agrees either way.
-6. **A switch moves one count and not two.** Press **Dislike**: `likes` back to `seed.likes`
-   (the like is *replaced*, not added), `dislikes === seed.dislikes + 1`, exactly one `.vote`
-   pressed, and the Ratio cell still a percent.
-7. Restore what can be restored: the specs describe **two** buttons and no *unvote*, so a viewer who
-   arrived with no vote cannot be returned to none. Record the seed, note in the evidence what was
-   left behind, and leave the vote on **Like** (`likes` back to `seed.likes + 1`) so the final state
-   is one vote, not two — `sign out` follows and each run starts a fresh memory adapter. **Do not add
-   an unvote affordance**; `character/detail.md` fixes the pair.
-8. Read-only apart from the viewer's own vote row: no CDP override, no probe, no store pair. Ends on
-   the character page, then `sign out` stays the walk's last row.
+1. Seed the fixture, not the walk: `src/lib/fixtures/posts.ts` grows to **30 listed** posts — keep
+   `POST(1..12)` exactly as they are (rows 21, 30, 38 and 39 name ids), and add `POST(13..30)` in a
+   **loop** with distinct `createdAt` values (the thread's default sort is `newest`, so an equal clock
+   makes the order — and the walk — non-deterministic), distinct bodies, `nsfw: false`,
+   `status: "visible"`, and the same author shape the twelve use. 30 listed ⇒ page 1 is 24 cards and
+   page 2 is **6**, enough to prove an append without a 49-post fixture. Do **not** change `PAGE_SIZE`.
+2. Change nothing else in the fixture: post 6 stays the seeded `removed` row (row 21's case), post 7
+   stays the only `nsfw` one (row 38 composes its own flagged post because row 21 removes this one).
+3. **Row 39 is the row that extends** (do not add row 41): its last block currently **throws** on
+   `end.cards >= 24` with a message saying the paging half is stale — that guard is exactly what fires
+   once the seed lands, so replace it with the paging proof rather than deleting it. After the two
+   `history.back()` steps: assert `location.search === ""`, that `.pager-action` **exists** and the
+   `End of feed.` note does **not**; press the pager's own control (`.pager-action button`, scoped — this
+   page also draws Create, the sort `select` and a card link), then assert:
+   - the card count grows by the second page (read the count, do not pin it),
+   - the **first page's cards keep their order and their stamps** (row 39's `stamp()`/`state()` already
+     carry node identity: an append must leave them, a replace must not),
+   - `location.search` is still `""` — **paging writes no URL**,
+   - a second press either appends the rest or leaves `End of feed.` — assert whichever the fixture's
+     size makes true, and name it in the message.
+4. The "state lost on back" half: press Load more, then `history.back()` (paging pushed no entry, so it
+   leaves the thread) and return — the listing must be the **first page** again and the address what it
+   was. If that is the honest product behaviour, assert it and say so in the evidence; if the spec wants
+   the page kept, that is a product decision for the owner, not a walk row.
+5. Re-derive every post count the walk already asserts — the seeding *is* the ticket. Grep
+   `scripts/smoke.mjs` for the rows that count `.card.post` / `.post-count` and re-read them against the
+   new fixture: row 21's moderation case, row 36's `thread: N post card(s)` line, row 38's
+   `1/12 post card(s) covered`, row 39's `11 cards`. The walk's own rows still add two posts (`publish a
+   post`, row 38's composed flagged one), so nothing may pin a total.
+6. `Counts` below says `posts 12 (11 listed…)` — update it in the same commit as the fixture, or the
+   next session re-derives it from a stale note.
 
 **Traps**
 
-- **`busy` disables both `.vote` buttons during the await** (`character-detail.tsrx` →
-  `castVote`), so a press dispatched while it is set is swallowed by the `disabled` attribute and the
-  row reads "the count never moved" on a page that is right. Poll `button.vote:not([disabled])`
-  before every press.
-- **`myVote` is the page's own state, filled from `repo.myVote` at load**, so the pressed state
-  surviving a remount is worth one extra read (re-`go()` the same character after the switch and
-  assert the same `.vote` is still pressed) — that is `detail.md` → *States* → *Voted*, and it is
-  cheap.
-- **Counts are the adapter's answer, not a local `+1`** — if the page started recomputing, the row's
-  delta would still pass. Read the `.count-value` cells, never the button.
-- **A card's ratio rounds to whole percent**, so any "the number moved" assertion must be on the
-  detail page's Likes/Dislikes cells (T-52's find, twice now).
-- **The moderator/owner branches draw extra controls** on this page (Report, the notice, Fork) — key
-  the vote read on `button.vote`, never on "the page's buttons".
+- **Do not delete row 39's stale guard, replace it.** `if (end.cards >= 24) throw … "the paging half of
+  this row is stale and needs its own .pager-action step"` is this ticket, written into the walk three
+  ticks early; a session that deletes it gets a green run that proves nothing.
+- **`.pager-action` is a wrapper, not the control** (`post-thread.tsrx`: a `<div class="pager-action">`
+  around a `Button`), so the press targets `.pager-action button`.
+- **`appending` disables the pager during the await** — the same trap as T-56's vote pair: poll for a
+  not-disabled control before the press, or the row reads "nothing was appended" on a page that is right.
+- **`hasMore` false after the first page means the seed did not land**: say so
+  (`0 .pager-action with N listed cards`) rather than press nothing.
+- **Seeding 30 posts changes the preview classifier's `hash("jev:post:" + body) % 5` buckets** for the
+  new bodies; the report row names `POST_REPORTED` by id and body, so leave both intact.
+- **`schema:check` parses every fixture** — a generated row must satisfy `postSchema` (uuid-shaped
+  `POST(n)` id, real ISO-8601 `createdAt`, the same author field). A fixture that fails its schema is
+  fixed against the spec, never by loosening the schema.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **40/40** locally and **40/40 `--live`**; row 40 proved
-**red** first by deleting `memory.ts`'s `if (previous === direction) return row as EntityOf<V>;`
-guard (a repeat then doubles the like) — capture the message, restore the exact bytes, `sha256sum -c`
-it; `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **40/40** locally and **40/40 `--live`** (row 39 extended,
+row count unchanged); the paging block proved **red** first — make `loadMore()` write `?page=2` into
+`location.search` (or make it replace the listing instead of appending) and capture the message, then
+restore the exact bytes and `sha256sum -c` them; `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Driving the desktop window (recipe, proven 2026-11-01)
 
@@ -133,14 +136,15 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Open decisions
 
-- **T-57 is filed, not started — the follow-up to T-55.** Failure-bank entry 3's paging half needs
-  **25+ posts** so the thread actually draws **Load more**: `lib/fixtures/posts.ts` holds 12 (11
-  listed, post 7 removed by row 21), `PAGE_SIZE` is 24, so `hasMore` is false and `/post/thread`
-  correctly draws no `.pager-action` — row 39 asserts that absence plus the `End of feed.` note
-  instead of pressing a control that is not there. Seeding 25+ rows is one commit of fixtures **plus**
-  every post count in the walk (row 36's feed read, row 38's composed flagged post, row 39's 11-card
-  reading), so it is a ticket of its own and not a side-edit.
-- **Row count is 39 (T-55).** `scripts/smoke.mjs` keeps it in an explicit
+- **T-57 is the ticket, and it changes the walk's post counts — deliberately.** Failure-bank entry 3's
+  paging half needs **25+ listed posts** so the thread draws **Load more**: `lib/fixtures/posts.ts`
+  holds 12 (11 listed at the seed; row 21 removes the only `nsfw` one), `PAGE_SIZE` is 24, so
+  `hasMore` is false and `/post/thread` correctly draws no `.pager-action` — row 39 asserts that
+  absence plus the `End of feed.` note instead of pressing a control that is not there. Seeding 25+
+  rows is one commit of fixtures **plus** every post count in the walk (row 21's moderation case, row
+  36's feed read, row 38's composed flagged post, row 39's 11-card reading), so it is a ticket of its
+  own and not a side-edit. Nothing may pin a total after it: the walk itself publishes two posts.
+- **Row count is 40 (T-56).** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
   adding a near-copy of it, and bump the count only when a row is genuinely new. **Rows 36 and 37 are
   read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the thread;
@@ -180,7 +184,8 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   exists only because a *hover* still has to survive that backplate (4.66, which is why it is 40/60
   and not 55/45 = 4.38 or 60/40 = 4.29). Do not "restore" the lighter mix by eye.
 
-- **Row count is 39 after T-55; 40 is T-56's.** Row 32 shadows `visualViewport.height`, takes its
+- **Row count is 40 after T-56; 41 is T-57's only if a new row is genuinely needed (it extends row 39,
+  so it is not).** Row 32 shadows `visualViewport.height`, takes its
   own 360×740 metrics override, and clears both in `finally`; anything added after it must assume the
   shadow is gone, the token is back to `0px` and the session is back at the browser's own window
   size (assert `innerWidth` returned, never trust the `finally`). **Row 33 is mutating**: it presses
@@ -192,6 +197,26 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **The uniqueness guard is not what makes a repeat a no-op (T-56).** `vote()`'s
+  `if (previous === direction) return row` only saves a write: delete it and the walk stays **green**,
+  because the next two lines decrement the previous vote and then increment the new one, so a repeat
+  nets **zero**. The invariant lives in the decrement/increment pair; a row that wants to prove
+  "one vote per viewer" must be shown red by removing **both** (a repeat then reads `+2`), and the
+  "switch replaces" half by removing the two decrements alone (the like stays counted). A ticket that
+  offers one of the two edits as its red proof is offering a green run — check the arithmetic before
+  spending a walk on it.
+- **Row 40 leaves one Like behind on `/character/…0002`** (the spec fixes the two-button pair and has
+  no *unvote*), so anything added after it must assume the viewer already voted there, and must not
+  re-read that character's counts as the fixture's.
+- **A press helper that lowercases the DOM label must lowercase the wanted one too.** Row 40's first
+  run failed on a page that was right: `press("Like")` compared `"like"` against `JSON.stringify("Like")`,
+  matched nothing, and the failure read `no button.vote reads "Like" — saw Like | Dislike`. Cheap to
+  see in the message, one walk to discover — compare both sides lowercased.
+- **The engagement block is `.detail .counts[aria-label="Engagement"]`**, four `<li class="count">`
+  children of `.count-label` + `.count-value`; keying on `.counts` alone is fine on this page (it draws
+  one) but the `aria-label` is the fact that survives a class rename, and the four cells are
+  `likes / dislikes / ratio / comments` — the ratio is a **percent** and the comments cell is `0` on
+  the fixture.
 - **`App.tsrx`'s effect keys on `path + search`, and that is the whole reason a one-time
   `useQuery()` read is honest (T-55).** A query change sets `status = "loading"` first, so the
   `@default` branch (and the page component in it) is torn down before `Page.value` is set again —

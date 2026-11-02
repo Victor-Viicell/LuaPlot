@@ -3321,6 +3321,236 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-56 — failure bank 5: *"Voting allows multiple votes per viewer"*. The law is one vote per
+ * viewer per item, and a switch **replaces** the earlier vote rather than stacking on it
+ * (`character/detail.md` → Actions), which `memory.ts` `vote()` owns.
+ *
+ * Row 8 presses a brand-new post's **Like** and reads its `aria-pressed` — a page-local boolean a
+ * doubled count would leave exactly where it was. This row reads the **numbers**: the detail page's
+ * Likes/Dislikes cells, which are the adapter's answer (`castVote()` renders what came back and
+ * never recomputes), and asserts a **delta** against a seed it read, because the walk's earlier
+ * rows have already added rows and no count is pinned anywhere else either. Sonic is the target
+ * because rows 6, 32, 35, 36 and 37 open it and **no row has ever voted on it**.
+ * ---------------------------------------------------------------------------------------------- */
+const VOTE_CHARACTER = "/character/c0a1b2c3-0000-4000-8000-000000000002";
+
+results.push(
+  await journey("a repeat vote is not a second vote, and a switch moves one count", async () => {
+    /**
+     * One reading of the engagement block: the four cells **per label** and both `.vote` controls.
+     * `.count-label` is `text-transform: uppercase`, so the label is read from `textContent` and
+     * lowercased (T-49), and the **Ratio** cell is a percent (T-52) — nothing here assumes that
+     * every value is a number.
+     */
+    const panel = () =>
+      js(`
+        const list = document.querySelector('.detail .counts[aria-label="Engagement"]');
+        const cells = list ? [...list.querySelectorAll(".count")].map((row) => {
+          const label = row.querySelector(".count-label");
+          const value = row.querySelector(".count-value");
+          return {
+            label: (label ? label.textContent : "").trim().toLowerCase(),
+            value: (value ? value.textContent : "").trim(),
+          };
+        }) : [];
+        const cell = (name) => {
+          const hit = cells.find((row) => row.label === name);
+          return hit ? hit.value : null;
+        };
+        return {
+          path: location.pathname,
+          labels: cells.map((row) => row.label),
+          likes: cell("likes"),
+          dislikes: cell("dislikes"),
+          ratio: cell("ratio"),
+          comments: cell("comments"),
+          votes: [...document.querySelectorAll(".detail button.vote")].map((b) => ({
+            label: (b.textContent || "").trim(),
+            pressed: b.getAttribute("aria-pressed"),
+            disabled: b.disabled,
+          })),
+        };
+      `);
+
+    const describe = (now) =>
+      now
+        ? `Likes ${JSON.stringify(now.likes)}, Dislikes ${JSON.stringify(now.dislikes)}, Ratio ${JSON.stringify(now.ratio)}, Comments ${JSON.stringify(now.comments)}, .vote ${JSON.stringify(now.votes.map((v) => v.label + ":" + v.pressed + (v.disabled ? ":disabled" : "")))} at ${now.path}`
+        : "no engagement block on the page";
+
+    /** The shape every reading must hold: three whole counts and one percentage. */
+    const shapes = (now) => {
+      if (!/^\d+$/.test(now.likes || "")) return `Likes reads ${JSON.stringify(now.likes)}, not a count`;
+      if (!/^\d+$/.test(now.dislikes || "")) return `Dislikes reads ${JSON.stringify(now.dislikes)}, not a count`;
+      if (!/^\d+%$/.test(now.ratio || "")) return `Ratio reads ${JSON.stringify(now.ratio)}, not a percentage`;
+      return "";
+    };
+
+    /** Open the detail page and wait for the block *and* both controls before trusting the read. */
+    async function open(label) {
+      try {
+        await waitFor(
+          `document.querySelector('.detail .counts[aria-label="Engagement"]') !== null && document.querySelectorAll(".detail button.vote").length === 2`,
+          `${label}'s engagement block and both .vote controls`,
+          8000,
+        );
+      } catch (error) {
+        throw new Error(`${label}: ${error.message} — read ${describe(await panel())} at ${await url()}`);
+      }
+      await sleep(120);
+      return panel();
+    }
+
+    /**
+     * Press one `.vote` by its own label, after polling `button.vote:not([disabled])` — `busy`
+     * disables **both** during the await (`.tsrx` → `castVote`), and a press dispatched while it
+     * is set is swallowed by the attribute, reading "the count never moved" on a page that is right.
+     */
+    async function press(name) {
+      await waitFor(
+        `document.querySelectorAll(".detail button.vote").length === 2 && document.querySelector(".detail button.vote:disabled") === null`,
+        `the vote controls to clear before pressing ${name}`,
+        8000,
+      );
+      const hit = await js(`
+        const el = [...document.querySelectorAll(".detail button.vote")].find((b) => ((b.textContent || "").trim().toLowerCase() === ${JSON.stringify(name.toLowerCase())}));
+        if (!el) return "";
+        el.scrollIntoView({ block: "center" });
+        el.click();
+        return (el.textContent || "").trim();
+      `);
+      if (!hit) {
+        const seen = (await panel()).votes.map((v) => v.label).join(" | ");
+        throw new Error(`no button.vote reads ${JSON.stringify(name)} — saw ${seen}`);
+      }
+      return hit;
+    }
+
+    /**
+     * Poll the settled panel until `check` accepts it (it answers a sentence while the reading is
+     * wrong), and fail with that sentence **and** the numbers — a bare poll timeout names nothing
+     * a reader can act on (T-36a).
+     */
+    async function expect(label, check, timeout = 8000) {
+      const deadline = Date.now() + timeout;
+      let now = await panel();
+      let why = "";
+      while (Date.now() < deadline) {
+        if (now && now.votes.length === 2 && !now.votes.some((v) => v.disabled)) {
+          why = check(now) || "";
+          if (!why) return now;
+        } else {
+          why = "the vote controls were still busy";
+        }
+        await sleep(100);
+        now = await panel();
+      }
+      throw new Error(`${label}: ${why} — read ${describe(now)}`);
+    }
+
+    const findVote = (now, name) => now.votes.find((v) => v.label.toLowerCase() === name) || null;
+
+    // 1. The seed: a page nobody has voted on, read as numbers plus a pressed state.
+    await go(VOTE_CHARACTER);
+    const seed = await open(VOTE_CHARACTER);
+    const seedShape = shapes(seed);
+    if (seedShape) throw new Error(`the seed read: ${seedShape} (${describe(seed)})`);
+    if (seed.labels.length !== 4) {
+      throw new Error(`the engagement list drew ${seed.labels.length} cell(s) (${JSON.stringify(seed.labels)}), not the four the detail spec names`);
+    }
+    const alreadyVoted = seed.votes.filter((v) => v.pressed === "true").map((v) => v.label);
+    if (alreadyVoted.length) {
+      throw new Error(
+        `a vote was already pressed on ${VOTE_CHARACTER} (${JSON.stringify(alreadyVoted)}) — an earlier row now votes on this character, and this row's deltas assume a fresh viewer`,
+      );
+    }
+    const base = { likes: Number(seed.likes), dislikes: Number(seed.dislikes) };
+
+    // 2. **A press is one vote.**
+    await press("Like");
+    const first = await expect("pressing Like once", (now) => {
+      const bad = shapes(now);
+      if (bad) return bad;
+      if (Number(now.likes) !== base.likes + 1) return `Likes read ${now.likes}, wanted the seed's ${base.likes} + 1`;
+      if (Number(now.dislikes) !== base.dislikes) return `Dislikes read ${now.dislikes}, wanted the seed's ${base.dislikes}`;
+      const like = findVote(now, "like");
+      const dislike = findVote(now, "dislike");
+      if (!like || like.pressed !== "true") return `Like reads aria-pressed=${like ? like.pressed : "missing"} after the press`;
+      if (!dislike || dislike.pressed !== "false") return `Dislike reads aria-pressed=${dislike ? dislike.pressed : "missing"} after a Like`;
+      return "";
+    });
+
+    // 3. **A repeat is not a second vote** — the assertion this row exists for, and it must read
+    //    the numbers: the pressed state agrees either way.
+    await press("Like");
+    const repeated = await expect("pressing Like a second time", (now) => {
+      const bad = shapes(now);
+      if (bad) return bad;
+      if (Number(now.likes) !== base.likes + 1) {
+        return `a repeated Like moved Likes to ${now.likes}; one vote per viewer means it stays at the seed's ${base.likes} + 1`;
+      }
+      if (Number(now.dislikes) !== base.dislikes) return `a repeated Like moved Dislikes to ${now.dislikes}, wanted the seed's ${base.dislikes}`;
+      return "";
+    });
+    await sleep(300);
+    const settled = await panel();
+    if (settled.likes !== repeated.likes || settled.dislikes !== repeated.dislikes) {
+      throw new Error(
+        `the count was still moving 300ms after the repeat — read Likes/Dislikes ${first.likes}/${first.dislikes} after one press, ${repeated.likes}/${repeated.dislikes} straight after the repeat, ${settled.likes}/${settled.dislikes} 300ms later`,
+      );
+    }
+
+    // 4. **A switch moves one count and not two**: the Like is replaced, not added to.
+    await press("Dislike");
+    const switched = await expect("switching to Dislike", (now) => {
+      const bad = shapes(now);
+      if (bad) return bad;
+      if (Number(now.likes) !== base.likes) {
+        return `Likes read ${now.likes} after the switch; the Like was replaced, so it must be back at the seed's ${base.likes}`;
+      }
+      if (Number(now.dislikes) !== base.dislikes + 1) return `Dislikes read ${now.dislikes}, wanted the seed's ${base.dislikes} + 1`;
+      const on = now.votes.filter((v) => v.pressed === "true");
+      if (on.length !== 1) return `${on.length} .vote controls read pressed (${JSON.stringify(on.map((v) => v.label))}) — exactly one vote can be in force`;
+      if (on[0].label.toLowerCase() !== "dislike") return `${JSON.stringify(on[0].label)} is pressed after pressing Dislike`;
+      return "";
+    });
+
+    // 5. **Voted is the adapter's state, so it survives a remount** (`detail.md` → States): leave
+    //    the page entirely and come back through the router; `myVote` is re-read from `repo.myVote`.
+    await go("/character/catalog");
+    await waitFor(`document.querySelector(".catalog") !== null`, "the catalog on the way out", 8000);
+    await go(VOTE_CHARACTER);
+    const remounted = await open("the character again after a remount");
+    const survived = (() => {
+      const bad = shapes(remounted);
+      if (bad) return bad;
+      if (Number(remounted.likes) !== base.likes) return `Likes read ${remounted.likes} after the remount, wanted ${base.likes}`;
+      if (Number(remounted.dislikes) !== base.dislikes + 1) return `Dislikes read ${remounted.dislikes} after the remount, wanted ${base.dislikes + 1}`;
+      const dislike = findVote(remounted, "dislike");
+      const like = findVote(remounted, "like");
+      if (!dislike || dislike.pressed !== "true") return `Dislike reads aria-pressed=${dislike ? dislike.pressed : "missing"} after the remount — the Voted state did not survive it`;
+      if (!like || like.pressed !== "false") return `Like reads aria-pressed=${like ? like.pressed : "missing"} after the remount`;
+      return "";
+    })();
+    if (survived) throw new Error(`the switch did not survive a remount: ${survived} (${describe(remounted)})`);
+
+    // 6. Leave **one** vote behind, not two. The spec fixes the pair (no *unvote*), so a viewer who
+    //    arrived with no vote cannot be returned to none: the row records the seed and says so.
+    await press("Like");
+    const restored = await expect("leaving one Like behind", (now) => {
+      const bad = shapes(now);
+      if (bad) return bad;
+      if (Number(now.likes) !== base.likes + 1) return `Likes read ${now.likes}, wanted ${base.likes + 1}`;
+      if (Number(now.dislikes) !== base.dislikes) return `Dislikes read ${now.dislikes}, wanted the seed's ${base.dislikes}`;
+      const on = now.votes.filter((v) => v.pressed === "true");
+      if (on.length !== 1) return `${on.length} .vote controls read pressed (${JSON.stringify(on.map((v) => v.label))})`;
+      return "";
+    });
+
+    return `seed Likes/Dislikes ${base.likes}/${base.dislikes} at ${VOTE_CHARACTER.slice(-12)} · Like → ${first.likes}/${first.dislikes} · Like again → ${repeated.likes}/${repeated.dislikes}, still ${settled.likes}/${settled.dislikes} after 300ms (a repeat is not a second vote) · Dislike → ${switched.likes}/${switched.dislikes} with one .vote pressed (the Like was replaced) · remount via /character/catalog → ${remounted.likes}/${remounted.dislikes}, Dislike still pressed · left on Like ${restored.likes}/${restored.dislikes} (the spec fixes the pair; a viewer who arrived with no vote cannot be returned to none)`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -3343,9 +3573,9 @@ chrome.kill("SIGKILL");
  * than `passed === rows.length`) makes a row that silently stopped running a red walk — the failure
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
- * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39).
+ * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40).
  */
-const EXPECTED_ROWS = 39;
+const EXPECTED_ROWS = 40;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

@@ -3,6 +3,41 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-56: a repeat is not a vote, a switch moves one count
+
+- **Changed:** walk row **40** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 39 → 40) for failure-bank
+  entry 5 — *Voting allows multiple votes per viewer → uniqueness in adapter and DB* — and
+  `character/detail.md` → *Actions*: *"one vote per viewer; switching replaces the previous vote"*,
+  with *States* → **Voted** as the state that survives. Nothing had ever read a count around a vote:
+  row 8 presses a brand-new post's **Like** and asserts `aria-pressed="true"`, a page-local boolean a
+  doubled count leaves exactly where it was. The row opens Sonic
+  (`/character/c0a1b2c3-…0002`, opened by rows 6/32/35/36/37 and **never voted on**), waits for
+  `.detail .counts[aria-label="Engagement"]` plus both `button.vote`, and reads the four cells **per
+  label** from `textContent` (`.count-label` is uppercased in CSS; the **Ratio** cell is a percent,
+  so "every value is a number" is false on a right page). It records the seed (`412/61`, neither vote
+  pressed) and asserts **deltas**: Like → `413/61`; Like **again** → still `413/61`, re-read 300 ms
+  later; Dislike → `412/62` with exactly **one** `.vote` pressed (the like is *replaced*, not
+  stacked); a remount through `/character/catalog` → `412/62` with Dislike still pressed; finally
+  pressed back onto **Like** → `413/61`, one vote, not two. Every read is the `.count-value` cell, so
+  a page that recomputed locally would still be caught.
+- **Verified:** `./scripts/check.sh` GREEN (build, 30 routes, schema, tauri, 52 anchors, 5822
+  declarations across 46 regions); local walk **40/40**; live walk **40/40 `--live`**; `curl` **200**;
+  published `assets/index-CPVMPrcv.js` (unchanged — this ticket touches only the walk, not `src/`).
+  **Red proof, and a correction to the ticket:** deleting only `if (previous === direction) return
+  row` leaves the walk **green** — the decrement/increment pair is symmetric, so a repeat nets zero
+  and the guard only saves a write. The honest red is **both** removed (no uniqueness, no
+  replacement), which read `pressing Like a second time: a repeated Like moved Likes to 414; one vote
+  per viewer means it stays at the seed's 412 + 1 — read Likes "414", Dislikes "61", Ratio "87%",
+  … .vote ["Like:true","Dislike:false"]`, 39/40. The switch half is proved separately by removing
+  only the two decrements: `switching to Dislike: Likes read 413 after the switch; the Like was
+  replaced, so it must be back at the seed's 412`. `memory.ts` was restored byte-for-byte
+  (`sha256 f768bb74e50b644770c670be4f921b199ab0a5dec1a79da2dcda9a4de97ba248`, `sha256sum -c` OK).
+- **Not verified / filed:** a viewer who arrives with **no** vote cannot be returned to none — the
+  spec fixes the pair and has no *unvote* — so the row leaves one **Like** behind on Sonic and says
+  so in its evidence; `sign out` follows and each run starts a fresh memory adapter. No layout
+  changed, so no width was measured. The paging half of failure bank 3 is still **T-57** (needs a
+  25+ post seed).
+
 ## 2026-11-02 — T-55: the thread's sort is a URL fact, and Back is the proof
 
 - **Changed:** walk row **39** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 38 → 39) for failure-bank
