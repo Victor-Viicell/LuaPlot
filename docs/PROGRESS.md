@@ -3,6 +3,36 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-78: `/user/[handle]`'s `sm 640` head is rendered in both directions
+
+- **Changed:** `scripts/smoke.mjs` only — **row 46 extended** (no new row; `EXPECTED_ROWS` stays
+  **55**). The T-63 journey's `§5` takes a `640×740` and then a `360×740` override after the Cancel
+  assertions, reads the same `readHeadAt()` on each and hands both readings to `assertHead(r, width)`,
+  which asserts the breakpoint **in both directions**: at 640 `.profile-head` is a `grid` of exactly
+  **three** tracks with the first `72 ± 1`, avatar/who tops within 2px, `who.left ≥ avatar.right`,
+  **`|head-action.top − head-avatar.top| ≤ 2`** (the action on the avatar's own row — the whole `sm`
+  fact), and `.name` **26px**; at 360 **two** tracks with the first `56 ± 1`, `head-action.top >
+  head-avatar.top + 1` (its own row) and `.name` **22px**. `.pager > div`'s `min-width: 200px` is read
+  **only when the listing draws a pager** (it does not on this tree) so the row never asserts one into
+  being. Both overrides are cleared in one `finally` and `innerWidth` is asserted back afterwards.
+  Measured at 640: `["72px","225.188px","238.812px"]`, gap `18px`, avatar/who/action tops **80/80/80**,
+  `who.left 114`, `.name` **26px**; at 360: `["56px","238px"]`, gap `14px`, tops **76/76**, action top
+  **218.95**, `.name` **22px**.
+- **Verified:** red first — deleting `grid-template-areas: "avatar who action";` from
+  `user-profile.tsrx`'s `sm 640` block put **row 46 alone** red (54 PASS / 1 FAIL) reading
+  *"/user/you at 640px: .head-action sits at top 208.66 and the avatar at 80 — the sm block puts the
+  action on the avatar's own row (grid-template-areas \"avatar who action\"), and the base block
+  drops it to row 2"* — the page, the width and both tops, as the accept line asked. Bytes restored
+  (`cp` + `cmp` identical; `git status` shows only `scripts/smoke.mjs`), `check.sh` **GREEN** (all
+  sections), `./scripts/smoke.sh` **55/55**, `publish.sh` → `LIVE=https://victor-viicell.github.io/LuaPlot/`
+  (asset `index-DPoxP2Sr.js`, unchanged: no built source moved), `curl` **200**, `./scripts/smoke.sh
+  --live` **55/55** with the identical two-arm evidence line.
+- **Not verified / next:** `.pager > div`'s 200px minimum and `.pager { align-items: center }` are still
+  unwalked — the profile's creations tab draws no pager on this fixture — and 32 other page files
+  still carry a `sm 640` block no row has ever rendered; the next one is `/bookmarks`' toolbar
+  (**T-79** in `docs/NEXT.md`), whose two-column rewrite has a documented near-bug behind it. No new
+  dependency, no schema/adapter/JEV change this tick.
+
 ## 2026-11-03 — T-77: the three detail pages' `sm 640` arm is rendered, and row 54 is width-major
 
 - **Changed:** `scripts/smoke.mjs` only — **row 54 extended a third time** (no new row;

@@ -634,6 +634,30 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-78 `/user/[handle]`'s `sm 640` head had never been rendered.** `user-profile.tsrx` keeps a
+      `@media (min-width: 640px)` block that turns `.profile-head` from **two** tracks with the action
+      on a second row into **three** tracks on **one** row (`72px minmax(0, 1fr) auto`, areas
+      `"avatar who action"`) and raises `.name` 22 → 26px — and rows 45–47 mount that page only at the
+      session's own ~500px, below the breakpoint, reading names and lists rather than geometry. So
+      deleting `grid-template-areas: "avatar who action";` dropped the Save/Edit pair back under the
+      name at the width that exists to put it beside, and every gate stayed green. Row **46 extended**
+      (no new row; `EXPECTED_ROWS` stays **55**): after the Cancel assertions the row takes `640×740`
+      then `360×740`, reads one `readHeadAt()` at each and hands it to `assertHead(r, width)` — 640
+      asserts **three** tracks with the first `72 ± 1`, avatar/who/action tops within 2px of each other,
+      `who.left ≥ avatar.right − 0.5` and `.name` **26px**; 360 asserts the opposite in the same words
+      (**two** tracks, first `56 ± 1`, `head-action.top > head-avatar.top + 1`, `.name` **22px**). A
+      one-direction read cannot show a breakpoint, which is why both are read. Measured 640:
+      `["72px","225.188px","238.812px"]` gap `18px`, tops `80/80/80`, `who.left 114`; 360:
+      `["56px","238px"]` gap `14px`, tops `76/76`, action `218.95`. Red first: deleting the areas line
+      put **row 46 alone** red reading *".head-action sits at top 208.66 and the avatar at 80"*. Bytes
+      restored (`cp` + `cmp` identical), `check.sh` **GREEN**, 55/55 local, 55/55 `--live`,
+      `publish.sh` → `LIVE` (asset `index-DPoxP2Sr.js`, unchanged: no page file moved), `curl` **200**.
+      Brief: `docs/NEXT.md` (T-78).
+      Found: the deletion leaves the **track count at three** (the base block's two-area template still
+      names `action`, and the sm `grid-template-columns` still declares three columns), so the count is
+      green and the **tops** are what fires — the mirror of T-77, where the count stayed three and the
+      first track was the witness.
+
 - [x] **T-77 the three catalogue detail pages' `sm 640` arm had never been rendered.** Each keeps its
       own `@media (min-width: 640px)` block that rewrites `.head` from two tracks to `320px
       minmax(0, 1fr) auto` (the portrait moving out of `grid-column: 1 / -1` into column 1 **beside**

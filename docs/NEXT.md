@@ -1,66 +1,69 @@
 # Baton — what the next session does
 
-**T-77 landed.** Row 54 was **reshaped, not duplicated** — `EXPECTED_ROWS` stays **55** — and it is the
-third extension of the same row. The four page-major phases became **width-major**:
-`SPLIT_WIDTHS = [360, 640, 1200]` takes one browser-level override per width and mounts character,
-lorebook and preset inside it, so nine readings cost **three** overrides where the old shape cost four.
-`assertPhone()` became `assertSplit(r, { label, path, width, counts })`, and the one `read()` grew
-`headDisplay`/`headTracks`/`portrait`/`identity`/`titleFont`/`proseFont`/`entryFont`/`vote`/`save`/
-`start` rather than forking a second reader. Measured at 640 on all three pages identically: `.head`
-`grid → ["320px","168px","44px"]`, portrait right **344** ≤ identity left **364**, tops **80/80**,
-title **34px**, prose **15px** (lorebook entry **15px**), vote/save **132px grow 0**, `.cols` still the
-phone `flex column` (aside top **469** < main **594.8**, both **572** inside the 620px outlet),
-`scrollWidth 630/640`. At 360 the same pages read title `26px`, prose `14px`, vote/save `96px grow 1`;
-at 1200 `["362px","320px"]`. The red proof was the ticket's own edit and it **worked**, with a twist
-worth carrying: deleting `grid-template-columns: 320px minmax(0, 1fr) auto;` from `preset-detail.tsrx`'s
-`sm` block red-lit **row 54 alone** (54 PASS / 1 FAIL) at the **first-track** assertion reading
-*"preset at 640px: the head's first track resolves to \"290.797px\" (tracks [\"290.797px\",\"197.203px\",\"44px\"]),
-not the 320px cover column the sm block declares"* — the **count** stayed three, because the base
-placement gives `.menu-btn` an implicit third column, so a row that only counted tracks would have
-walked green. No page file changed. `check.sh` GREEN, 55/55 local, 55/55 `--live`, `publish.sh` →
-`LIVE` (asset `index-DPoxP2Sr.js`, unchanged because no built source moved), `curl` 200.
+**T-78 landed.** Row 46 was **extended, not duplicated** — `EXPECTED_ROWS` stays **55** — and the head
+is now read in **both directions**. After the Cancel assertions the row takes `640×740`, then
+`360×740`, reads one `readHeadAt()` at each and hands it to `assertHead(r, width)`: 640 asserts a
+`grid` of **exactly three** tracks with the first `72 ± 1`, avatar/who/action tops within 2px, and
+`.name` **26px**; 360 asserts the opposite in the same words (**two** tracks, first `56 ± 1`,
+`head-action.top > head-avatar.top + 1`, `.name` **22px**). Measured at 640:
+`["72px","225.188px","238.812px"]`, gap `18px`, tops **80/80/80**, `who.left 114`; at 360
+`["56px","238px"]`, gap `14px`, tops **76/76**, action **218.95**. `.pager > div`'s 200px minimum is
+read only when a listing draws a pager (this tree draws none), so the row never asserts one into
+being. The red proof was the ticket's own edit and it **worked**, with a twist worth carrying: deleting
+`grid-template-areas: "avatar who action";` red-lit **row 46 alone** (54 PASS / 1 FAIL) at the
+**action-top** assertion — *".head-action sits at top 208.66 and the avatar at 80"* — while the
+**track count stayed three**, because the base block's two-area template still names `action` and the
+sm `grid-template-columns` still declares three columns. That is the mirror of T-77: there the count
+stayed green and the *first track's size* was the witness; here the count is green and the
+*placement* is. `check.sh` GREEN, 55/55 local, 55/55 `--live` with the identical evidence line,
+`publish.sh` → `LIVE` (asset `index-DPoxP2Sr.js`, unchanged because no built source moved), `curl` 200.
 
-## T-78 — `/user/[handle]`'s `sm 640` head has never been rendered either
+## T-79 — `/bookmarks`' `sm 640` toolbar has never been rendered either
 
-**Why it is next.** `user-profile.tsrx` keeps a `@media (min-width: 640px)` block that turns
-`.profile-head` from **two** tracks with the action on its own second row (`56px minmax(0, 1fr)`,
-areas `"avatar who"` / `"action action"`) into **three** tracks on **one** row
-(`72px minmax(0, 1fr) auto`, areas `"avatar who action"`, gap 18), raises `.name` 22 → **26px**,
-right-aligns `.head-action` and centres `.pager` with a 200px minimum inside it. No row has ever
-rendered it: rows 45–47 mount `/user/<own>` at the walk's own ~500px — **below** 640 — and they read
-names, figures, tabs and lists, never the head's geometry. So deleting
-`grid-template-areas: "avatar who action";` walks green while the action drops back onto its own row
-at 640 and `.name` shrinks to 22px: the Save/Edit pair sits *under* the name on the width that exists
-to put it beside.
+**Why it is next.** `bookmarks.tsrx` keeps a `@media (min-width: 640px)` block that rewrites
+`.toolbar` (base: a one-column grid, `gap: 10px`) into **two** tracks —
+`grid-template-columns: minmax(0, 1fr) 220px; align-items: end; gap: 12px 16px` — then pins the three
+children: `.search { grid-column: 1 / -1 }` across the top, `.sort { grid-column: 2; grid-row: 2 }`
+into the fixed column, `.meta { grid-column: 1; grid-row: 2; align-self: end }` beside it, and gives
+`.pager > div` a 200px minimum. No row has ever mounted `/bookmarks` above 640: row 50 (T-67) presses
+its tabs, its search and its sort at the session's own ~500px, and rows 51/52 mount other catalogues.
+The block's own comment records the near-bug it exists for — *the sort used to inherit
+`grid-column: 1 / -1` and spanned the row on its own, which is why the desktop toolbar read as three
+ragged lines* — so a deleted pin restores exactly that and every gate stays green.
 
-**Approach.** Extend **row 46** (T-63 — no new row; `EXPECTED_ROWS` stays **55**). That row is
-read-only, presses **Cancel** and lands on `/user/<own>`, and already reads the head's name, handle
-and bio on both sides of the form, so the width phase goes **after** those assertions where it cannot
-disturb them. Take `640×740`, read the head, assert: `.profile-head` computes `grid` with **exactly
-three** tracks and the first `72 ± 1`; `|head-avatar.top − who.top| ≤ 2` and
-`who.left ≥ head-avatar.right − 0.5`; **`|head-action.top − head-avatar.top| ≤ 2`** — the action is on
-the *same row*, which is the whole `sm` fact, because the base block puts it on row 2; and `.name`
-computes **26px**. Then take `360×740` and assert the **opposite** in the same words: three tracks →
-**two**, first `56 ± 1`, **`head-action.top > head-avatar.top + 1`** (its own row, below), `.name`
-**22px**. A one-direction read cannot show a breakpoint; the pair reads it in both directions. Clear
-both overrides in one `finally` and assert `innerWidth` came back before returning.
+**Approach.** Extend **row 50** (T-67 — no new row; `EXPECTED_ROWS` stays **55**). That row is
+read-only and already ends on `/bookmarks?type=lorebook` with two rows and an empty field, so the
+width phase goes **after** its last press where it cannot disturb any read. Take `640×740`, read the
+toolbar, and assert: `.toolbar` computes `grid`; **exactly two** tracks and the **second `220 ± 1`**
+(count *and* size — T-77's lesson: a leftover placement creates an implicit track and the count alone
+proves nothing); `.search` spans the toolbar (`|search.left − toolbar.left| ≤ 1` and
+`|search.right − toolbar.right| ≤ 1`); **`|sort.top − meta.top| ≤ 2`** — the saved count sits beside
+the sort, which is the whole `sm` fact; `meta.left < sort.left − 1`; and `sort.left` is inside the
+220px column (`sort.left ≥ toolbar.right − 220 − 16 − 1`). Then take `360×740` and assert the
+opposite: **one** track, `sort.top > search.bottom − 1` and `meta.top > sort.bottom − 1` (stacked,
+each on its own row). Clear both overrides in one `finally` and assert `innerWidth` came back before
+returning.
 
-**Traps.** (a) The classes are `.head-avatar`, `.who`, `.head-action`, `.name` — **not** `.avatar`; the
-disc's own size is the `Avatar size={56}` prop, so the 72px column is the thing the grid declares, not
-the circle. (b) Read `.pager` only when a tab draws one — its inner box is the 200px minimum and a tab
-with no pages draws none. (c) `/user/you` is the viewer's own profile, so the head draws **Personas**
-+ **Edit profile**, never Follow: assert geometry, not a label, or a rename row (`ownHandle()`) reds
-this one for the wrong reason. (d) `go()` is not needed — Cancel already landed the row on the
-profile — but the override is browser-level, so re-take it and assert `innerWidth` on every reading
-instead of assuming the width survived the form. (e) Aim the red proof at `grid-template-areas`, not
-at the track list: the three tracks come from `grid-template-columns`, so deleting *that* leaves two
-tracks while the areas still name three columns, and the count assertion fires on an edit whose
-consequence the message does not describe.
+**Traps.** (a) **A grid with no template still computes one track.** Chrome resolves
+`grid-template-columns` to the *implicit* track list, so the base toolbar reads
+`["308px"]` — one track — and that is the honest read; do not conclude "no template therefore zero
+tracks" and do not split a `none` string (T-73's flex trap has the sibling shape: `none` there means
+*flex*, here a single resolved track means *implicit*). (b) **`.meta`'s pin is the one that binds, not
+the sort's** — `.meta { grid-column: 1; grid-row: 2 }` leaves (row 2, column 2) as the only free cell,
+so deleting the **sort's** own `grid-column: 2; grid-row: 2` walks **green** (T-75's class, third
+time). Aim the red proof at the meta pin and let the message name what moved. (c) `.sort` is a
+`Select` wrapper and `.search` a `Field` wrapper — read `.toolbar > .sort` / `.toolbar > .search`, not
+the inner control, and never the `label` text (the sort's label is the "Sort" word, the value is a
+`select`). (d) The row must not disturb row 50's own state: keep the presses untouched and put the
+width phase last, and remember `Emulation.setDeviceMetricsOverride` is browser-level, so `innerWidth`
+is asserted on **every** reading rather than assumed to have survived. (e) `?type=lorebook` draws two
+rows, so the listing's `.pager` draws nothing unless the tab has a next page — read `.pager > div` only
+when it exists, like row 46 does.
 
-**Accept.** Red first: delete `grid-template-areas: "avatar who action";` from `user-profile.tsrx`'s
-`sm 640` block → **row 46 alone** red, naming `/user/<handle>`, `640px` and the two tops it read.
-Bytes restored (`cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row),
-`publish.sh` prints `LIVE`, `curl` 200.
+**Accept.** Red first: delete `.meta { grid-column: 1; grid-row: 2 }` from `bookmarks.tsrx`'s `sm 640`
+block → **row 50 alone** red, naming `/bookmarks`, `640px` and the two tops it read. Bytes restored
+(`cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row), `publish.sh` prints
+`LIVE`, `curl` 200.
 
 **Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
 owner's — see *Open decisions*. Do not invent tags to make a row pass.
@@ -88,10 +91,10 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
 
 ## Open decisions
 
-- **T-78 is the ticket: `/user/[handle]`'s `sm 640` head (72px avatar | name | action on one row,
-  26px name) has never been rendered.** Rows 45–47 read that page at the walk's own ~500px, i.e.
-  always below the breakpoint, so the `sm` block's `grid-template-areas` is a declaration nothing
-  can go red on.
+- **T-79 is the ticket: `/bookmarks`' `sm 640` toolbar (search across, sort in a 220px column with
+  the saved count beside it) has never been rendered.** Row 50 presses that page's tabs, search and
+  sort at the walk's own ~500px, always below the breakpoint, so the block's three pins are
+  declarations nothing can go red on.
   Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
@@ -100,12 +103,12 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   its desktop rail**, **54 the three catalogue detail pages' `.main` + `.aside` at 360, 640 and
   1200**, **55 the moderation case's `md 900` flex row**), every bank entry that can be walked is
   walked, and the word break has a gate section (10). What is left is *copies of the same rules in
-  other files*: T-75/T-76/T-77 closed base, `lg` **and** `sm` for the three detail pages, so the same
-  argument now points at the **other** pages whose `sm 640` block no row has ever rendered —
-  `user-profile` is T-78, and 33 page files still carry one — plus whatever the gate or the walk
-  finds next. The rest of the plan waits on Supabase (T-29…T-32), the Android toolchain
-  (T-35/T-36/T-39) or an owner decision (T-33B's deep link dependency and `Ctrl/Cmd+K`, the tag
-  vocabulary).
+  other files*: T-75/T-76/T-77 closed base, `lg` **and** `sm` for the three detail pages and T-78
+  closed `user-profile`'s `sm` head, so the same argument now points at the **other** pages whose
+  `sm 640` block no row has ever rendered — `/bookmarks`' toolbar is T-79, and 32 page files still
+  carry one — plus whatever the gate or the walk finds next. The rest of the plan waits on Supabase
+  (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep link
+  dependency and `Ctrl/Cmd+K`, the tag vocabulary).
 - **The tag field's press is blocked on a decision, not on work.** Every lorebook and preset
   fixture ships `tags: []`, and `schema.ts`'s own comment says they stay empty *while the taxonomy is
   undecided* — so `listTags("lorebook")` / `("preset")` answer `[]`, the picker opens its empty
@@ -115,7 +118,7 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   either record a tag vocabulary for lorebooks and presets in `docs/DESIGN.md` (and then a ticket
   seeds two or three tags, leaving one card tagless so `catalog.md`'s *an item with none renders no
   row and no placeholder* finally has a target) or accept that the press stays unwalkable.
-- **Row count is 55 after T-74 — T-75, T-76 and T-77 added none.** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 55 after T-74 — T-75, T-76, T-77 and T-78 added none.** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
   adding a near-copy of it, and bump the count only when a row is genuinely new (**T-61 added row 44;
   T-62 added 45; T-63 added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 added 50; T-68
@@ -159,9 +162,13 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   a right tree, and the number changes whenever a fixture or an earlier row adds one). It ends by
   pressing **Save** on `/user/you/edit`, so it writes through `saveProfileEdit` **and**
   `savePreferences` (the pair is re-saved from the form's own toggles, which it never flips).
-- **Row 46 (T-63) is read-only and hands nothing over.** It presses **Cancel** and reads the profile
-  it lands on against the head it read before the form, so a later row may rely on `/user/<own>`'s
-  name, handle and bio and on the NSFW pair being untouched. It takes no override and no probe.
+- **Row 46 (T-63, extended by T-78) is read-only and hands nothing over, but it now takes two
+  metrics overrides** (`640×740`, `360×740`) **after** pressing **Cancel**: it reads the
+  profile it lands on against the head it read before the form, then reads that head at both widths,
+  clears both overrides in one `finally` and asserts `innerWidth` came back before returning. A
+  later row may rely on `/user/<own>`'s name, handle and bio, on the NSFW pair being untouched and on
+  no override being in play; it also leaves the reader on `/user/<own>` (no `go()` after the width
+  phase).
 - **Row 47 (T-64) is read-only and presses tabs, not writes.** It leaves the reader on
   `/user/<own>?tab=following` (the last tab it pressed) and writes no preference and no store row, so
   a later row may rely on the profile's name, bio, figures and all four lists as it found them. It
@@ -279,6 +286,21 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   Encoding that as an argument keeps one reader and one set of messages.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **Deleting `grid-template-areas` keeps the track COUNT and moves the item instead (T-78).** The `sm`
+  block's three columns come from `grid-template-columns`, so with the areas line gone the count still
+  reads **three** (the base block's `"avatar who" / "action action"` template still names all three
+  areas, and the sm columns still declare three tracks) — what changes is that `.head-action` falls to
+  **row 2**. The assertion that fires is the **placement** (`|action.top − avatar.top| ≤ 2`), not the
+  count. This is the exact mirror of T-77, where the count stayed three and the **first track's size**
+  was the witness: for an `areas` edit assert placement, for a `columns` edit assert the fixed track,
+  and never treat the count as proof of either.
+- **A guarded read is the honest way to assert a `min-width` on a box a fixture may not draw (T-78).**
+  `.pager > div` gets `min-width: 200px` from the `sm` block, but the profile's creations tab draws
+  **no** `.pager` on this tree (five creations, no next page) — so the row reads `pagerMinWidth` and
+  only asserts it when the string is non-empty. Asserting the pager into existence would red a right
+  page; skipping it silently would leave the rule unwalked, which is what the evidence line's
+  `, no pager` records.
 
 - **A leftover `grid-column: 3` keeps the track COUNT at three after `grid-template-columns` is gone
   (T-77).** Deleting the `sm` block's `grid-template-columns: 320px minmax(0, 1fr) auto` left the

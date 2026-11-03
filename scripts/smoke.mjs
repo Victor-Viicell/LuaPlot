@@ -5018,7 +5018,150 @@ results.push(
       );
     }
 
-    return `/user/${STRANGER_HANDLE}/edit stays put and reads "You can't edit this account." with no username field, no Save and Back to your profile at /user/${ownHandle} · the owner's form prefills ${JSON.stringify([form.handle, form.name, before.bio])} with the rule ${JSON.stringify(rule)} as help · @${STRANGER_HANDLE} → ${JSON.stringify("Username taken")} with Save disabled and no help · "ab" → the same rule as the inline error with Save disabled · back to @${ownHandle} → error gone, rule back as help, Save enabled · Cancel → /user/${ownHandle} reads ${JSON.stringify([after.name, after.handle])} unchanged`;
+    // 5. The head at the two widths its own stylesheet draws it for (T-78). `user-profile.tsrx`'s
+    //    `sm 640` block turns `.profile-head` from **two** tracks with the action on a second row
+    //    into **three** on one row and raises `.name` 22 → 26px. Rows 45–47 all mount this page at
+    //    the session's own ~500px — below the breakpoint — so the block was a declaration nothing
+    //    could go red on. Both widths are read, because one direction cannot show a breakpoint.
+    const readHeadAt = () =>
+      js(`
+        const rect = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width) };
+        };
+        const head = document.querySelector(".profile-head");
+        const hs = head ? getComputedStyle(head) : null;
+        const isGrid = !!hs && hs.display.indexOf("grid") >= 0;
+        const nameEl = document.querySelector(".profile-head h1.name");
+        const pager = document.querySelector(".pager");
+        const pagerBox = document.querySelector(".pager > div");
+        return {
+          path: location.pathname,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          headDisplay: hs ? hs.display : "",
+          headTracks: isGrid ? hs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          headGap: hs ? hs.gap : "",
+          avatar: rect(document.querySelector(".profile-head .head-avatar")),
+          who: rect(document.querySelector(".profile-head .who")),
+          action: rect(document.querySelector(".profile-head .head-action")),
+          name: (nameEl ? nameEl.textContent || "" : "").trim(),
+          nameFont: nameEl ? getComputedStyle(nameEl).fontSize : "",
+          pagerAlign: pager ? getComputedStyle(pager).alignItems : "",
+          pagerMinWidth: pagerBox ? getComputedStyle(pagerBox).minWidth : "",
+        };
+      `);
+
+    const assertHead = (r, width) => {
+      const at = `/user/${ownHandle} at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!r.path.endsWith(`/user/${ownHandle}`)) {
+        throw new Error(`${at}: the head was measured on ${JSON.stringify(r.path)}, not the profile Cancel landed on`);
+      }
+      if (r.headDisplay.indexOf("grid") < 0) {
+        throw new Error(`${at}: .profile-head computes ${JSON.stringify(r.headDisplay)}, not the grid both of its blocks declare`);
+      }
+      if (!r.avatar || !r.who || !r.action) {
+        throw new Error(
+          `${at}: the head is incomplete — avatar ${JSON.stringify(r.avatar)}, who ${JSON.stringify(r.who)}, action ${JSON.stringify(r.action)}`,
+        );
+      }
+      if (r.name === "") throw new Error(`${at}: the head draws no h1.name, so what measured is a skeleton`);
+      // `>` and not `===`: `html` carries `scrollbar-gutter: stable`, so an unoverflowed document
+      // reports scrollWidth equal to its client width.
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the profile scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+
+      if (width === 640) {
+        // The whole `sm` fact: three tracks, and the action on the **same row** as the avatar.
+        if (r.headTracks.length !== 3) {
+          throw new Error(
+            `${at}: .profile-head resolves ${r.headTracks.length} track(s) ${JSON.stringify(r.headTracks)}, not the three the sm block declares (72px | fluid | auto)`,
+          );
+        }
+        // The count alone is not proof: a leftover placement can create an implicit third track, so
+        // the track the block declares is sized too (T-77's lesson).
+        if (Math.abs(parseFloat(r.headTracks[0]) - 72) > 1) {
+          throw new Error(`${at}: the head's first track resolves to ${JSON.stringify(r.headTracks[0])}, not the 72px avatar column the sm block declares (tracks ${JSON.stringify(r.headTracks)})`);
+        }
+        if (Math.abs(r.avatar.top - r.who.top) > 2) {
+          throw new Error(`${at}: the avatar sits at top ${r.avatar.top} and .who at ${r.who.top} — the sm block puts them on one row`);
+        }
+        if (r.who.left < r.avatar.right - 0.5) {
+          throw new Error(`${at}: .who starts at ${r.who.left}, left of the avatar's right edge ${r.avatar.right} — the name column is not beside the disc`);
+        }
+        if (Math.abs(r.action.top - r.avatar.top) > 2) {
+          throw new Error(
+            `${at}: .head-action sits at top ${r.action.top} and the avatar at ${r.avatar.top} — the sm block puts the action on the avatar's own row (grid-template-areas "avatar who action"), and the base block drops it to row 2`,
+          );
+        }
+        if (r.nameFont !== "26px") {
+          throw new Error(`${at}: .name computes ${JSON.stringify(r.nameFont)}, not the 26px the sm block raises it to from 22px`);
+        }
+        // `.pager` draws only while the listing has a next page, so it is read when it exists and
+        // never asserted into being.
+        if (r.pagerMinWidth !== "" && r.pagerMinWidth !== "200px") {
+          throw new Error(`${at}: the pager's inner box computes min-width ${JSON.stringify(r.pagerMinWidth)}, not the 200px the sm block gives it`);
+        }
+        return;
+      }
+
+      // The opposite, in the same words: the base block is still the phone's.
+      if (r.headTracks.length !== 2) {
+        throw new Error(
+          `${at}: .profile-head resolves ${r.headTracks.length} track(s) ${JSON.stringify(r.headTracks)}, not the two the base block declares (56px | fluid) — the sm block is leaking below its breakpoint`,
+        );
+      }
+      if (Math.abs(parseFloat(r.headTracks[0]) - 56) > 1) {
+        throw new Error(`${at}: the head's first track resolves to ${JSON.stringify(r.headTracks[0])}, not the 56px base column (tracks ${JSON.stringify(r.headTracks)})`);
+      }
+      if (!(r.action.top > r.avatar.top + 1)) {
+        throw new Error(
+          `${at}: .head-action sits at top ${r.action.top} with the avatar at ${r.avatar.top} — below 640 the action belongs on its own second row, spanning both columns`,
+        );
+      }
+      if (r.nameFont !== "22px") {
+        throw new Error(`${at}: .name computes ${JSON.stringify(r.nameFont)}, not the base 22px`);
+      }
+    };
+
+    const headRestore = await js("return window.innerWidth;");
+    const headLines = [];
+    let headSeen = "";
+    try {
+      // One override per width. The `Emulation` override is browser-level, so it survives nothing
+      // but is cheap to re-take; every reading asserts `innerWidth` instead of assuming it held.
+      for (const [width, expectTracks] of [
+        [640, 3],
+        [360, 2],
+      ]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        // The override does not remount, so the head is the one Cancel landed on; re-read it and
+        // let `assertHead` prove the width rather than trusting the settle.
+        await waitFor(`document.querySelector(".profile-head h1.name") !== null`, `the profile head at ${width}px`, 10000);
+        const head = await readHeadAt();
+        assertHead(head, width);
+        headLines.push(
+          `${width}px: .profile-head ${JSON.stringify(head.headDisplay)} gap ${head.headGap} → ${JSON.stringify(head.headTracks)} (${expectTracks} tracks), avatar top ${head.avatar.top} · who top ${head.who.top} left ${head.who.left} · action top ${head.action.top}, name ${JSON.stringify(head.name)} at ${head.nameFont}${head.pagerMinWidth ? `, pager min-width ${head.pagerMinWidth} align ${head.pagerAlign}` : ", no pager"}`,
+        );
+      }
+      headSeen = headLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const headAfter = await js("return window.innerWidth;");
+    if (headAfter !== headRestore) {
+      throw new Error(`the head's overrides cleared to ${headAfter}px, but the session runs at ${headRestore}px — a leaked override would mis-measure every later row`);
+    }
+
+    return `/user/${STRANGER_HANDLE}/edit stays put and reads "You can't edit this account." with no username field, no Save and Back to your profile at /user/${ownHandle} · the owner's form prefills ${JSON.stringify([form.handle, form.name, before.bio])} with the rule ${JSON.stringify(rule)} as help · @${STRANGER_HANDLE} → ${JSON.stringify("Username taken")} with Save disabled and no help · "ab" → the same rule as the inline error with Save disabled · back to @${ownHandle} → error gone, rule back as help, Save enabled · Cancel → /user/${ownHandle} reads ${JSON.stringify([after.name, after.handle])} unchanged · the head at ${headSeen}`;
   }),
 );
 
