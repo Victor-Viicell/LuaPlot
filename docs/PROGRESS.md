@@ -3,6 +3,39 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-72: `/terms`' desktop rail is rendered by a walk for the first time
+
+- **Changed:** `scripts/smoke.mjs` — **row 53** (`EXPECTED_ROWS` 52 → 53, read-only). `/terms` is the
+  only page with a page-level desktop composition (`.contents`: 200px, sticky, `display: none` below
+  1200) and no row had ever taken an override on it: row 52 proves the copy at the walk's own 500×653.
+  The row takes its **own** `360×740` and `1200×740` overrides (`measureAt()` is `/dev/primitives`-only),
+  settles two frames each, clears them in a `finally`, then **asserts** `innerWidth` came back (T-32).
+  At 360: `.contents` computes `none`, `.doc` is one track (flex, read through `gridTemplateColumns`'
+  own `none`, which is why the display is printed beside the count), `.lede` and every `.note-body` fit
+  inside `.outlet`, no horizontal scroll. At 1200: `.contents` computes `flex`, measures 200px and is
+  `sticky`, `.doc` is a grid of exactly two tracks whose prose column is ≤ 720 (`minmax(0, 720px)`),
+  the rail's `.contents-link` **fragments equal the page's heading ids in the page's own order** (read
+  from `.rule[id]`/`.note[id]`, never pinned to eight anchors), every fragment resolves to an element,
+  no horizontal scroll.
+- **Verified:** `check.sh` **GREEN** (section 10 on the rebuilt bundle: `62 asset(s), 620 KB, 233
+  inline tag(s)`), `publish.sh` → `LIVE`, `curl` **200**, **53/53** local and **53/53** `--live`. Row
+  53's evidence: `at 360: .contents "none" (0px), .doc "flex" → 1 track, widest paragraph 308 inside
+  the 340px outlet, scrollWidth 350/360 · at 1200: .contents "flex" 200px sticky, .doc grid →
+  ["200px","458px"] (prose 458px ≤ 720), 8 rail link(s) matching the 8 heading id(s) … every fragment
+  in the DOM, scrollWidth 1190/1200`. Red first: removing the `lg` block's `display: flex` from
+  `.contents` (the rule the ticket says may "never turn on") put **row 53 alone** red (52/53) reading
+  *"at 1200px .contents computes to \"none\" and measures 0px — the lg rail never turns on above 1200,
+  so the page is a stretched phone with a hidden nav"*. Bytes restored (`cp` back, `cmp` clean, `git
+  status` showing only `scripts/smoke.mjs`).
+- **Not verified / found:** the ticket's own red proof — `.doc`'s `lg` rule changed to
+  `grid-template-columns: 200px minmax(0, 1fr)` — walks **GREEN, 53/53**. The prose track resolves to
+  458px either way: the shell's 794px A4 outlet (minus 40px padding each side, minus the 200px rail and
+  its 56px gap) caps it long before 720 binds, so the `≤ 720` assertion is a guard for a wider outlet,
+  not a measurement of the measure rule today. Also found: `scrollWidth === innerWidth` is false on a
+  right page here (`html { scrollbar-gutter: stable }` → 350 at 360, 1190 at 1200), so the row asserts
+  `scrollWidth > innerWidth` like rows 30/31/32. Both lessons are in `docs/NEXT.md` → *Found while
+  working*.
+
 ## 2026-11-03 — T-71: `/terms` is mounted by a row, and its one clause is proved twice
 
 - **Changed:** `scripts/smoke.mjs` — **row 52** (`EXPECTED_ROWS` 51 → 52), the last route in

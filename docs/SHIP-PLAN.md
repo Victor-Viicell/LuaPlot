@@ -634,6 +634,27 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-72 `/terms`' desktop rail had never been rendered by a walk.**
+      Row 52 proves the page's copy at the walk's own 500×653; `/terms` is the only page with a
+      page-level desktop composition (`.contents`: 200px, sticky, `display: none` below 1200) and no
+      row had ever taken an override on it — a rail that overflowed the 794px outlet, a prose column
+      that grew past its measure, or a `display: none` that never turned on was green in every gate, in
+      all 52 rows and on the live walk. Row **53** (`EXPECTED_ROWS` 52 → 53, **read-only**) takes its
+      own `360×740` and `1200×740` overrides, settles two frames each, clears them in a `finally` and
+      then **asserts** `innerWidth` came back (T-32). At 360: `.contents` computes `none`, `.doc` is
+      one track, `.lede` and every `.note-body` fit inside `.outlet`, no horizontal scroll. At 1200:
+      `.contents` computes `flex`, 200px, `sticky`; `.doc` is a grid of two tracks whose prose column
+      is ≤ 720; the rail's fragments **equal** the page's heading ids in the page's own order (read off
+      `.rule[id]`/`.note[id]`, never pinned to eight anchors) and every fragment resolves. Red first:
+      the ticket's own edit (`minmax(0, 1fr)`) walks **green** — the prose track is 458px either way,
+      because the 794px A4 outlet caps it before 720 can bind — so the red proof is deleting the `lg`
+      block's `display: flex` on `.contents`, which put **row 53 alone** red (52/53) reading *"at
+      1200px .contents computes to \"none\" and measures 0px"*. `check.sh` **GREEN**, `publish.sh` →
+      `LIVE`, `curl` **200**, 53/53 local and 53/53 `--live`. Brief: `docs/NEXT.md` (T-72).
+      Found: the same `scrollWidth === innerWidth` trap in the accept line (the gutter makes a right
+      page read 350/360 — the rule is an inequality); and the four detail pages' `.main` + `.aside`
+      split has never been rendered either — filed as **T-73**.
+
 - [x] **T-71 /terms is the one route no row had ever mounted.**
       `pages/terms.md` is pure copy — three prohibitions and five notes — and it is the page T-69's
       word-break class broke twice by hand (*Finishingonboardingis the acceptance*, *beside Finish*),

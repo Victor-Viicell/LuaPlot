@@ -6372,6 +6372,178 @@ results.push(
   }),
 );
 
+/* ------------------------------------------------------------------------------------------------
+ * T-72 — `/terms` is the only page in the app with a page-level desktop composition, and no row has
+ * ever rendered it.
+ *
+ * Row 52 proves the copy at whatever width the session happens to be — the walk's own is 500×653
+ * (T-36a). `.contents` is the page's whole answer to *desktop responsive is mandatory, nothing is a
+ * stretched phone*: a 200px sticky rail beside a prose column, `lg` only. Nothing has looked at
+ * `/terms` above 900px, so a rail that overflows the outlet, a prose column that grows past its
+ * measure, or a `display: none` that never turns on is green in `check.sh`, in every other row and
+ * on the live walk. Ladder row 30 measures `/dev/primitives`' `.rail` — the **shell's** rail, a
+ * different decision behind a different selector.
+ *
+ * Read-only: `/terms` reads no store, writes no preference, presses nothing and commits no query.
+ *
+ * Traps, all of them live:
+ *  - `go("/terms")` is an app path; `go(await url())` would double the served base (T-59).
+ *  - The row takes its **own** `360×740` and `1200×740` overrides, settles two frames, and clears
+ *    them in a `finally`; a leaked override poisons the sign-out row after it (T-32) — so the row
+ *    asserts `innerWidth` came back rather than trusting the `finally`.
+ *  - `gridTemplateColumns` returns the **resolved tracks**, and a flex container answers `none`
+ *    there: `split(" ").filter(Boolean)` reads that as the one track it is, which is why the row
+ *    prints the display beside the count.
+ *  - The rail's labels are `TERMS_RULES`' product strings: the row asserts the **ids**, in the
+ *    page's own order, never a label text and never the number eight.
+ *  - A fragment is not asserted as "stays in the app": `follow()` drops it on purpose and
+ *    `/terms#anchor` is a real document load (`ARCHITECTURE.md` → Router). The id in the DOM is the
+ *    honest assertion.
+ * ---------------------------------------------------------------------------------------------- */
+results.push(
+  await journey("/terms hides its contents rail on a phone and sets it beside the prose at 1200", async () => {
+    await go(TERMS_PATH);
+    await waitFor(
+      `String((document.querySelector("h1.title") || {}).textContent || "").trim() === "Three prohibitions" && location.pathname.endsWith("/terms")`,
+      "the terms heading before the rail is read",
+      12000,
+    );
+
+    /**
+     * Everything read at one width in one evaluation. The prose widths are the paragraph boxes, not
+     * the column's: `.note-body` and `.lede` are what must fit the outlet, and a max-width that
+     * outgrows its lane shows up here as a box wider than the container.
+     */
+    const read = () =>
+      js(`
+        const box = (el) => (el ? Math.round(el.getBoundingClientRect().width * 100) / 100 : -1);
+        const tracks = (el) => (el ? getComputedStyle(el).gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : []);
+        const doc = document.querySelector(".doc");
+        const contents = document.querySelector(".contents");
+        const outlet = document.querySelector(".outlet");
+        const lede = document.querySelector(".lede");
+        const bodies = [...document.querySelectorAll(".note-body")];
+        const links = [...document.querySelectorAll(".contents-link")];
+        const targets = [...document.querySelectorAll(".rule[id], .note[id]")];
+        const fragment = (a) => {
+          const href = a.getAttribute("href") || "";
+          const at = href.indexOf("#");
+          return at < 0 ? "" : href.slice(at + 1);
+        };
+        return {
+          path: location.pathname + location.search,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          outlet: box(outlet),
+          docDisplay: doc ? getComputedStyle(doc).display : "",
+          docTracks: tracks(doc),
+          contentsDisplay: contents ? getComputedStyle(contents).display : "",
+          contentsWidth: box(contents),
+          contentsPosition: contents ? getComputedStyle(contents).position : "",
+          lede: box(lede),
+          bodies: bodies.map(box),
+          targetIds: targets.map((el) => el.id),
+          links: links.map((a) => ({ text: String(a.textContent || "").trim(), fragment: fragment(a) })),
+          orphans: links.map(fragment).filter((id) => id === "" || document.getElementById(id) === null),
+        };
+      `);
+
+    const restore = await js(`return window.innerWidth;`);
+    const widthOf = { phone: 360, desktop: 1200 };
+    let seen = "";
+    try {
+      /* ---------------------------------------------------------------- phone: one column, no rail */
+      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.phone, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260); // the media queries settle in two frames; a width read too early is the old box
+      const phone = await read();
+      if (phone.innerWidth !== widthOf.phone) {
+        throw new Error(`the override asked for ${widthOf.phone} and the page measured ${phone.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!phone.path.endsWith(TERMS_PATH)) {
+        throw new Error(`the rail row is on ${JSON.stringify(phone.path)}, not ${TERMS_PATH} — something navigated between the mount and the override`);
+      }
+      if (phone.contentsDisplay !== "none") {
+        throw new Error(`at ${widthOf.phone}px .contents computes to ${JSON.stringify(phone.contentsDisplay)} and measures ${phone.contentsWidth}px — the rail is lg-only, and a rail drawn at 360 is a phone showing a desktop page squeezed`);
+      }
+      if (phone.docTracks.length !== 1) {
+        throw new Error(`at ${widthOf.phone}px .doc (display ${JSON.stringify(phone.docDisplay)}) resolves to the tracks ${JSON.stringify(phone.docTracks)}, not one — the phone reads one column of prose`);
+      }
+      const spill = [
+        ["lede", phone.lede],
+        ...phone.bodies.map((width, at) => [`.note-body[${at}]`, width]),
+      ].filter(([, width]) => width > phone.outlet + 0.5);
+      if (spill.length > 0) {
+        throw new Error(
+          `at ${widthOf.phone}px ${spill.length} paragraph(s) are wider than the ${phone.outlet}px outlet: ${JSON.stringify(spill)} — prose wider than its lane is the horizontal scroll the page must never have`,
+        );
+      }
+      // `>` and not `===`: `html` carries `scrollbar-gutter: stable`, so an unoverflowed document
+      // reports scrollWidth equal to its **client** width (360 → 350 on this box). The rule is "no
+      // horizontal scroll", which is an inequality — a strict equality reads a right page as red.
+      if (phone.scrollWidth > phone.innerWidth) {
+        throw new Error(`at ${widthOf.phone}px the document scrolls horizontally: scrollWidth ${phone.scrollWidth} > innerWidth ${phone.innerWidth}`);
+      }
+
+      /* ------------------------------------------------- desktop: the rail, the tracks, the fragments */
+      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.desktop, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260);
+      const desk = await read();
+      if (desk.innerWidth !== widthOf.desktop) {
+        throw new Error(`the override asked for ${widthOf.desktop} and the page measured ${desk.innerWidth}`);
+      }
+      if (desk.contentsDisplay !== "flex") {
+        throw new Error(
+          `at ${widthOf.desktop}px .contents computes to ${JSON.stringify(desk.contentsDisplay)} and measures ${desk.contentsWidth}px — the lg rail never turns on above 1200, so the page is a stretched phone with a hidden nav`,
+        );
+      }
+      if (Math.abs(desk.contentsWidth - 200) > 1) {
+        throw new Error(`at ${widthOf.desktop}px the rail measures ${desk.contentsWidth}px, not the 200px track it declares (tracks ${JSON.stringify(desk.docTracks)})`);
+      }
+      if (desk.docDisplay !== "grid" || desk.docTracks.length !== 2) {
+        throw new Error(
+          `at ${widthOf.desktop}px .doc (display ${JSON.stringify(desk.docDisplay)}) resolves to the tracks ${JSON.stringify(desk.docTracks)}, not a rail plus a prose column`,
+        );
+      }
+      const measure = parseFloat(desk.docTracks[1]);
+      if (!Number.isFinite(measure) || measure > 720.5) {
+        throw new Error(
+          `the prose column resolves to ${JSON.stringify(desk.docTracks[1])} (tracks ${JSON.stringify(desk.docTracks)}) — the measure rule is minmax(0, 720px), so a column past 720 is prose set wider than a readable line`,
+        );
+      }
+
+      // The rail lists the page's own headings: read the ids off the DOM, never pin eight anchors.
+      const linkIds = desk.links.map((link) => link.fragment);
+      if (JSON.stringify(linkIds) !== JSON.stringify(desk.targetIds)) {
+        throw new Error(
+          `/terms' rail lists ${JSON.stringify(linkIds)} but the page mounts the headings ${JSON.stringify(desk.targetIds)} — every heading gets one entry, in the page's own order (${desk.links.length} link(s))`,
+        );
+      }
+      if (desk.orphans.length > 0) {
+        throw new Error(
+          `the rail points at ${JSON.stringify(desk.orphans)}, which no element on the page carries — a link to a missing fragment scrolls nowhere`,
+        );
+      }
+      const unlabelled = desk.links.filter((link) => link.text === "");
+      if (unlabelled.length > 0) {
+        throw new Error(`${unlabelled.length} of ${desk.links.length} rail link(s) print no text — a bare fragment is not a contents entry`);
+      }
+      if (desk.scrollWidth > desk.innerWidth) {
+        throw new Error(`at ${widthOf.desktop}px the document scrolls horizontally: scrollWidth ${desk.scrollWidth} > innerWidth ${desk.innerWidth}`);
+      }
+
+      seen = `at ${widthOf.phone}: .contents ${JSON.stringify(phone.contentsDisplay)} (${phone.contentsWidth}px), .doc ${JSON.stringify(phone.docDisplay)} → ${phone.docTracks.length} track, widest paragraph ${Math.max(phone.lede, ...phone.bodies)} inside the ${phone.outlet}px outlet, scrollWidth ${phone.scrollWidth}/${phone.innerWidth} · at ${widthOf.desktop}: .contents ${JSON.stringify(desk.contentsDisplay)} ${desk.contentsWidth}px ${desk.contentsPosition}, .doc ${desk.docDisplay} → ${JSON.stringify(desk.docTracks)} (prose ${measure}px ≤ 720), ${desk.links.length} rail link(s) matching the ${desk.targetIds.length} heading id(s) in order ${JSON.stringify(linkIds)}, every fragment in the DOM, scrollWidth ${desk.scrollWidth}/${desk.innerWidth}`;
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const after = await js(`return window.innerWidth;`);
+    if (after !== restore) {
+      throw new Error(`the override cleared to ${after}px, but the session runs at ${restore}px — a leaked override would mis-measure every later row`);
+    }
+    return seen;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -6396,9 +6568,9 @@ chrome.kill("SIGKILL");
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
  * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48, T-66: 49,
- * T-67: 50, T-68: 51, T-71: 52).
+ * T-67: 50, T-68: 51, T-71: 52, T-72: 53).
  */
-const EXPECTED_ROWS = 52;
+const EXPECTED_ROWS = 53;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");
