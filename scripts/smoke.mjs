@@ -4621,6 +4621,208 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-62 — `pages/user/edit.md` is law in four places nothing had executed: the handle follows
+ * onboarding's rules, *"Changing it moves the profile URL and no alias is kept, so a link to the
+ * previous handle reports not-found rather than redirecting; the account keeps its content,
+ * follows, and bookmarks"*, and the state *Handle changed* — *"the profile loads at the new URL"*.
+ * Row 3 mounts the form and stops at the push proof, so `saveProfileEdit()` — the one write that
+ * **moves** an account — had never been pressed; a rename that re-created the row (losing the bio
+ * and `joinedAt`), left the authored rows behind, or kept the old handle claimed is green in every
+ * gate and in all 44 rows.
+ *
+ * **Mutating.** It renames the walk's account out and back; the four things it compares are read
+ * from the page on both sides, never pinned to a fixture value.
+ * ---------------------------------------------------------------------------------------------- */
+const EDIT_HANDLE = "edit_walk";
+
+results.push(
+  await journey("renaming the account on /user/you/edit moves the row, the content and the graph", async () => {
+    /** The profile head plus the creations grid — the four things a rename must not lose. */
+    const readHead = () =>
+      js(`
+        const text = (selector) => {
+          const el = document.querySelector(selector);
+          return el ? (el.textContent || "").replace(/\\s+/g, " ").trim() : "";
+        };
+        return {
+          path: location.pathname,
+          present: document.querySelector(".profile-head") !== null,
+          name: text(".profile-head h1.name"),
+          handle: text(".profile-head .handle"),
+          bio: text(".profile-head .bio"),
+          figures: text(".profile-head .figures"),
+          creations: document.querySelectorAll(".card-grid .card-cell").length,
+          missing: document.body.innerText.includes("This user doesn't exist."),
+        };
+      `);
+
+    /**
+     * The form as it mounts. **`/user/you/edit` is not a `<form>`** — a `div.form` of `Field`s — and
+     * its username field is named `username`, not `handle` (onboarding's is `handle`), so both names
+     * are tried rather than one being assumed.
+     */
+    const readForm = () =>
+      js(`
+        const one = (selector) => document.querySelector(selector);
+        const handleInput = one('input[name="username"]') || one('input[name="handle"]');
+        const fieldOf = (el) => (el ? el.closest(".field") : null);
+        const save = [...document.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Save");
+        return {
+          path: location.pathname,
+          mounted: handleInput !== null && one('input[name="displayName"]') !== null,
+          handle: handleInput ? handleInput.value : "",
+          name: one('input[name="displayName"]') ? one('input[name="displayName"]').value : "",
+          bio: one('textarea[name="bio"]') ? one('textarea[name="bio"]').value : "",
+          handleError: ((fieldOf(handleInput)?.querySelector(".field-error") || {}).textContent || "").trim(),
+          save: save ? save.disabled : null,
+          failure: [...document.querySelectorAll(".form-failure")].map((el) => (el.textContent || "").trim()).join(" | "),
+        };
+      `);
+
+    const until = async (label, check, timeout = 8000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await readForm();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${label} — read ${JSON.stringify(last)}`);
+    };
+
+    const readShell = () =>
+      js(`
+        const link = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Open profile");
+        return {
+          sentence: (document.querySelector(".reading-value")?.textContent || "").trim(),
+          profile: link ? link.getAttribute("href") || "" : "",
+        };
+      `);
+
+    const HEAD = 'input[name="username"], input[name="handle"]';
+
+    // 1. The account as it reads today: name, handle, bio, the two figures and the creations count.
+    await go("/user/you");
+    await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the account's profile header", 10000);
+    const before = await readHead();
+    if (!before.name || !before.handle || !before.bio) {
+      throw new Error(`/user/you reads ${JSON.stringify(before)} — the walk needs a name, a handle and a bio to prove a rename keeps them`);
+    }
+    const accountHandle = before.handle.replace(/^@/, "");
+
+    // 2. The form prefills from the row, not from a blank: the URL's handle, the row's name and bio.
+    await go(`/user/${accountHandle}/edit`);
+    let form = await until("the account form to mount", (f) => f.mounted, 12000);
+    const prefilled = { handle: form.handle, name: form.name, bio: form.bio };
+    if (form.handle !== accountHandle) {
+      throw new Error(`the edit form prefills the username as ${JSON.stringify(form.handle)}, not the URL's ${JSON.stringify(accountHandle)}`);
+    }
+    if (form.name !== before.name) {
+      throw new Error(`the edit form prefills the display name as ${JSON.stringify(form.name)}, not the row's ${JSON.stringify(before.name)}`);
+    }
+    if (form.bio !== before.bio) {
+      throw new Error(`the edit form prefills the bio as ${JSON.stringify(form.bio)}, not the row's ${JSON.stringify(before.bio)}`);
+    }
+    if (form.save !== false) {
+      throw new Error(`Save is disabled on a form that prefilled a valid pair (${JSON.stringify(form)}) — nothing has been typed yet`);
+    }
+
+    // 3. The rename: one free handle, one Save, and the landing is the new URL's own profile.
+    await retype(HEAD, EDIT_HANDLE);
+    form = await until("Save to stay open on the free handle", (f) => f.handle === EDIT_HANDLE && f.handleError === "" && f.save === false);
+    await click("Save", { exact: true });
+    try {
+      await expectPath(`/user/${EDIT_HANDLE}`, "Save", 12000);
+    } catch (error) {
+      const seen = await readForm();
+      const body = await js(`return document.body.innerText.replace(/\\s+/g, " ").trim().slice(0, 160);`);
+      throw new Error(`${error.message} — Save left the reader at ${JSON.stringify(seen)} with the page reading ${JSON.stringify(body)}`);
+    }
+    await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the renamed profile", 10000);
+    const after = await readHead();
+    if (after.missing || !after.present) {
+      throw new Error(`/user/${EDIT_HANDLE} after Save reads ${JSON.stringify(after)} — the row did not move to the new handle`);
+    }
+    if (after.name !== before.name) {
+      throw new Error(`the renamed profile reads the name ${JSON.stringify(after.name)}, not ${JSON.stringify(before.name)} — a rename moved the handle and dropped the row's identity`);
+    }
+    if (after.handle !== `@${EDIT_HANDLE}`) {
+      throw new Error(`the renamed profile reads the handle ${JSON.stringify(after.handle)}, not @${EDIT_HANDLE}`);
+    }
+    if (after.bio !== before.bio) {
+      throw new Error(`the renamed profile reads the bio ${JSON.stringify(after.bio)}, not ${JSON.stringify(before.bio)} — the row was re-created instead of moved`);
+    }
+    if (after.figures !== before.figures) {
+      throw new Error(`the renamed profile reads the figures ${JSON.stringify(after.figures)}, not ${JSON.stringify(before.figures)} — the rename did not move both sides of the follow graph`);
+    }
+    if (after.creations !== before.creations) {
+      throw new Error(`the renamed profile draws ${after.creations} creation card(s), not ${before.creations} — the authored rows did not follow the handle`);
+    }
+
+    // 4. The spec's other half: the previous handle is not-found, and no alias redirects to the new one.
+    await go(`/user/${accountHandle}`);
+    await waitText("This user doesn't exist.", 10000);
+    const old = await readHead();
+    if (old.present) {
+      throw new Error(`/user/${accountHandle} still renders the profile after the rename — the old handle was not released`);
+    }
+
+    // 4b. The account **keeps its content**: the comment it wrote on its own post is signed by the
+    //     new handle. A rename that moved the authored rows but not the comments leaves every
+    //     comment signed by a handle that now answers not-found.
+    const postId = newPostPath.split("/").pop();
+    await go(`/post/${postId}`);
+    await waitText(ownComment, 10000);
+    const signed = await js(`
+      const comment = [...document.querySelectorAll("article.comment")].find((el) => (el.textContent || "").includes(${JSON.stringify(ownComment)}));
+      return comment ? (comment.querySelector(".row-author")?.textContent || "").trim() : null;
+    `);
+    if (signed !== `@${EDIT_HANDLE}`) {
+      throw new Error(`the comment the account wrote reads ${JSON.stringify(signed)} after the rename, not @${EDIT_HANDLE} — a comment is signed by its author, and the account keeps its content`);
+    }
+
+    // 5. The account itself moved: `/` names the same person at the new handle.
+    await go("/");
+    await waitText("signed in as", 8000);
+    const shell = await readShell();
+    if (shell.sentence !== `signed in as ${before.name}` || !shell.profile.endsWith(`/user/${EDIT_HANDLE}`)) {
+      throw new Error(`/ reads ${JSON.stringify([shell.sentence, shell.profile])} after the rename, not ${JSON.stringify([`signed in as ${before.name}`, `/user/${EDIT_HANDLE}`])} — the session kept the old handle`);
+    }
+
+    // 6. The way back, and the whole pair re-read: the walk hands the account over as row 44 does.
+    try {
+      await go(`/user/${EDIT_HANDLE}/edit`);
+      await until("the renamed account's form to mount", (f) => f.mounted, 12000);
+      await retype(HEAD, accountHandle);
+      form = await until(`Save to stay open on @${accountHandle}`, (f) => f.handle === accountHandle && f.handleError === "" && f.save === false);
+      await click("Save", { exact: true });
+      await expectPath(`/user/${accountHandle}`, "the restore's Save", 12000);
+      await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the restored profile", 10000);
+      const back = await readHead();
+      if (back.missing || back.handle !== `@${accountHandle}` || back.name !== before.name) {
+        throw new Error(`the restore landed on ${JSON.stringify([back.name, back.handle, back.missing])}, not ${JSON.stringify([before.name, `@${accountHandle}`])}`);
+      }
+      if (back.bio !== before.bio || back.figures !== before.figures || back.creations !== before.creations) {
+        throw new Error(`the restore reads ${JSON.stringify([back.bio, back.figures, back.creations])}, not ${JSON.stringify([before.bio, before.figures, before.creations])} — the round trip lost a row`);
+      }
+      await go("/");
+      await waitText("signed in as", 8000);
+      const home = await readShell();
+      if (home.sentence !== `signed in as ${before.name}` || !home.profile.endsWith(`/user/${accountHandle}`)) {
+        throw new Error(`/ reads ${JSON.stringify([home.sentence, home.profile])} after the restore, not ${JSON.stringify([`signed in as ${before.name}`, `/user/${accountHandle}`])}`);
+      }
+
+      return `@${accountHandle} → @${EDIT_HANDLE} → @${accountHandle} · the form prefilled ${JSON.stringify([prefilled.handle, prefilled.name, prefilled.bio])} with Save enabled · Save → /user/${EDIT_HANDLE} reads ${JSON.stringify([after.name, after.handle, after.figures, after.creations])} (same name, bio, figures and creations as before) · /user/${accountHandle} reads "This user doesn't exist." with no profile · the account's own comment reads ${JSON.stringify(signed)} · / reads ${JSON.stringify(shell.sentence)} with Open profile at ${shell.profile} · the way back restores ${JSON.stringify([back.handle, back.bio, back.creations])}`;
+    } catch (error) {
+      throw new Error(
+        `${error.message} — the account was left as @${EDIT_HANDLE}; the walk's borrowed @${accountHandle} was not handed back`,
+      );
+    }
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -4644,9 +4846,9 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41, T-59: 42, T-60: 43, T-61: 44).
+ * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45).
  */
-const EXPECTED_ROWS = 44;
+const EXPECTED_ROWS = 45;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

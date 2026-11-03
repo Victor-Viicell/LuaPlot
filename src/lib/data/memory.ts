@@ -327,6 +327,13 @@ function renameAccount(from: Handle, to: Handle, displayName: string): void {
       if (item.author === from) item.author = to;
     }
   }
+  // A comment is signed by its author's handle too, and the profile it reads is the account's own
+  // (`comment-thread.md` draws `@author`). `pages/user/edit.md` says the account **keeps its
+  // content**, so a rename that skipped these would leave every comment the account wrote signed by
+  // a handle that now answers not-found — T-62's row is that bug's witness.
+  for (const comment of store.comments) {
+    if (comment.author === from) comment.author = to;
+  }
   for (const key of [...follows]) {
     const [follower, followee] = key.split(":");
     if (follower !== from && followee !== from) continue;
