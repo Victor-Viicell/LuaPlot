@@ -3,6 +3,41 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-77: the three detail pages' `sm 640` arm is rendered, and row 54 is width-major
+
+- **Changed:** `scripts/smoke.mjs` only — **row 54 extended a third time** (no new row;
+  `EXPECTED_ROWS` stays **55**). The row's page-major phases (`360 → 1200 → pair 360 → pair 1200`,
+  four overrides) became **width-major**: `SPLIT_WIDTHS = [360, 640, 1200]` takes **one** override
+  per width and mounts `SPLIT_PAGES` (character, lorebook, preset) inside it, so nine readings cost
+  **three** overrides and a fourth width is one array entry. `assertPhone()` became
+  `assertSplit(r, { label, path, width, counts })`, which answers all three widths: 360/640 keep the
+  phone `.cols` facts (`flex`/`column`, no grid tracks, `aside.top < main.top − 1`, one width for
+  both halves), 640 adds the `sm` block (`.head` a grid of **exactly three** tracks with the first
+  `320 ± 1`, the portrait beside the identity rather than over it, `h1.title` **34px**, `.prose`
+  **15px**, lorebook's `.entry-text` **15px** when drawn, `.vote`/`.save` `min-width: 132px` with
+  `flex-grow: 0` — the last four read as **computed strings**, since a rect cannot prove a
+  `min-width` the row never has to fill), and 1200 keeps the two-track `lg` grid. The single `read()`
+  grew `headDisplay`/`headTracks`/`portrait`/`identity`/`titleFont`/`proseFont`/`entryFont`/
+  `vote`/`save`/`start` rather than forking a second reader, and `evidence()` prints per width.
+  Measured at 640, identical on all three pages: `.head` `grid → ["320px","168px","44px"]`, portrait
+  right **344** ≤ identity left **364**, tops **80/80**, title **34px**, prose **15px** (lorebook
+  entry **15px**), vote/save **132px grow 0**, `.cols` still `flex column` (aside top **469** < main
+  **594.8**, both **572** inside the 620px outlet), `scrollWidth 630/640`. At 360 the same pages read
+  title `26px`, prose `14px`, vote/save `96px grow 1`; at 1200 `["362px","320px"]`.
+- **Verified:** red first — deleting `grid-template-columns: 320px minmax(0, 1fr) auto;` from
+  `preset-detail.tsrx`'s `sm 640` block put **row 54 alone** red (54 PASS / 1 FAIL) reading *"preset
+  at 640px: the head's first track resolves to \"290.797px\" (tracks [\"290.797px\",\"197.203px\",\"44px\"]),
+  not the 320px cover column the sm block declares"* — the page, the width and the track list, as
+  the accept line asked. Bytes restored (`cp` + `cmp` identical; `git status` shows only
+  `scripts/smoke.mjs`), `check.sh` **GREEN** (all sections), `./scripts/smoke.sh` **55/55**,
+  `publish.sh` → `LIVE=https://victor-viicell.github.io/LuaPlot/` (asset `index-DPoxP2Sr.js`, the
+  same file as the previous publish because this ticket touches no built source), `curl` **200**,
+  `./scripts/smoke.sh --live` **55/55**.
+- **Not verified / next:** the facts this row asserts are still hand-written in **three** separate
+  `<style>` blocks — nothing makes the three detail pages agree except this row — and the
+  profile page's own `sm 640` head (`72px | name | action`, one row) has never been rendered either →
+  **T-78** in `docs/NEXT.md`. No new dependency, no schema/adapter/JEV change this tick.
+
 ## 2026-11-03 — T-76: the lorebook and preset detail pages' phone arm is rendered
 
 - **Changed:** `scripts/smoke.mjs` — **row 54 extended again** (no new row; `EXPECTED_ROWS` stays

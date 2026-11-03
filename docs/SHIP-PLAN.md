@@ -634,6 +634,35 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-77 the three catalogue detail pages' `sm 640` arm had never been rendered.** Each keeps its
+      own `@media (min-width: 640px)` block that rewrites `.head` from two tracks to `320px
+      minmax(0, 1fr) auto` (the portrait moving out of `grid-column: 1 / -1` into column 1 **beside**
+      the identity, `.identity-text` into column 2 of row 1, `.menu-btn` into column 3), sets
+      `.title` 26 → **34px**, `.prose` 14 → **15px** (lorebook also `.entry-text`), and turns
+      `.vote`/`.save` from `flex: 1 1 auto; min-width: 96px` into `flex: 0 0 auto; min-width: 132px` —
+      and row 54 measured 360 and 1200 only, so deleting `grid-template-columns` from
+      `preset-detail`'s `sm` block left the portrait over the name at the one width the design ladder
+      puts it beside and `check.sh`, all 55 rows and the live walk stayed green. Row **54 extended a
+      third time** (no new row; `EXPECTED_ROWS` stays **55**) and reshaped **width-major**:
+      `SPLIT_WIDTHS = [360, 640, 1200]` takes one override per width and mounts character, lorebook and
+      preset inside it, so nine readings cost **three** overrides where the old page-major shape cost
+      four, and `assertPhone()` became `assertSplit(r, { label, path, width, counts })` answering all
+      three widths. At 640, on all three pages identically: `.head` `grid → ["320px","168px","44px"]`,
+      portrait right **344** ≤ identity left **364**, tops **80/80**, title **34px**, prose **15px**
+      (lorebook entry **15px**), vote/save **132px grow 0**, and `.cols` still the phone
+      `flex column` (aside top **469** < main **594.8**, both **572** inside the 620px outlet) — the
+      `sm` block touches `.head` and the type, never `.cols`. At 360 the same pages read title `26px`,
+      vote/save `96px grow 1`; at 1200 `["362px","320px"]`. Red first: deleting
+      `grid-template-columns: 320px minmax(0, 1fr) auto;` from `preset-detail.tsrx`'s `sm` block put
+      **row 54 alone** red reading *"preset at 640px: the head's first track resolves to
+      \"290.797px\" (tracks [\"290.797px\",\"197.203px\",\"44px\"]), not the 320px cover column the sm block
+      declares"*. Bytes restored (`cp` + `cmp` identical), `check.sh` **GREEN**, 55/55 local, 55/55
+      `--live`, `publish.sh` → `LIVE` (asset `index-DPoxP2Sr.js`, unchanged: no page file moved),
+      `curl` **200**. Brief: `docs/NEXT.md` (T-77).
+      Found: the deletion leaves the **track count at three** (an implicit third column appears for
+      `.menu-btn`), so the count assertion never fires — the **first-track** assertion is what catches
+      it. And the profile page's own `sm` head has never been rendered either — filed as **T-78**.
+
 - [x] **T-76 the two pages T-75 mounted still had an unrendered *phone* arm.** Each of the three
       catalogue detail pages carries its own copy of the base block (`.cols { display: flex;
       flex-direction: column; gap: 20px }`, `.aside { order: -1 }`) and only `character-detail`'s had

@@ -6563,11 +6563,15 @@ results.push(
  * T-76 finished the other half of those two copies: the **base** block (`display: flex;
  * flex-direction: column`, `.aside { order: -1 }`) had never been rendered on either page, so
  * deleting `order: -1` from `preset-detail` would have dropped the engagement row below a 60-line
- * description on a phone and walked green. The phone arm is one shared `assertPhone()` now, called
- * for the character page and for both copies, so the three files cannot drift apart unnoticed.
- * Phase order is character 360 → character 1200 → the pair at 360 → the pair at 1200: the override
- * is browser-level and survives `go()`, so each phase re-takes it and each reading asserts
- * `innerWidth` rather than assuming.
+ * description on a phone and walked green. The phone arm is one shared assertion, called for the
+ * character page and for both copies, so the three files cannot drift apart unnoticed.
+ *
+ * T-77 closed the class with the **last unrendered arm**: the `sm 640` block (`.head` rewritten from
+ * two tracks to `320px minmax(0, 1fr) auto` with the portrait moved beside the identity, `.title`
+ * 26 → 34px, `.prose` 14 → 15px, `.vote`/`.save` `flex: 1 1 auto; min-width: 96px` → `flex: 0 0 auto;
+ * min-width: 132px`). The row is now **width-major** — `assertSplit(r, { label, path, width, counts })`
+ * answers all three widths and `SPLIT_WIDTHS` drives them — so nine readings cost **three** overrides
+ * where the old page-major shape cost four, and a fourth width is one array entry.
  */
 const DETAIL_SPLIT_PATH = "/character/c0a1b2c3-0000-4000-8000-000000000002";
 
@@ -6584,20 +6588,25 @@ const SPLIT_COPIES = [
   { path: "/preset/9e5e7000-0000-4000-8000-000000000002", label: "preset" },
 ];
 
-results.push(
-  await journey("the catalogue detail pages put their aside beside the description at 1200", async () => {
-    await go(DETAIL_SPLIT_PATH);
-    await waitFor(
-      'document.querySelector(".detail .cols .main") !== null && document.querySelector(".detail .cols .aside") !== null && (document.querySelector(".detail h1.title") || {}).textContent !== ""',
-      "the detail page's .main + .aside composition",
-      12000,
-    );
+const SPLIT_PAGES = [
+  { label: "character", path: DETAIL_SPLIT_PATH, counts: "require" },
+  ...SPLIT_COPIES.map((copy) => ({ label: copy.label, path: copy.path, counts: "read" })),
+];
 
+/**
+ * The ladder these three pages are designed on, walked **width-major**: one browser-level override
+ * per width, the three mounts inside it. Page-major would cost nine overrides for nine readings and
+ * nine more for a fourth width; width-major costs three and a fourth width slots in as one entry.
+ */
+const SPLIT_WIDTHS = [360, 640, 1200];
+
+results.push(
+  await journey("the catalogue detail pages render their phone, sm and lg arms", async () => {
     /**
-     * One reading of the composition at one width. Two things the T-72 row could not answer are
-     * read here explicitly: the **display** beside the track count (a flex container's
-     * `gridTemplateColumns` is `none`, so tracks are only read when the box is a grid), and the
-     * geometry, because `order: -1` is a *visual* order — DOM order says the opposite.
+     * One reading of the composition at one width — the same reader on all three pages, because the
+     * row's whole subject is that three files keep **three private copies** of one rule set. The
+     * `sm` half cannot be read off a rectangle (a `min-width` the row never has to fill, a font the
+     * page may not draw), so the type and the action sizing are read as **computed strings**.
      */
     const read = () =>
       js(`
@@ -6607,9 +6616,22 @@ results.push(
           const round = (n) => Math.round(n * 100) / 100;
           return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width) };
         };
+        const box = (sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const s = getComputedStyle(el);
+          return { minWidth: s.minWidth, flexGrow: s.flexGrow, flexBasis: s.flexBasis };
+        };
+        const fontOf = (sel) => {
+          const el = document.querySelector(sel);
+          return el ? getComputedStyle(el).fontSize : "";
+        };
         const cols = document.querySelector(".detail .cols");
         const cs = cols ? getComputedStyle(cols) : null;
         const isGrid = !!cs && cs.display.indexOf("grid") >= 0;
+        const head = document.querySelector(".detail .head");
+        const hs = head ? getComputedStyle(head) : null;
+        const headIsGrid = !!hs && hs.display.indexOf("grid") >= 0;
         const counts = document.querySelector('.detail .counts[aria-label="Engagement"]');
         return {
           path: location.pathname,
@@ -6624,28 +6646,34 @@ results.push(
           aside: rect(document.querySelector(".detail .cols .aside")),
           outlet: rect(document.querySelector(".outlet")),
           countCells: counts ? counts.querySelectorAll(".count").length : -1,
+          headDisplay: hs ? hs.display : "",
+          headTracks: headIsGrid ? hs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          portrait: rect(document.querySelector(".detail .head .portrait")),
+          identity: rect(document.querySelector(".detail .head .identity-text")),
+          titleFont: fontOf(".detail h1.title"),
+          proseFont: fontOf(".detail .prose"),
+          entryFont: fontOf(".detail .entry-text"),
+          vote: box(".detail .vote"),
+          save: box(".detail .save"),
+          start: box(".detail .start"),
         };
       `);
 
     const restore = await js("return window.innerWidth;");
-    const widthOf = { phone: 360, desktop: 1200 };
 
     /**
-     * The **phone arm** of the same three rules, shared by all three catalogue detail pages: one
-     * flex *column*, no grid tracks (a flex container's `gridTemplateColumns` is the literal
-     * `none`, so the display is read first), the aside lifted **above** the description
-     * (`order: -1` — the DOM says the opposite, so only `top` answers it), one width for both
-     * halves, inside the outlet, no horizontal scroll.
+     * Every assertion one mount can answer at one width, with the page's name and the width in each
+     * message so a red says **which copy** drifted and **where** it was read.
      *
-     * `label` names the page in every message so a red says which copy drifted. `counts` is
-     * `"require"` for the page this row has always opened, and `"read"` for the two it mounts:
-     * a page that draws the engagement list must draw the four cells the spec fixes, while a page
-     * that draws none is simply not this row's subject.
+     * 360 and 640 both keep the **phone** `.cols` (one flex column, the aside lifted above the
+     * description by `order: -1`) — the `sm` block rewrites `.head` and the type, never `.cols`, and
+     * asserting that is half the point: a page that turned its grid on a breakpoint early would
+     * otherwise read as a desktop page one width down. 1200 is the two-track grid.
      */
-    const assertPhone = (r, { label, path, counts }) => {
-      const at = `${label} at ${widthOf.phone}px`;
-      if (r.innerWidth !== widthOf.phone) {
-        throw new Error(`${at}: the override asked for ${widthOf.phone} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+    const assertSplit = (r, { label, path, width, counts }) => {
+      const at = `${label} at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
       }
       if (!r.path.endsWith(path)) {
         throw new Error(`${at}: the row is on ${JSON.stringify(r.path)}, not ${path} — something navigated between the mount and the override`);
@@ -6653,21 +6681,9 @@ results.push(
       if (r.title === "") {
         throw new Error(`${at}: the page prints no .detail h1.title, so the composition measured is a skeleton or the not-found arm`);
       }
-      if (r.colsDisplay !== "flex" || r.colsFlow !== "column") {
-        throw new Error(
-          `${at}: .cols computes to display ${JSON.stringify(r.colsDisplay)} flow ${JSON.stringify(r.colsFlow)} — the phone reads one column of main then aside, not a squeezed grid`,
-        );
-      }
-      if (r.colsTracks.length !== 0) {
-        throw new Error(`${at}: .cols (display ${JSON.stringify(r.colsDisplay)}) still resolves to the grid tracks ${JSON.stringify(r.colsTracks)} — it is meant to be a flex column there`);
-      }
-      if (!(r.aside.top < r.main.top - 1)) {
-        throw new Error(
-          `${at}: .aside sits at top ${r.aside.top} and .main at top ${r.main.top} — the aside is not above the description, so a reader scrolls the whole prose to find Like (order: -1 is the mobile argument)`,
-        );
-      }
-      if (Math.abs(r.aside.width - r.main.width) > 1) {
-        throw new Error(`${at}: .aside measures ${r.aside.width}px and .main ${r.main.width}px — one column means one width, and a mismatched pair is a second track`);
+      /* ------------------------------------------------- everything all three widths must hold */
+      if (!r.main || !r.aside || !r.outlet) {
+        throw new Error(`${at}: the composition is incomplete — main ${JSON.stringify(r.main)}, aside ${JSON.stringify(r.aside)}, outlet ${JSON.stringify(r.outlet)}`);
       }
       if (r.main.left < r.outlet.left - 0.5 || r.aside.right > r.outlet.right + 0.5) {
         throw new Error(
@@ -6689,139 +6705,130 @@ results.push(
       if (r.scrollWidth > r.innerWidth) {
         throw new Error(`${at}: the document scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
       }
+
+      if (width === 1200) {
+        /* ------------------------------------------------ lg: two tracks, the aside BESIDE main */
+        if (r.colsDisplay.indexOf("grid") < 0 || r.colsTracks.length !== 2) {
+          throw new Error(
+            `${at}: .cols computes to display ${JSON.stringify(r.colsDisplay)} → the tracks ${JSON.stringify(r.colsTracks)} — the lg composition never turns on, so this page is a stretched phone with a 360-wide reading column`,
+          );
+        }
+        const column = parseFloat(r.colsTracks[1]);
+        if (!Number.isFinite(column) || Math.abs(column - 320) > 1) {
+          throw new Error(`${at}: the second track resolves to ${JSON.stringify(r.colsTracks[1])} (tracks ${JSON.stringify(r.colsTracks)}), not the 320px aside the page declares`);
+        }
+        if (!(r.aside.left >= r.main.right - 0.5)) {
+          throw new Error(
+            `${at}: .aside spans ${r.aside.left}–${r.aside.right} and .main ends at ${r.main.right} — the aside is not beside the description, it is under it (grid-column: 2 is the rule that places it)`,
+          );
+        }
+        if (Math.abs(r.aside.top - r.main.top) > 2) {
+          throw new Error(`${at}: .aside starts at top ${r.aside.top} and .main at ${r.main.top} — the two columns do not start on the same row (grid-row: 1 for both)`);
+        }
+        return;
+      }
+
+      /* ------------------------------------- 360 and 640: still the phone .cols, aside lifted above */
+      if (r.colsDisplay !== "flex" || r.colsFlow !== "column") {
+        throw new Error(
+          `${at}: .cols computes to display ${JSON.stringify(r.colsDisplay)} flow ${JSON.stringify(r.colsFlow)} — the phone (and its sm neighbour) reads one column of main then aside, not a squeezed grid`,
+        );
+      }
+      if (r.colsTracks.length !== 0) {
+        throw new Error(`${at}: .cols (display ${JSON.stringify(r.colsDisplay)}) still resolves to the grid tracks ${JSON.stringify(r.colsTracks)} — it is meant to be a flex column there`);
+      }
+      if (!(r.aside.top < r.main.top - 1)) {
+        throw new Error(
+          `${at}: .aside sits at top ${r.aside.top} and .main at top ${r.main.top} — the aside is not above the description, so a reader scrolls the whole prose to find Like (order: -1 is the mobile argument)`,
+        );
+      }
+      if (Math.abs(r.aside.width - r.main.width) > 1) {
+        throw new Error(`${at}: .aside measures ${r.aside.width}px and .main ${r.main.width}px — one column means one width, and a mismatched pair is a second track`);
+      }
+
+      if (width !== 640) return;
+
+      /* -------------------------------------------------- sm 640: three tracks, the portrait beside */
+      if (r.headDisplay.indexOf("grid") < 0 || r.headTracks.length !== 3) {
+        throw new Error(
+          `${at}: .head computes to display ${JSON.stringify(r.headDisplay)} and the tracks ${JSON.stringify(r.headTracks)} — the sm block's three-track head (320px cover | name | menu) is not in force, so the portrait is still stacked over the name at the one width the ladder puts it beside`,
+        );
+      }
+      const portraitTrack = parseFloat(r.headTracks[0]);
+      if (!Number.isFinite(portraitTrack) || Math.abs(portraitTrack - 320) > 1) {
+        throw new Error(
+          `${at}: the head's first track resolves to ${JSON.stringify(r.headTracks[0])} (tracks ${JSON.stringify(r.headTracks)}), not the 320px cover column the sm block declares`,
+        );
+      }
+      if (Math.abs(r.portrait.top - r.identity.top) > 2) {
+        throw new Error(
+          `${at}: .portrait starts at top ${r.portrait.top} and the identity at ${r.identity.top} — they are stacked, not side by side (the sm block moves the portrait to column 1 and the name to column 2 of row 1)`,
+        );
+      }
+      if (!(r.identity.left >= r.portrait.right - 0.5)) {
+        throw new Error(
+          `${at}: the identity starts at left ${r.identity.left} and the portrait ends at ${r.portrait.right} — the name is not to the right of the cover`,
+        );
+      }
+      if (r.titleFont !== "34px") {
+        throw new Error(`${at}: h1.title computes to ${JSON.stringify(r.titleFont)}, not the 34px the sm block declares (it is 26px below 640)`);
+      }
+      if (r.proseFont !== "15px") {
+        throw new Error(`${at}: .prose computes to ${JSON.stringify(r.proseFont)}, not the 15px the sm block declares (it is 14px below 640)`);
+      }
+      // The lorebook's entry text is the one extra line the sm block widens, and only that page has it.
+      if (r.entryFont !== "" && r.entryFont !== "15px") {
+        throw new Error(`${at}: .entry-text computes to ${JSON.stringify(r.entryFont)}, not the 15px the lorebook's sm block declares`);
+      }
+      for (const [name, action] of [
+        ["vote", r.vote],
+        ["save", r.save],
+      ]) {
+        if (!action) {
+          throw new Error(`${at}: the story has no .${name} control on this page, so the sm block's flex sizing measured nothing`);
+        }
+        if (action.minWidth !== "132px") {
+          throw new Error(`${at}: .${name} computes min-width ${JSON.stringify(action.minWidth)}, not the 132px the sm block declares (it is 96px below 640)`);
+        }
+        if (action.flexGrow !== "0") {
+          throw new Error(`${at}: .${name} computes flex-grow ${JSON.stringify(action.flexGrow)}, not the 0 of the sm block's flex: 0 0 auto — a growing pair is the phone's full-width row`);
+        }
+      }
     };
 
-    const phoneEvidence = (label, r) =>
-      `${label} "${r.title}" at ${widthOf.phone}: .cols ${JSON.stringify(r.colsDisplay)} ${JSON.stringify(r.colsFlow)} → ${r.colsTracks.length} track(s), aside top ${r.aside.top} < main top ${r.main.top}, both ${r.aside.width}px inside the outlet ${r.outlet.left}–${r.outlet.right}, ${
-        r.countCells >= 0 ? `${r.countCells} count cells` : "no .counts block"
-      }, scrollWidth ${r.scrollWidth}/${r.innerWidth}`;
+    const evidence = (label, r, width) => {
+      const base = `${label} "${r.title}" at ${width}: .cols ${JSON.stringify(r.colsDisplay)} ${JSON.stringify(r.colsFlow)} → ${JSON.stringify(r.colsTracks)}, aside top ${r.aside.top} vs main ${r.main.top}, both ${r.aside.width}px inside the outlet ${r.outlet.left}–${r.outlet.right}`;
+      const counts = r.countCells >= 0 ? `${r.countCells} count cells` : "no .counts block";
+      const type = `title ${r.titleFont} / prose ${r.proseFont}${r.entryFont ? ` / entry ${r.entryFont}` : ""}`;
+      const actions = `vote ${r.vote ? `${r.vote.minWidth} grow ${r.vote.flexGrow}` : "none"}, save ${r.save ? `${r.save.minWidth} grow ${r.save.flexGrow}` : "none"}`;
+      if (width === 640) {
+        return `${base} · .head ${JSON.stringify(r.headDisplay)} → ${JSON.stringify(r.headTracks)}, portrait right ${r.portrait.right} ≤ identity left ${r.identity.left}, tops ${r.portrait.top}/${r.identity.top}, ${type}, ${actions}, scrollWidth ${r.scrollWidth}/${r.innerWidth}`;
+      }
+      return `${base}, ${counts}, ${type}, ${actions}, scrollWidth ${r.scrollWidth}/${r.innerWidth}`;
+    };
 
     let seen = "";
-    const phones = [];
+    const lines = [];
     try {
-      /* ---------------------------------------------- phone: one column, aside lifted above main */
-      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.phone, height: 740, deviceScaleFactor: 1, mobile: false });
-      await sleep(260); // the media queries settle in two frames; a width read too early is the old box
-      const phone = await read();
-      assertPhone(phone, { label: "character", path: DETAIL_SPLIT_PATH, counts: "require" });
-      phones.push(phoneEvidence("character", phone));
-
-      /* -------------------------------------- desktop: two tracks, the aside beside the description */
-      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.desktop, height: 740, deviceScaleFactor: 1, mobile: false });
-      await sleep(260);
-      const desk = await read();
-      if (desk.innerWidth !== widthOf.desktop) {
-        throw new Error(`the override asked for ${widthOf.desktop} and the page measured ${desk.innerWidth}`);
-      }
-      if (desk.colsDisplay.indexOf("grid") < 0 || desk.colsTracks.length !== 2) {
-        throw new Error(
-          `at ${widthOf.desktop}px .cols computes to display ${JSON.stringify(desk.colsDisplay)} → the tracks ${JSON.stringify(desk.colsTracks)} — the lg composition never turns on, so the detail page is a stretched phone with a 360-wide reading column`,
-        );
-      }
-      const column = parseFloat(desk.colsTracks[1]);
-      if (!Number.isFinite(column) || Math.abs(column - 320) > 1) {
-        throw new Error(`at ${widthOf.desktop}px the second track resolves to ${JSON.stringify(desk.colsTracks[1])} (tracks ${JSON.stringify(desk.colsTracks)}), not the 320px aside the page declares`);
-      }
-      if (!(desk.aside.left >= desk.main.right - 0.5)) {
-        throw new Error(
-          `at ${widthOf.desktop}px .aside spans ${desk.aside.left}–${desk.aside.right} and .main ends at ${desk.main.right} — the aside is not beside the description, it is under it (grid-column: 2 is the rule that places it)`,
-        );
-      }
-      if (Math.abs(desk.aside.top - desk.main.top) > 2) {
-        throw new Error(`at ${widthOf.desktop}px .aside starts at top ${desk.aside.top} and .main at ${desk.main.top} — the two columns do not start on the same row (grid-row: 1 for both)`);
-      }
-      if (desk.main.left < desk.outlet.left - 0.5 || desk.aside.right > desk.outlet.right + 0.5) {
-        throw new Error(
-          `at ${widthOf.desktop}px the columns spill outside the outlet: main ${desk.main.left}–${desk.main.right}, aside ${desk.aside.left}–${desk.aside.right}, outlet ${desk.outlet.left}–${desk.outlet.right}`,
-        );
-      }
-      if (desk.countCells !== 4) {
-        throw new Error(`at ${widthOf.desktop}px the engagement block draws ${desk.countCells} .count cell(s), not four`);
-      }
-      if (desk.scrollWidth > desk.innerWidth) {
-        throw new Error(`at ${widthOf.desktop}px the document scrolls horizontally: scrollWidth ${desk.scrollWidth} > innerWidth ${desk.innerWidth}`);
-      }
-
-      /* -------- phone arm of the two other catalogue detail pages, each running its OWN copy ---- */
-      // The override is browser-level and survives `go()`, so it is re-taken for each phase and each
-      // reading asserts `innerWidth` — a reading that falls through to the session's own ~500px
-      // would measure a page nobody ships.
-      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.phone, height: 740, deviceScaleFactor: 1, mobile: false });
-      await sleep(260);
-      for (const target of SPLIT_COPIES) {
-        await go(target.path);
-        await waitFor(
-          'document.querySelector(".detail .cols .main") !== null && document.querySelector(".detail .cols .aside") !== null && (document.querySelector(".detail h1.title") || {}).textContent.trim() !== ""',
-          `the ${target.label} detail page's .main + .aside composition and its h1.title`,
-          12000,
-        );
-        const copyPhone = await read();
-        assertPhone(copyPhone, { label: target.label, path: target.path, counts: "read" });
-        phones.push(phoneEvidence(target.label, copyPhone));
-      }
-
-      /* ------------- the two other catalogue detail pages at 1200, each running its OWN copy */
-      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.desktop, height: 740, deviceScaleFactor: 1, mobile: false });
-      await sleep(260);
-      const copies = [];
-      for (const target of SPLIT_COPIES) {
-        await go(target.path);
-        await waitFor(
-          'document.querySelector(".detail .cols .main") !== null && document.querySelector(".detail .cols .aside") !== null && (document.querySelector(".detail h1.title") || {}).textContent.trim() !== ""',
-          `the ${target.label} detail page's .main + .aside composition and its h1.title`,
-          12000,
-        );
-        const copy = await read();
-        if (copy.innerWidth !== widthOf.desktop) {
-          throw new Error(
-            `${target.label}: the override is meant to stay live across the mount, but the page measured ${copy.innerWidth}px instead of ${widthOf.desktop}px`,
+      // Width-major. The override is browser-level and survives `go()`, so it is taken **once per
+      // width** and every reading still asserts `innerWidth` — a reading that fell through to the
+      // session's own ~500px would measure a page nobody ships.
+      for (const width of SPLIT_WIDTHS) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260); // the media queries settle in two frames; a width read too early is the old box
+        for (const page of SPLIT_PAGES) {
+          await go(page.path);
+          await waitFor(
+            'document.querySelector(".detail .cols .main") !== null && document.querySelector(".detail .cols .aside") !== null && (document.querySelector(".detail h1.title") || {}).textContent.trim() !== ""',
+            `the ${page.label} detail page's .main + .aside composition and its h1.title at ${width}px`,
+            12000,
           );
+          const reading = await read();
+          assertSplit(reading, { label: page.label, path: page.path, width, counts: page.counts });
+          lines.push(evidence(page.label, reading, width));
         }
-        if (!copy.path.endsWith(target.path)) {
-          throw new Error(`${target.label}: the row mounted ${JSON.stringify(copy.path)}, not ${target.path} — those are different pages`);
-        }
-        if (copy.title === "") {
-          throw new Error(`${target.label}: the page prints no .detail h1.title at ${widthOf.desktop}px, so the composition measured is a skeleton or the not-found arm`);
-        }
-        if (copy.colsDisplay.indexOf("grid") < 0 || copy.colsTracks.length !== 2) {
-          throw new Error(
-            `${target.label}: at ${widthOf.desktop}px .cols computes to display ${JSON.stringify(copy.colsDisplay)} → the tracks ${JSON.stringify(copy.colsTracks)} — this page's own lg block never turns on, so it is a stretched phone with a 360-wide reading column`,
-          );
-        }
-        const track = parseFloat(copy.colsTracks[1]);
-        if (!Number.isFinite(track) || Math.abs(track - 320) > 1) {
-          throw new Error(
-            `${target.label}: at ${widthOf.desktop}px the second track resolves to ${JSON.stringify(copy.colsTracks[1])} (tracks ${JSON.stringify(copy.colsTracks)}), not the 320px aside the page declares`,
-          );
-        }
-        if (!(copy.aside.left >= copy.main.right - 0.5)) {
-          throw new Error(
-            `${target.label}: at ${widthOf.desktop}px .aside spans ${copy.aside.left}–${copy.aside.right} and .main ends at ${copy.main.right} — the aside is not beside the description, it is under it (this file's own grid-column: 2 is the rule that places it)`,
-          );
-        }
-        if (Math.abs(copy.aside.top - copy.main.top) > 2) {
-          throw new Error(
-            `${target.label}: at ${widthOf.desktop}px .aside starts at top ${copy.aside.top} and .main at ${copy.main.top} — the two columns do not start on the same row (grid-row: 1 for both)`,
-          );
-        }
-        if (copy.scrollWidth > copy.innerWidth) {
-          throw new Error(
-            `${target.label}: at ${widthOf.desktop}px the document scrolls horizontally: scrollWidth ${copy.scrollWidth} > innerWidth ${copy.innerWidth}`,
-          );
-        }
-        // The counts block is read, never required: this row asserts only that the page it drew is the
-        // mounted one. A page that draws the engagement list must draw the four cells the spec fixes.
-        if (copy.countCells >= 0 && copy.countCells !== 4) {
-          throw new Error(`${target.label}: the engagement block draws ${copy.countCells} .count cell(s), not the four the detail spec fixes`);
-        }
-        copies.push(
-          `${target.label} "${copy.title}" → ${JSON.stringify(copy.colsTracks)} (aside ${track}px), aside left ${copy.aside.left} ≥ main right ${copy.main.right}, tops ${copy.aside.top}/${copy.main.top}, ${
-            copy.countCells >= 0 ? `${copy.countCells} count cells` : "no .counts block"
-          }, scrollWidth ${copy.scrollWidth}/${copy.innerWidth}`,
-        );
       }
-
-      seen = `${copies.join(" · ")} · ${phones.join(" · ")} · character "${desk.title}" at ${widthOf.desktop}: .cols grid → ${JSON.stringify(desk.colsTracks)} (aside ${column}px), aside left ${desk.aside.left} ≥ main right ${desk.main.right}, tops ${desk.aside.top}/${desk.main.top}, ${desk.countCells} count cells, scrollWidth ${desk.scrollWidth}/${desk.innerWidth}`;
+      seen = lines.join(" · ");
     } finally {
       await send("Emulation.clearDeviceMetricsOverride");
       await sleep(240);

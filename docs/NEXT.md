@@ -1,62 +1,66 @@
 # Baton — what the next session does
 
-**T-76 landed.** Row 54 was **extended** for the third time, not duplicated: its character-only phone
-block became one shared `assertPhone(r, { label, path, counts })` plus a `phoneEvidence()` printer,
-and the row now walks **character 360 → character 1200 → the lorebook/preset pair at 360 → the pair at
-1200**, re-taking the override at each phase (four, not six) and asserting `innerWidth` on every
-reading instead of assuming the width carried over `go()`. Measured at 360: lorebook aside **545.58**
-< main **723.38**, preset **515.69** < **641.48**, character **572.38** < **802.17**, all three 308px
-inside the 340px outlet, four `.count` cells each, `scrollWidth 350/360`. The red proof was the
-ticket's own edit and it **worked**: deleting `.aside { order: -1 }` from `preset-detail.tsrx`'s base
-block red-lit **row 54 alone** (54 PASS / 1 FAIL) reading *"preset at 360px: .aside sits at top
-1102.64 and .main at top 515.69"*. No page file changed — both pages were right, the **measurement**
-was what was missing. `check.sh` GREEN, 55/55 local, 55/55 `--live`, `publish.sh` → `LIVE` (asset
-`index-DPoxP2Sr.js`), `curl` 200.
+**T-77 landed.** Row 54 was **reshaped, not duplicated** — `EXPECTED_ROWS` stays **55** — and it is the
+third extension of the same row. The four page-major phases became **width-major**:
+`SPLIT_WIDTHS = [360, 640, 1200]` takes one browser-level override per width and mounts character,
+lorebook and preset inside it, so nine readings cost **three** overrides where the old shape cost four.
+`assertPhone()` became `assertSplit(r, { label, path, width, counts })`, and the one `read()` grew
+`headDisplay`/`headTracks`/`portrait`/`identity`/`titleFont`/`proseFont`/`entryFont`/`vote`/`save`/
+`start` rather than forking a second reader. Measured at 640 on all three pages identically: `.head`
+`grid → ["320px","168px","44px"]`, portrait right **344** ≤ identity left **364**, tops **80/80**,
+title **34px**, prose **15px** (lorebook entry **15px**), vote/save **132px grow 0**, `.cols` still the
+phone `flex column` (aside top **469** < main **594.8**, both **572** inside the 620px outlet),
+`scrollWidth 630/640`. At 360 the same pages read title `26px`, prose `14px`, vote/save `96px grow 1`;
+at 1200 `["362px","320px"]`. The red proof was the ticket's own edit and it **worked**, with a twist
+worth carrying: deleting `grid-template-columns: 320px minmax(0, 1fr) auto;` from `preset-detail.tsrx`'s
+`sm` block red-lit **row 54 alone** (54 PASS / 1 FAIL) at the **first-track** assertion reading
+*"preset at 640px: the head's first track resolves to \"290.797px\" (tracks [\"290.797px\",\"197.203px\",\"44px\"]),
+not the 320px cover column the sm block declares"* — the **count** stayed three, because the base
+placement gives `.menu-btn` an implicit third column, so a row that only counted tracks would have
+walked green. No page file changed. `check.sh` GREEN, 55/55 local, 55/55 `--live`, `publish.sh` →
+`LIVE` (asset `index-DPoxP2Sr.js`, unchanged because no built source moved), `curl` 200.
 
-## T-77 — the same three pages' `sm 640` arm has never been rendered either
+## T-78 — `/user/[handle]`'s `sm 640` head has never been rendered either
 
-**Why it is next.** The three catalogue detail pages each keep a **second** media block nobody reads:
-`@media (min-width: 640px)` rewrites `.head` from two tracks to **three** — `320px minmax(0, 1fr)
-auto`, with `.portrait` moving from `grid-column: 1 / -1` (a full-width cover above the name) into
-column 1 **beside** the identity, `.identity-text` from row 2 to `column 2 / row 1`, and `.menu-btn`
-into column 3. The same block sets `.title` **26px → 34px**, `.prose` **14px → 15px** (lorebook also
-`.entry-text` 15px), and `.vote`/`.save` from `flex: 1 1 auto; min-width: 96px` to **`flex: 0 0 auto;
-min-width: 132px`**. Row 54 measures 360 and 1200 only, so today a deleted `grid-template-columns` in
-that block leaves the portrait over the name at 640 — the one width the design's own ladder defines —
-and `check.sh`, all 55 rows and the live walk stay green. This is the third and **last** unrendered
-arm of these three files (base and `lg` are walked since T-76/T-75), so it closes the class.
+**Why it is next.** `user-profile.tsrx` keeps a `@media (min-width: 640px)` block that turns
+`.profile-head` from **two** tracks with the action on its own second row (`56px minmax(0, 1fr)`,
+areas `"avatar who"` / `"action action"`) into **three** tracks on **one** row
+(`72px minmax(0, 1fr) auto`, areas `"avatar who action"`, gap 18), raises `.name` 22 → **26px**,
+right-aligns `.head-action` and centres `.pager` with a 200px minimum inside it. No row has ever
+rendered it: rows 45–47 mount `/user/<own>` at the walk's own ~500px — **below** 640 — and they read
+names, figures, tabs and lists, never the head's geometry. So deleting
+`grid-template-areas: "avatar who action";` walks green while the action drops back onto its own row
+at 640 and `.name` shrinks to 22px: the Save/Edit pair sits *under* the name on the width that exists
+to put it beside.
 
-**Approach.** Extend row 54 again (no new row; `EXPECTED_ROWS` stays **55**). Go **width-major**:
-`mount + read + assert` for all three pages at 360, then the same at 640, then at 1200 — **three**
-overrides for nine mounts, which is fewer overrides than the row takes today and is the shape a fourth
-width would slot into. Factor the current `assertPhone` into `assertSplit(r, { label, path, width })`
-that reads the width off the phase rather than closing over `widthOf.phone`; the phone half keeps its
-extra facts (`aside.top < main.top − 1`, `|aside.width − main.width| ≤ 1`) and the 640 half asserts:
-`.head` is a grid with **exactly three** tracks, the first `320` ± 1, `|portrait.top − identity.top| ≤
-2`, `identity.left ≥ portrait.right − 0.5`, the computed `font-size` of `h1.title` is `34px` and of
-`.prose` is `15px`, and `.vote`/`.save` compute `min-width: 132px` with `flex-grow: 0` (read them as
-**computed strings** — a rect cannot prove a `min-width` the row never has to fill). At 640 the
-composition is still the **phone** `.cols` (flex column, aside first), so keep those two facts in that
-phase too: the `sm` block touches `.head` and type, never `.cols`.
+**Approach.** Extend **row 46** (T-63 — no new row; `EXPECTED_ROWS` stays **55**). That row is
+read-only, presses **Cancel** and lands on `/user/<own>`, and already reads the head's name, handle
+and bio on both sides of the form, so the width phase goes **after** those assertions where it cannot
+disturb them. Take `640×740`, read the head, assert: `.profile-head` computes `grid` with **exactly
+three** tracks and the first `72 ± 1`; `|head-avatar.top − who.top| ≤ 2` and
+`who.left ≥ head-avatar.right − 0.5`; **`|head-action.top − head-avatar.top| ≤ 2`** — the action is on
+the *same row*, which is the whole `sm` fact, because the base block puts it on row 2; and `.name`
+computes **26px**. Then take `360×740` and assert the **opposite** in the same words: three tracks →
+**two**, first `56 ± 1`, **`head-action.top > head-avatar.top + 1`** (its own row, below), `.name`
+**22px**. A one-direction read cannot show a breakpoint; the pair reads it in both directions. Clear
+both overrides in one `finally` and assert `innerWidth` came back before returning.
 
-**Traps.** (a) The ladder must be **width-major**, not page-major: `go()` re-mounts but the override
-is browser-level, so a page-major 360/640/1200 per page costs nine overrides where three suffice —
-and every reading still asserts `innerWidth`, because the session's own width is ~500 (T-36a).
-(b) `read()` already returns `colsDisplay`/`colsFlow`/`colsTracks`/`countCells`; add `head` (rect),
-`headTracks`, `portrait`, `identity`, `titleFont`, `proseFont`, `voteMin`, `voteGrow` to **that same
-reader** rather than forking a second one — it runs on all three pages unchanged. (c) `.start` exists
-only on the character page and `.entry-text` only on the lorebook page; read them, never require them.
-(d) Neither copy may be pressed: they are `ada`'s content and rows 42/43 own each fixture's `…0001`.
-(e) Aim the red proof at the **track list**, not at a font size: deleting `grid-template-columns:
-320px minmax(0, 1fr) auto` from `preset-detail.tsrx`'s `sm` block leaves the base rule's two tracks,
-so the count is 2 — but **check the green run's evidence line first** (T-75's suggested edit was
-inert; T-76's was not) and aim at `.portrait { grid-column: 1 }` → `1 / -1` as the fallback if the
-track count does not move.
+**Traps.** (a) The classes are `.head-avatar`, `.who`, `.head-action`, `.name` — **not** `.avatar`; the
+disc's own size is the `Avatar size={56}` prop, so the 72px column is the thing the grid declares, not
+the circle. (b) Read `.pager` only when a tab draws one — its inner box is the 200px minimum and a tab
+with no pages draws none. (c) `/user/you` is the viewer's own profile, so the head draws **Personas**
++ **Edit profile**, never Follow: assert geometry, not a label, or a rename row (`ownHandle()`) reds
+this one for the wrong reason. (d) `go()` is not needed — Cancel already landed the row on the
+profile — but the override is browser-level, so re-take it and assert `innerWidth` on every reading
+instead of assuming the width survived the form. (e) Aim the red proof at `grid-template-areas`, not
+at the track list: the three tracks come from `grid-template-columns`, so deleting *that* leaves two
+tracks while the areas still name three columns, and the count assertion fires on an edit whose
+consequence the message does not describe.
 
-**Accept.** Red first: delete `grid-template-columns: 320px minmax(0, 1fr) auto;` from
-`preset-detail.tsrx`'s `sm 640` block → **row 54 alone** red, naming the preset page, the width and
-the track list it read. Bytes restored (`cmp`), `check.sh` GREEN, **55/55** local and **55/55**
-`--live` (no new row), `publish.sh` prints `LIVE`, `curl` 200.
+**Accept.** Red first: delete `grid-template-areas: "avatar who action";` from `user-profile.tsrx`'s
+`sm 640` block → **row 46 alone** red, naming `/user/<handle>`, `640px` and the two tops it read.
+Bytes restored (`cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row),
+`publish.sh` prints `LIVE`, `curl` 200.
 
 **Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
 owner's — see *Open decisions*. Do not invent tags to make a row pass.
@@ -84,20 +88,24 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
 
 ## Open decisions
 
-- **T-77 is the ticket: the three catalogue detail pages' `sm 640` arm (a three-track `.head`
-  with the portrait beside the identity, 34px title, 132px actions) has never been rendered.**
+- **T-78 is the ticket: `/user/[handle]`'s `sm 640` head (72px avatar | name | action on one row,
+  26px name) has never been rendered.** Rows 45–47 read that page at the walk's own ~500px, i.e.
+  always below the breakpoint, so the `sm` block's `grid-template-areas` is a declaration nothing
+  can go red on.
   Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
   T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every route now has a row (48 the character catalog,
   49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and `/persona`, 52 `/terms`, **53
-  its desktop rail**, **54 the three catalogue detail pages' `.main` + `.aside` at 360 and 1200**,
-  **55 the moderation case's `md 900` flex row**), every bank entry that can be walked is walked, and
-  the word break has a gate section (10). What is left is *copies of the same rules in other files*:
-  T-75 closed the `lg` half for all three detail pages, so what remains is the **phone** half of the
-  two pages it mounted, and whatever the gate or the walk finds next. The rest of the plan waits on
-  Supabase (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep
-  link dependency and `Ctrl/Cmd+K`, the tag vocabulary).
+  its desktop rail**, **54 the three catalogue detail pages' `.main` + `.aside` at 360, 640 and
+  1200**, **55 the moderation case's `md 900` flex row**), every bank entry that can be walked is
+  walked, and the word break has a gate section (10). What is left is *copies of the same rules in
+  other files*: T-75/T-76/T-77 closed base, `lg` **and** `sm` for the three detail pages, so the same
+  argument now points at the **other** pages whose `sm 640` block no row has ever rendered —
+  `user-profile` is T-78, and 33 page files still carry one — plus whatever the gate or the walk
+  finds next. The rest of the plan waits on Supabase (T-29…T-32), the Android toolchain
+  (T-35/T-36/T-39) or an owner decision (T-33B's deep link dependency and `Ctrl/Cmd+K`, the tag
+  vocabulary).
 - **The tag field's press is blocked on a decision, not on work.** Every lorebook and preset
   fixture ships `tags: []`, and `schema.ts`'s own comment says they stay empty *while the taxonomy is
   undecided* — so `listTags("lorebook")` / `("preset")` answer `[]`, the picker opens its empty
@@ -107,12 +115,12 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   either record a tag vocabulary for lorebooks and presets in `docs/DESIGN.md` (and then a ticket
   seeds two or three tags, leaving one card tagless so `catalog.md`'s *an item with none renders no
   row and no placeholder* finally has a target) or accept that the press stays unwalkable.
-- **Row count is 55 after T-74 — T-75 and T-76 added none.** `scripts/smoke.mjs` keeps it in an explicit
+- **Row count is 55 after T-74 — T-75, T-76 and T-77 added none.** `scripts/smoke.mjs` keeps it in an explicit
   `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
   adding a near-copy of it, and bump the count only when a row is genuinely new (**T-61 added row 44;
   T-62 added 45; T-63 added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 added 50; T-68
   added 51; T-69 adds none; T-71 added 52; T-72 added 53; T-73 added 54; T-74 added 55; T-75 adds
-  none; T-76 adds none**). **Row 55 (T-74) is read-only  and takes two overrides of its own** (`900×740`,
+  none; T-76 adds none; T-77 adds none**). **Row 55 (T-74) is read-only  and takes two overrides of its own** (`900×740`,
   `1200×740`): it opens the concluded case
   `/moderation/4e90047a-…0002?admin=1`, presses no decision control and writes no store row, clears
   both overrides in a `finally` and asserts `innerWidth` came back — anything after it may assume no
@@ -175,16 +183,17 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   `1200×740`), clears them in a `finally`, and asserts `innerWidth` came back before it returns — a
   later row may assume no override is in play and no `.contents` width is pinned. It leaves the
   reader on `/terms` at the old position (`go()` pushes), and row 54 must therefore navigate itself.
-- **Row 54 (T-73, extended by T-75 and T-76) is read-only and takes four overrides of its own**
-  (`360×740`, `1200×740`, then `360×740` again for the two copies, then `1200×740`). It opens
+- **Row 54 (T-73, extended by T-75, T-76 and T-77) is read-only and takes three overrides of its
+  own** (`360×740`, `640×740`, `1200×740` — **width-major**, one override per width with all three
+  pages mounted inside it, so nine readings cost three overrides). It opens
   `/character/c0a1b2c3-0000-4000-8000-000000000002` (row 40 leaves one Like there, so nothing reads a
   count as the fixture's), presses nothing, writes no store row and no preference, clears every
   override in one `finally`, and asserts `innerWidth` came back before it returns — anything after it
-  may assume no override is in play. Since T-75 it also mounts `/lorebook/…0002` and `/preset/…0002`
-  as a **pair at each width** and leaves the reader on the **preset** page (`go()` pushes), so a row
-  added after it must navigate itself; row 55 and the sign-out row both do. Since T-76 the phone
-  assertions are one shared `assertPhone()`, so a new width phase should parameterise that function
-  rather than fork a second copy of the facts.
+  may assume no override is in play. Since T-75 it also mounts `/lorebook/…0002` and `/preset/…0002`,
+  and since T-77 it **leaves the reader on the preset page** (`go()` pushes), so a row added after it
+  must navigate itself; row 55 and the sign-out row both do. The three arms are one shared
+  `assertSplit(r, { label, path, width, counts })`, so a new width is one entry in `SPLIT_WIDTHS`
+  plus one branch — never a second copy of the facts.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.
@@ -271,6 +280,18 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A leftover `grid-column: 3` keeps the track COUNT at three after `grid-template-columns` is gone
+  (T-77).** Deleting the `sm` block's `grid-template-columns: 320px minmax(0, 1fr) auto` left the
+  base `minmax(0, 1fr) auto`, but `.menu-btn { grid-column: 3 }` — a line of the *same* block — then
+  created an **implicit** third track: the head read `["290.797px","197.203px","44px"]`. A row that
+  only counted tracks would have walked **green** on the bug; the assertion that caught it is the
+  **fixed track's size** (`|tracks[0] − 320| ≤ 1`). Count the tracks *and* size the one the block
+  declares, in that order, and never treat "three tracks" as proof that a three-track rule is live.
+- **Walk width-major, not page-major (T-77).** `go()` remounts but the `Emulation` override is
+  browser-level, so `[360, 640, 1200] × {character, lorebook, preset}` costs **three** overrides and
+  nine mounts, where a page-major loop costs nine overrides for the same readings. It also makes the
+  evidence line read as the ladder the design is drawn on. Every reading still asserts `innerWidth`
+  — the session's own tab is ~500px, so a dropped override is invisible otherwise.
 - **An explicit placement on *one* item makes the other item's `grid-column` inert (T-75).** `.main`
   is placed at `grid-column: 1; grid-row: 1`, so `.aside { grid-row: 1 }` auto-places into the only
   free cell of row 1 — column 2 — whether or not it says `grid-column: 2`. Deleting that declaration
