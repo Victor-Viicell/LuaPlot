@@ -6213,6 +6213,165 @@ results.push(
   }),
 );
 
+/* ------------------------------------------------------------------------------------------------
+ * T-71 — `/terms` is the one route no row had ever mounted.
+ *
+ * `src/router.ts` against this file leaves exactly one page: `/terms` appeared nowhere, and it is the
+ * page T-69's word-break class broke twice by hand (*Finishingonboardingis the acceptance*,
+ * *beside Finish*). Gate section 10 proves the **bundle** has no literal glued to an inline tag; a
+ * row proves the **sentence** a reader gets — the compile-time trim is invisible to a static scan of
+ * the source, and the copy here is the product's longest prose.
+ *
+ * Read-only: `/terms` reads no store, writes no preference, takes no override and commits no query.
+ * It adds one history entry (the push into `/onboarding`) and gives it back with the Back press.
+ *
+ * Three traps shape it:
+ *  - `/terms` draws no `.detail` wrapper, so the page is keyed on `.kicker` + `h1.title` **and** the
+ *    absence of `.detail` — a shared root class is not a landmark (T-51, `CommentThread`'s `.thread`);
+ *  - the copy is long, so whitespace is collapsed **in Node**, never inside the page template: a
+ *    `\s` written in a `js(…)` template literal is the double-escaping trap that has cost two
+ *    sessions already (T-49), and doing it here means the page expression carries no escapes at all;
+ *  - `TERMS_RULES`' titles are the product's, not this row's: they are read from the page, and only
+ *    their count and distinctness are asserted.
+ * ---------------------------------------------------------------------------------------------- */
+const TERMS_PATH = "/terms";
+/** The five notes, in the page's own order — a deleted or reordered section is a red row. */
+const TERMS_SECTION_IDS = [
+  "where-the-line-sits",
+  "what-the-rules-apply-to",
+  "what-the-flag-covers",
+  "accepting-the-terms",
+  "how-enforcement-works",
+];
+
+results.push(
+  await journey("/terms mounts the terms copy, and its one link is a push into onboarding", async () => {
+    /** Whitespace collapse in Node: the page expression below carries no backslash at all. */
+    const clean = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+
+    const read = () =>
+      js(`
+        const raw = (el) => (el ? String(el.textContent || "") : "");
+        const notes = [...document.querySelectorAll("section.note")];
+        const accepting = document.getElementById("accepting-the-terms");
+        const para = accepting ? accepting.querySelector("p") : null;
+        const link = para ? para.querySelector("a") : null;
+        return {
+          path: location.pathname + location.search,
+          kicker: raw(document.querySelector(".kicker")),
+          title: raw(document.querySelector("h1.title")),
+          lede: raw(document.querySelector(".lede")),
+          detail: !!document.querySelector(".detail"),
+          ids: notes.map((section) => section.id),
+          noteTitles: notes.map((section) => raw(section.querySelector(".note-title"))),
+          rules: [...document.querySelectorAll(".rule-title")].map((el) => raw(el)),
+          sentence: raw(para),
+          linkText: raw(link),
+          linkHref: link ? link.getAttribute("href") : "",
+          docTitle: document.title,
+        };
+      `);
+
+    /** A poll that names the route, the title and the notes it last saw (T-53: a timeout must read). */
+    const until = async (label, check, timeout = 12000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await read();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(
+        `${label} — at ${JSON.stringify(last.path)} the page read title ${JSON.stringify(clean(last.title))}, kicker ${JSON.stringify(clean(last.kicker))}, notes ${JSON.stringify(last.ids)} (document.title ${JSON.stringify(last.docTitle)})`,
+      );
+    };
+
+    const onTerms = (state) =>
+      state.path.endsWith(TERMS_PATH) &&
+      clean(state.title) === "Three prohibitions" &&
+      clean(state.kicker).toLowerCase() === "content rules";
+
+    await go(TERMS_PATH);
+    const page = await until("the terms page to mount its own heading", onTerms);
+
+    if (page.detail) {
+      throw new Error(
+        `/terms drew a .detail wrapper — this page is prose, and a row keyed on a shared class passes on another page (T-51)`,
+      );
+    }
+    if (clean(page.lede) === "") {
+      throw new Error(`/terms prints no lede — the paragraph under the title is the page's own`);
+    }
+    // The five sections, in order. A deleted one shortens the list; a reordered one moves it.
+    if (JSON.stringify(page.ids) !== JSON.stringify(TERMS_SECTION_IDS)) {
+      throw new Error(
+        `/terms draws the notes ${JSON.stringify(page.ids)}, not ${JSON.stringify(TERMS_SECTION_IDS)} — every section is mounted, in the page's order`,
+      );
+    }
+    const untitled = page.noteTitles.filter((title) => clean(title) === "");
+    if (untitled.length > 0) {
+      throw new Error(
+        `${untitled.length} of ${page.ids.length} note(s) draw no .note-title (read ${JSON.stringify(page.noteTitles.map(clean))}) — a section without its heading is a blank block`,
+      );
+    }
+    // The three prohibitions. The titles are `TERMS_RULES`' own strings, so they are read, not pinned.
+    if (page.rules.length !== 3) {
+      throw new Error(`/terms draws ${page.rules.length} .rule-title(s), not the three prohibitions`);
+    }
+    const ruleTitles = page.rules.map(clean);
+    if (ruleTitles.some((title) => title === "") || new Set(ruleTitles).size !== 3) {
+      throw new Error(
+        `the three rule cards read ${JSON.stringify(ruleTitles)} — every prohibition is named and none is repeated`,
+      );
+    }
+
+    // The clause this row exists for: the acceptance sentence's words either side of its two inline
+    // elements. `textContent` is the honest read (no `text-transform` in this paragraph) and the
+    // collapse happened above, so a missing `{" "}` stays glued as *Finishingonboarding* instead of
+    // becoming a line break the comparison would forgive.
+    const sentence = clean(page.sentence);
+    const clauses = ["Finishing onboarding is the acceptance", "beside Finish"];
+    const missing = clauses.filter((clause) => !sentence.includes(clause));
+    const glued = ["Finishingonboarding", "besideFinish"].filter((glue) => sentence.includes(glue));
+    if (missing.length > 0 || glued.length > 0) {
+      throw new Error(
+        `/terms' accepting-the-terms paragraph reads ${JSON.stringify(sentence)} — ${
+          missing.length > 0
+            ? `it is missing ${JSON.stringify(missing)}`
+            : `it runs the words either side of a tag together (${JSON.stringify(glued)}: the DOM drops a literal's boundary space beside an element, so the source needs an explicit {" "})`
+        }`,
+      );
+    }
+    if (clean(page.linkText).toLowerCase() !== "onboarding" || !page.linkHref.endsWith("/onboarding")) {
+      throw new Error(
+        `the sentence's link reads ${JSON.stringify([clean(page.linkText), page.linkHref])} — it must be the word onboarding pointing at /onboarding`,
+      );
+    }
+
+    // The press. A URL assertion cannot see a re-boot (T-45), so document identity carries it.
+    const mark = await markDocument(`terms ${stamp}`);
+    await clickSelector("#accepting-the-terms p a");
+    const landing = await waitFor(
+      `(() => {
+        const title = document.querySelector("h1.title");
+        if (!location.pathname.endsWith("/onboarding") || !title) return "";
+        const text = String(title.textContent || "").trim();
+        return text === "Claim your handle" ? { path: location.pathname + location.search, title: text } : "";
+      })()`,
+      "the onboarding heading after pressing the sentence's link",
+      12000,
+    );
+    const pushProof = await expectNoReload(mark, "pressing onboarding inside the accepting-the-terms sentence");
+
+    await js(`history.back(); return true;`);
+    const back = await until("Back from /onboarding to return to the terms heading", onTerms);
+    const backProof = await expectNoReload(mark, "Back to /terms");
+
+    return `/terms reads ${JSON.stringify([clean(page.kicker), clean(page.title)])} with a lede and the notes ${JSON.stringify(page.ids)} · the rule cards are ${JSON.stringify(ruleTitles)} · the accepting sentence reads ${JSON.stringify(sentence.slice(0, 92))}… **with its word breaks** · pressing its link pushed rather than re-booted (${pushProof}) to ${JSON.stringify(landing.title)} at ${JSON.stringify(landing.path)}, and Back returned to ${JSON.stringify(clean(back.title))} (${backProof}) · accepting-the-terms is in the DOM as an id, so a fragment link resolves (the fragment itself is a document load by design)`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -6237,9 +6396,9 @@ chrome.kill("SIGKILL");
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
  * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48, T-66: 49,
- * T-67: 50, T-68: 51).
+ * T-67: 50, T-68: 51, T-71: 52).
  */
-const EXPECTED_ROWS = 51;
+const EXPECTED_ROWS = 52;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

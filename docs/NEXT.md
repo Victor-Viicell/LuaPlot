@@ -1,69 +1,66 @@
 # Baton — what the next session does
 
-**T-70 landed.** `scripts/wordbreak-check.mjs` is **gate section 10** (`== wordbreak`), and it runs
-after the build because it reads `dist/assets/*.js`: a letter/digit/dot/paren glued to an inline
-opening tag, and a closing tag glued to the following word. Green line: `62 asset(s), 620 KB, 233
-inline tag(s); no literal is glued to an inline element`. Red proof from **one** injected copy read
-`2 literal(s) are glued to an inline element:` naming *"…page never needs a&lt;code&gt;try&lt;/code&gt;…"*
-and *"…&lt;/a&gt;if to render “nothing happened”…"*, exit 1, tree untouched.
+**T-71 landed.** `/terms` was the one route in `src/router.ts` that no row named, and the page T-69's
+word-break class broke twice by hand. Row **52** (`EXPECTED_ROWS` 52, read-only) mounts it and reads it
+as a reader does: `.kicker` *content rules* + `h1.title` *Three prohibitions* + a non-empty `.lede` and
+**no `.detail`**, the five `section.note` ids in the page's own order, a `.note-title` on each, the
+three `.rule-title`s (read from `TERMS_RULES`, asserted for count and distinctness only), and the
+accepting-the-terms paragraph's words — `Finishing onboarding is the acceptance` / `beside Finish`,
+with the glued forms named as the failure. Then a document mark, a press on the sentence's own link
+(`#accepting-the-terms p a`), the landing read as `/onboarding`'s own heading, `expectNoReload`, and
+`history.back()` back to the terms heading with the mark intact. Red first: dropping the `{" "}` before
+*is* put **row 52 alone** red (51/52) reading *"…reads "Finishing onboardingis the acceptance: …" — it
+is missing ["Finishing onboarding is the acceptance"]"*. Bytes restored, `check.sh` GREEN (section 10
+unchanged on the rebuilt bundle), `publish.sh` → `LIVE`, `curl` 200, 52/52 local and 52/52 `--live`.
 
-The guard **found an eighth site on its first run**: `dev-native.tsrx`'s lede rendered *"needs atry"*
-on `/dev/native` (`never needs a` + newline + `<code>try</code>`), so T-69's hand sweep missed one;
-its note also wrote `read<b> cancelled</b>`, which rendered correctly only because the space sits
-*inside* the element, and now writes the house shape `read{" "}<b>cancelled</b>`. Both fixed in the
-same commit. 51/51 local, 51/51 `--live`, `publish.sh` → `LIVE`, `curl` 200.
+## T-72 — `/terms`' desktop rail has never been rendered by a walk
 
-## T-71 — `/terms` is the one route no row has ever mounted
+**Why it is next.** Row 52 proves the page's *copy* at whatever width the session happens to be — the
+walk's own is 500×653 unless a row takes an override (T-36a). `/terms` is the only page in the app that
+draws a **contents rail** (`.contents`: 200px, sticky, `display: none` below 1200), and that rail is
+the page's whole answer to *"desktop responsive is mandatory, nothing is a stretched phone"*. Nothing
+has ever looked at `/terms` above 900px: a rail that overflows the 794px outlet, a
+`grid-template-columns` that lets the prose column grow past its measure, or a `display: none` that
+never turns on are all green in every gate, in all 52 rows and on the live walk. Ladder row 30
+measures `/dev/primitives`' `.rail` — the *shell's* rail, a different decision and a different
+selector.
 
-**Why it is next.** A scan of `src/router.ts` against `scripts/smoke.mjs` leaves exactly one page: the
-other unmatched paths are param routes the walk lands on with a concrete id, and `/terms` has **no
-mention anywhere in the walk** (`grep -n "terms" scripts/smoke.mjs` → nothing). It is also the page
-T-69 found this class on twice by hand — *Finishingonboardingis the acceptance* and *beside Finish* —
-so the one page whose copy is legal prose, and whose copy has already broken, is the one page nothing
-reads. Gate section 10 now proves the *bundle* has no glue; a row proves the *sentence* a reader
-gets, which is the half every walk row exists for (`/persona`'s row 51 is the shape).
+**Approach.** **Row 53** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 52 → 53), owning its own override.
+Do **not** reuse `measureAt()`: it reads `.g-sec` / `.g-grid` / `.rail` and is `/dev/primitives`-only.
+Take the two reads rows 31/32 use instead —
 
-**Approach.** Row **52**, `EXPECTED_ROWS` 51 → 52, **read-only** — `/terms` reads no store, writes no
-preference, takes no override and commits no query, so it is safe anywhere after row 51 and leaves
-nothing behind. Read from the page, never from a sketch: mount `/terms` with `go("/terms")`, then
-assert —
+- at **360×740** (`Emulation.setDeviceMetricsOverride`, then a 260ms settle): `.contents` computes to
+  `display: none`, `.doc` resolves to **one** track, `.note-body` and `.lede` are no wider than the
+  outlet, and `document.documentElement.scrollWidth === window.innerWidth`;
+- at **1200×740**: `.contents` computes to `flex` and measures ~200px wide, `.doc` resolves to **two**
+  tracks whose **second** is ≤ 720 (that is the measure rule: `minmax(0, 720px)`), the rail's
+  `.contents-link` count equals the page's heading count (three rules + five notes **today** — read
+  the ids, do not pin eight anchors), in the page's own order, and every link's `href` is a
+  **fragment** (`#copied-content` … `#how-enforcement-works`) whose id **exists in the DOM**;
+- `scrollWidth === innerWidth` at **both** widths, compared against the `innerWidth` the row read,
+  never a constant;
+- the override cleared in `finally`, then the row **asserts** `window.innerWidth` came back to the
+  value it read before the first override — a `finally` is not a proof (T-32).
 
-- the page is the terms page: `.kicker` reads **content rules**, `h1.title` **Three prohibitions**,
-  and the lede is non-empty (its exact words are the product's, not the row's);
-- the **five** `section.note` ids in order — `where-the-line-sits`, `what-the-rules-apply-to`,
-  `what-the-flag-covers`, `accepting-the-terms`, `how-enforcement-works` — each with a
-  `.note-title`, so a deleted or reordered section is red;
-- the three rule cards' `.rule-title`s are non-empty and distinct (they come from `TERMS_RULES`, so
-  read them, never pin them);
-- **the accepting-the-terms paragraph's words**, which is the clause this row exists for: it must
-  read `Finishing onboarding is the acceptance` and `beside Finish`, and must not contain
-  `Finishingonboarding` or `besideFinish`. Read that section's `p` and collapse whitespace before
-  comparing (no `text-transform` here, so `innerText` is honest);
-- the in-app link is a **push, not a load**: press *onboarding* inside that sentence, assert the
-  landing (`/onboarding`'s own heading), press Back, and poll the `/terms` heading back. A URL
-  assertion cannot see a re-boot — if a full load would otherwise pass, prove the push with document
-  identity (`window` marker + `performance.timeOrigin`, row 45's shape);
-- **no fragment navigation**: `/terms#accepting-the-terms` is a real document load on purpose
-  (`follow()` drops the fragment; `ARCHITECTURE.md` → Router carries the three `link-check`
-  exemptions), so do **not** assert a fragment press "stays in the app" — assert only that the
-  section id is in the DOM.
+A fragment press is **not** asserted as "stays in the app": `follow()` drops the fragment on purpose
+and a `/terms#anchor` link is a real document load (`ARCHITECTURE.md` → Router). The id in the DOM is
+the honest assertion.
 
-**Traps.** (a) `/terms` draws no `.detail` wrapper, so key it on `.kicker` + `h1.title`, never a
-shared class — `CommentThread.tsrx`'s `.thread` is the cautionary tale (T-51). (b) The section copy is
-long; collapse whitespace before comparing (`\\s` per template level — T-49's escaping trap), or a
-right page reads red on a line break. (c) `TERMS_RULES` titles are the product's, not the ticket's:
-read them. (d) `go("/terms")` is an app path — never `go(await url())`, which doubles the base
-(T-59). (e) Row 52 adds a history entry and nothing else, so a later row calling `history.back()`
-must not expect row 47's `?tab=following`.
+**Traps.** (a) `go("/terms")` is an app path — never `go(await url())`, which doubles the base (T-59).
+(b) `.contents` is `position: sticky` inside `.doc`, so a width read before the media query settles is
+the *hidden* box: settle two frames, as `measureAt()` does. (c) `getComputedStyle(.doc).gridTemplateColumns`
+returns the **tracks**, so read them with the same `split(" ").filter(Boolean)` the ladder row uses —
+`minmax(0, 720px)` resolves to a px value there. (d) A row that leaves the metrics override on breaks
+the sign-out row after it. (e) The labels are `TERMS_RULES`' product strings: assert **count and
+order of the ids**, never the label text.
 
-**Accept.** Red first, aimed at the copy clause: put the literal back in `terms.tsrx` (`</a> is the
-acceptance` — drop the `{" "}` before *is*) → row 52 alone red, reading the sentence it read; bytes
-restored, then `check.sh` GREEN, **52/52** local and **52/52** `--live`, `publish.sh` prints `LIVE`,
-`curl` 200, and gate section 10 stays green on the rebuilt bundle.
+**Accept.** Red first: change `.doc`'s `lg` rule in `terms.tsrx` to
+`grid-template-columns: 200px minmax(0, 1fr)` → row **53 alone** red, naming the second track it read;
+bytes restored (`git checkout --`), `check.sh` GREEN, **53/53** local and **53/53** `--live`,
+`publish.sh` prints `LIVE`, `curl` 200, and gate section 10 stays green on the rebuilt bundle.
 
 **Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
-owner's: `DESIGN.md` records it (then a ticket seeds two or three tags, leaving one card tagless) or
-row 51's chip **press** branch stays unwalkable. Do not invent tags to make a row pass.
+owner's — see *Open decisions*. Do not invent tags to make a row pass.
 
 ## Blocked — what a human must do
 
@@ -88,17 +85,18 @@ row 51's chip **press** branch stays unwalkable. Do not invent tags to make a ro
 
 ## Open decisions
 
-- **T-71 is the ticket: `/terms` is the one page no row has ever mounted.** Failure-bank
+- **T-72 is the ticket: `/terms`' desktop rail has never been rendered by a walk.** Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
-  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every page that commits a query has a row (48 the
-  character catalog, 49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and
-  `/persona`), every bank entry that can be walked is walked, and the word break now has a gate
-  section (10), so what is left unblocked is **the page nobody reads**: `/terms` is the only route
-  whose path never appears in `scripts/smoke.mjs`, and it is the page T-69's class broke twice. After
-  T-71 the unblocked work is whatever the gate or the walk finds next; the rest of the plan waits on
-  Supabase (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep
-  link dependency and `Ctrl/Cmd+K`, the tag vocabulary).
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every route now has a row (48 the character catalog,
+  49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and `/persona`, **52 `/terms`**),
+  every bank entry that can be walked is walked, and the word break has a gate section (10), so the
+  only unblocked work left is what no row has ever *rendered*: `/terms` is the one page with a
+  page-level desktop composition (a 200px contents rail beside a 720px prose column, `lg` only) and
+  no row has ever taken an override on it. After T-72 the unblocked work is whatever the gate or the
+  walk finds next; the rest of the plan waits on Supabase (T-29…T-32), the Android toolchain
+  (T-35/T-36/T-39) or an owner decision (T-33B's deep link dependency and `Ctrl/Cmd+K`, the tag
+  vocabulary).
 - **The tag field's press is blocked on a decision, not on work.** Every lorebook and preset
   fixture ships `tags: []`, and `schema.ts`'s own comment says they stay empty *while the taxonomy is
   undecided* — so `listTags("lorebook")` / `("preset")` answer `[]`, the picker opens its empty
@@ -108,11 +106,11 @@ row 51's chip **press** branch stays unwalkable. Do not invent tags to make a ro
   either record a tag vocabulary for lorebooks and presets in `docs/DESIGN.md` (and then a ticket
   seeds two or three tags, leaving one card tagless so `catalog.md`'s *an item with none renders no
   row and no placeholder* finally has a target) or accept that the press stays unwalkable.
-- **Row count is 51 after T-68.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+- **Row count is 52 after T-71.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
   it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
   added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 added 50; T-68 added 51; T-69 adds
-  none**). **Rows 36 and 37
+  none; T-71 added 52**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -161,6 +159,10 @@ row 51's chip **press** branch stays unwalkable. Do not invent tags to make a ro
   dialog still lists the account's personas only because its filter reads the constant, not because
   anything moved them. When T-30 wires Supabase, the ownership column must come from the **session**,
   never a fixture handle: a row that renames the account is the shape that catches it.
+- **Row 52 (T-71) is read-only and hands nothing over.** It no longer adds a dangling history entry:
+  the one it adds is the push it walks *into* `/onboarding`, and the row presses Back, so the walk's
+  position is where row 51 left it (the session's own width, 500×653, and no override in play). It
+  writes no store row, no preference and no query, so a later row may rely on everything it read.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.
@@ -239,6 +241,15 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **Collapse whitespace in Node, not inside a `js(…)` template (T-71).** A page expression is a
+  template literal, so `\\s` written there unescapes once before `Runtime.evaluate` ever sees it — the
+  T-49 trap, twice over. Row 52 reads `textContent` raw and collapses with a plain regex in the walk,
+  where a regex needs no escaping at all; the page expression then carries no backslash and the copy
+  comparison cannot break on a line wrap. Do that for any new row that compares prose.
+- **`measureAt()` is `/dev/primitives`' ladder, not a general viewport helper (T-71).** It reads
+  `.g-sec`, `.g-grid` and the shell's `.rail`, so a page-level layout (e.g. `/terms`' `.doc` grid)
+  needs its own override + read pair and its own `finally`. The *shape* to copy is rows 31/32, not
+  the function.
 - **A hand sweep's "zero today" is a hypothesis too (T-70).** T-69's baton recorded that its two
   greps over `dist/assets/*.js` read zero after the fix; the **same** two greps on the same build read
   **two** hits, both in `dev-native.tsrx`'s prose. The scanner then found a real eighth site —

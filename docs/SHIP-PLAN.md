@@ -634,6 +634,33 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-71 /terms is the one route no row had ever mounted.**
+      `pages/terms.md` is pure copy — three prohibitions and five notes — and it is the page T-69's
+      word-break class broke twice by hand (*Finishingonboardingis the acceptance*, *beside Finish*),
+      yet `grep -n "terms" scripts/smoke.mjs` was empty: `/terms` was the last route in
+      `src/router.ts` no row named. Gate section 10 proves the **bundle** carries no literal glued to
+      an inline tag; a row proves the **sentence**, the half every walk row exists for. Row **52**
+      (`EXPECTED_ROWS` 51 → 52, **read-only**) mounts `go("/terms")` and asserts the page by its own
+      marks (`.kicker` *content rules* + `h1.title` *Three prohibitions* + a non-empty `.lede` +
+      **no `.detail`**, so a page sharing a root class cannot pass), the five `section.note` ids in
+      the page's own order with a `.note-title` on each, the three `.rule-title`s (read from
+      `TERMS_RULES`, asserted only for count and distinctness), and the accepting-the-terms
+      paragraph's words — `Finishing onboarding is the acceptance` / `beside Finish`, with
+      `Finishingonboarding` and `besideFinish` named as the failure. Whitespace is collapsed **in
+      Node**, never inside the `js(…)` template, so the page expression carries no regex and the T-49
+      double-escaping trap cannot reach it. Last half: a document-identity mark, a press on the
+      sentence's own link, the landing read as `/onboarding`'s heading (*Claim your handle*),
+      `expectNoReload` (a URL match cannot see a re-boot), then `history.back()` polling back to the
+      terms heading with the mark intact. Red first, aimed at the copy clause: dropping the `{" "}`
+      before *is* put **row 52 alone** red (51/52) reading *"/terms' accepting-the-terms paragraph
+      reads \"Finishing onboardingis the acceptance: …\" — it is missing [\"Finishing onboarding is the
+      acceptance\"]"*. Bytes restored, `check.sh` **GREEN** (section 10 on the rebuilt bundle: `62
+      asset(s), 620 KB, 233 inline tag(s); no literal is glued to an inline element`), `publish.sh` →
+      `LIVE`, `curl` **200**, 52/52 local and 52/52 `--live`. Brief: `docs/NEXT.md` (T-71).
+      Found: `/terms` is the only page with a page-level desktop composition (a 200px contents rail
+      beside a 720px prose column, `lg` only) and no row has ever taken an override on it — filed as
+      **T-72**.
+
 - [x] **T-70 The word break between a literal and an element had no guard.**
       T-69 fixed seven sites by hand and only `/persona` had a row that would notice the bug coming
       back; the argument this repo has answered twice (T-46's `link-check.mjs`, T-48's

@@ -3,6 +3,34 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-71: `/terms` is mounted by a row, and its one clause is proved twice
+
+- **Changed:** `scripts/smoke.mjs` — **row 52** (`EXPECTED_ROWS` 51 → 52), the last route in
+  `src/router.ts` that no row named. It mounts `go("/terms")` and asserts the page by its own marks
+  (`.kicker` *content rules*, `h1.title` *Three prohibitions*, a non-empty `.lede`, **no `.detail`**),
+  the five `section.note` ids **in the page's own order** each with a `.note-title`, the three
+  `.rule-title`s read from `TERMS_RULES` (count + distinctness, never pinned text), and the
+  accepting-the-terms paragraph's words (`Finishing onboarding is the acceptance` / `beside Finish`,
+  with `Finishingonboarding` / `besideFinish` named as the failure). Whitespace is collapsed **in
+  Node**, so the page expression carries no regex and the T-49 double-escaping trap cannot reach it.
+  Then a document mark (`markDocument`), a press on the sentence's own link
+  (`#accepting-the-terms p a`), the landing read as `/onboarding`'s heading, `expectNoReload`, and
+  `history.back()` polling back to the terms heading with the mark intact. Read-only: no override, no
+  store write, no preference, no query. `docs/NEXT.md` rewritten for T-72, `SHIP-PLAN.md` ticked.
+- **Verified:** red first, aimed at the copy clause — dropping the `{" "}` before *is* in
+  `terms.tsrx` gave **51/52** with **row 52 alone** failing: *"/terms' accepting-the-terms paragraph
+  reads \"Finishing onboardingis the acceptance: …\" — it is missing [\"Finishing onboarding is the
+  acceptance\"]"*; bytes restored with `git checkout -- src/pages/terms.tsrx` (the `{" "}` greps back
+  at line 400). Then **52/52** local (`./scripts/smoke.sh`) and **52/52** `--live`,
+  `./scripts/check.sh` → **GREEN** (section 10 on the rebuilt bundle: `62 asset(s), 620 KB, 233
+  inline tag(s); no literal is glued to an inline element`), `publish.sh` → `LIVE` with
+  `assets/index-DPoxP2Sr.js`, and `curl` the site root → **200**.
+- **Not verified:** the dynamic half of the word break (`{n}<strong>followers</strong>` — a value with
+  no trailing space glues exactly like a literal, and no scan can see it) is still unguarded; the
+  fragment link on `/terms` is asserted only as *the id exists in the DOM*, because a fragment press
+  is a document load by design (`ARCHITECTURE.md` → Router). `/terms` at `lg` (its 200px contents
+  rail) has still never been rendered by a walk — filed as **T-72**.
+
 ## 2026-11-03 — T-70: the word break has a gate section, and the gate found an eighth site
 
 - **Changed:** new `scripts/wordbreak-check.mjs` (node stdlib only): scans `dist/assets/*.js` for a
