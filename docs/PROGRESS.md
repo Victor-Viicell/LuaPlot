@@ -3,6 +3,38 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-80: `/post/thread`'s `sm 640` controls are rendered in both directions
+
+- **Changed:** `scripts/smoke.mjs` only — **row 39 extended** (no new row; `EXPECTED_ROWS` stays
+  **55**). The T-55 journey's new **§7** runs after its paging half (where no read follows, and
+  nothing is pressed — a `go()` there would drop the appended page), takes `640×740` then `900×740`,
+  reads one `readControls()` at each and hands it to `assertControls(r, width)`. At 640 it asserts
+  `.controls` computes a `grid`, **exactly three** tracks with the **first `200 ± 1`**, `.sort` and
+  `.create` sharing row 1 by their **bottoms** (`|create.bottom − sort.bottom| ≤ 2`, `align-items:
+  end`), `.prefs` **below both** (the `640–899` block's `grid-row: 2`), `.prefs` starting at the
+  controls' left edge and running on **past the sort column** (its own box is content-sized —
+  `justify-self: start` — so the right edge is the pair's, not the band's), `flex-direction: row`,
+  `.feed` gap `16px` and `.pager-action`'s 200px minimum **only while the pager is drawn**. At 900 it
+  asserts the opposite direction: **four** tracks with the **first `220 ± 1`** (the `md` block), and
+  `.prefs` back on row 1 between the sort and Create. Both overrides clear in one `finally` and
+  `innerWidth` is asserted back. Measured at 640: `["200px","238.75px","85.25px"]`, gap `24px`, sort
+  `24→224` bottom `180.39`, prefs `24→445.63` top `204.39` (row), create `510.75→596` bottom
+  `180.39`, pager min-width `200px`; at 900 `["220px","421.625px","16.375px","0px"]`, sort
+  `117→337`, prefs `361→782.63`, create `737.75→823`.
+- **Verified:** red first — deleting `.prefs`' `grid-column: 1 / -1` from the range block put **row 39
+  alone** red (54 PASS / 1 FAIL) reading *"/post/thread at 640px: .prefs starts at 248 in a controls
+  box starting at 24 — the range block puts the pair across the width …, not in the middle column it
+  squeezed to 115px"* — the page, the width and both lefts, as the accept line asked. Bytes restored
+  (`cp` + `cmp` identical; `git status` shows only `scripts/smoke.mjs`), `check.sh` **GREEN** (all ten
+  sections), `./scripts/smoke.sh` **55/55**, `publish.sh` → `LIVE` (asset `index-DPoxP2Sr.js`,
+  unchanged: no built source moved), `curl` **200**, `./scripts/smoke.sh --live` **55/55**.
+- **Not verified / next:** the baton's own red proof (`grid-row: 2`) **walks green** — the pair spans
+  all three columns, so auto-placement cannot fit it on row 1 beside `.sort` and `.create` and puts
+  it on row 2 anyway; recorded in `docs/NEXT.md`. `.feed`'s 12px base gap and the 360 stacking are
+  unread (row 39 runs at the session's ~500px and asserts nothing there). At 900 the `md` block
+  declares four tracks but `.create` stays in column 3, so **track 4 resolves `0px`** and the button
+  still ends the row — measured, not a bug. No new dependency, no schema/adapter/JEV change.
+
 ## 2026-11-03 — T-79: `/bookmarks`' `sm 640` toolbar is rendered in both directions
 
 - **Changed:** `scripts/smoke.mjs` only — **row 50 extended** (no new row; `EXPECTED_ROWS` stays

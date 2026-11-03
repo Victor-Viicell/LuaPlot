@@ -3172,8 +3172,11 @@ results.push(
  * entry at all (it leaves the thread instead of returning to a loaded page), and a return that reads
  * the first page again.
  *
- * Read-only: no store write, no CDP override, no probe. Ends on `/post/thread` with no query, and
- * sits after row 38 and before `sign out`, so `sign out` stays the walk's last row.
+ * Read-only: no store write, no probe. **T-80 adds two metrics overrides** (`640×740`, `900×740`) at
+ * the very end — after the paging half, where no read follows — reading `.controls` in both
+ * directions; they are cleared in one `finally` and `innerWidth` is asserted back. Ends on
+ * `/post/thread` with no query, and sits after row 38 and before `sign out`, so `sign out` stays the
+ * walk's last row.
  * -------------------------------------------------------------------------------------------- */
 const THREAD_PATH = "/post/thread";
 
@@ -3433,7 +3436,183 @@ results.push(
       );
     }
 
-    return `?sort=discussed loads by address with the control on discussed (${shared.cards} cards) · newest writes no param (search "") · press discussed → ?sort=discussed, ${discussed.cards} card(s) re-rendered · press liked → ?sort=liked, ${liked.cards} · Back → ?sort=discussed with the control and the listing (${back.cards}) · Back → "" + newest (${home.cards}) · Load more: ${first.cards} → ${appended.cards} card(s), first page's ${appended.marks} stamp(s) and order kept, search still "" · ${secondHalf} · Back from a loaded page left the thread (${left.cards} card(s) at ?sort=discussed), returning re-read page 1 (${rebound.cards} card(s), 0 stamps, Load more back)`;
+    /* 7. **The `sm 640` controls and the `640–899` rewrite, read in both directions** (T-80).
+     *    `post-thread.tsrx` stacks two media blocks over `.controls`: `sm` makes it
+     *    `200px minmax(0, 1fr) auto` with sort / the NSFW pair / Create across one row, and the
+     *    `640–899` block lifts the pair onto a second row spanning the width (`grid-column: 1 / -1;
+     *    grid-row: 2`) because the comment records four-across squeezing both switches to 115px.
+     *    Every earlier row mounts this page at the session's own ~500px, so both blocks were
+     *    declarations nothing could go red on. **Nothing is pressed and no `go()` runs** — the
+     *    listing is page 1 exactly as step 6 left it, and a remount here would drop the row's state.
+     */
+    const readControls = () =>
+      js(`
+        const box = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width), height: round(r.height) };
+        };
+        const bar = document.querySelector(".thread > .controls");
+        const bs = bar ? getComputedStyle(bar) : null;
+        const isGrid = !!bs && bs.display.indexOf("grid") >= 0;
+        const prefsEl = document.querySelector(".thread > .controls > .prefs");
+        const feed = document.querySelector(".thread > .feed");
+        const pagerBox = document.querySelector(".pager-action");
+        return {
+          path: location.pathname,
+          search: location.search,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          display: bs ? bs.display : "",
+          tracks: isGrid ? bs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          gap: bs ? bs.gap : "",
+          controls: box(bar),
+          sort: box(document.querySelector(".thread > .controls > .sort")),
+          prefs: box(prefsEl),
+          create: box(document.querySelector(".thread > .controls > .create")),
+          prefsDirection: prefsEl ? getComputedStyle(prefsEl).flexDirection : "",
+          feedGap: feed ? getComputedStyle(feed).gap : "",
+          cards: document.querySelectorAll(".card.post").length,
+          pagerMinWidth: pagerBox ? getComputedStyle(pagerBox).minWidth : "",
+        };
+      `);
+
+    const assertControls = (r, width) => {
+      const at = `${THREAD_PATH} at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(
+          `${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`,
+        );
+      }
+      if (!/\/post\/thread$/.test(r.path)) {
+        throw new Error(`${at}: the controls were measured on ${JSON.stringify(r.path)}, not the thread`);
+      }
+      if (r.display.indexOf("grid") < 0) {
+        throw new Error(`${at}: .controls computes ${JSON.stringify(r.display)}, not the grid both of its blocks declare`);
+      }
+      if (!r.controls || !r.sort || !r.prefs || !r.create) {
+        throw new Error(
+          `${at}: the controls are incomplete — box ${JSON.stringify(r.controls)}, sort ${JSON.stringify(r.sort)}, prefs ${JSON.stringify(r.prefs)}, create ${JSON.stringify(r.create)}`,
+        );
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the thread scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+      if (r.feedGap !== "16px") {
+        throw new Error(`${at}: .feed computes gap ${JSON.stringify(r.feedGap)}, not the 16px the sm block gives it (12px is the phone's)`);
+      }
+      // `.pager-action` draws only while the listing has a next page — read, never asserted into being.
+      if (r.pagerMinWidth !== "" && r.pagerMinWidth !== "200px") {
+        throw new Error(`${at}: .pager-action computes min-width ${JSON.stringify(r.pagerMinWidth)}, not the 200px the sm block gives it`);
+      }
+
+      if (width === 640) {
+        // Three tracks, the first the sort's fixed column. Count *and* size: a leftover placement
+        // creates an implicit track, so the count alone is not proof (T-77).
+        if (r.tracks.length !== 3) {
+          throw new Error(
+            `${at}: .controls resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the three the sm block declares (200px | fluid | auto)`,
+          );
+        }
+        if (Math.abs(parseFloat(r.tracks[0]) - 200) > 1) {
+          throw new Error(
+            `${at}: the controls' first track resolves to ${JSON.stringify(r.tracks[0])}, not the 200px sort column the sm block declares (tracks ${JSON.stringify(r.tracks)})`,
+          );
+        }
+        // Sort and Create share row 1, bottom-aligned by `align-items: end` — the bottoms are the
+        // witness, not the tops (T-79).
+        if (Math.abs(r.create.bottom - r.sort.bottom) > 2) {
+          throw new Error(
+            `${at}: .sort ends at ${r.sort.bottom} and .create at ${r.create.bottom} — the range block lifts Create to row 1 (grid-row: 1), so the button sits beside the sort, not beneath it`,
+          );
+        }
+        if (!(r.sort.left < r.create.left - 1)) {
+          throw new Error(`${at}: .sort starts at ${r.sort.left} and .create at ${r.create.left} — the sort is the left column and Create ends the row`);
+        }
+        // The pair across the width on row 2, below both of them.
+        if (!(r.prefs.top > r.sort.bottom - 1)) {
+          throw new Error(
+            `${at}: .prefs sits at top ${r.prefs.top} over the sort's bottom ${r.sort.bottom} — under md the pair takes the row beneath (grid-row: 2), which is the whole point of the 640–899 block`,
+          );
+        }
+        if (!(r.prefs.top > r.create.bottom - 1)) {
+          throw new Error(
+            `${at}: .prefs sits at top ${r.prefs.top} over Create's bottom ${r.create.bottom} — the squeezed middle column is what the range block exists to undo`,
+          );
+        }
+        if (Math.abs(r.prefs.left - r.controls.left) > 1) {
+          throw new Error(
+            `${at}: .prefs starts at ${r.prefs.left} in a controls box starting at ${r.controls.left} — the range block puts the pair across the width (grid-column: 1 / -1), not in the middle column it squeezed to 115px`,
+          );
+        }
+        // The band's own box is content-sized (`justify-self: start`, so it does **not** stretch to
+        // the controls' right edge); what "across the width" means here is that it starts in column 1
+        // and runs on past the 200px sort column, which no column-2 box could do.
+        if (!(r.prefs.right > r.sort.right + 1)) {
+          throw new Error(
+            `${at}: .prefs ends at ${r.prefs.right}, not past the sort column's ${r.sort.right} — the pair spans the grid, not the middle column`,
+          );
+        }
+        if (r.prefsDirection !== "row") {
+          throw new Error(`${at}: .prefs computes flex-direction ${JSON.stringify(r.prefsDirection)}, not the row the sm block gives the pair`);
+        }
+        return;
+      }
+
+      // 900 — the range block no longer applies: four tracks from `md`, and the pair back on row 1.
+      if (r.tracks.length !== 4) {
+        throw new Error(
+          `${at}: .controls resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the four the md block declares (220px | auto | fluid | auto)`,
+        );
+      }
+      if (Math.abs(parseFloat(r.tracks[0]) - 220) > 1) {
+        throw new Error(
+          `${at}: the controls' first track resolves to ${JSON.stringify(r.tracks[0])}, not the 220px sort column the md block declares (tracks ${JSON.stringify(r.tracks)})`,
+        );
+      }
+      if (!(r.prefs.top < r.create.bottom - 1)) {
+        throw new Error(
+          `${at}: .prefs sits at top ${r.prefs.top} under Create's bottom ${r.create.bottom} — above 900 the pair is back on row 1, not on a row of its own`,
+        );
+      }
+      if (!(r.sort.left < r.prefs.left - 1)) {
+        throw new Error(`${at}: .prefs starts at ${r.prefs.left}, not right of the sort at ${r.sort.left} — the pair takes the column beside the sort`);
+      }
+      if (!(r.prefs.left < r.create.left - 1)) {
+        throw new Error(`${at}: Create starts at ${r.create.left}, not right of the pair at ${r.prefs.left} — the button ends the row`);
+      }
+    };
+
+    const controlsRestore = await js("return window.innerWidth;");
+    const controlsLines = [];
+    let controlsSeen = "";
+    try {
+      // One override per width, low to high. The override is browser-level and this page does not
+      // remount on a width change, so every reading asserts `innerWidth` (T-78's rule).
+      for (const width of [640, 900]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(300);
+        await waitFor(`document.querySelector(".thread > .controls > .prefs") !== null`, `the thread's controls at ${width}px`, 10000);
+        const bar = await readControls();
+        assertControls(bar, width);
+        controlsLines.push(
+          `${width}px: .controls ${JSON.stringify(bar.display)} gap ${bar.gap} → ${JSON.stringify(bar.tracks)} (${bar.tracks.length} track(s)) · sort ${bar.sort.left}→${bar.sort.right} top ${bar.sort.top} bottom ${bar.sort.bottom} · prefs ${bar.prefs.left}→${bar.prefs.right} top ${bar.prefs.top} bottom ${bar.prefs.bottom} (${bar.prefsDirection}) · create ${bar.create.left}→${bar.create.right} top ${bar.create.top} bottom ${bar.create.bottom} · .feed gap ${bar.feedGap}, ${bar.cards} card(s)${bar.pagerMinWidth ? `, pager min-width ${bar.pagerMinWidth}` : ", no pager"}`,
+        );
+      }
+      controlsSeen = controlsLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const controlsAfter = await js("return window.innerWidth;");
+    if (controlsAfter !== controlsRestore) {
+      throw new Error(
+        `the thread's width overrides cleared to ${controlsAfter}px, but the session runs at ${controlsRestore}px — a leaked override would mis-measure every later row`,
+      );
+    }
+
+    return `?sort=discussed loads by address with the control on discussed (${shared.cards} cards) · newest writes no param (search "") · press discussed → ?sort=discussed, ${discussed.cards} card(s) re-rendered · press liked → ?sort=liked, ${liked.cards} · Back → ?sort=discussed with the control and the listing (${back.cards}) · Back → "" + newest (${home.cards}) · Load more: ${first.cards} → ${appended.cards} card(s), first page's ${appended.marks} stamp(s) and order kept, search still "" · ${secondHalf} · Back from a loaded page left the thread (${left.cards} card(s) at ?sort=discussed), returning re-read page 1 (${rebound.cards} card(s), 0 stamps, Load more back) · the controls at ${controlsSeen}`;
   }),
 );
 

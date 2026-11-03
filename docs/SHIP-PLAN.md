@@ -634,6 +634,41 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [ ] **T-81 `/persona`'s `sm 640` toolbar had never been rendered.** `persona-collection.tsrx` keeps a
+      `@media (min-width: 640px)` block that rewrites `.toolbar` from a flex column into
+      `minmax(0, 1fr) minmax(0, 1fr)` with `.search` spanning both columns (`grid-column: 1 / span 2`)
+      and sort + Create auto-placed on the line beneath, and widens `.create .btn` from the base
+      `width: 100%` to `width: auto; min-width: 120px` — and row 51 mounts that page only at the
+      session's own ~500px, below the breakpoint. Brief: `docs/NEXT.md` (T-81).
+
+- [x] **T-80 `/post/thread`'s `sm 640` controls had never been rendered.** `post-thread.tsrx` stacks
+      **two** media blocks over `.controls`: `sm` turns the base two-track stack into
+      `200px minmax(0, 1fr) auto` (sort | pair | Create on one row, `align-items: end`, gap 24px,
+      `.prefs` as a **row**), and `640–899` then lifts `.prefs` to `grid-column: 1 / -1; grid-row: 2`
+      and `.create` to `grid-row: 1` — the comment records the near-bug it exists for (*"Under `md`
+      the four-across row squeezed both switches to 115px"*). Row 39 mounted that page only at the
+      session's ~500px and pressed Load more, so both blocks were declarations nothing could go red
+      on. Row **39 extended** (no new row; `EXPECTED_ROWS` stays **55**): after the paging half it
+      takes `640×740` then `900×740`, one `readControls()` each into `assertControls(r, width)` — 640
+      asserts a `grid` of **exactly three** tracks with the first `200 ± 1`, sort and Create sharing
+      row 1 by their **bottoms**, `.prefs` below both, starting at the controls' left edge and running
+      past the sort column, computing `flex-direction: row`, `.feed` gap `16px` and the pager's 200px
+      minimum only while drawn; 900 asserts **four** tracks with the first `220 ± 1` and `.prefs` back
+      on row 1 between the sort and Create. Measured 640: `["200px","238.75px","85.25px"]` gap `24px`,
+      sort `24→224` bottom `180.39`, prefs `24→445.63` top `204.39`, create `510.75→596` bottom
+      `180.39`; 900 `["220px","421.625px","16.375px","0px"]`, sort `117→337`, prefs `361→782.63`,
+      create `737.75→823`. Red first: deleting `.prefs`' `grid-column: 1 / -1` from the range block
+      put **row 39 alone** red reading *".prefs starts at 248 in a controls box starting at 24"*.
+      Bytes restored (`cp` + `cmp` identical), `check.sh` **GREEN**, 55/55 local, 55/55 `--live`,
+      `publish.sh` → `LIVE` (asset `index-DPoxP2Sr.js`, unchanged), `curl` **200**. Brief:
+      `docs/NEXT.md` (T-80).
+      Found: the baton's own red proof (`grid-row: 2`) **walks green, 55/55** — dropping it changes
+      nothing, because the pair spans all three columns and cannot share row 1 with `.sort` and
+      `.create`, so auto-placement puts it on row 2 regardless (T-75's class, fifth time). The
+      declaration that binds is `grid-column: 1 / -1`. And `.prefs`' box is **content-sized** at 640
+      (`justify-self: start`), so the ticket's `|prefs.right − controls.right| ≤ 1` was wrong on a
+      right page; the witness is the left edge plus crossing the sort column.
+
 - [x] **T-79 `/bookmarks`' `sm 640` toolbar had never been rendered.** `bookmarks.tsrx` keeps a
       `@media (min-width: 640px)` block that rewrites `.toolbar` from one column into `minmax(0, 1fr)
       220px`, pins `.search` across both columns, and puts `.sort` in the fixed column with `.meta`
