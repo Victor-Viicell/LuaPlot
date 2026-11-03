@@ -1,59 +1,53 @@
 # Baton — what the next session does
 
-**T-74 landed.** `moderation-detail`'s split — the fourth detail page, and the only one whose
-composition differs — is rendered for the first time. Row **55** (`EXPECTED_ROWS` 54 → 55, read-only)
-opens `/moderation/4e90047a-0000-4000-8000-000000000002?admin=1` (row 20's road; row 20 has already
-concluded that case, so its aside draws the decision record — the composition is identical either
-way), reads the title and the `case · post` kicker off the page, takes its own `900×740` and
-`1200×740` overrides, settles two frames each, clears them in a `finally`, then **asserts**
-`innerWidth` came back (T-32). At 360: `.cols` is `flex` `column`, **no** grid tracks, `.aside` sits
-**below** `.main` (`931.02 > 234.39` — this page sets no `order`, the deliberate opposite of the three
-catalogue detail pages), both 308px inside the 340px outlet, `.aside` computes `static`, no horizontal
-scroll. At 900 — *its* breakpoint, not 1200: `.cols` `flex` `row`, `.aside` measures **340**
-(`flex: 0 0 340px`), beside the main (`left 507 ≥ main right 475`), tops equal (`218.39/218.39`),
-computes `position: sticky` / `top: 24px`, no horizontal scroll. At 1200 the same three facts hold,
-and `.cols` reads **730** at 900 against **714** at 1200 (the outlet's own padding narrows at `lg`), so
-the two widths are *not* the same box — the evidence says that instead of claiming they are. Red
-first: deleting `flex: 0 0 340px` from the `md` block put **row 55 alone** red (54/55) reading *"at
-900px .aside measures 111.05px, not the 340px the md block fixes (flex: 0 0 340px) — main 586.95px,
-.cols 730px"*. Bytes restored (`cmp`), `check.sh` GREEN, `publish.sh` → `LIVE`, `curl` 200, 55/55 local
-and 55/55 `--live`.
+**T-75 landed.** Row 54 was **extended**, not duplicated: after the character page's 1200 read it now
+`go()`es to `/lorebook/10eb00c5-…0002` and then `/preset/9e5e7000-…0002`, waits on `.cols .main`
+**and** a non-empty `h1.title`, and asserts the three facts all three catalogue detail pages share —
+`.cols` a grid of exactly two tracks, the second `320` (±1), `.aside.left ≥ .main.right`,
+`|aside.top − main.top| ≤ 2` — plus no horizontal scroll and (only where drawn) four `.count` cells.
+Measured: *Ashmarket Gazetteer* and *Long Table* both `["362px","320px"]`, aside left **747** ≥ main
+right **715**, tops **477/477**. The ticket's suggested red proof was **inert**: deleting
+`grid-column: 2;` from the lorebook `lg` block walks green, because `.main` is explicitly at
+`grid-column: 1; grid-row: 1` and `.aside`'s own `grid-row: 1` auto-places it into column 2. Aimed
+at the aside (`grid-column: 1`), **row 54 alone** went red naming the lorebook page. `check.sh`
+GREEN, 55/55 local, 55/55 `--live`, `publish.sh` → `LIVE`, `curl` 200.
 
-## T-75 — three detail pages each carry their *own* copy of the `lg` rules, and only one copy has ever been rendered
+## T-76 — the two pages T-75 just mounted still have an unrendered **phone** arm
 
-**Why it is next.** T-73 measured `character-detail`'s `.lg` split. `lorebook-detail.tsrx` and
-`preset-detail.tsrx` carry the **same three rules** — `.cols` as a grid of `minmax(0, 1fr) 320px`,
-`.aside` at `grid-column: 2; grid-row: 1; order: 0`, `.main` at `grid-column: 1; grid-row: 1` — but
-each lives in that page's **own `<style>` block**, so nothing in the tree makes the three agree. Delete
-`grid-column: 2` from the lorebook copy and the aside lands under the description, at 1200px, on a
-page nothing measures: `check.sh` is green (it never renders), the other 54 rows are green (row 54
-reads the character page only) and the live walk is green. The mobile `order: -1` carries the same
-risk — one file's copy is exactly what a later "tidy the CSS" commit drops.
+**Why it is next.** T-75 fixed what the three catalogue detail pages share at **1200**. The other
+half of each copy is the base block — `.cols { display: flex; flex-direction: column; gap: 20px }`
+and `.aside { order: -1 }` — and only `character-detail`'s has ever been measured (row 54's 360
+phase). Delete `order: -1` from `preset-detail.tsrx` and the engagement row drops **below** a
+60-line description on a phone: `check.sh` green, the other 54 rows green, the live walk green. That
+is exactly the bug T-73's red proof found on the character page, and nothing prevents the same
+regression in the two files nobody renders.
 
-**Approach.** **Extend row 54** in `scripts/smoke.mjs` rather than adding row 56 (the contract prefers
-an extended row to a near-copy). Keep its overrides and its `finally`; add one phase after the existing
-1200 read: mount a **lorebook** and then a **preset** detail page with `go()`, and at 1200 assert only
-the three shared facts per page — `.cols` is a grid with exactly two tracks, the second track resolves
-to `320px` (±1), `.aside.left ≥ .main.right` and `|aside.top − main.top| ≤ 2`. Use
-`/lorebook/10eb00c5-0000-4000-8000-000000000002` and `/preset/9e5e7000-0000-4000-8000-000000000002`
-(rows 42/43 own `…0001`). Read `.counts` only on the page that draws it — check presence first and
-print it — never assert the four engagement cells on a page that does not draw them. One `seen` clause
-per page naming the measured tracks and the aside's left/top, so a red message names the page.
+**Approach.** Extend row 54 again — the loop over `SPLIT_COPIES` already mounts both pages, so put
+the phone read **before** the 1200 phase: for each of the two pages take the `360×740` override
+once (outside the loop, before both mounts, since the override survives `go()`), `go()`, wait,
+`read()`, and assert the four phone facts per page: `.cols` computes `flex`/`column`, **no** grid
+tracks (guard on the display first — a flex box's `gridTemplateColumns` is the literal `none`),
+`aside.top < main.top − 1` (the `order: -1` argument), `|aside.width − main.width| ≤ 1`, and inside
+the outlet. Then re-take `1200×740` for the existing phase. Keep one `finally` for both overrides
+and keep the `innerWidth` assertion after it. One `seen` clause per page naming its phone tops, so a
+red names the page.
 
-**Traps.** (a) Each `go()` pushes history and remounts; re-read the composition after each mount and
-never reuse the previous page's rects. (b) Wait on `.cols .main` **and** a non-empty `h1.title` for the
-page you are about to measure — a skeleton or the not-found arm cannot then pass. (c) Rows 2+ of both
-fixtures are other people's content (rows 42/43 are the refusal rows): open as a reader, press nothing.
-(d) The override stays live across the extra mounts — that is the cheap half — but the row must still
-clear it in the **same** `finally` and assert `innerWidth` came back.
+**Traps.** (a) The phone read must not come after the 1200 read with the override still at 1200 —
+order the phases 360 (two mounts) → 1200 (character read, then the two mounts again, or read the
+1200s first for all three). Cheapest correct shape: **character 360 → character 1200 → lorebook 360
+→ preset 360 → lorebook 1200 → preset 1200**, six overrides is fine but four is enough if the 360
+pair shares one. (b) `read()` is the row's own generic reader (`.detail .cols`) — it works on all
+three pages unchanged; do not fork it. (c) Both pages draw four `.count` cells at 360 too, but keep
+the "read, never require" branch T-75 added. (d) Neither page may be pressed: they are other
+people's content (`ada`), rows 42/43 own each fixture's `…0001`.
 
-**Accept.** Red first: delete `grid-column: 2;` from `lorebook-detail.tsrx`'s `lg` block → the extended
-row alone red, naming the lorebook page and the aside's measured left/top. Bytes restored (`cmp`),
-`check.sh` GREEN, **55/55** local and **55/55** `--live` (the row count does not change), `publish.sh`
-prints `LIVE`, `curl` 200.
+**Accept.** Red first: delete `.aside { order: -1 }` from `preset-detail.tsrx`'s base block →
+**row 54 alone** red, naming the preset page and both measured tops. Bytes restored (`cmp`),
+`check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row), `publish.sh` prints `LIVE`,
+`curl` 200.
 
-**Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the owner's
-— see *Open decisions*. Do not invent tags to make a row pass.
+**Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
+owner's — see *Open decisions*. Do not invent tags to make a row pass.
 
 ## Blocked — what a human must do
 
@@ -78,20 +72,19 @@ prints `LIVE`, `curl` 200.
 
 ## Open decisions
 
-- **T-75 is the ticket: the three catalogue detail pages each keep their own copy of the `lg` rules.**
+- **T-76 is the ticket: the lorebook and preset detail pages' phone arm has never been rendered.**
   Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
   T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every route now has a row (48 the character catalog,
   49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and `/persona`, 52 `/terms`, **53
-  its desktop rail**, **54 the character detail's `.main` + `.aside`**, **55 the moderation case's
-  `md 900` flex row**), every bank entry that can be walked is walked, and the word break has a gate
-  section (10). What is left is *copies of the same rules in other files*: T-73 measured the `lg` split
-  of `character-detail` only, and `lorebook-detail` / `preset-detail` each carry their own copy of the
-  three rules that nothing renders. After that the unblocked work is whatever the gate or the walk
-  finds next; the rest of the plan waits on Supabase (T-29…T-32), the Android toolchain
-  (T-35/T-36/T-39) or an owner decision (T-33B's deep link dependency and `Ctrl/Cmd+K`, the tag
-  vocabulary).
+  its desktop rail**, **54 the three catalogue detail pages' `.main` + `.aside` at 360 and 1200**,
+  **55 the moderation case's `md 900` flex row**), every bank entry that can be walked is walked, and
+  the word break has a gate section (10). What is left is *copies of the same rules in other files*:
+  T-75 closed the `lg` half for all three detail pages, so what remains is the **phone** half of the
+  two pages it mounted, and whatever the gate or the walk finds next. The rest of the plan waits on
+  Supabase (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep
+  link dependency and `Ctrl/Cmd+K`, the tag vocabulary).
 - **The tag field's press is blocked on a decision, not on work.** Every lorebook and preset
   fixture ships `tags: []`, and `schema.ts`'s own comment says they stay empty *while the taxonomy is
   undecided* — so `listTags("lorebook")` / `("preset")` answer `[]`, the picker opens its empty
@@ -101,12 +94,13 @@ prints `LIVE`, `curl` 200.
   either record a tag vocabulary for lorebooks and presets in `docs/DESIGN.md` (and then a ticket
   seeds two or three tags, leaving one card tagless so `catalog.md`'s *an item with none renders no
   row and no placeholder* finally has a target) or accept that the press stays unwalkable.
-- **Row count is 55 after T-74.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
-  row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
-  it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
-  added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 added 50; T-68 added 51; T-69 adds
-  none; T-71 added 52; T-72 added 53; T-73 added 54; T-74 added 55**). **Row 55 (T-74) is read-only
-  and takes two overrides of its own** (`900×740`, `1200×740`): it opens the concluded case
+- **Row count is 55 after T-74 — T-75 added none.** `scripts/smoke.mjs` keeps it in an explicit
+  `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing row rather than
+  adding a near-copy of it, and bump the count only when a row is genuinely new (**T-61 added row 44;
+  T-62 added 45; T-63 added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 added 50; T-68
+  added 51; T-69 adds none; T-71 added 52; T-72 added 53; T-73 added 54; T-74 added 55; T-75 adds
+  none**). **Row 55 (T-74) is read-only  and takes two overrides of its own** (`900×740`,
+  `1200×740`): it opens the concluded case
   `/moderation/4e90047a-…0002?admin=1`, presses no decision control and writes no store row, clears
   both overrides in a `finally` and asserts `innerWidth` came back — anything after it may assume no
   override is in play. It leaves the reader on the case page, so the sign-out row after it navigates
@@ -168,12 +162,14 @@ prints `LIVE`, `curl` 200.
   `1200×740`), clears them in a `finally`, and asserts `innerWidth` came back before it returns — a
   later row may assume no override is in play and no `.contents` width is pinned. It leaves the
   reader on `/terms` at the old position (`go()` pushes), and row 54 must therefore navigate itself.
-- **Row 54 (T-73) is read-only and takes two overrides of its own.** It opens
+- **Row 54 (T-73, extended by T-75) is read-only and takes two overrides of its own.** It opens
   `/character/c0a1b2c3-0000-4000-8000-000000000002` (row 40 leaves one Like there, so nothing reads a
   count as the fixture's), presses nothing, writes no store row and no preference. It measures
   `360×740` and `1200×740`, clears both in a `finally`, and asserts `innerWidth` came back before it
-  returns — anything after it may assume no override is in play. It leaves the reader on the character
-  page (`go()` pushes), so a row added after it must navigate itself; the sign-out row does.
+  returns — anything after it may assume no override is in play. Since T-75 it also mounts
+  `/lorebook/…0002` and `/preset/…0002` **under the live 1200 override** and leaves the reader on
+  the **preset** page (`go()` pushes), so a row added after it must navigate itself; row 55 and the
+  sign-out row both do.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.
@@ -252,6 +248,20 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **An explicit placement on *one* item makes the other item's `grid-column` inert (T-75).** `.main`
+  is placed at `grid-column: 1; grid-row: 1`, so `.aside { grid-row: 1 }` auto-places into the only
+  free cell of row 1 — column 2 — whether or not it says `grid-column: 2`. Deleting that declaration
+  walks **green, 55/55**: the accept line's red proof proved nothing. Aim at the aside itself
+  (`grid-column: 2` → `1`) and the row reds with the page's name and its measured span. Before
+  spending a walk on "delete this declaration", ask what else constrains the same property.
+- **A red proof can name the right page and the wrong rule (T-75).** The green run's evidence line is
+  what to check first: if a deleted declaration leaves the measured numbers identical, the rule never
+  bound. T-72's `minmax(0, 720px)` never binding and T-75's `grid-column: 2` never binding are the
+  same class — the measurement, not the intent, decides.
+- **Extending a row that already owns an override is cheaper than a second row (T-75).** `go()`
+  remounts the page but the `Emulation.setDeviceMetricsOverride` is browser-level, so it survives the
+  hop; the row reads its own `innerWidth` after each mount to prove that instead of assuming it. Two
+  mounts cost ~1.9s of walk, and no row count changes.
 - **A flex container's `gridTemplateColumns` computes to the string `none` (T-73).** So
   `split(" ").filter((t) => t.trim() !== "")` answers **one** track (the literal `none`) on a box that
   has no grid at all: a row that counts tracks without checking the display reads a flex column as a
@@ -903,4 +913,3 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 Take the next unblocked ticket in the same phase, log the blocker at the top of this file with what a
 human must run, and stop. Never invent a workaround that changes the product.
-

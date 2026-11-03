@@ -634,6 +634,28 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-75 the three catalogue detail pages each keep their *own copy* of the `lg` rules, and only one
+      copy had ever been rendered.** `lorebook-detail.tsrx` and `preset-detail.tsrx` carry the same three
+      declarations as `character-detail` (`.cols` = `minmax(0, 1fr) 320px`, `.aside`
+      `grid-column: 2; grid-row: 1; order: 0`, `.main` `grid-column: 1; grid-row: 1`) but each inside its
+      own `<style>` block, so nothing made the three agree: a deleted `grid-column: 2` on the lorebook page
+      put the aside under the description at 1200 on a page no row measures — green in `check.sh`, in 54
+      rows and on the live walk. Row **54 was extended** (no new row; `EXPECTED_ROWS` stays **55**): after
+      its 1200 read it `go()`es to `/lorebook/10eb00c5-…0002` then `/preset/9e5e7000-…0002` (`…0001` is
+      rows 42/43's refusal road), waits on `.cols .main` **and** a non-empty `h1.title`, and asserts per
+      page: two grid tracks, the second `320` ±1, `.aside.left ≥ .main.right`, `|aside.top − main.top| ≤ 2`,
+      no horizontal scroll, and — only where drawn — four `.count` cells. Measured: *Ashmarket Gazetteer*
+      and *Long Table* both `["362px","320px"]`, aside left **747** ≥ main right **715**, tops **477/477**.
+      The override stays live across both mounts (read back each time, not assumed), the same `finally`
+      clears it and `innerWidth` is asserted back. Red first: the ticket's own edit — deleting
+      `grid-column: 2;` — walks **GREEN**, because `.main`'s explicit placement plus `.aside`'s
+      `grid-row: 1` auto-places column 2 anyway. Aimed at the aside (`grid-column: 2` → `1`), **row 54
+      alone** went red (54/55) naming the lorebook page and its span (`353–715` against main's `715`).
+      Bytes restored (`cp` + `cmp`), `check.sh` **GREEN**, `publish.sh` → `LIVE`, `curl` **200**, 55/55
+      local and 55/55 `--live`. Brief: `docs/NEXT.md` (T-75).
+      Found: the two pages' **phone** arm (`.cols` flex column + `.aside { order: -1 }`) still has no row
+      — only `character-detail`'s 360 phase measures it — filed as **T-76**.
+
 - [x] **T-74 `moderation-detail`'s split is a *different* composition and no row had rendered it.**
       The fourth detail page is the only one that is not the `lg` grid: its `.cols` is a flex column on a
       phone that becomes a **flex row at `md 900`** (not 1200), its aside is `flex: 0 0 340px` with

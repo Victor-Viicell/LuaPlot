@@ -6553,11 +6553,30 @@ results.push(
  * The character walk opens the page it has opened since row 6 (Sonic, `…0002`); the name is read
  * off the page (row 42 renames a character and nothing here pins one), and the counts are read for
  * **shape** only — row 40 leaves a Like behind on this character.
+ *
+ * T-75 extended this row instead of adding a near-copy: after the 1200 read it mounts the **lorebook**
+ * and **preset** detail pages, each of which keeps its own `<style>` copy of the same three `lg`
+ * rules, and asserts only the facts all three share (two tracks, the second 320px, the aside beside
+ * the description on the same row). The page name is in every message, so a red names which copy
+ * drifted.
  */
 const DETAIL_SPLIT_PATH = "/character/c0a1b2c3-0000-4000-8000-000000000002";
 
+/**
+ * The other two catalogue detail pages carry **their own copy** of the same three `lg` rules
+ * (`grid-template-columns: minmax(0, 1fr) 320px`, `.aside { grid-column: 2; grid-row: 1; order: 0 }`,
+ * `.main { grid-column: 1; grid-row: 1 }`), each inside its own `<style>` block — so nothing in the
+ * tree makes the three agree and nothing rendered these two. Rows 42/43 own each fixture's `…0001`
+ * (the refusal road), so this row opens `…0002`: both are public, `nsfw: false`, authored by `ada`,
+ * and no earlier row edits them.
+ */
+const SPLIT_COPIES = [
+  { path: "/lorebook/10eb00c5-0000-4000-8000-000000000002", label: "lorebook" },
+  { path: "/preset/9e5e7000-0000-4000-8000-000000000002", label: "preset" },
+];
+
 results.push(
-  await journey("/character/[id] puts its aside above the description on a phone and beside it at 1200", async () => {
+  await journey("the catalogue detail pages put their aside beside the description at 1200", async () => {
     await go(DETAIL_SPLIT_PATH);
     await waitFor(
       'document.querySelector(".detail .cols .main") !== null && document.querySelector(".detail .cols .aside") !== null && (document.querySelector(".detail h1.title") || {}).textContent !== ""',
@@ -6682,7 +6701,68 @@ results.push(
         throw new Error(`at ${widthOf.desktop}px the document scrolls horizontally: scrollWidth ${desk.scrollWidth} > innerWidth ${desk.innerWidth}`);
       }
 
-      seen = `"${desk.title}" · at ${widthOf.phone}: .cols ${JSON.stringify(phone.colsDisplay)} ${JSON.stringify(phone.colsFlow)} → ${phone.colsTracks.length} track(s), aside top ${phone.aside.top} < main top ${phone.main.top}, both ${phone.aside.width}px inside the outlet ${phone.outlet.left}–${phone.outlet.right}, ${phone.countCells} count cells, scrollWidth ${phone.scrollWidth}/${phone.innerWidth} · at ${widthOf.desktop}: .cols grid → ${JSON.stringify(desk.colsTracks)} (aside ${column}px), aside left ${desk.aside.left} ≥ main right ${desk.main.right}, tops ${desk.aside.top}/${desk.main.top}, ${desk.countCells} count cells, scrollWidth ${desk.scrollWidth}/${desk.innerWidth}`;
+      /* ------------- the two other catalogue detail pages, each running its OWN copy of the rules */
+      // The override stays live across these mounts (it is browser-level, not page-level), so every
+      // reading below is still a 1200px reading — asserted, never assumed.
+      const copies = [];
+      for (const target of SPLIT_COPIES) {
+        await go(target.path);
+        await waitFor(
+          'document.querySelector(".detail .cols .main") !== null && document.querySelector(".detail .cols .aside") !== null && (document.querySelector(".detail h1.title") || {}).textContent.trim() !== ""',
+          `the ${target.label} detail page's .main + .aside composition and its h1.title`,
+          12000,
+        );
+        const copy = await read();
+        if (copy.innerWidth !== widthOf.desktop) {
+          throw new Error(
+            `${target.label}: the override is meant to stay live across the mount, but the page measured ${copy.innerWidth}px instead of ${widthOf.desktop}px`,
+          );
+        }
+        if (!copy.path.endsWith(target.path)) {
+          throw new Error(`${target.label}: the row mounted ${JSON.stringify(copy.path)}, not ${target.path} — those are different pages`);
+        }
+        if (copy.title === "") {
+          throw new Error(`${target.label}: the page prints no .detail h1.title at ${widthOf.desktop}px, so the composition measured is a skeleton or the not-found arm`);
+        }
+        if (copy.colsDisplay.indexOf("grid") < 0 || copy.colsTracks.length !== 2) {
+          throw new Error(
+            `${target.label}: at ${widthOf.desktop}px .cols computes to display ${JSON.stringify(copy.colsDisplay)} → the tracks ${JSON.stringify(copy.colsTracks)} — this page's own lg block never turns on, so it is a stretched phone with a 360-wide reading column`,
+          );
+        }
+        const track = parseFloat(copy.colsTracks[1]);
+        if (!Number.isFinite(track) || Math.abs(track - 320) > 1) {
+          throw new Error(
+            `${target.label}: at ${widthOf.desktop}px the second track resolves to ${JSON.stringify(copy.colsTracks[1])} (tracks ${JSON.stringify(copy.colsTracks)}), not the 320px aside the page declares`,
+          );
+        }
+        if (!(copy.aside.left >= copy.main.right - 0.5)) {
+          throw new Error(
+            `${target.label}: at ${widthOf.desktop}px .aside spans ${copy.aside.left}–${copy.aside.right} and .main ends at ${copy.main.right} — the aside is not beside the description, it is under it (this file's own grid-column: 2 is the rule that places it)`,
+          );
+        }
+        if (Math.abs(copy.aside.top - copy.main.top) > 2) {
+          throw new Error(
+            `${target.label}: at ${widthOf.desktop}px .aside starts at top ${copy.aside.top} and .main at ${copy.main.top} — the two columns do not start on the same row (grid-row: 1 for both)`,
+          );
+        }
+        if (copy.scrollWidth > copy.innerWidth) {
+          throw new Error(
+            `${target.label}: at ${widthOf.desktop}px the document scrolls horizontally: scrollWidth ${copy.scrollWidth} > innerWidth ${copy.innerWidth}`,
+          );
+        }
+        // The counts block is read, never required: this row asserts only that the page it drew is the
+        // mounted one. A page that draws the engagement list must draw the four cells the spec fixes.
+        if (copy.countCells >= 0 && copy.countCells !== 4) {
+          throw new Error(`${target.label}: the engagement block draws ${copy.countCells} .count cell(s), not the four the detail spec fixes`);
+        }
+        copies.push(
+          `${target.label} "${copy.title}" → ${JSON.stringify(copy.colsTracks)} (aside ${track}px), aside left ${copy.aside.left} ≥ main right ${copy.main.right}, tops ${copy.aside.top}/${copy.main.top}, ${
+            copy.countCells >= 0 ? `${copy.countCells} count cells` : "no .counts block"
+          }, scrollWidth ${copy.scrollWidth}/${copy.innerWidth}`,
+        );
+      }
+
+      seen = `${copies.join(" · ")} · "${desk.title}" · at ${widthOf.phone}: .cols ${JSON.stringify(phone.colsDisplay)} ${JSON.stringify(phone.colsFlow)} → ${phone.colsTracks.length} track(s), aside top ${phone.aside.top} < main top ${phone.main.top}, both ${phone.aside.width}px inside the outlet ${phone.outlet.left}–${phone.outlet.right}, ${phone.countCells} count cells, scrollWidth ${phone.scrollWidth}/${phone.innerWidth} · at ${widthOf.desktop}: .cols grid → ${JSON.stringify(desk.colsTracks)} (aside ${column}px), aside left ${desk.aside.left} ≥ main right ${desk.main.right}, tops ${desk.aside.top}/${desk.main.top}, ${desk.countCells} count cells, scrollWidth ${desk.scrollWidth}/${desk.innerWidth}`;
     } finally {
       await send("Emulation.clearDeviceMetricsOverride");
       await sleep(240);

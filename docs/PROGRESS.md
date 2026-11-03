@@ -3,6 +3,36 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-75: the lorebook and preset detail pages' own copies of the `lg` split are rendered
+
+- **Changed:** `scripts/smoke.mjs` — **row 54 extended** (no new row; `EXPECTED_ROWS` stays **55**).
+  `lorebook-detail.tsrx` and `preset-detail.tsrx` each carry their own `<style>` copy of the three
+  `lg` rules T-73 measured on `character-detail` (`.cols` = `minmax(0, 1fr) 320px`, `.aside`
+  `grid-column: 2; grid-row: 1; order: 0`, `.main` `grid-column: 1; grid-row: 1`), and no row had ever
+  rendered either. After the character page's 1200 read the row mounts
+  `/lorebook/10eb00c5-…0002` then `/preset/9e5e7000-…0002` (`…0001` is rows 42/43's refusal road) with
+  `go()`, waits for `.cols .main` **and** a non-empty `h1.title` (a skeleton or not-found arm cannot
+  pass), and asserts per page: `.cols` is a grid of exactly two tracks, the second resolves to
+  320px ± 1, `.aside.left ≥ .main.right`, `|aside.top − main.top| ≤ 2`, no horizontal scroll, and —
+  only when the page draws one — four `.count` cells. Measured: lorebook *Ashmarket Gazetteer* and
+  preset *Long Table* both `["362px","320px"]`, aside left **747** ≥ main right **715**, tops
+  **477/477**, 4 count cells, `scrollWidth 1190/1200`. The override stays live across both mounts,
+  the same `finally` clears it, and `innerWidth` is asserted back.
+- **Verified:** red first — but **not** the edit the ticket named. Deleting `grid-column: 2;` from
+  the lorebook `lg` block walks **GREEN**: `.main` is explicitly placed at `grid-column: 1; grid-row:
+  1`, so `.aside`'s own `grid-row: 1` auto-places it into the first free cell of row 1 — column 2 —
+  and `grid-column: 2` never binds. The red proof that works is aiming at the aside's placement,
+  `grid-column: 2` → `grid-column: 1`: **row 54 alone** red (54/55) reading *"lorebook: at 1200px
+  .aside spans 353–715 and .main ends at 715 — the aside is not beside the description, it is under
+  it (this file's own grid-column: 2 is the rule that places it)"*. Bytes restored (`cp` + `cmp`,
+  identical; `git status` shows only `scripts/smoke.mjs`), `check.sh` **GREEN**, `./scripts/smoke.sh`
+  **55/55**, `publish.sh` → `LIVE=…/LuaPlot/` (asset `index-DPoxP2Sr.js`), `curl` **200**,
+  `./scripts/smoke.sh --live` **55/55**.
+- **Not verified:** nothing on a device. The row's own vocabulary (titles, count cell values) is read
+  from the page, never pinned. `lorebook-detail` / `preset-detail` are still free to drift from
+  `character-detail` in ways the row does not measure (their phone-arm `order: -1`, their `sm`/`md`
+  blocks) — this row only fixes the facts all three share at 1200.
+
 ## 2026-11-03 — T-74: the moderation case's split (a `md 900` flex row) is rendered by a walk
 
 - **Changed:** `scripts/smoke.mjs` — **row 55** (`EXPECTED_ROWS` 54 → 55, read-only). `moderation-detail`
