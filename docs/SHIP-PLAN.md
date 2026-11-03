@@ -634,6 +634,30 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-79 `/bookmarks`' `sm 640` toolbar had never been rendered.** `bookmarks.tsrx` keeps a
+      `@media (min-width: 640px)` block that rewrites `.toolbar` from one column into `minmax(0, 1fr)
+      220px`, pins `.search` across both columns, and puts `.sort` in the fixed column with `.meta`
+      beside it on row 2 — and row 50 mounted that page only at the session's own ~500px, below the
+      breakpoint, so a deleted pin restored the ragged three-line toolbar the block's own comment
+      records and every gate stayed green. Row **50 extended** (no new row; `EXPECTED_ROWS` stays
+      **55**): after its last tab press the row takes `640×740` then `360×740`, reads one
+      `readToolbar()` at each and hands it to `assertToolbar(r, width)` — 640 asserts a `grid` of
+      **exactly two** tracks with the second `220 ± 1`, `.search` spanning the toolbar, `.sort` on
+      row 2 under the search, **`|sort.bottom − meta.bottom| ≤ 2`** (the count beside the sort),
+      `meta.left < sort.left − 1`, `sort.left` inside the 220px column + 16px gap, and the pager's
+      200px minimum only where a pager is drawn; 360 asserts **one** track and the three children
+      stacked. Measured 640: `["336px","220px"]` gap `12px 16px`, search `24→596` bottom `276.98`,
+      sort `376→596` bottom `354.58`, meta `24→360` bottom `354.58`; 360 `["308px"]`, search bottom
+      `268.19`, sort `278.19→343.78`, meta `353.78→372.97`. Red first: deleting `.meta {
+      grid-column: 1; grid-row: 2 }` put **row 50 alone** red reading *".sort ends at 354.58 and
+      .meta at 385.77 — the sm block puts them on one row (grid-row: 2), so the saved count sits
+      beside the sort, not under it"*. Bytes restored (`cp` + `cmp` identical), `check.sh` **GREEN**,
+      55/55 local, 55/55 `--live`, `publish.sh` → `LIVE` (asset `index-DPoxP2Sr.js`, unchanged: no
+      page file moved), `curl` **200**. Brief: `docs/NEXT.md` (T-79).
+      Found: the ticket's `|sort.top − meta.top| ≤ 2` was **wrong on a right page** — the two boxes
+      are bottom-aligned (`align-items: end`) and their heights differ, so the tops read `288.98`
+      vs `335.39`; the assertion that carries the fact is the **bottoms**.
+
 - [x] **T-78 `/user/[handle]`'s `sm 640` head had never been rendered.** `user-profile.tsrx` keeps a
       `@media (min-width: 640px)` block that turns `.profile-head` from **two** tracks with the action
       on a second row into **three** tracks on **one** row (`72px minmax(0, 1fr) auto`, areas

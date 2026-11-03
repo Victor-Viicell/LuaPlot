@@ -5830,9 +5830,13 @@ results.push(
  *     seam (T-66), and the one clause a missing key move turns red;
  *  7. a sort pressed *under a search* keeps the search, and Back returns it with the field holding
  *     the word (the URL is the state, not the component);
- *  8. the tab you are already on is a press too: it clears the search and rewrites the URL.
+ *  8. the tab you are already on is a press too: it clears the search and rewrites the URL;
+ *  9. the toolbar at the two widths its own stylesheet draws it for (T-79): `640×740` is the `sm`
+ *     two-column rewrite (search across, sort in its 220px column with the saved count beside it),
+ *     `360×740` is the base block (one track, the three children stacked).
  *
- * Read-only: types, presses tabs, the sort select and Back. No store row, no preference.
+ * Read-only: types, presses tabs, the sort select and Back, and measures two widths. No store row,
+ * no preference.
  * ---------------------------------------------------------------------------------------------- */
 const BOOKMARKS_PATH = "/bookmarks";
 /** The four types with the label the strip draws — the spec's own tab order (`bookmarks.md`). */
@@ -6053,7 +6057,149 @@ results.push(
       throw new Error(`after the press the strip marks ${JSON.stringify(leftByTab.selected)} selected, not ${JSON.stringify(target.label)} — the tab that leaves a narrowed view is the tab it is on`);
     }
 
-    return `a fresh ${BOOKMARKS_PATH} writes ${JSON.stringify(opened.search)} (the default tab ${JSON.stringify(opened.type)}, counts ${JSON.stringify(opened.counts)}) · pressing ${JSON.stringify(target.label)} pushed ${JSON.stringify(pressed.search)} and drew ${pressed.count} row(s) of ${JSON.stringify(pressed.grid)} · a mount from ?type=${target.type} draws the same ${JSON.stringify(mounted.titles)} · ?sort=name reads ${JSON.stringify(byName.sortLabel)} at ${JSON.stringify(byName.search)} with the titles ${JSON.stringify(byName.titles)} ascending, and Back returns ${JSON.stringify(backToTab.search)} with ${backToTab.count} row(s) · typing ${JSON.stringify(word)} committed ${JSON.stringify(narrowed.search)} with ${narrowed.count} of ${mounted.count} row(s) and **kept the caret** (activeElement ${narrowed.active}) · a mount from ?type=${target.type} remounted the whole tab (${reopened.count} row(s), field ${JSON.stringify(reopened.field)}) · a sort under the search reads ${JSON.stringify(sortedUnderSearch.search)} and Back returns ${JSON.stringify(backToSearch.search)} with the field holding ${JSON.stringify(backToSearch.field)} · the ${target.label} tab, pressed on itself, cleared the search to ${JSON.stringify(leftByTab.search)} with ${leftByTab.count} row(s) and an empty field`;
+    // 9. The toolbar at the two widths its stylesheet draws it for (T-79). `bookmarks.tsrx`'s
+    //    `sm 640` block rewrites `.toolbar` from one column into `minmax(0, 1fr) 220px`, pins the
+    //    search across the top and puts the sort in the fixed column with the saved count beside it
+    //    on row 2 — and every earlier row mounts this page at the session's own ~500px, below the
+    //    breakpoint, so the three pins were declarations nothing could go red on. Both widths are
+    //    read, because one direction cannot show a breakpoint (T-77/T-78).
+    const readToolbar = () =>
+      js(`
+        const box = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width), height: round(r.height) };
+        };
+        const bar = document.querySelector(".toolbar");
+        const bs = bar ? getComputedStyle(bar) : null;
+        const isGrid = !!bs && bs.display.indexOf("grid") >= 0;
+        const metaEl = document.querySelector(".toolbar > .meta");
+        const select = document.querySelector('select[name="sort"]');
+        const pagerBox = document.querySelector(".pager > div");
+        return {
+          path: location.pathname,
+          search: location.search,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          display: bs ? bs.display : "",
+          tracks: isGrid ? bs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          gap: bs ? bs.gap : "",
+          toolbar: box(bar),
+          field: box(document.querySelector(".toolbar > .search")),
+          sort: box(document.querySelector(".toolbar > .sort")),
+          meta: box(metaEl),
+          metaAlign: metaEl ? getComputedStyle(metaEl).alignSelf : "",
+          saved: metaEl ? String(metaEl.textContent || "").trim() : "",
+          sortValue: select ? select.value : "",
+          pagerMinWidth: pagerBox ? getComputedStyle(pagerBox).minWidth : "",
+        };
+      `);
+
+    const assertToolbar = (r, width) => {
+      const at = `${BOOKMARKS_PATH} at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!r.path.endsWith(BOOKMARKS_PATH)) {
+        throw new Error(`${at}: the toolbar was measured on ${JSON.stringify(r.path)}, not the saved page`);
+      }
+      if (r.display.indexOf("grid") < 0) {
+        throw new Error(`${at}: .toolbar computes ${JSON.stringify(r.display)}, not the grid both of its blocks declare`);
+      }
+      if (!r.toolbar || !r.field || !r.sort || !r.meta) {
+        throw new Error(
+          `${at}: the toolbar is incomplete — toolbar ${JSON.stringify(r.toolbar)}, search ${JSON.stringify(r.field)}, sort ${JSON.stringify(r.sort)}, meta ${JSON.stringify(r.meta)}`,
+        );
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the saved page scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+
+      if (width === 640) {
+        // The whole `sm` fact: two tracks, the second the sort's fixed column. The count alone is
+        // not proof — a leftover placement creates an implicit track (T-77) — so it is sized too.
+        if (r.tracks.length !== 2) {
+          throw new Error(
+            `${at}: .toolbar resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the two the sm block declares (fluid | 220px)`,
+          );
+        }
+        if (Math.abs(parseFloat(r.tracks[1]) - 220) > 1) {
+          throw new Error(`${at}: the toolbar's second track resolves to ${JSON.stringify(r.tracks[1])}, not the 220px sort column the sm block declares (tracks ${JSON.stringify(r.tracks)})`);
+        }
+        // The search spans the toolbar, which is the top row.
+        if (Math.abs(r.field.left - r.toolbar.left) > 1 || Math.abs(r.field.right - r.toolbar.right) > 1) {
+          throw new Error(
+            `${at}: .search spans ${r.field.left}→${r.field.right} in a toolbar ${r.toolbar.left}→${r.toolbar.right} — the sm block puts it across both columns (grid-column 1 / -1)`,
+          );
+        }
+        if (!(r.sort.top > r.field.bottom - 1)) {
+          throw new Error(`${at}: .sort sits at top ${r.sort.top} above the search's bottom ${r.field.bottom} — the search owns row 1 and the sort row 2`);
+        }
+        // Beside: the sort and the saved count share row 2, bottom-aligned by `align-items: end`.
+        if (Math.abs(r.sort.bottom - r.meta.bottom) > 2) {
+          throw new Error(
+            `${at}: .sort ends at ${r.sort.bottom} and .meta at ${r.meta.bottom} — the sm block puts them on one row (grid-row: 2), so the saved count sits beside the sort, not under it`,
+          );
+        }
+        if (!(r.meta.left < r.sort.left - 1)) {
+          throw new Error(`${at}: .meta starts at ${r.meta.left}, not left of the sort at ${r.sort.left} — the count is the row-2 visitor, the sort the fixed column`);
+        }
+        if (!(r.sort.left >= r.toolbar.right - 220 - 16 - 1)) {
+          throw new Error(
+            `${at}: .sort starts at ${r.sort.left} in a toolbar ending at ${r.toolbar.right} — inside the 220px column and its 16px gap, not before it`,
+          );
+        }
+        // `.pager` draws only while the listing has a next page, so a min-width is read when the box
+        // exists and never asserted into being.
+        if (r.pagerMinWidth !== "" && r.pagerMinWidth !== "200px") {
+          throw new Error(`${at}: the pager's inner box computes min-width ${JSON.stringify(r.pagerMinWidth)}, not the 200px the sm block gives it`);
+        }
+        return;
+      }
+
+      // The opposite, in the same words: the base block is still the phone's, one implicit track
+      // and the three children stacked in DOM order.
+      if (r.tracks.length !== 1) {
+        throw new Error(
+          `${at}: .toolbar resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the one the base block leaves (no grid-template-columns) — the sm block is leaking below its breakpoint`,
+        );
+      }
+      if (!(r.sort.top > r.field.bottom - 1)) {
+        throw new Error(`${at}: .sort sits at top ${r.sort.top} over the search's bottom ${r.field.bottom} — below 640 the sort takes its own row`);
+      }
+      if (!(r.meta.top > r.sort.bottom - 1)) {
+        throw new Error(`${at}: .meta sits at top ${r.meta.top} over the sort's bottom ${r.sort.bottom} — below 640 the count takes a third row`);
+      }
+    };
+
+    const barRestore = await js("return window.innerWidth;");
+    const barLines = [];
+    let barSeen = "";
+    try {
+      // One override per width. The `Emulation` override is browser-level and this page does not
+      // remount on a width change, so every reading asserts `innerWidth` instead of assuming it held.
+      for (const width of [640, 360]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        await waitFor(`document.querySelector(".toolbar > .sort") !== null`, `the saved toolbar at ${width}px`, 10000);
+        const bar = await readToolbar();
+        assertToolbar(bar, width);
+        barLines.push(
+          `${width}px: .toolbar ${JSON.stringify(bar.display)} gap ${bar.gap} → ${JSON.stringify(bar.tracks)} (${bar.tracks.length} track(s), state ${JSON.stringify(bar.search)}) · search ${bar.field.left}→${bar.field.right} in ${bar.toolbar.left}→${bar.toolbar.right}, bottom ${bar.field.bottom} · sort ${bar.sort.left}→${bar.sort.right} top ${bar.sort.top} bottom ${bar.sort.bottom} · meta ${bar.meta.left}→${bar.meta.right} top ${bar.meta.top} bottom ${bar.meta.bottom} (align ${bar.metaAlign}, ${JSON.stringify(bar.saved)}${bar.pagerMinWidth ? `, pager min-width ${bar.pagerMinWidth}` : ", no pager"})`,
+        );
+      }
+      barSeen = barLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const barAfter = await js("return window.innerWidth;");
+    if (barAfter !== barRestore) {
+      throw new Error(`the toolbar's overrides cleared to ${barAfter}px, but the session runs at ${barRestore}px — a leaked override would mis-measure every later row`);
+    }
+
+    return `a fresh ${BOOKMARKS_PATH} writes ${JSON.stringify(opened.search)} (the default tab ${JSON.stringify(opened.type)}, counts ${JSON.stringify(opened.counts)}) · pressing ${JSON.stringify(target.label)} pushed ${JSON.stringify(pressed.search)} and drew ${pressed.count} row(s) of ${JSON.stringify(pressed.grid)} · a mount from ?type=${target.type} draws the same ${JSON.stringify(mounted.titles)} · ?sort=name reads ${JSON.stringify(byName.sortLabel)} at ${JSON.stringify(byName.search)} with the titles ${JSON.stringify(byName.titles)} ascending, and Back returns ${JSON.stringify(backToTab.search)} with ${backToTab.count} row(s) · typing ${JSON.stringify(word)} committed ${JSON.stringify(narrowed.search)} with ${narrowed.count} of ${mounted.count} row(s) and **kept the caret** (activeElement ${narrowed.active}) · a mount from ?type=${target.type} remounted the whole tab (${reopened.count} row(s), field ${JSON.stringify(reopened.field)}) · a sort under the search reads ${JSON.stringify(sortedUnderSearch.search)} and Back returns ${JSON.stringify(backToSearch.search)} with the field holding ${JSON.stringify(backToSearch.field)} · the ${target.label} tab, pressed on itself, cleared the search to ${JSON.stringify(leftByTab.search)} with ${leftByTab.count} row(s) and an empty field · the toolbar at ${barSeen}`;
   }),
 );
 

@@ -3,6 +3,38 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-79: `/bookmarks`' `sm 640` toolbar is rendered in both directions
+
+- **Changed:** `scripts/smoke.mjs` only — **row 50 extended** (no new row; `EXPECTED_ROWS` stays
+  **55**). The T-67 journey's new **§9** runs after its last tab press (where no read follows) and
+  takes `640×740` then `360×740`, reading one `readToolbar()` at each and handing it to
+  `assertToolbar(r, width)`. At 640 it asserts `.toolbar` computes a `grid`, **exactly two** tracks
+  with the **second `220 ± 1`** (count *and* size — T-77's lesson), `.search` spans the toolbar
+  (`left`/`right` within 1px), `.sort` is below the search (row 2), **`|sort.bottom − meta.bottom| ≤
+  2`** (one row, bottom-aligned by `align-items: end` — the saved count *beside* the sort, which is
+  the whole `sm` fact), `meta.left < sort.left − 1`, `sort.left` inside the 220px column plus its
+  16px gap, and `.pager > div`'s 200px minimum **only when a pager is drawn**. At 360 it asserts the
+  opposite: **one** track, `sort.top > search.bottom − 1`, `meta.top > sort.bottom − 1` (stacked, one
+  per row). Both overrides are cleared in one `finally` and `innerWidth` is asserted back. Measured
+  at 640: `["336px","220px"]`, gap `12px 16px`, search `24→596` of toolbar `24→596` bottom `276.98`,
+  sort `376→596` bottom `354.58`, meta `24→360` bottom `354.58` (`2 saved`); at 360 `["308px"]`,
+  gap `10px`, search bottom `268.19`, sort top `278.19` bottom `343.78`, meta top `353.78`.
+- **Verified:** red first — deleting `.meta { grid-column: 1; grid-row: 2 }` from `bookmarks.tsrx`'s
+  `sm 640` block put **row 50 alone** red (54 PASS / 1 FAIL) reading *"/bookmarks at 640px: .sort
+  ends at 354.58 and .meta at 385.77 — the sm block puts them on one row (grid-row: 2), so the saved
+  count sits beside the sort, not under it"* — the page, the width and both bottoms, as the accept
+  line asked. Bytes restored (`cp` + `cmp` identical; `git status` shows only `scripts/smoke.mjs`),
+  `check.sh` **GREEN** (all ten sections), `./scripts/smoke.sh` **55/55**, `publish.sh` →
+  `LIVE=https://victor-viicell.github.io/LuaPlot/` (asset `index-DPoxP2Sr.js`, unchanged: no built
+  source moved), `curl` **200**, `./scripts/smoke.sh --live` **55/55**, same evidence line.
+- **Not verified / next:** the ticket's own `|sort.top − meta.top| ≤ 2` was **wrong on a right page**
+  (tops read `288.98` vs `335.39`: the two boxes are bottom-aligned and their heights differ), so the
+  row asserts the **bottoms** — recorded in `docs/NEXT.md`. `.pager > div`'s 200px and `.pager {
+  align-items: center }` are still unwalked here (the lorebook tab draws no pager); 32 page files
+  still carry a `sm 640` block no row has ever rendered, and the next one is `/post/thread`'s
+  `.controls` (**T-80**), which has **two** stacked media blocks. No new dependency, no
+  schema/adapter/JEV change this tick.
+
 ## 2026-11-03 — T-78: `/user/[handle]`'s `sm 640` head is rendered in both directions
 
 - **Changed:** `scripts/smoke.mjs` only — **row 46 extended** (no new row; `EXPECTED_ROWS` stays
