@@ -1,5 +1,5 @@
 import { effect, track, type Component } from "ripple";
-import { currentRoute, follow, href, navigate, onRouteChange, type RouteState } from "./router.ts";
+import { currentRoute, follow, getMountedKey, href, navigate, onRouteChange, setMountedKey, type RouteState } from "./router.ts";
 import {
   IconBack,
   IconBell,
@@ -135,7 +135,6 @@ export function App() @{
   installKeyboardInset();
 
   let seq = 0;
-  let lastKey = "";
   let lastAttempt = -1;
   let scroller: HTMLElement | undefined;
 
@@ -145,8 +144,13 @@ export function App() @{
     const key = `${current.path}${current.search}`;
 
     // The effect also feeds the title and the scroll reset; only a new location loads a module.
-    if (key === lastKey && retry === lastAttempt) return;
-    lastKey = key;
+    // The key lives in the router (T-66) because a page that commits its own query moves it too —
+    // a private copy here stayed on the pre-query location and made the next navigation to this
+    // same route a no-op (URL cleared, grid still filtered). This guard is the **only** thing that
+    // skips a load, so it must never compare against `path` alone: `/post/thread?sort=…` and
+    // `/user/<h>?tab=…` are links that have to remount.
+    if (key === getMountedKey() && retry === lastAttempt) return;
+    setMountedKey(key);
     lastAttempt = retry;
 
     const mine = ++seq;

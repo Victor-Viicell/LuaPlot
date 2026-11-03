@@ -79,6 +79,25 @@ not a tracked value: `track()` must be created inside a component in this Ripple
 module-scope tracked has no owning block and every write to it throws. `App.tsrx` mirrors the store
 into its own `track()` and that is the signal renders read.
 
+**The router also owns the mounted key (T-66).** `getMountedKey()`/`setMountedKey()` hold the
+`path + search` the shell has actually mounted; `App.tsrx`'s reload guard compares against it and
+nothing else (`emit()` never touches it — a navigation must always reach the address bar). A page
+that writes its own query calls **`commitQuery(search, mode)`**: `pushState`/`replaceState`, then
+`state = readLocation()` and the mounted key moved to the new location, **without** `emit()`. Two
+consequences, both spec'd, both walked (row 49):
+
+- **No remount, so the caret survives.** This is why the settle does not go through `navigate()`: a
+  remount hands the reader a fresh `<input>` with no focus, and a person who types four letters and
+  pauses loses their place.
+- **A press on the route you are already on still reloads.** The key moved, so `navigate` to that
+  path is a different key — the address and the grid cannot disagree, and the narrowed view is
+  shareable from the bar (T-66's bug: the key stayed on the pre-query location, the press was a
+  silent no-op, the URL cleared and the grid kept the filter).
+
+`commitQuery()` applies the query to `state.path` — the route the table already matched — so a page
+cannot write onto a path it is not on. `scripts/history-check.mjs` (gate section 9) keeps every page
+off `history` directly.
+
 Pages live flat in `src/pages/` as `<type>-<view>.tsrx` (`character-catalog`, `lorebook-detail`,
 `session-detail`, `moderation-queue`), each exporting a named component plus a default for the lazy
 import. `src/components/PagePlaceholder.tsrx` is the scaffold every route renders until its ticket.

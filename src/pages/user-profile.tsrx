@@ -8,7 +8,7 @@ import { Skeleton } from "../components/Skeleton.tsrx";
 import { PersonaSheet } from "../components/PersonaSheet.tsrx";
 import { Tabs } from "../components/Tabs.tsrx";
 import { UserCard } from "../components/UserCard.tsrx";
-import { follow, href, useParams, useQuery } from "../router.ts";
+import { commitQuery, follow, href, useParams, useQuery } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type {
   AuthoredItem,
@@ -33,7 +33,7 @@ import { toast } from "../lib/toast.ts";
  *
  * What the page owns:
  * - **Four tabs in `?tab=`**, the type control row in `?type=` on the creations tab only. Both are
- *   written straight through `history` — `navigate()` remounts and throws away the rows.
+ *   committed through `commitQuery()` — `navigate()` remounts and throws away the rows and the caret.
  * - **One fetch path per tab**, `(1, "replace")` on a change and `(next, "append")` for **Load
  *   more**; paging is deliberately not in the URL (`luaplot-pages.md` → *Conventions*).
  * - **The follow write never remounts**: the answer is the updated profile, so the figure and the
@@ -73,15 +73,16 @@ function readQuery(): { tab: ProfileTab; type: ProfileCreationType } {
   };
 }
 
-/** Write tab/type through history without telling the router (see the page's header comment). */
+/**
+ * Write tab/type into the URL through `commitQuery()` (T-66) — the router applies the query to the
+ * route it already matched (`/user/<handle>`), so the page never spells its own path.
+ */
 function writeQuery(tab: ProfileTab, type: ProfileCreationType, mode: "push" | "replace"): void {
   const params = new URLSearchParams();
   params.set("tab", tab);
   if (tab === "creations" && type !== "all") params.set("type", type);
 
-  const url = `${window.location.pathname}?${params.toString()}`;
-  if (mode === "replace") window.history.replaceState({}, "", url);
-  else window.history.pushState({}, "", url);
+  commitQuery(params.toString(), mode);
 }
 
 type Phase = "loading" | "ready" | "missing" | "error";

@@ -7,7 +7,7 @@ import { PostCard } from "../components/PostCard.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
 import { Tabs } from "../components/Tabs.tsrx";
-import { href, useQuery } from "../router.ts";
+import { commitQuery, useQuery } from "../router.ts";
 import { PAGE_SIZE, resolveRepo, type SortOrder } from "../lib/data/repo.ts";
 import type {
   AuthoredItem,
@@ -37,8 +37,9 @@ import { toast } from "../lib/toast.ts";
  *   type's not-exist sentence in the title slot, links nowhere and **still carries Remove bookmark**.
  *   That is the one thing this page exists to guarantee, so removal goes through
  *   `repo.removeBookmark` (key-only), never `toggleBookmark`, which refuses a missing row.
- * - **URL state**: `?type=&q=&sort=` written straight through `history` — `navigate()` would remount
- *   the page and drop the rows it just fetched (the rule `character-catalog` records in DESIGN).
+ * - **URL state**: `?type=&q=&sort=` committed through `commitQuery()` — `navigate()` would remount
+ *   the page and drop the rows it just fetched **and** the caret (the rule `character-catalog`
+ *   records in DESIGN, T-66).
  *   The NSFW pair is deliberately **not** here: it belongs to the account.
  * - **Six states**, all drawn: loading, empty (*Nothing saved here yet.*), no results, a tab entirely
  *   hidden by the NSFW preference, end of list, error.
@@ -122,16 +123,14 @@ function adapterSort(sort: SortChoice): SortOrder {
   return "newest";
 }
 
-/** Write the tab state into the URL without telling the router (see the page's header comment). */
+/** Write the tab state into the URL through `commitQuery()` (T-66) — the router owns the mounted key. */
 function writeQuery(type: BookmarkKind, q: string, sort: SortChoice, mode: "push" | "replace"): void {
   const params = new URLSearchParams();
   params.set("type", type);
   if (q) params.set("q", q);
   if (sort !== "recent") params.set("sort", sort);
 
-  const url = `${href("/bookmarks")}?${params.toString()}`;
-  if (mode === "replace") window.history.replaceState({}, "", url);
-  else window.history.pushState({}, "", url);
+  commitQuery(params.toString(), mode);
 }
 
 export function Bookmarks() @{

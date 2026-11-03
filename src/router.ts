@@ -351,6 +351,30 @@ function readLocation(): RouteState {
 let state: RouteState = readLocation();
 const listeners = new Set<(next: RouteState) => void>();
 
+/**
+ * The `path + search` key the shell has actually **mounted**.
+ *
+ * It lives here, not in `App.tsrx`, because two parties write it: a navigation (the shell mounts a
+ * new key) and a page that commits its own query (T-66). While it was a private `lastKey` in the
+ * shell, a page's silent `pushState` left it pointing at the *pre-query* location — so pressing the
+ * Catalog tab from a narrowed catalog asked for the key the shell already believed it had mounted,
+ * nothing reloaded, the URL dropped the query and the grid kept it (row 48 had to route through
+ * `go("/")` to force a mount).
+ *
+ * `emit()` deliberately does **not** touch it: a navigation must always reach the URL in the bar.
+ */
+let mountedKey = "";
+
+/** The key the shell has mounted — `getMountedKey()` === the location the DOM is showing. */
+export function getMountedKey(): string {
+  return mountedKey;
+}
+
+/** Record the key the shell has just mounted (or failed to mount). Only the shell and `commitQuery` call this. */
+export function setMountedKey(key: string): void {
+  mountedKey = key;
+}
+
 /** Current match. Reads outside a render are a snapshot, not a subscription. */
 export function currentRoute(): RouteState {
   return state;
@@ -394,6 +418,35 @@ export function navigate(path: string, options: { replace?: boolean } = {}): voi
   if (options.replace) window.history.replaceState({}, "", next);
   else window.history.pushState({}, "", next);
   emit();
+}
+
+/**
+ * A page writing **its own** query into the address bar — the debounced search, a tag chip, a sort,
+ * a tab (T-66).
+ *
+ * It is not `navigate()`, and it must not become `navigate()`: `navigate()` emits, `App.tsrx` reloads
+ * the page module whenever the location key changes, and a remount mid-typing hands the reader a
+ * **new `<input>` with no caret** — a person who types four letters and pauses loses their place.
+ * So this writes history, refreshes the router's own snapshot (`useQuery()`/`useParams()` for a page
+ * mounted *after* this call) and moves the shell's mounted key to the location it now owns, while
+ * keeping every listener quiet.
+ *
+ * **The mounted key is the whole point.** Without it the shell still believed it was showing the
+ * pre-query location, so any later navigation to that same route was a no-op: press the Catalog tab
+ * on a narrowed catalog and the URL cleared while the grid kept the filter — the one shape
+ * `character/catalog.md` → *URL* forbids (a narrowed view can be shared, bookmarked).
+ *
+ * `search` is a bare query string (`q=sea`, leading `?` allowed), applied to the route the router
+ * has already matched — a page cannot commit a query onto a path it is not on.
+ */
+export function commitQuery(search: string, mode: "push" | "replace" = "replace"): void {
+  if (typeof window === "undefined") return;
+  const clean = search.replace(/^\?/, "");
+  const next = `${href(state.path)}${clean ? `?${clean}` : ""}`;
+  if (mode === "replace") window.history.replaceState({}, "", next);
+  else window.history.pushState({}, "", next);
+  state = readLocation();
+  mountedKey = `${state.path}${state.search}`;
 }
 
 /**

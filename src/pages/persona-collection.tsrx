@@ -4,7 +4,7 @@ import { Field } from "../components/Field.tsrx";
 import { PersonaCard } from "../components/PersonaCard.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { follow, href, useQuery } from "../router.ts";
+import { commitQuery, follow, href, useQuery } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Persona } from "../lib/data/types.ts";
 import { currentUser } from "../lib/state/session.ts";
@@ -51,19 +51,17 @@ function readQuery(): { q: string; sort: SortChoice } {
 }
 
 /**
- * Write the collection's state into the URL without telling the router — `navigate()` would remount
- * the page and throw away the grid it just fetched (the same reason `preset-catalog` writes history
- * directly).
+ * Write the collection's state into the URL through `commitQuery()` (T-66) — never `history`
+ * directly: `navigate()` would remount the page, throw away the grid it just fetched, and leave the
+ * search field a new element with no caret, while a raw write left the router believing the page
+ * was still at `/persona` and made the next press on this route a silent no-op.
  */
 function writeQuery(q: string, sort: SortChoice, mode: "push" | "replace"): void {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (sort !== "newest") params.set("sort", sort);
 
-  const search = params.toString();
-  const url = `${href("/persona")}${search ? `?${search}` : ""}`;
-  if (mode === "replace") window.history.replaceState({}, "", url);
-  else window.history.pushState({}, "", url);
+  commitQuery(params.toString(), mode);
 }
 
 export function PersonaCollection() @{

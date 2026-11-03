@@ -474,11 +474,16 @@ so these are the decisions they inherit.
   chosen in a row. Two tags match items carrying **either** — an all-of filter empties a small
   catalog on the second click. There is no separate `All` control: it is the empty state of this
   one, which is why the toolbar carries four rows and no chip.
-- **The listing writes its own URL.** `writeQuery()` uses `replaceState` for the search settle and
-  `pushState` for a sort, and never `navigate()`: `App.tsrx` reloads the page module whenever
-  `path + search` changes, so a debounced keystroke would remount the page and drop the accumulated
-  rows. Back/forward still remounts, and the page reads `useQuery()` at mount — which is exactly when
-  it wants to.
+- **The listing writes its own URL — through the router's commit seam.** `writeQuery()` calls
+  `commitQuery()`: `replaceState` for the search settle and `pushState` for a sort, never
+  `navigate()`. `navigate()` emits, `App.tsrx` reloads the page module when the location key changes,
+  so a debounced keystroke would remount the page, drop the accumulated rows **and hand the reader a
+  new field with no caret** (T-66: the walk asserts `document.activeElement` is still the input after
+  a settle). Back/forward still remounts, and the page reads `useQuery()` at mount — which is exactly
+  when it wants to. The cost of a silent write (T-66): the router's mounted key must move with it, or
+  a press on the route you are already on is a no-op and the address and the grid disagree —
+  `commitQuery()` owns that. **No page calls `history` directly**; `scripts/history-check.mjs` (gate
+  section 9) fails the build if one does.
 - **`q` belongs to the shareable view**, although the spec's URL section names only filter and sort:
   a search *is* a narrowed view, and a searchable listing whose search cannot be shared is a bug with
   a link on it.

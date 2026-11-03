@@ -92,6 +92,18 @@ else
   FAIL=1
 fi
 
+# 9. A page never writes the address bar behind the router's back (T-66). The seam is
+# commitQuery() — it writes history *and* moves the shell's mounted key. A raw write left the key on
+# the pre-query location, so the next press on that route was a silent no-op (URL cleared, grid
+# still filtered) and the narrowed view could not be shared from the address bar at all.
+say "== history"
+if node scripts/history-check.mjs; then
+  say "   history ok"
+else
+  say "   WRITE BEHIND THE ROUTER — a page must commit its query through commitQuery()"
+  FAIL=1
+fi
+
 if [[ $FAIL -eq 0 ]]; then
   say "GREEN"
   exit 0

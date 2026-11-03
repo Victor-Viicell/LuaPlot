@@ -1,84 +1,94 @@
 # Baton — what the next session does
 
-**T-65 landed.** Row **48** (`EXPECTED_ROWS` 48) reads the catalog's toolbar for the first time: it
-types the first card's own title into the search one character at a time and reads `location.search`
-between keystrokes (**13 in-window samples, none carrying `q=`**), then reads the settle's **whole**
-word and the narrowed grid; a mount from `?q=…` preloads the field and draws the same cards;
-`?q=zzqx-nothing-matches` reads *Nothing matches those filters.* with 0 cards, **no** Retry and a
-Clear filters control; `?sort=ratio` reorders the grid (22 ratios, never rising) and puts **Top
-rated** on the control, Newest drops the param, `history.back()` returns the listing **and** the
-control; `?tags=ghost` narrows to 5 cards all carrying it and its chip's own remove control rewrites
-the URL to `""`; `?tags=ghost,artisan` draws **4 ghost-only + 7 artisan-only** (either, not both) and
-removing `artisan` leaves `?tags=ghost`; at 360 one card folds `+2` behind its `+N` chip and the
-floating list opens and closes again. **Read-only** — no store write, no preference. 48/48 local.
+**T-66 landed.** The router owns the shell's mounted key, and a page that writes its own query goes
+through `commitQuery()` instead of `history` directly. The bug is gone: typing into the catalog's
+search commits `?q=…` **and keeps the caret** (`document.activeElement` is still the `INPUT.field-input`
+after the settle — a `navigate()` here would hand the reader a new field mid-word), and the tabs that
+were silently dead now really leave: `.cat-switch` → **Characters** and the bottom bar → **Catalog**
+both clear the query, the field and the grid (20 cards, `location.search === ""`), and the shell's
+crumb reads `/character/catalog`. `?tags=`, `?sort=`, the 360 `+N` fold and the `?q=` mount stay
+green (row 48's `go("/")` workaround is gone — the bare-route hop now remounts, and row 48 asserts
+it). Seven pages (`character-catalog`, `lorebook-catalog`, `preset-catalog`, `persona-collection`,
+`bookmarks`, `post-thread`, `user-profile`) route through the one seam, and **gate section 9**
+(`scripts/history-check.mjs`) fails the build if any file but `src/router.ts` touches history.
+49/49 local and 49/49 `--live`.
 
-Red proof, aimed at the debounce clause: `onSearchInput` calling `applySearch(next)` on every
-keystroke → *"the search wrote the URL 13 time(s) while \"Lamplighter's\" was still being typed (read
-[{\"typed\":\"L\",\"search\":\"?q=L\",\"elapsed\":75},…]) — a per-keystroke writer, not the 250ms
-settle"* (47/48 in 1.2s). Bytes restored, so the green run is the proof.
+Red first, twice, both restored to the byte:
 
-## T-66 — a page that writes its own query leaves the router believing something else
+1. **The key.** Dropping `mountedKey = …` from `commitQuery()` → row 48 failed at *"the bare catalog to
+   remount after the settle's commit — read {…,\"count\":1,\"field\":\"Lamplighter's\"}"* and row 49 at
+   *"the settle to commit q=\"Lamplighter's\" — read {…,\"count\":1,\"field\":\"Lamplighter's\"}"*
+   (47/49). **Order matters for a future red proof:** row 48 catches this seam *before* row 49 can,
+   because the aborted row leaves a narrowed component mounted and row 49's `retype()` types the same
+   word it already holds — so a red run never reaches row 49's press clause. A row-49-only proof has to
+   aim somewhere else (that is what proof 2 does).
+2. **The silence.** `character-catalog`'s `writeQuery()` calling `navigate(path, {replace})` instead of
+   `commitQuery()` → **row 49 alone**, in 729 ms: *"the search field lost the caret the moment it
+   settled (document.activeElement is BODY., the field reads \"Lamplighter's\", URL
+   \"?q=Lamplighter%27s\") — a query write that emits remounts the page mid-typing"* (48/49; row 48
+   stayed green, which is exactly the isolation this clause needed).
 
-**Why it is next.** Found while writing row 48, and it is a **product** divergence, not a walk
-detail: `character-catalog.tsrx`'s `writeQuery()` writes `history.pushState`/`replaceState` directly
-(its header comment says why) and never notifies the router, so after a search settles the address
-reads `?q=sea` while `router.state.search` — and `App.tsrx`'s private `lastKey` — still say
-`/character/catalog`. Press the **Catalog** tab (or the catalog switcher's **Characters** tab) in that
-state and `navigate("/character/catalog")` emits exactly the key the shell already believes it
-mounted: **nothing reloads**, the URL drops the query, and the grid *keeps* it. Copying the address
-then shows the whole catalog — the spec's *"a narrowed view can be shared, bookmarked"* is broken in
-the one state the reader narrows by hand. Row 48 has to route through `go("/")` to force a mount;
-that workaround is the smell.
+## T-67 — six pages commit a query now, and one of them is walked
+
+**Why it is next.** T-66 changed **seven** pages' `writeQuery()` at once, and the walk proves the seam
+on **one** of them (`/character/catalog`, row 49) plus two halves that already existed (row 39's thread
+sort, row 47's profile tabs — both written before the seam and green through it). Nothing walks the
+other listings' own URL writes at all: `/bookmarks`' **type tabs are `push`** and its search/sort are
+`replace` (a mode mix the catalog does not have), `/preset/catalog` and `/lorebook/catalog` are the
+catalog's toolbar over another entity, and `/persona` is the same again behind a signed-in gate. A
+regression in `bookmarks`' tab write would be invisible to every row — and it is the one page where a
+press lands on the same route *with* a different query.
 
 **Approach**
 
-1. **Give the router the one fact the shell needs — the key it has mounted — instead of letting
-   `App.tsrx` keep a private `lastKey`.**
-   - `src/router.ts`: hold `mountedKey` (a string) beside `state`; export `getMountedKey()` /
-     `setMountedKey(key)`; `emit()` must not touch it.
-   - `src/App.tsrx`: the effect's `lastKey` becomes `getMountedKey()`; after a module loads (or a
-     missing/error verdict) it calls `setMountedKey(key)`.
-   - `src/router.ts`: a `commitQuery(path, mode)` for pages that write their own query — the
-     `history.pushState`/`replaceState` the page does today, then `state = readLocation()` **and**
-     `setMountedKey(path + search)`, **without** `emit()`.
-   - `character-catalog.tsrx`'s `writeQuery()` calls it; so does any other page that writes history
-     directly (grep `history.pushState` / `replaceState` first — the thread's `writeSort()` and the
-     profile's `writeQuery()` are the others).
-2. **Rejected: routing the settle through `navigate()`.** It emits, so every settle remounts the
-   page and the search field is a **new element with no focus** — a person who types four letters and
-   pauses loses the caret. A `go()`-driven row stays green through that, which is why the accept line
-   below names `document.activeElement`.
-3. **Row 49** (`EXPECTED_ROWS` 48 → 49), placed after row 48 (which leaves the reader on the catalog
-   with a clean URL and the 360 override cleared): type a word into `input[name="q"]`, wait for the
-   settle, assert **the field still has focus** and the URL carries `q`, then press **Characters** in
-   `.cat-switch` — the search clears, the grid is back to its unfiltered count, the field is empty,
-   and `location.search === ""`. Press the bottom bar's **Catalog** tab in a narrowed state and
-   assert the same. Then the reverse: `?q=` pasted **by address** still mounts a narrowed grid (that
-   half already exists in row 48 — do not duplicate it; extend, do not near-copy).
-4. Same commit: `docs/DESIGN.md` → *Catalog* and `docs/ARCHITECTURE.md` → *Router* must say what
-   "the query is the state" now costs — a page may commit its own query, and the router's mounted key
-   follows it. `docs/NEXT.md`'s row-48 comment about `go("/")` is re-read and simplified if the
-   same-URL `go()` has become honest.
+1. **Row 50** (`EXPECTED_ROWS` 49 → 50), placed after row 49 and before `sign out`: walk
+   `/bookmarks`' three query facts, in this order, because each is the shape of the next one's failure:
+   - **The type tabs are the URL.** `/bookmarks` with no query defaults to **Characters**
+     (`readQuery()` answers `type: null` → the first tab). Press **Lorebooks** in the Tabs strip: the
+     URL reads `?type=lorebook`, the strip's selected tab moves, the rows change — and the count is
+     whatever the page draws. **Read it, never pin it** (row 41 spliced a persona out, rows 38/42 added
+     a post and a cut).
+   - **`?type=<x>` pasted by address** mounts that tab directly (the reverse half: a shared link still
+     works).
+   - **The search commits silently and keeps the caret.** Type a word from a row's own title into
+     `input[name="q"]` with `retype()`, poll `location.search` for `q=`, then read
+     `document.activeElement` — row 49's clause, on the page whose writes are `replaceState` *and*
+     whose tab writes are `pushState`.
+   - **Sort is a `push`, so Back is the proof.** `choose('select[name="sort"]', "name")` → `?sort=name`
+     and a reordered list; `history.back()` returns `?type=<x>&q=<word>` **with the field still holding
+     the word**.
+   - **Press the tab you are already on.** After a settle, press **Characters** in the same strip (the
+     page's own route, a different query): the search clears, the field is empty and `location.search`
+     reads `?type=character` — the T-66 seam, on the page whose tab write is a `push`.
+2. **Do not extend row 49.** It is about the catalog's toolbar and the `.cat-switch`/tab-bar presses;
+   row 50 is about a page whose *tabs* are the query. Two shapes, two rows.
+3. **The three catalog copies stay for T-68** (`/preset/catalog`, `/lorebook/catalog`, `/persona`: the
+   same toolbar over another entity, one row, one press each). Name it in the baton when T-67 lands
+   rather than folding them in here — one row that reads four pages' toolbars fails in the fourth and
+   names only the third.
 
 **Traps**
 
-- **The App's `key === lastKey` guard is the only thing that skips a load.** Delete it and every
-  query write remounts (the focus bug); keep it and the page's silent write must update
-  `mountedKey`, which is the whole ticket. Do not "fix" it by making the guard compare against
-  `path` alone: `/post/thread?sort=…` and `/user/<h>?tab=…` are links that must remount (rows 39, 47).
-- **`useQuery()` reads `state.search`**, so a page mounted *after* a commit must see the committed
-  query — that is what `commitQuery()`'s `state = readLocation()` buys.
-- **A row cannot prove focus loss with `go()`** — synthetic navigation keeps nothing focused or
-  everything focused. Use a real `retype()` into the field and read `document.activeElement`.
-- **Row 48's step 3 leaves the reader on the catalog with `?tags=` cleared and the width restored**
-  (it asserts `innerWidth`). Anything after it may read the full grid; nothing may assume the 360
-  override is still on.
-- **`data-walk-head`-style expandos do not survive a commit** if `commitQuery` ever re-renders the
-  page: today it must not, and a row that marks the page and presses a chip is the proof.
+- **`/bookmarks` is a signed-in route, and the walk's last row (`sign out`) closes the session** — so
+  row 50 has to sit before it. It does.
+- **`?type=` is always present on a tab press** (`writeQuery` sets it unconditionally), so a "the URL
+  is empty" assertion is wrong here where it is right on the catalog. A fresh `/bookmarks` reads `""`;
+  a pressed tab reads `?type=character`. Assert what this page writes, not what the catalog writes.
+- **A bookmark row is not a `.card`.** Read the row's own markup in `bookmarks.tsrx` before writing a
+  selector: the catalog's `.card-cell .card .card-title` matches **nothing** here, and a count of `0`
+  would read as an empty listing rather than a wrong selector (T-50's lesson).
+- **`history.back()` is one `sleep` away from a flaky row** (T-55): poll the search **and** the control
+  **and** the field together, and throw with all three.
+- **The sort vocabulary is the page's** (`recent` / `oldest` / `name`, not the adapter's `newest`):
+  `?sort=newest` is not a param this page ever writes. Read `SORT_OPTIONS` first and assert the
+  **label** (`Title A–Z`) beside the value.
+- **Row 9 removed a bookmark and the early rows saved/unsaved a post**, so the listing holds whatever
+  it holds: pick the tab with the most rows when the row needs rows to read, and never assert a total.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **49/49** locally and **49/49 `--live`**; the assertion
-proved **red** first (name the edit and the message in PROGRESS); `publish.sh` prints `LIVE` and
-`curl` is 200.
+**Accept:** `./scripts/check.sh` GREEN; walk **50/50** locally and **50/50 `--live`**; the assertion
+proved **red** first — cheapest aim: `commitQuery()` skipping the key move (the same edit T-66 used,
+which section 9 cannot catch because it is inside the one allowed file) — and name the message in
+PROGRESS; `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Blocked — what a human must do
 
@@ -107,17 +117,17 @@ proved **red** first (name the edit and the message in PROGRESS); `publish.sh` p
 
 ## Open decisions
 
-- **T-66 is the ticket: a page that writes its own query leaves the router blind (found by T-65).** Failure-bank entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
+- **T-67 is the ticket: six pages commit a query and one of them is walked (found by T-66).** Failure-bank entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
-  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). With the catalog toolbar (row 48: `?q=`, `?tags=`, `?sort=`, the 250ms settle and the
-  `+N` fold) now walked, the next work is the **seam** that test exposed rather than new coverage: a
-  page's own query write never reaches the router, so the narrowed view and its address can disagree
-  — the one shape `character/catalog.md` → *URL* forbids, and invisible to the gate and to all 48
-  rows.
-- **Row count is 48 after T-65.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). With the catalog toolbar (row 48: `?q=`, `?tags=`,
+  `?sort=`, the 250ms settle and the `+N` fold) and the seam it exposed (row 49: caret, the two tab
+  presses) now walked, the next work is **coverage of the other six pages that write their own
+  query** — `/bookmarks` first, because its tab write is the one `push` in the set, and a regression
+  there is invisible to all 49 rows. The three catalog copies follow as T-68.
+- **Row count is 49 after T-66.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
   it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
-  added 46; T-64 added 47; T-65 added 48; T-66 adds 49**). **Rows 36 and 37
+  added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 adds 50**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -244,14 +254,31 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
-- **A `replaceState` write leaves the router blind, and that is how a view and its URL can disagree
-  (T-65).** The catalog commits a search with `history.replaceState` and no `emit()`, so
-  `router.state.search` stays `""` while the address reads `?q=…`; `App.tsrx`'s `lastKey` is that
-  stale key, so a later `navigate("/character/catalog")` — the **Catalog** tab, or the switcher's own
-  **Characters** tab — emits the key the shell already believes it mounted and **nothing reloads**.
-  Row 48 could not therefore "reload" with a `go()` to the same URL (its first run read
-  `{"search":"","count":1,"field":"Lamplighter's"}` for twelve seconds on a page that was right); it
-  goes through `go("/")` and back. T-66 is the fix; when it lands, re-read that comment.
+- **The mounted key belongs to the router, not the shell (T-66).** A page that commits its own query
+  must move the key or the *next* navigation to that route is a no-op: the browser clears the URL,
+  nothing reloads, and the grid (or field, or tab) keeps the state the address no longer describes.
+  `commitQuery()` is the seam; `getMountedKey()`/`setMountedKey()` are the fact; `emit()` must never
+  touch it. `scripts/history-check.mjs` (gate section 9) keeps every page off `history` directly —
+  add a new page's commit through `commitQuery()` or the gate goes red.
+- **A red proof is aimed, not pointed at the bug (T-66).** Reverting the seam reverted *two* rows and
+  the earlier one aborted the later, so the run that should have named the caret never got there:
+  dropping `mountedKey` red-lit rows 48 and 49, but `writeQuery` → `navigate()` red-lit **only** row
+  49, in 729 ms, exactly at `document.activeElement`. When two rows cover one seam, give each clause
+  its own edit.
+- **A `void commitQuery;` is the cheapest way to keep a temporary red edit type-clean** when the probe
+  swaps the call for `navigate()`: `noUnusedLocals` fails the *build* otherwise, and a red run that
+  stops at `tsrx-tsc` proves nothing about the page.
+
+- **A `replaceState` write left the router blind, and that is how a view and its URL disagreed
+  (T-65 → fixed by T-66).** The catalog committed a search with `history.replaceState` and no
+  `emit()`, so `router.state.search` stayed `""` while the address read `?q=…`; the shell's private
+  `lastKey` was that stale key, so a later `navigate("/character/catalog")` — the **Catalog** tab, or
+  the switcher's own **Characters** tab — emitted the key the shell already believed it mounted and
+  **nothing reloaded**. Row 48 could not therefore "reload" with a `go()` to the same URL (its first
+  run read `{"search":"","count":1,"field":"Lamplighter's"}` for twelve seconds on a page that was
+  right) and went through `go("/")`. **T-66 landed:** `commitQuery()` moves `mountedKey`, row 49 walks
+  the two presses, and row 48's workaround is gone — that `go("/")` hop is now the bare-route remount
+  it always claimed to be. Keep the shape in mind: any *silent* URL write owes the router a key.
 - **Every catalog fixture carries tags, so `catalog.md`'s no-tags rule has no page to read (T-65).**
   All 28 characters carry ≥1 tag (one is private), and row 48 is read-only, so *an item with none
   renders no row and no placeholder* stays untested — the row instead proves the visible row + its

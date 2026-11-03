@@ -3,6 +3,44 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-66: the router owns the mounted key, and a page's query write reaches it
+
+- **Changed:** `src/router.ts` — new `getMountedKey()`/`setMountedKey()` (the `path + search` the shell
+  has actually mounted; `emit()` never touches it) and the new **`commitQuery(search, mode)`**: writes
+  history, refreshes `state`, moves the mounted key, **no `emit()`** (an emit remounts the page and the
+  settled search field loses the caret). `src/App.tsrx` — the private `lastKey` is gone, the effect's
+  guard reads `getMountedKey()` and records the key it mounts. Seven pages' `writeQuery()`/`writeSort()`
+  now call `commitQuery()` instead of `history.pushState`/`replaceState`
+  (`character-catalog`, `lorebook-catalog`, `preset-catalog`, `persona-collection`, `bookmarks`,
+  `post-thread`, `user-profile`), and their header comments say so. **Gate section 9** is new:
+  `scripts/history-check.mjs` fails the build if any file but `src/router.ts` mentions
+  `history.pushState`/`replaceState` (proved red with a one-line probe file, then removed).
+  `scripts/smoke.mjs` — new walk **row 49**, `EXPECTED_ROWS` 48 → 49, and **row 48's `go("/")`
+  workaround is deleted** (its bare-route hop now remounts, and the row asserts that instead of
+  assuming it). Docs: `DESIGN.md` → *Catalog* (the commit seam and its two consequences),
+  `ARCHITECTURE.md` → *Router* (mounted key + `commitQuery`), `SHIP-PLAN.md` (T-66 ticked),
+  `NEXT.md` (T-67 baton + three new "found while working" notes).
+- **Verified:** `./scripts/check.sh` GREEN (30 routes, schema, 52 links, tiers, new history section:
+  *4 history write(s), all in src/router.ts*). Walk **49/49** locally and **49/49 `--live`** against
+  https://victor-viicell.github.io/LuaPlot/ (200, `assets/index-0WXkfKKh.js`; `publish.sh` printed
+  `LIVE`). Row 49's evidence: *typing "Lamplighter's" committed "?q=Lamplighter%27s" with 1 of 20
+  card(s) and kept the caret in the field (activeElement INPUT.field-input) · the switcher's Characters
+  tab cleared the query, the field and the grid (20 card(s), "") · a second settle then the bottom
+  bar's Catalog tab did the same (20 card(s), "", crumb "/character/catalog")*.
+- **Red first, twice, aimed separately** (a full revert red-lit two rows and the earlier aborted the
+  later, so the caret clause never got its run): (1) dropping `mountedKey = …` from `commitQuery()` →
+  47/49, row 48 *"the bare catalog to remount after the settle's commit — read
+  {…,"count":1,"field":"Lamplighter's"}"* and row 49 *"the settle to commit q="Lamplighter's" — read
+  {…,"count":1,"field":"Lamplighter's"}"*; (2) `character-catalog`'s `writeQuery()` calling
+  `navigate(path, {replace})` instead → **48/49, row 49 alone in 729ms**: *"the search field lost the
+  caret the moment it settled (document.activeElement is BODY., the field reads "Lamplighter's", URL
+  "?q=Lamplighter%27s") — a query write that emits remounts the page mid-typing"*. Bytes restored
+  (only the intended diff is in `git diff`).
+- **Not verified:** the other six pages' own query writes are **unwalked** — row 49 proves the seam on
+  `/character/catalog` only (`/bookmarks`' `push` tabs, the preset/lorebook catalogs and `/persona` are
+  filed as T-67/T-68). No iOS/Android pass (no toolchain, T-35); the walk's Chromium is the only
+  engine. Nothing about Supabase moved (still the memory adapter, T-29 blocked).
+
 ## 2026-11-03 — T-65: the catalog's search, tags and sort, and the 250ms settle
 
 - **Changed:** `scripts/smoke.mjs` only — new walk **row 48**, `EXPECTED_ROWS` 47 → 48, after row 47

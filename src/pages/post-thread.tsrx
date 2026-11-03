@@ -5,7 +5,7 @@ import { NsfwControl } from "../components/NsfwControl.tsrx";
 import { PostCard } from "../components/PostCard.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
-import { href, navigate, useQuery } from "../router.ts";
+import { commitQuery, href, navigate, useQuery } from "../router.ts";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Character, Post } from "../lib/data/types.ts";
 import { nsfwPreference, onPrefs } from "../lib/state/prefs.ts";
@@ -45,12 +45,12 @@ function readSort(params: URLSearchParams): SortChoice {
   return value === "discussed" || value === "liked" ? value : "newest";
 }
 
-/** Write the sort into the URL without telling the router — a remount would lose the loaded rows. */
+/**
+ * Write the sort into the URL through `commitQuery()` (T-66) — a remount would lose the loaded rows,
+ * and a raw write left the router's mounted key on the pre-sort location.
+ */
 function writeSort(sort: SortChoice, mode: "push" | "replace"): void {
-  const search = sort === "newest" ? "" : `?sort=${sort}`;
-  const url = `${href("/post/thread")}${search}`;
-  if (mode === "replace") window.history.replaceState({}, "", url);
-  else window.history.pushState({}, "", url);
+  commitQuery(sort === "newest" ? "" : `sort=${sort}`, mode);
 }
 
 export function PostThread() @{

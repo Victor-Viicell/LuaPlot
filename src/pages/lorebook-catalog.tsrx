@@ -8,7 +8,7 @@ import { NsfwControl } from "../components/NsfwControl.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
 import { TagPicker } from "../components/TagPicker.tsrx";
-import { href, navigate, useQuery } from "../router.ts";
+import { commitQuery, href, navigate, useQuery } from "../router.ts";
 import { PAGE_SIZE, resolveRepo } from "../lib/data/repo.ts";
 import type { Lorebook } from "../lib/data/types.ts";
 import { nsfwPreference, onPrefs } from "../lib/state/prefs.ts";
@@ -53,12 +53,13 @@ function readQuery(): { q: string; sort: SortChoice; tags: string[] } {
 }
 
 /**
- * Write the listing's state into the URL without telling the router.
+ * Write the listing's state into the URL — through `commitQuery()`, never `history` directly (T-66).
  *
- * `navigate()` emits, and `App.tsrx` reloads the page module whenever `path + search` changes — so
- * a debounced search settle would remount the catalog and throw away its accumulated rows. Writing
- * history directly keeps the URL shareable, and a back/forward still lands a remount that reads the
- * query at mount, which is exactly when this page wants to read it.
+ * `navigate()` emits, and `App.tsrx` reloads the page module whenever the location key changes — so
+ * a debounced search settle would remount the catalog, throw away its accumulated rows and hand the
+ * reader a **new field with no caret**. `commitQuery()` writes history *and* moves the router's
+ * mounted key, so the URL stays shareable and the next press on this same route is a real remount
+ * instead of a silent no-op.
  */
 function writeQuery(
   q: string,
@@ -71,10 +72,7 @@ function writeQuery(
   if (tags.length > 0) params.set("tags", tags.join(","));
   if (sort !== "newest") params.set("sort", sort);
 
-  const search = params.toString();
-  const url = `${href("/lorebook/catalog")}${search ? `?${search}` : ""}`;
-  if (mode === "replace") window.history.replaceState({}, "", url);
-  else window.history.pushState({}, "", url);
+  commitQuery(params.toString(), mode);
 }
 
 export function LorebookCatalog() @{

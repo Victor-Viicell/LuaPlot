@@ -5402,13 +5402,13 @@ results.push(
     }
 
     // 3. The URL is the state: a fresh mount from `?q=` preloads the field and draws the same grid.
-    //    A `go()` cannot be used to "reload" here: the settle wrote the query with `replaceState`,
-    //    which never notifies the router, so `App.tsrx` still believes it is on a bare
-    //    `/character/catalog` and its `path + search` key does not change — no remount. Leaving the
-    //    catalog and coming back is the only shape that guarantees a mount. (Found while working:
-    //    that stale key is also how the view and the URL can disagree — recorded in docs/NEXT.md.)
-    await go("/");
-    await waitText("signed in as", 8000);
+    //    T-66 made this half honest: the settle's write is `commitQuery()`, which moves the router's
+    //    mounted key to the location it now owns — so a hop to the bare route really does remount
+    //    (before that it was a no-op and the only way out was `go("/")`, which row 48 used to need).
+    //    The bare hop is asserted rather than assumed: a page that drew the full grid without
+    //    remounting would still be showing the narrowed component's state.
+    await go(CATALOG_PATH);
+    await untilCatalog("the bare catalog to remount after the settle's commit", (s) => s.q === null && !s.busy && s.count === full.count);
     await go(`${CATALOG_PATH}?q=${encodeURIComponent(word)}`);
     const restored = await untilCatalog(`a mount from ?q=${word} to draw the narrowed grid`, (s) => s.q === word && !s.busy && s.count > 0);
     if (restored.field !== word) {
@@ -5581,6 +5581,96 @@ results.push(
 );
 
 results.push(
+  await journey("a page's own query write reaches the router, so the tab that leaves the narrowed view really leaves it", async () => {
+    /** One read of the four things a commit moves: address, field (and its caret), grid, chrome. */
+    const read = () =>
+      js(`
+        const params = new URLSearchParams(location.search);
+        const field = document.querySelector('input[name="q"]');
+        const active = document.activeElement;
+        return {
+          search: location.search,
+          q: params.get("q"),
+          count: document.querySelectorAll(".card-cell .card").length,
+          field: field ? field.value : "",
+          focused: !!field && active === field,
+          active: active ? active.tagName + "." + (active.className || "") : "none",
+          busy: document.querySelector(".catalog [aria-busy='true']") !== null,
+          crumb: (document.querySelector(".crumb") || {}).textContent || "",
+        };
+      `);
+
+    /** A poll that throws with the whole read it last saw, never a bare timeout (T-53). */
+    const until = async (label, check, timeout = 12000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await read();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${label} — read ${JSON.stringify(last)}`);
+    };
+
+    // 1. A fresh catalog, and a word taken from its own first card so the search is real.
+    await go(CATALOG_PATH);
+    const full = await until("the catalog to draw its first page", (s) => !s.busy && s.count > 0 && s.q === null);
+    const firstTitle = await js(`const el = document.querySelector(".card-cell .card .card-title"); return el ? el.textContent.trim() : "";`);
+    const word =
+      firstTitle
+        .split(/\s+/)
+        .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 5)
+        .sort((a, b) => b.length - a.length)[0] || firstTitle;
+    if (!word) throw new Error(`the catalog's first card draws no title — the row has nothing to type`);
+
+    // 2. The commit is silent: the URL carries the word and the **field still has the caret**. A
+    //    `navigate()` here would remount the page and hand the reader a new input mid-typing, so
+    //    focus is the assertion, not a nicety.
+    await retype('input[name="q"]', word);
+    const narrowed = await until(`the settle to commit q=${JSON.stringify(word)}`, (s) => s.q === word && !s.busy);
+    if (narrowed.count === 0 || narrowed.count >= full.count) {
+      throw new Error(`?q=${word} draws ${narrowed.count} card(s) of the ${full.count} the bare catalog draws — the word came from the first card's own title, so it must narrow the grid and keep that card`);
+    }
+    if (!narrowed.focused) {
+      throw new Error(
+        `the search field lost the caret the moment it settled (document.activeElement is ${narrowed.active}, the field reads ${JSON.stringify(narrowed.field)}, URL ${JSON.stringify(narrowed.search)}) — a query write that emits remounts the page mid-typing, so the commit has to stay silent`,
+      );
+    }
+
+    // 3. The switcher's own tab, pressed on the catalog it is already on. This is the bug T-66
+    //    fixed: without a mounted key that follows the commit, `navigate(/character/catalog)` asks
+    //    for the key the shell already believed it had, nothing reloads, the URL drops the query and
+    //    the grid keeps the filter.
+    await click("Characters", { exact: true, scope: ".cat-switch a" });
+    const leftBySwitch = await until(
+      "the Characters tab to leave the narrowed view (search cleared, grid unfiltered)",
+      (s) => s.search === "" && s.q === null && !s.busy && s.count === full.count,
+    );
+    if (leftBySwitch.field !== "") {
+      throw new Error(`after the switcher's Characters tab the field still holds ${JSON.stringify(leftBySwitch.field)} — the URL cleared but the page did not remount, so the view and the address disagree`);
+    }
+
+    // 4. The bottom bar's Catalog tab in a narrowed state — the second shape of the same press.
+    await retype('input[name="q"]', word);
+    const reNarrowed = await until(`the second settle to commit q=${JSON.stringify(word)}`, (s) => s.q === word && !s.busy && s.count === narrowed.count);
+    await click("Catalog", { exact: true, scope: ".tabbar a" });
+    const leftByTab = await until(
+      "the bottom bar's Catalog tab to leave the narrowed view",
+      (s) => s.search === "" && s.q === null && !s.busy && s.count === full.count,
+    );
+    if (leftByTab.field !== "") {
+      throw new Error(`after the Catalog tab the field still holds ${JSON.stringify(leftByTab.field)} on ${JSON.stringify(leftByTab.search)} — a page's silent query write left the router's mounted key behind`);
+    }
+    if (!leftByTab.crumb.endsWith(CATALOG_PATH)) {
+      throw new Error(`the shell's crumb reads ${JSON.stringify(leftByTab.crumb)} after the tab press, not ${CATALOG_PATH} — the tab landed somewhere else`);
+    }
+
+    return `typing ${JSON.stringify(word)} committed ${JSON.stringify(narrowed.search)} with ${narrowed.count} of ${full.count} card(s) and **kept the caret in the field** (activeElement ${narrowed.active}) · the switcher's Characters tab cleared the query, the field and the grid (${leftBySwitch.count} card(s), ${JSON.stringify(leftBySwitch.search)}) · a second settle (${JSON.stringify(reNarrowed.search)}) then the bottom bar's Catalog tab did the same (${leftByTab.count} card(s), ${JSON.stringify(leftByTab.search)}, crumb ${JSON.stringify(leftByTab.crumb.trim())})`;
+  }),
+);
+
+results.push(
   await journey("sign out", async () => {
     await go("/");
     await waitText("signed in as", 8000);
@@ -5603,9 +5693,9 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48).
+ * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48, T-66: 49).
  */
-const EXPECTED_ROWS = 48;
+const EXPECTED_ROWS = 49;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

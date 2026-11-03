@@ -570,6 +570,36 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: a page's own `replaceState` query write never notifies the router, so the view and its URL
       can disagree — filed as **T-66**.
 
+- [x] **T-66 A page that writes its own query leaves the router believing something else.**
+      `character/catalog.md` → *URL*: *"The search, the tags, and the sort live in the query string — …
+      so a narrowed view can be shared, bookmarked, and restored by back/forward"*, plus
+      `CONTRACT.md` → *Engineering law* (a phone-first app must not throw the caret away). Found while
+      writing row 48: the page wrote `history.pushState`/`replaceState` itself, so `router.state` and
+      the shell's private `lastKey` stayed on the **pre-query** location — press the **Catalog** tab (or
+      the switcher's **Characters** tab) on a narrowed catalog and `navigate("/character/catalog")`
+      emitted the key the shell already believed it mounted: nothing reloaded, the URL dropped the
+      query and the grid kept it. The spec's shareable narrowed view was broken in the one state a
+      reader narrows by hand, and no gate and no row of 48 could see it. Fix: **the router owns the
+      mounted key** (`getMountedKey()`/`setMountedKey()`; `emit()` never touches it), and the new
+      **`commitQuery(search, mode)`** writes history, refreshes `state` and moves the key **without**
+      emitting — so the settle keeps the caret and the next press on the same route is a real remount.
+      All seven pages that wrote history directly now go through it (`character-catalog`,
+      `lorebook-catalog`, `preset-catalog`, `persona-collection`, `bookmarks`, `post-thread`,
+      `user-profile`), and **gate section 9** (`scripts/history-check.mjs`) fails the build if any file
+      but `router.ts` touches history. Row **49** (`EXPECTED_ROWS` 49) types a word into the catalog's
+      search and asserts the **field still has focus** after the settle, then presses **Characters**
+      (`.cat-switch`) and the bottom bar's **Catalog** tab in a narrowed state — search cleared, field
+      empty, `location.search === ""`, the full grid and the crumb's path — and row 48's `go("/")`
+      workaround is gone (its bare-route hop now remounts and the row asserts it). Red first, twice:
+      dropping `mountedKey` from `commitQuery()` → *"the bare catalog to remount after the settle's
+      commit … {"count":1,"field":"Lamplighter's"}"* (47/49); `character-catalog`'s `writeQuery()`
+      calling `navigate()` → **row 49 alone** in 729ms: *"the search field lost the caret the moment it
+      settled (document.activeElement is BODY., the field reads "Lamplighter's", URL
+      "?q=Lamplighter%27s") — a query write that emits remounts the page mid-typing"* (48/49). Bytes
+      restored. 49/49 local and 49/49 `--live`. Brief: `docs/NEXT.md` (T-66).
+      Found: six pages commit a query the walk never reads (`/bookmarks`, the two other catalogs,
+      `/persona`) — filed as **T-67**.
+
 - [x] **T-64 The profile's four tabs are a URL fact, and a follower is drawn as a catalog card.**
       `user/profile.md` → *Layout* / *Actions* / *URL*: four tabs in `?tab=`, the creations filter in
       `?type=` (**read on that tab only**), and *"Followers and Following are drawn with the catalog
