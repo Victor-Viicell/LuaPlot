@@ -5914,6 +5914,297 @@ results.push(
   }),
 );
 
+/**
+ * The three pages T-66 moved onto `commitQuery()` that no row had ever typed into (T-68).
+ *
+ * The two catalogues are one toolbar over another entity and write `?q=&tags=&sort=`; `/persona`
+ * writes `?q=&sort=` only and draws `.persona-card` rows instead of catalogue cards. Each descriptor
+ * carries the **page's own** selectors and labels, so a red names the page it was reading.
+ */
+const TOOLBAR_PAGES = [
+  { path: "/lorebook/catalog", owner: "catalog", grid: "Lorebooks", emptyCatalog: "No lorebooks yet." },
+  { path: "/preset/catalog", owner: "catalog", grid: "Presets", emptyCatalog: "No presets yet." },
+  { path: "/persona", owner: "personas", grid: "Your personas", emptyCatalog: "" },
+];
+
+results.push(
+  await journey("the other three toolbars: a search that keeps the caret, a tag that reaches the listing, a sort that names itself", async () => {
+    /** One read of everything the three passes assert, whichever of the three pages is mounted. */
+    const read = () =>
+      js(`
+        const params = new URLSearchParams(location.search);
+        const text = (el) => (el ? String(el.textContent || "").replace(/\\s+/g, " ").trim() : "");
+        const cards = [...document.querySelectorAll(".card-cell .card")];
+        const personas = [...document.querySelectorAll(".persona-card")];
+        const field = document.querySelector('input[name="q"]');
+        const select = document.querySelector('select[name="sort"]');
+        const grid = document.querySelector(".card-grid[aria-label]");
+        const active = document.activeElement;
+        return {
+          search: location.search,
+          q: params.get("q"),
+          tags: params.get("tags"),
+          sort: params.get("sort"),
+          owner: document.querySelector(".personas-page") ? "personas" : document.querySelector(".catalog") ? "catalog" : "other",
+          grid: grid ? String(grid.getAttribute("aria-label") || "") : "",
+          count: cards.length,
+          titles: cards.map((card) => text(card.querySelector(".card-title"))),
+          personas: personas.length,
+          names: personas.map((card) => text(card.querySelector(".persona-card-name"))),
+          tagSets: cards.map((card) => [...card.querySelectorAll(".card-tags.is-measure .card-tag")].map(text)),
+          chips: [...document.querySelectorAll(".tagpicker .tag-chip-text")].map(text),
+          field: field ? field.value : "",
+          focused: !!field && active === field,
+          active: active ? active.tagName + "." + (active.className || "") : "none",
+          sortValue: select ? select.value : "",
+          sortLabel: select && select.selectedOptions[0] ? text(select.selectedOptions[0]) : "",
+          skeletons: document.querySelectorAll(".skel-card").length,
+          noResults: text(document.querySelector(".no-results")),
+          empty: text(document.querySelector(".empty-copy")),
+          actions: [...document.querySelectorAll(".personas-page button, .personas-page a, .empty button, .empty a")].map((el) => text(el)),
+        };
+      `);
+
+    /** A poll that always names the page it was on and the whole read it last saw (T-53). */
+    const until = async (path, label, check, timeout = 12000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await read();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${path}: ${label} — read ${JSON.stringify(last)}`);
+    };
+
+    /** A page's drawn rows and their count, in whichever shape it draws them. */
+    const rowsOf = (page, s) => (page.owner === "personas" ? s.names : s.titles);
+    const countOf = (page, s) => (page.owner === "personas" ? s.personas : s.count);
+
+    /** The word to type: the longest in a row's own name, so the row that named it must survive. */
+    const longestWord = (label, min) => {
+      const parts = String(label)
+        .split(/\s+/)
+        .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= min);
+      return parts.sort((a, b) => b.length - a.length)[0] || String(label);
+    };
+
+    /** A fresh mount of one of the three pages: its own toolbar, its own listing, nothing set. */
+    const freshPage = async (page) => {
+      await go(page.path);
+      const state = await until(
+        page.path,
+        "the page to draw its toolbar and its first rows",
+        (s) => s.owner === page.owner && s.skeletons === 0 && countOf(page, s) > 0,
+      );
+      if (state.grid !== page.grid) {
+        throw new Error(
+          `${page.path}: the grid is labelled ${JSON.stringify(state.grid)}, not ${JSON.stringify(page.grid)} — the row has to be reading this page's own listing, not a skeleton or another page`,
+        );
+      }
+      if (state.q !== null || state.tags !== null || state.sort !== null) {
+        throw new Error(
+          `${page.path} opens on ${JSON.stringify(state.search)} — the search, the tags and the sort are the reader's, so not one of them starts set`,
+        );
+      }
+      if (state.field !== "") throw new Error(`${page.path} opens with the search field holding ${JSON.stringify(state.field)}, not an empty one`);
+      if (state.sortValue !== "newest" || state.sortLabel !== "Newest") {
+        throw new Error(`${page.path}'s sort control opens reading ${JSON.stringify([state.sortValue, state.sortLabel])}, not newest / Newest`);
+      }
+      return state;
+    };
+
+    // 1. The search: one word from a row's own name, committed silently, and the caret stays. The
+    //    URL it writes is the state — a mount from it preloads the field and draws the same rows.
+    const searchPass = async (page, full) => {
+      const first = rowsOf(page, full)[0] || "";
+      if (!first) {
+        throw new Error(`${page.path}: its first row draws no name (read ${JSON.stringify(rowsOf(page, full))}) — the word has to come from a row that exists`);
+      }
+      const word = longestWord(first, page.owner === "personas" ? 4 : 5);
+      await retype('input[name="q"]', word);
+      const narrowed = await until(page.path, `the settle to commit q=${JSON.stringify(word)}`, (s) => s.q === word && s.skeletons === 0);
+      const count = countOf(page, narrowed);
+      if (count === 0 || count > countOf(page, full)) {
+        throw new Error(
+          `${page.path}: ?q=${word} draws ${count} of the ${countOf(page, full)} row(s) the page draws unfiltered — the word came from a row's own name, so that row has to survive its own search`,
+        );
+      }
+      if (page.owner !== "personas" && count >= countOf(page, full)) {
+        throw new Error(`${page.path}: ?q=${word} draws all ${count} row(s) — the search has to narrow the listing, and this word is on every row`);
+      }
+      if (!rowsOf(page, narrowed).some((label) => label.includes(word))) {
+        throw new Error(
+          `${page.path}: ?q=${word} drops ${JSON.stringify(first)} (read ${JSON.stringify(rowsOf(page, narrowed))}) — the row whose own name the word came from must survive its own search`,
+        );
+      }
+      if (!narrowed.focused) {
+        throw new Error(
+          `${page.path}: the search field lost the caret the moment it settled (document.activeElement is ${narrowed.active}, the field reads ${JSON.stringify(narrowed.field)}, URL ${JSON.stringify(narrowed.search)}) — a query write that emits remounts the page mid-typing, so the commit has to stay silent and go through commitQuery()`,
+        );
+      }
+      await go(`${page.path}?q=${encodeURIComponent(word)}`);
+      const restored = await until(
+        page.path,
+        `a mount from ?q=${word} to preload the field and draw the same rows`,
+        (s) => s.q === word && s.field === word && s.skeletons === 0,
+      );
+      if (JSON.stringify(rowsOf(page, restored)) !== JSON.stringify(rowsOf(page, narrowed))) {
+        throw new Error(
+          `${page.path}: a mount from ?q=${word} draws ${JSON.stringify(rowsOf(page, restored))}, not the ${JSON.stringify(rowsOf(page, narrowed))} the typed query drew — one query, two listings`,
+        );
+      }
+      return { word, narrowed, restored, count };
+    };
+
+    // 2. The tag field. Its vocabulary is the adapter's `listTags` over the entity's own cards, so a
+    //    **chip** can only be pressed when a fixture carries a tag — every lorebook and preset
+    //    fixture ships `tags: []` (T-68's find), so both branches are written and the empty one is the
+    //    state a reader actually has: the menu says so, and the URL→field→adapter road is still walked
+    //    (the chip prints, the listing empties, Clear filters restores it).
+    const tagPass = async (page, full) => {
+      const frequency = new Map();
+      for (const set of full.tagSets) for (const tag of set) frequency.set(tag, (frequency.get(tag) || 0) + 1);
+      const rarest = frequency.size > 0 ? [...frequency.entries()].sort((a, b) => a[1] - b[1])[0] : null;
+
+      await freshPage(page);
+      await clickSelector(".tagpicker-field");
+      await waitFor(
+        `document.querySelectorAll(".tagpicker-option").length > 0 || document.querySelectorAll(".tagpicker-empty").length > 0`,
+        `${page.path}: the tag menu to open`,
+        6000,
+      );
+      const menu = await js(`
+        const empty = document.querySelector(".tagpicker-empty");
+        return {
+          options: [...document.querySelectorAll(".tagpicker-option")].map((o) => (o.textContent || "").trim()),
+          empty: empty ? String(empty.textContent || "").trim() : "",
+        };
+      `);
+
+      if (rarest) {
+        const tag = rarest[0];
+        const picked = await js(`
+          const el = [...document.querySelectorAll(".tagpicker-option")].find((o) => (o.textContent || "").trim() === ${JSON.stringify(tag)});
+          if (!el) return false;
+          el.scrollIntoView({ block: "center" });
+          el.click();
+          return true;
+        `);
+        if (!picked) {
+          throw new Error(
+            `${page.path}: the tag menu offers ${JSON.stringify(menu.options)} but not ${JSON.stringify(tag)} — the picker's vocabulary is the adapter's listTags, and this tag came off a card the page draws`,
+          );
+        }
+        const tagged = await until(page.path, `the ${JSON.stringify(tag)} chip to reach the URL`, (s) => s.tags === tag && s.skeletons === 0);
+        const count = countOf(page, tagged);
+        if (JSON.stringify(tagged.chips) !== JSON.stringify([tag])) {
+          throw new Error(`${page.path}: the tag field reads ${JSON.stringify(tagged.chips)} on ?tags=${tag}, not one chip holding it — the field prints what the URL selects`);
+        }
+        if (count === 0 || count > countOf(page, full)) {
+          throw new Error(`${page.path}: ?tags=${tag} draws ${count} of the ${countOf(page, full)} row(s) the unfiltered page draws — a tag filter selects rows, it never invents or drops the page`);
+        }
+        if (rarest[1] < countOf(page, full) && count >= countOf(page, full)) {
+          throw new Error(
+            `${page.path}: ?tags=${tag} draws all ${count} row(s) although only ${rarest[1]} of them carry it — the chip reached the URL but not the adapter's query`,
+          );
+        }
+        const strays = tagged.tagSets.filter((set) => !set.includes(tag)).length;
+        if (strays > 0) {
+          throw new Error(`${page.path}: ?tags=${tag} drew ${strays} of ${count} card(s) without it (read ${JSON.stringify(tagged.tagSets)}) — the filter is on each item's own tags`);
+        }
+        return `the ${JSON.stringify(tag)} chip pushed ${JSON.stringify(tagged.search)} with ${count} card(s), every one carrying it`;
+      }
+
+      // No card draws a tag: the menu must say so rather than invent a vocabulary of its own.
+      if (menu.options.length > 0) {
+        throw new Error(`${page.path}: the picker offers ${JSON.stringify(menu.options)} while no card on the page draws a tag — the vocabulary is listTags over the entity's own tags`);
+      }
+      if (menu.empty === "") {
+        throw new Error(`${page.path}: the tag menu opened with neither an option nor its empty sentence (read ${JSON.stringify(menu)}) — an empty menu is a state, not a blank`);
+      }
+      const tag = "archive";
+      await go(`${page.path}?tags=${tag}`);
+      const tagged = await until(page.path, `?tags=${tag} to reach the tag field and the adapter`, (s) => s.tags === tag && s.skeletons === 0);
+      if (JSON.stringify(tagged.chips) !== JSON.stringify([tag])) {
+        throw new Error(`${page.path}: the tag field reads ${JSON.stringify(tagged.chips)} on ?tags=${tag}, not one chip holding it — the field prints what the URL selects`);
+      }
+      if (countOf(page, tagged) !== 0) {
+        throw new Error(`${page.path}: ?tags=${tag} draws ${countOf(page, tagged)} card(s) although no card on this page carries a tag — the tag reached the field but not the adapter's query`);
+      }
+      if (tagged.empty === "" || tagged.empty === page.emptyCatalog) {
+        throw new Error(
+          `${page.path}: ?tags=${tag} reads ${JSON.stringify(tagged.empty)} — a query that matches nothing is the filters' state, not the empty ${JSON.stringify(page.emptyCatalog)} catalogue`,
+        );
+      }
+      await click("Clear filters", { exact: true });
+      const cleared = await until(
+        page.path,
+        "Clear filters to drop the tag and restore the whole listing",
+        (s) => s.tags === null && s.chips.length === 0 && s.skeletons === 0 && countOf(page, s) === countOf(page, full),
+      );
+      return `no fixture carries a tag, so the picker opens its own empty sentence (${JSON.stringify(menu.empty)}); a pasted ?tags=${tag} prints its chip, draws 0 card(s) with ${JSON.stringify(tagged.empty)}, and Clear filters restores ${JSON.stringify(cleared.search)} with ${countOf(page, cleared)} card(s)`;
+    };
+
+    // 3. The sort: the page's own vocabulary (`newest` / `ratio` for the two catalogues, `newest` /
+    //    `oldest` / `name` for the personas), and the control's **label** is the state's, not its own.
+    const sortPass = async (page, value, label) => {
+      await freshPage(page);
+      await choose('select[name="sort"]', value);
+      const sorted = await until(page.path, `?sort=${value} to reach the URL`, (s) => s.sort === value && s.skeletons === 0);
+      if (sorted.sortLabel !== label) {
+        throw new Error(`${page.path}: ?sort=${value} leaves the control reading ${JSON.stringify(sorted.sortLabel)}, not ${JSON.stringify(label)} — the select prints the state, it does not own it`);
+      }
+      if (countOf(page, sorted) === 0) {
+        throw new Error(`${page.path}: ?sort=${value} draws no row (read ${JSON.stringify(sorted.search)}) — a sort reorders, it does not empty the listing`);
+      }
+      if (value === "name") {
+        const names = rowsOf(page, sorted);
+        const ascending = names.every((name, i) => i === 0 || names[i - 1].localeCompare(name) <= 0);
+        if (!ascending) throw new Error(`${page.path}: ?sort=name draws ${JSON.stringify(names)} — a Name sort orders the rows by their own name`);
+      }
+      return sorted;
+    };
+
+    // A. `/lorebook/catalog` — the full toolbar, and the page most like row 48's own catalogue.
+    const lorebook = TOOLBAR_PAGES[0];
+    const lorebookFull = await freshPage(lorebook);
+    const lorebookSearch = await searchPass(lorebook, lorebookFull);
+    const lorebookTag = await tagPass(lorebook, lorebookFull);
+    const lorebookSort = await sortPass(lorebook, "ratio", "Top rated");
+
+    // B. `/preset/catalog` — the same three facts in one short pass. If the two toolbars differ, that
+    //    is the point of pressing both.
+    const preset = TOOLBAR_PAGES[1];
+    const presetFull = await freshPage(preset);
+    const presetSearch = await searchPass(preset, presetFull);
+    const presetTag = await tagPass(preset, presetFull);
+    const presetSort = await sortPass(preset, "ratio", "Top rated");
+
+    // C. `/persona` — `?q=&sort=` only, no tag field and no `.catalog` root; its rows are
+    //    `.persona-card`s and its loading state is `.skel-card`s inside `.card-cell`s (T-50's lesson:
+    //    an absence count on the first frame reads 3). A search that matches nothing is a *state*
+    //    with its own sentence — never the failed fetch's Retry.
+    const persona = TOOLBAR_PAGES[2];
+    const personaFull = await freshPage(persona);
+    const personaSearch = await searchPass(persona, personaFull);
+    await go(`${persona.path}?q=zzqx-nothing-matches`);
+    const personaNone = await until(
+      persona.path,
+      "the no-match state for a query nothing matches",
+      (s) => s.q === "zzqx-nothing-matches" && s.skeletons === 0 && s.personas === 0 && s.noResults !== "",
+    );
+    const retry = personaNone.actions.filter((label) => label === "Retry" || label === "Try again");
+    if (retry.length > 0) {
+      throw new Error(`${persona.path}: the no-match state offers ${JSON.stringify(retry)} — nothing failed, the name simply matched nothing (that is the fetch's state, not the search's)`);
+    }
+    const personaSort = await sortPass(persona, "name", "Name");
+
+    return `${lorebook.path}: a fresh mount reads ${JSON.stringify(lorebookFull.search)} with ${lorebookFull.count} card(s) of ${JSON.stringify(lorebookFull.grid)} and Newest selected · typing ${JSON.stringify(lorebookSearch.word)} committed ${JSON.stringify(lorebookSearch.narrowed.search)} with ${lorebookSearch.count} of ${lorebookFull.count} card(s) and **kept the caret** (activeElement ${lorebookSearch.narrowed.active}), and a mount from that URL preloads the field and draws the same rows · ${lorebookTag} · ?sort=ratio reads ${JSON.stringify(lorebookSort.sortLabel)} at ${JSON.stringify(lorebookSort.search)} · ${preset.path} reads ${JSON.stringify(presetFull.search)} with ${presetFull.count} card(s), typing ${JSON.stringify(presetSearch.word)} committed ${JSON.stringify(presetSearch.narrowed.search)} with ${presetSearch.count} and kept the caret, ${presetTag}, and ?sort=ratio reads ${JSON.stringify(presetSort.sortLabel)} · ${persona.path} reads ${JSON.stringify(personaFull.search)} with ${personaFull.personas} persona card(s), typing ${JSON.stringify(personaSearch.word)} committed ${JSON.stringify(personaSearch.narrowed.search)} with ${personaSearch.count} and kept the caret, ?q=zzqx-nothing-matches reads ${JSON.stringify(personaNone.noResults)} with no Retry, and ?sort=name reads ${JSON.stringify(personaSort.sortLabel)} with ${JSON.stringify(rowsOf(persona, personaSort))}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -5938,9 +6229,9 @@ chrome.kill("SIGKILL");
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
  * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48, T-66: 49,
- * T-67: 50).
+ * T-67: 50, T-68: 51).
  */
-const EXPECTED_ROWS = 50;
+const EXPECTED_ROWS = 51;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

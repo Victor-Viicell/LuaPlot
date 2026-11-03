@@ -1,79 +1,45 @@
 # Baton — what the next session does
 
-**T-67 landed.** The saved page's four tabs, its search and its sort are one row now, and the clause
-that mattered turned a dead control into a working one: `chooseTab()` returned early when the pressed
-tab was the one already selected, so on `?type=lorebook&q=Archive` the only road back to the tab's
-whole list (there is no `Clear search` outside the no-results state) was **nothing at all**. A
-same-tab press is *this tab, unfiltered* now — it clears the search (and a settle that has not fired)
-and pushes `?type=lorebook`. Row **50** walks eight facts on this page, because it is the only one
-whose *tab* write is a `push` and whose *search* write is a `replace`: a fresh mount writes its own
-`?type=` on boot with counts `[3,2,1,2]`; **Lorebooks** pushes `?type=lorebook`; that URL pasted by
-address draws the same two rows; `?sort=name` reads **Title A–Z** and orders the titles; Back returns
-the tab **and** its control; typing `Archive` commits silently **and keeps the caret**; a mount from
-`?type=lorebook` — the URL the page wrote *before* the search — remounts the whole tab (the key
-seam); a sort under the search keeps it and Back returns `?type=lorebook&q=Archive` with the field
-holding the word; and pressing **Lorebooks** on itself clears it. 50/50 local and 50/50 `--live`.
+**T-68 landed.** The three pages T-66 moved onto `commitQuery()` and no row had ever typed into are
+walked: **row 51** reads `/lorebook/catalog`, `/preset/catalog` and `/persona` with one shared
+reader and a `TOOLBAR_PAGES` table, so every failure message names the page it was on. It proves a
+fresh mount is blank (`""`, empty field, Newest selected, the grid's own label), that a word from a
+row's own name commits `?q=` **and keeps the caret**, that a mount from that URL preloads the field
+and draws the same rows, that the sort writes `?sort=` with its **label** on the control
+(`ratio` → **Top rated** on both catalogues, `name` → **Name** with the persona names ascending),
+and that `/persona`'s no-match state is its own sentence with **no** Retry. 51/51 local and
+51/51 `--live`.
 
-Red first, twice, both restored to the byte:
+Red first, aimed at one page's seam: `lorebook-catalog.tsrx`'s `writeQuery()` → `navigate(path,
+{ replace })` gave **50/51** with row 51 alone at *"/lorebook/catalog: the search field lost the
+caret the moment it settled (document.activeElement is BODY., the field reads "Cartographer's", URL
+"?q=Cartographer%27s")"*. Two things the ticket got wrong, both recorded in `PROGRESS.md`: the
+catalogues' sort vocabulary is `newest` / `ratio` (not `recent` / `oldest`), and the tag half has no
+fixture to press (see below).
 
-1. **The whole key.** Dropping `mountedKey = …` from `commitQuery()` → 47/50; row 50 aborted at
-   *"Back to return the unsorted tab"* with `sortValue: "name"` on a URL that no longer carried
-   `?sort=` — one clause **too early** for the seam the row exists for (see the lesson below).
-2. **The replace.** `if (mode === "push") mountedKey = …` — a *replace* commit leaves the key stale —
-   → 47/50, row 50 alone at *"a mount from ?type=lorebook (the URL the page wrote before the search)
-   to remount the whole tab — read {…, "count":1, "titles":["The Salt Archive"], "field":"Archive"}*.
+## T-69 — the persona no-match sentence runs two words together
 
-## T-68 — the other three pages that commit a query, one press each
+**Brief: `docs/tickets/T-69-no-results-copy.md`** — read it before touching the page.
 
-**Why it is next.** T-66 moved **seven** pages onto `commitQuery()` and one row walks each half of
-that: row 49 the character catalog, row 50 `/bookmarks`. The other three — `/lorebook/catalog`,
-`/preset/catalog` and `/persona` — are the same toolbar over another entity and **no row has ever
-typed into any of them**. The two catalogs write `?q=&tags=&sort=` and carry the tag chips; `/persona`
-writes `?q=&sort=` only. A page that rewrote `writeQuery()` back to `navigate()` (a caret lost
-mid-typing), a tag chip that never reaches the adapter, a sort vocabulary copied wrong, or a persona
-search that dies on a pasted URL are green in every gate and in all 50 rows.
+**Why it is next.** Row 51 read the no-match state's own text and it came back
+`No persona matches that name. Create oneif it is not here yet.` — the source writes `</a> if it is
+not here yet.`, so the **text node after an inline element lost its leading space** to Ripple's
+literal trimming. A reader sees a misspelt sentence on a page whose copy the spec quotes; the walk
+proved it and nothing yet fails on it. That is the same class of defect as a dead control: visible,
+harmless to every gate, and cheap to catch once a row reads the string.
 
-**Approach** — row **51** (`EXPECTED_ROWS` 50 → 51), read-only, placed after row 50 and before
-`sign out`:
+**Approach.** One `{" "}` after the link on `/persona`, then **sweep the class** (`</a> `, `</span `,
+`</b ` followed immediately by a letter in a text block — write the sweep as a `.py` under `$TMPDIR`
+and apply it bottom-up), then **one clause in row 51**: the sentence must contain `"Create one if"`
+and must not contain `"oneif"`. `EXPECTED_ROWS` stays **51** — the row gains a clause, not a row.
 
-1. **`/lorebook/catalog` first** — the full toolbar, and the page most like the one row 48 already
-   covers, so a failure here is the page's and not the row's. Assert: a fresh mount reads `""` and
-   an empty field; typing a word from the **first card's own title** commits `?q=<word>`, narrows the
-   grid, **keeps the caret**, and a mount from that URL preloads the field and draws the same cards;
-   a tag chip (the page's own vocabulary — read the card's `.card-tags` and pick one) writes
-   `?tags=<tag>` and narrows; the sort writes `?sort=<value>` with its **label** on the control.
-2. **`/preset/catalog`** — the same three facts in one short pass: search commit + caret, one tag,
-   one sort. If the two catalogs' toolbars differ, that is the point of pressing both.
-3. **`/persona`** — `?q=&sort=` only, **no** tag param and no `.catalog` root: it is `.personas-page`,
-   its cards are `.persona-card`, and its loading state is `.card-cell`s of `.skel-card` (T-50's
-   lesson — an absence count on the first frame reads `3`). Search commit + caret, then `?sort=`.
-4. Every failure message names **the page it was on** — one row that reads three toolbars must not
-   fail in the third and name the second.
+**Traps.** The reader must keep reading `textContent` collapsed through `\s+` (a real space survives
+that, so the absence is the DOM's); the empty-collection branch is a different sentence and a
+different state (`?q=zzqx-nothing-matches` is what draws this one); the catalogues use
+`.empty-copy`, not `.no-results`. The ticket carries all of it.
 
-**Traps**
-
-- **The sort vocabulary is the page's** (`recent` / `oldest` / `name` for the two catalogs, and read
-  `SORT_OPTIONS` on `/persona` before asserting anything) — `?sort=newest` is not a param any of them
-  writes. Assert the **label**, not just the value.
-- **Read counts, never pin them.** The three listings are the fixture's, and rows 41/42/45/50 moved
-  the store: a persona was spliced out (row 41 leaves **two**) and posts, bookmarks and profile rows
-  changed. Assert *narrowed* < *full*, never a number.
-- **`/persona` is behind the session, not behind a gate.** The walk is signed in; nothing there
-  writes a preference, but a search that clears must not offer a `Retry` (that is the failed fetch's
-  state, T-66's catalog row asserts the same).
-- **The `.cat-switch` strip is a navigation, not a query write.** Pressing **Lorebooks** in the
-  switcher leaves `/character/catalog` for `/lorebook/catalog`; do not read it as a toolbar press.
-- **A tag chip's value is page-read.** Row 48 read `ghost` and `artisan` off the character grid;
-  these two pages list other fixtures, so take the tags off **their own** first card, and assert the
-  union only if the page's own cards prove an item without the tag exists.
-- **`commitQuery()` is the only seam** (gate section 9): a page that types and remounts will lose
-  the caret, and it must show as a caret failure, not as a URL failure, or the next session will
-  edit the wrong line (T-66's lesson).
-
-**Accept:** `./scripts/check.sh` GREEN; walk **51/51** locally and **51/51 `--live`**; the assertion
-proved **red** first — cheapest aim: **one** page's `writeQuery()` calling `navigate(path, {replace})`
-(`scripts/history-check.mjs` does not see it, the write is still inside the page) — and name the
-message in PROGRESS; `publish.sh` prints `LIVE` and `curl` is 200.
+**Accept.** `check.sh` GREEN, 51/51 local and 51/51 `--live`, the clause proved red by reverting the
+`{" "}` (name the message in `PROGRESS.md`), `publish.sh` prints `LIVE`, `curl` is 200.
 
 ## Blocked — what a human must do
 
@@ -102,18 +68,29 @@ message in PROGRESS; `publish.sh` prints `LIVE` and `curl` is 200.
 
 ## Open decisions
 
-- **T-68 is the ticket: the other three pages that commit a query (found by T-67).** Failure-bank entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
+- **T-69 is the ticket: a sentence that lost a word break (found by T-68's row 51).** Failure-bank
+  entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
-  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). With the catalog toolbar (row 48: `?q=`, `?tags=`,
-  `?sort=`, the 250ms settle and the `+N` fold) and the seam it exposed (row 49: caret, the two tab
-  presses) now walked, the next work is **coverage of the three pages that are still unwalked** —
-  `/lorebook/catalog`, `/preset/catalog` and `/persona`, the catalog's toolbar over another entity
-  (T-67 walked `/bookmarks`, the one page whose tab write is a `push`). A regression in any of the
-  three is invisible to all 50 rows.
-- **Row count is 50 after T-67.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every page that commits a query now has a row
+  (48 the character catalog, 49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and
+  `/persona`), so what is left unblocked is the **defects those rows find** rather than more
+  surface. Row 51's first find is copy: `/persona`'s no-match state renders
+  `Create oneif it is not here yet.` — a literal after an inline element loses its leading space to
+  Ripple's trimming.
+- **The tag field's press is blocked on a decision, not on work.** Every lorebook and preset
+  fixture ships `tags: []`, and `schema.ts`'s own comment says they stay empty *while the taxonomy is
+  undecided* — so `listTags("lorebook")` / `("preset")` answer `[]`, the picker opens its empty
+  sentence, and there is no chip to press. Row 51 asserts that empty state **and** the pasted-`?tags=`
+  road (chip prints, 0 cards, *"Nothing matches those filters."*, Clear filters restores), and its
+  **press branch is already written** — it runs the day a fixture carries a tag. The owner must
+  either record a tag vocabulary for lorebooks and presets in `docs/DESIGN.md` (and then a ticket
+  seeds two or three tags, leaving one card tagless so `catalog.md`'s *an item with none renders no
+  row and no placeholder* finally has a target) or accept that the press stays unwalkable.
+- **Row count is 51 after T-68.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
   it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
-  added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 added 50; T-68 adds 51**). **Rows 36 and 37
+  added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 added 50; T-68 added 51; T-69 adds
+  none**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -239,6 +216,27 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   arithmetic, write a `.py` under `$TMPDIR` and run `python3 <file>`.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **A literal after an inline element loses its word break, and only a row that reads the string sees
+  it (T-68).** `/persona`'s no-match sentence is written `</a> if it is not here yet.` and renders
+  `Create oneif it is not here yet.` — Ripple trims the leading whitespace of the text node that
+  follows an element, while an explicit `{" "}` survives. Every page that writes copy around a link
+  has the same shape; a row must assert the **words**, not just that the sentence is non-empty.
+- **Every lorebook and preset fixture ships `tags: []`, so the tag picker has no vocabulary on those
+  two pages (T-68).** `schema.ts` says they stay empty *while the taxonomy is undecided*, and
+  `Card.tsrx` draws **no** `.card-tags` row at all for an item with none — so the "no tags → no row,
+  no placeholder" rule has no *tagged* neighbour to be absent beside. The tag **chip's press** is
+  therefore unwalkable on `/lorebook/catalog` and `/preset/catalog`; the character catalog's fixtures
+  do carry tags, which is why row 48's `?tags=` half works. Row 51 branches on the fixture: press
+  branch when a card carries a tag, picker-empty + pasted-`?tags=` road when none does.
+- **The catalogues' sort vocabulary is `newest` / `ratio`, not `recent` / `oldest` (T-68).** Both
+  `SORT_OPTIONS` tables read `Newest` / `Top rated`; only `/persona` has `Oldest` / `Name`. A ticket
+  that sketches a param is a hypothesis — read the page's own table before asserting a label.
+- **A row that reads three pages needs the page's name in every message and in its reader (T-68).**
+  Row 51's poll helper takes the `path` as its first argument and prefixes every timeout with it, and
+  its `TOOLBAR_PAGES` table carries each page's grid `aria-label` (`Lorebooks` / `Presets` /
+  `Your personas`) so a row that mounted the wrong page fails at the label instead of proving the
+  second page's facts on the third's DOM.
 
 - **A tab pressed on itself was the only road out of a `/bookmarks` search, and it was dead (T-67).**
   `Clear search` exists only in the no-results state, so once a search narrowed a tab a reader had no

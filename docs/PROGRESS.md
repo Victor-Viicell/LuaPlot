@@ -3,6 +3,40 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-68: the other three toolbars, one press each
+
+- **Changed:** `scripts/smoke.mjs` — new walk **row 51**, `EXPECTED_ROWS` 50 → 51, read-only: a
+  `TOOLBAR_PAGES` table of the three query-committing pages T-66 moved and no row had typed into
+  (`/lorebook/catalog`, `/preset/catalog`, `/persona`) with one shared reader, and three passes per
+  catalogue — a fresh mount (no `?q=`/`?tags=`/`?sort=`, empty field, Newest selected, the grid's own
+  label), the silent search (a word from the first row's own name, `?q=` committed **with the caret
+  still in the field**, then a mount from that URL preloading the field and drawing the same rows),
+  the tag field, and the sort (`?sort=ratio` / **Top rated**; `/persona`'s `?sort=name` / **Name**
+  with the names ascending). `/persona` also asserts the no-match state is its own sentence and
+  offers **no** Retry. No product code changed. Docs: `SHIP-PLAN.md` (T-68 ticked), `NEXT.md` (T-69
+  baton + three new "found while working" notes).
+- **Verified:** red first — `lorebook-catalog.tsrx`'s `writeQuery()` swapped to
+  `navigate(path, { replace })` (with `void commitQuery;` to keep it type-clean) → **50/51**, row 51
+  alone: *"/lorebook/catalog: the search field lost the caret the moment it settled
+  (document.activeElement is BODY., the field reads "Cartographer's", URL "?q=Cartographer%27s") —
+  a query write that emits remounts the page mid-typing"*; bytes restored (`git status` clean of the
+  page). Then **51/51** locally and **51/51 `--live`** against
+  https://victor-viicell.github.io/LuaPlot/ (curl 200; `publish.sh` printed
+  `LIVE_JS=assets/index-BWZZlNKL.js`). Row 51 evidence: `/lorebook/catalog` reads `""` with **5**
+  cards, `?q=Cartographer's` narrows to **1** and keeps the caret, `?sort=ratio` reads **Top rated**;
+  `/preset/catalog` reads `""` with **4** cards, `?q=Two-Hander` narrows to **1**, same sort;
+  `/persona` reads `""` with **2** persona cards, `?q=Ash` narrows to **1**, `?sort=name` reads
+  **Name** with `["Ash","The Correspondent"]`.
+- **Not verified:** the **tag chip's press** — every lorebook and preset fixture ships `tags: []`
+  (`src/lib/fixtures/lorebooks.ts`, `presets.ts`), so the picker's menu is legitimately empty and its
+  vocabulary (`listTags`) has nothing to offer. Row 51 asserts that empty state (the picker's own *"No
+  other tags yet."*) **and** the URL→field→adapter road a pasted `?tags=archive` still proves (chip
+  prints, 0 cards, *"Nothing matches those filters."*, Clear filters restores the listing), and its
+  press branch is written and will run the day a fixture carries a tag. Filed as **T-69**. Also
+  unverified: the ticket's `recent`/`oldest` sort vocabulary was wrong — both catalogues are
+  `newest`/`ratio` (`SORT_OPTIONS`), only `/persona` has `oldest`/`name`; row 51 reads the pages'
+  own values.
+
 ## 2026-11-03 — T-67: the saved page's tabs are the query, and a tab pressed on itself leaves the search
 
 - **Changed:** `src/pages/bookmarks.tsrx` — `chooseTab()` no longer returns early when the pressed tab

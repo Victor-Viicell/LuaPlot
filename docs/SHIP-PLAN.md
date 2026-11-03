@@ -634,6 +634,29 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-68 The other three pages that commit a query, one press each.**
+      T-66 moved seven pages onto `commitQuery()` and one row walked each half of that: row 49 the
+      character catalog, row 50 `/bookmarks`. `/lorebook/catalog`, `/preset/catalog` and `/persona`
+      were the same toolbar over another entity and **no row had ever typed into any of them** — a
+      `writeQuery()` reverted to `navigate()` (a caret lost mid-typing), a sort vocabulary copied
+      wrong, or a persona search that dies on a pasted URL was green in every gate and all 50 rows.
+      Row **51** (`EXPECTED_ROWS` 50 → 51, **read-only**) reads three pages with one shared reader
+      and a `TOOLBAR_PAGES` table carrying each page's own grid label: `/lorebook/catalog` (5 cards,
+      `?q=Cartographer's` → 1 of 5, caret `INPUT.field-input`, `?sort=ratio` = **Top rated**),
+      `/preset/catalog` (4 cards, `?q=Two-Hander` → 1, same sort), and `/persona` (2 `.persona-card`s
+      after row 41; `?q=Ash` → 1, `?sort=name` = **Name** with `["Ash","The Correspondent"]`, and
+      `?q=zzqx-nothing-matches` is its own *"No persona matches that name."* state with **no** Retry).
+      Every failure message names the page it was on. Red first, aimed at the seam:
+      `lorebook-catalog.tsrx`'s `writeQuery()` → `navigate(path, { replace })` (plus `void
+      commitQuery;` to keep the build clean) gave **50/51** and row 51 alone: *"/lorebook/catalog: the
+      search field lost the caret the moment it settled (document.activeElement is BODY., the field
+      reads "Cartographer's", URL "?q=Cartographer%27s") — a query write that emits remounts the page
+      mid-typing"*. Bytes restored, then 51/51 local and 51/51 `--live`. Brief: `docs/NEXT.md` (T-68).
+      Found: **every lorebook and preset fixture ships `tags: []`**, so the tag picker's vocabulary
+      (`listTags`) is empty on both pages and a **chip's press** cannot be walked — the row asserts
+      the picker's own *"No other tags yet."* and the pasted-`?tags=` road instead, and its press
+      branch waits on a fixture — filed as **T-69**.
+
 - [x] **T-64 The profile's four tabs are a URL fact, and a follower is drawn as a catalog card.**
       `user/profile.md` → *Layout* / *Actions* / *URL*: four tabs in `?tab=`, the creations filter in
       `?type=` (**read on that tab only**), and *"Followers and Following are drawn with the catalog
