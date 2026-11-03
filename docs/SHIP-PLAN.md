@@ -634,6 +634,30 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-74 `moderation-detail`'s split is a *different* composition and no row had rendered it.**
+      The fourth detail page is the only one that is not the `lg` grid: its `.cols` is a flex column on a
+      phone that becomes a **flex row at `md 900`** (not 1200), its aside is `flex: 0 0 340px` with
+      `position: sticky; top: 24px`, and it sets **no `order`** — the decision panel deliberately sits
+      *below* the description, the opposite of the three catalogue detail pages. No row had taken an
+      override on it, so a row that copied row 54's assertions would have been red on a right page, and a
+      collapsed 340px panel, a sticky box that never became static again, or an aside under the main was
+      green in `check.sh`, in 54 rows and on the live walk. Row **55** (`EXPECTED_ROWS` 54 → 55,
+      **read-only**) opens `/moderation/4e90047a-…0002?admin=1` (row 20's road; row 20 has already
+      concluded that case, so the aside draws the decision record — same composition), reads the title and
+      the `case · post` kicker off the page, takes its own `900×740` and `1200×740` overrides, settles two
+      frames each, clears them in a `finally` and **asserts** `innerWidth` came back (T-32). At 360:
+      `.cols` `flex`/`column`, no grid tracks, aside **below** main (`931.02 > 234.39`), both 308px inside
+      the 340px outlet, computed `position: static`, no horizontal scroll. At 900: `.cols`
+      `flex`/`row`, aside **340** beside the main (`left 507 ≥ main right 475`), tops equal, `sticky` /
+      `top: 24px`, no horizontal scroll. At 1200 the same facts (`.cols` 714 there vs 730 at 900 — the
+      outlet's padding narrows at `lg`, so the two are not the same box and the evidence says so). Red
+      first: deleting `flex: 0 0 340px` from the `md` block put **row 55 alone** red (54/55) reading *"at
+      900px .aside measures 111.05px, not the 340px the md block fixes"*. Bytes restored (`cmp`),
+      `check.sh` **GREEN**, `publish.sh` → `LIVE`, `curl` **200**, 55/55 local and 55/55 `--live`. Brief:
+      `docs/NEXT.md` (T-74).
+      Found: the three catalogue detail pages each keep their **own copy** of the `lg` rules and only
+      `character-detail`'s has ever been rendered — filed as **T-75**.
+
 - [x] **T-73 the detail pages' `lg` two-column composition had never been rendered.**
       Four detail pages share one `.cols` of `.main` + `.aside` — a column on a phone with the aside
       lifted by `order: -1`, a two-column grid from `lg` with a 320px aside (and `moderation-detail`

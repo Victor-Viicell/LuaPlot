@@ -6695,6 +6695,184 @@ results.push(
   }),
 );
 
+/**
+ * T-74 — `moderation-detail` is the fourth detail page and the only one whose split is a **different
+ * composition**: `.cols` is a flex column at 360 and becomes a flex **row at `md 900`** (not 1200),
+ * with a `flex: 0 0 340px` aside that is `position: sticky; top: 24px` and — unlike the three
+ * catalogue detail pages T-73 walked — **no `order` at all**, so the decision panel deliberately sits
+ * *below* the description on a phone. A row that copied row 54's assertions (a grid, the aside above
+ * the main, a 320px track) would be red on a right page, which is why this one exists.
+ *
+ * The case it opens is the one row 20 already concluded (as *removed*), so the aside draws the
+ * decision record instead of the *Decide* panel; the **composition** is identical either way and that
+ * is all this row measures. `?admin=1` is how a case page mounts for the preview account — row 20's
+ * road — and without it the page renders the forbidden arm, which has no `.cols` at all.
+ *
+ * Read-only: it presses no decision control, writes no store row and no preference, takes its own
+ * `900×740` and `1200×740` overrides, clears them in a `finally` and then **asserts** `innerWidth`
+ * came back (T-32: a leaked override mis-measures every later row, and the sign-out row is next).
+ */
+const MODERATION_SPLIT_PATH = "/moderation/4e90047a-0000-4000-8000-000000000002?admin=1";
+
+results.push(
+  await journey("/moderation/[id] becomes a 340px sticky decision column beside the case at 900", async () => {
+    await go(MODERATION_SPLIT_PATH);
+    await waitFor(
+      'document.querySelector(".case .cols .main") !== null && document.querySelector(".case .cols .aside") !== null && (document.querySelector(".case h1.title") || {}).textContent !== ""',
+      "the case page's .main + .aside composition",
+      12000,
+    );
+
+    /**
+     * One reading of the composition at one width. `colsGrid` is read explicitly because this page
+     * is **flex at both ends**: a flex container's `gridTemplateColumns` is `none`, so tracks are
+     * only split when the box really is a grid, and the display is printed beside the count.
+     */
+    const read = () =>
+      js(`
+        const rect = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width) };
+        };
+        const cols = document.querySelector(".case .cols");
+        const cs = cols ? getComputedStyle(cols) : null;
+        const isGrid = !!cs && cs.display.indexOf("grid") >= 0;
+        const aside = document.querySelector(".case .cols .aside");
+        const astyle = aside ? getComputedStyle(aside) : null;
+        return {
+          path: location.pathname + location.search,
+          title: ((document.querySelector(".case h1.title") || {}).textContent || "").trim(),
+          kicker: ((document.querySelector(".case .kicker") || {}).textContent || "").trim(),
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          colsDisplay: cs ? cs.display : "",
+          colsGrid: isGrid,
+          colsFlow: cs ? (isGrid ? cs.gridTemplateColumns : cs.flexDirection) : "",
+          colsTracks: isGrid ? cs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          cols: rect(cols),
+          main: rect(document.querySelector(".case .cols .main")),
+          aside: rect(aside),
+          outlet: rect(document.querySelector(".outlet")),
+          asidePosition: astyle ? astyle.position : "",
+          asideTop: astyle ? astyle.top : "",
+        };
+      `);
+
+    const restore = await js("return window.innerWidth;");
+    const widthOf = { phone: 360, beside: 900, desktop: 1200 };
+    let seen = "";
+    try {
+      /* ------------------------------------------- phone: one column with the panel *below* the case */
+      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.phone, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260); // the media queries settle in two frames; a width read too early is the old box
+      const phone = await read();
+      if (phone.innerWidth !== widthOf.phone) {
+        throw new Error(`the override asked for ${widthOf.phone} and the page measured ${phone.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!phone.path.endsWith("/moderation/4e90047a-0000-4000-8000-000000000002?admin=1")) {
+        throw new Error(`the moderation split row is on ${JSON.stringify(phone.path)}, not the case page — something navigated between the mount and the override`);
+      }
+      if (phone.title === "" || !phone.kicker.toLowerCase().startsWith("case")) {
+        throw new Error(
+          `at ${widthOf.phone}px the page prints title ${JSON.stringify(phone.title)} and kicker ${JSON.stringify(phone.kicker)} — that is not the mounted ready arm of a case page, so the composition measured is not the one under test`,
+        );
+      }
+      if (phone.colsDisplay !== "flex" || phone.colsFlow !== "column") {
+        throw new Error(
+          `at ${widthOf.phone}px .cols computes to display ${JSON.stringify(phone.colsDisplay)} flow ${JSON.stringify(phone.colsFlow)} — the phone reads one column of case then panel`,
+        );
+      }
+      if (phone.colsGrid || phone.colsTracks.length !== 0) {
+        throw new Error(`at ${widthOf.phone}px .cols (display ${JSON.stringify(phone.colsDisplay)}) resolves to the grid tracks ${JSON.stringify(phone.colsTracks)} — it is a flex column there, never a grid`);
+      }
+      if (!(phone.aside.top > phone.main.top + 1)) {
+        throw new Error(
+          `at ${widthOf.phone}px .aside sits at top ${phone.aside.top} and .main at top ${phone.main.top} — the panel is meant to sit BELOW the description here (no order), and a page that lifts it is copying the catalogue detail pages' argument`,
+        );
+      }
+      if (Math.abs(phone.aside.width - phone.main.width) > 1) {
+        throw new Error(`at ${widthOf.phone}px .aside measures ${phone.aside.width}px and .main ${phone.main.width}px — one column means one width, and a mismatched pair is a second track`);
+      }
+      if (phone.main.left < phone.outlet.left - 0.5 || phone.aside.right > phone.outlet.right + 0.5) {
+        throw new Error(
+          `at ${widthOf.phone}px the columns spill outside the outlet: main ${phone.main.left}–${phone.main.right}, aside ${phone.aside.left}–${phone.aside.right}, outlet ${phone.outlet.left}–${phone.outlet.right}`,
+        );
+      }
+      if (phone.asidePosition !== "static") {
+        throw new Error(`at ${widthOf.phone}px .aside computes to position ${JSON.stringify(phone.asidePosition)} — the sticky panel is an md rule, and a 340px sticky box beside a full-width column is the phone showing a desktop page`);
+      }
+      // `>` and not `===`: `html` carries `scrollbar-gutter: stable`, so an unoverflowed document
+      // reports scrollWidth equal to its **client** width. The rule is "no horizontal scroll".
+      if (phone.scrollWidth > phone.innerWidth) {
+        throw new Error(`at ${widthOf.phone}px the document scrolls horizontally: scrollWidth ${phone.scrollWidth} > innerWidth ${phone.innerWidth}`);
+      }
+
+      /* ------------------------------------------------ 900: *this* page's breakpoint, not 1200 */
+      const beside = async (at) => {
+        await send("Emulation.setDeviceMetricsOverride", { width: at, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        const desk = await read();
+        if (desk.innerWidth !== at) {
+          throw new Error(`the override asked for ${at} and the page measured ${desk.innerWidth}`);
+        }
+        if (desk.colsDisplay !== "flex" || desk.colsFlow !== "row") {
+          throw new Error(
+            `at ${at}px .cols computes to display ${JSON.stringify(desk.colsDisplay)} flow ${JSON.stringify(desk.colsFlow)} — the md composition never turns on, so the case page is a stretched phone with a 340px panel promised and never drawn`,
+          );
+        }
+        if (desk.colsGrid) {
+          throw new Error(`at ${at}px .cols computes to display ${JSON.stringify(desk.colsDisplay)} and answers grid tracks ${JSON.stringify(desk.colsTracks)} — this page's aside is flex, not a grid track`);
+        }
+        if (Math.abs(desk.aside.width - 340) > 1) {
+          throw new Error(
+            `at ${at}px .aside measures ${desk.aside.width}px, not the 340px the md block fixes (flex: 0 0 340px) — main ${desk.main.width}px, .cols ${desk.cols.width}px`,
+          );
+        }
+        if (!(desk.aside.left >= desk.main.right - 0.5)) {
+          throw new Error(
+            `at ${at}px .aside spans ${desk.aside.left}–${desk.aside.right} and .main ends at ${desk.main.right} — the panel is not beside the case, it is under it (flex-direction: row is the rule that places it)`,
+          );
+        }
+        if (Math.abs(desk.aside.top - desk.main.top) > 2) {
+          throw new Error(`at ${at}px .aside starts at top ${desk.aside.top} and .main at ${desk.main.top} — align-items: flex-start starts both columns on the same row`);
+        }
+        if (desk.asidePosition !== "sticky") {
+          throw new Error(`at ${at}px .aside computes to position ${JSON.stringify(desk.asidePosition)}, not sticky — the panel is meant to follow a long case`);
+        }
+        if (desk.asideTop !== "24px") {
+          throw new Error(`at ${at}px .aside computes top ${JSON.stringify(desk.asideTop)}, not 24px — the sticky offset is the md block's own number`);
+        }
+        if (desk.main.left < desk.outlet.left - 0.5 || desk.aside.right > desk.outlet.right + 0.5) {
+          throw new Error(
+            `at ${at}px the columns spill outside the outlet: main ${desk.main.left}–${desk.main.right}, aside ${desk.aside.left}–${desk.aside.right}, outlet ${desk.outlet.left}–${desk.outlet.right}`,
+          );
+        }
+        if (desk.scrollWidth > desk.innerWidth) {
+          throw new Error(`at ${at}px the document scrolls horizontally: scrollWidth ${desk.scrollWidth} > innerWidth ${desk.innerWidth}`);
+        }
+        return desk;
+      };
+
+      const nine = await beside(widthOf.beside);
+      /* 1200 repeats the same facts — the shell's outlet caps at 794 at every width ≥ 900, so this is
+         not independent evidence; it proves the composition does not change again above md. */
+      const wide = await beside(widthOf.desktop);
+
+      seen = `${JSON.stringify(nine.title)} (${JSON.stringify(nine.kicker)}) · at ${widthOf.phone}: .cols ${JSON.stringify(phone.colsDisplay)} ${JSON.stringify(phone.colsFlow)} (grid ${phone.colsGrid}, ${phone.colsTracks.length} track(s)), aside below main (tops ${phone.aside.top} > ${phone.main.top}), both ${phone.aside.width}px inside the outlet ${phone.outlet.left}–${phone.outlet.right}, position ${JSON.stringify(phone.asidePosition)}, scrollWidth ${phone.scrollWidth}/${phone.innerWidth} · at ${widthOf.beside}: .cols ${JSON.stringify(nine.colsDisplay)} ${JSON.stringify(nine.colsFlow)} → aside ${nine.aside.width}px beside main right ${nine.main.right} (left ${nine.aside.left}), tops ${nine.aside.top}/${nine.main.top}, ${JSON.stringify(nine.asidePosition)} top ${JSON.stringify(nine.asideTop)}, .cols ${nine.cols.width}px inside the ${nine.outlet.width}px outlet, scrollWidth ${nine.scrollWidth}/${nine.innerWidth} · at ${widthOf.desktop}: the same facts (the shell's outlet caps at 794 at every width ≥ 900, so this is the same measurement one breakpoint up, not independent evidence: .cols ${wide.cols.width}px vs ${nine.cols.width}px, aside ${wide.aside.width}px, ${JSON.stringify(wide.asidePosition)} top ${JSON.stringify(wide.asideTop)}, tops ${wide.aside.top}/${wide.main.top})`;
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const after = await js("return window.innerWidth;");
+    if (after !== restore) {
+      throw new Error(`the override cleared to ${after}px, but the session runs at ${restore}px — a leaked override would mis-measure every later row (the sign-out row is next)`);
+    }
+    return seen;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -6719,9 +6897,9 @@ chrome.kill("SIGKILL");
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
  * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48, T-66: 49,
- * T-67: 50, T-68: 51, T-71: 52, T-72: 53, T-73: 54).
+ * T-67: 50, T-68: 51, T-71: 52, T-72: 53, T-73: 54, T-74: 55).
  */
-const EXPECTED_ROWS = 54;
+const EXPECTED_ROWS = 55;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

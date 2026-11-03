@@ -3,6 +3,29 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-74: the moderation case's split (a `md 900` flex row) is rendered by a walk
+
+- **Changed:** `scripts/smoke.mjs` — **row 55** (`EXPECTED_ROWS` 54 → 55, read-only). `moderation-detail`
+  is the fourth detail page and the only one whose composition differs: `.cols` is a flex column on a
+  phone and a flex **row from 900** (not 1200), `.aside` is `flex: 0 0 340px` with
+  `position: sticky; top: 24px`, and nothing sets `order` — the panel sits *below* the description.
+  The row opens `/moderation/4e90047a-0000-4000-8000-000000000002?admin=1` (row 20's road; row 20 has
+  already concluded that case, so the aside draws the decision record — the composition is identical),
+  reads the title and `case · post` kicker off the page, takes its own `900×740` and `1200×740`
+  overrides, settles two frames each, clears them in a `finally`, then **asserts** `innerWidth` came
+  back. At 360: `.cols` `flex`/`column`, no grid tracks, aside **below** main (931.02 > 234.39), both
+  308px inside the 340px outlet, computed `position: static`, no horizontal scroll. At 900: `.cols`
+  `flex`/`row`, aside **340** beside the main (left 507 ≥ main right 475), tops equal (218.39/218.39),
+  `sticky` / `top: 24px`, no horizontal scroll. At 1200 the same facts.
+- **Verified:** red first — deleting `flex: 0 0 340px` from the `md` block put **row 55 alone** red
+  (54/55) reading *"at 900px .aside measures 111.05px, not the 340px the md block fixes (flex: 0 0
+  340px) — main 586.95px, .cols 730px"*. Bytes restored (`git checkout --` + `cmp`, identical),
+  `check.sh` GREEN, `./scripts/smoke.sh` **55/55**, `publish.sh` → `LIVE`, `curl` **200**,
+  `./scripts/smoke.sh --live` **55/55**.
+- **Not verified:** nothing on a device (no Android toolchain); `position: sticky` is asserted by the
+  computed `position`/`top`, never by a scrolled offset — a real scroll would need a taller case page
+  than the fixtures hold. The tag-vocabulary press is still un-walkable (owner decision, unchanged).
+
 ## 2026-11-03 — T-73: the detail pages' `.main` + `.aside` split is rendered by a walk
 
 - **Changed:** `scripts/smoke.mjs` — **row 54** (`EXPECTED_ROWS` 53 → 54, read-only). Four detail pages
