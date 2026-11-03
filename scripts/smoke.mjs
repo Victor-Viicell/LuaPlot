@@ -6559,6 +6559,15 @@ results.push(
  * rules, and asserts only the facts all three share (two tracks, the second 320px, the aside beside
  * the description on the same row). The page name is in every message, so a red names which copy
  * drifted.
+ *
+ * T-76 finished the other half of those two copies: the **base** block (`display: flex;
+ * flex-direction: column`, `.aside { order: -1 }`) had never been rendered on either page, so
+ * deleting `order: -1` from `preset-detail` would have dropped the engagement row below a 60-line
+ * description on a phone and walked green. The phone arm is one shared `assertPhone()` now, called
+ * for the character page and for both copies, so the three files cannot drift apart unnoticed.
+ * Phase order is character 360 → character 1200 → the pair at 360 → the pair at 1200: the override
+ * is browser-level and survives `go()`, so each phase re-takes it and each reading asserts
+ * `innerWidth` rather than assuming.
  */
 const DETAIL_SPLIT_PATH = "/character/c0a1b2c3-0000-4000-8000-000000000002";
 
@@ -6620,50 +6629,82 @@ results.push(
 
     const restore = await js("return window.innerWidth;");
     const widthOf = { phone: 360, desktop: 1200 };
+
+    /**
+     * The **phone arm** of the same three rules, shared by all three catalogue detail pages: one
+     * flex *column*, no grid tracks (a flex container's `gridTemplateColumns` is the literal
+     * `none`, so the display is read first), the aside lifted **above** the description
+     * (`order: -1` — the DOM says the opposite, so only `top` answers it), one width for both
+     * halves, inside the outlet, no horizontal scroll.
+     *
+     * `label` names the page in every message so a red says which copy drifted. `counts` is
+     * `"require"` for the page this row has always opened, and `"read"` for the two it mounts:
+     * a page that draws the engagement list must draw the four cells the spec fixes, while a page
+     * that draws none is simply not this row's subject.
+     */
+    const assertPhone = (r, { label, path, counts }) => {
+      const at = `${label} at ${widthOf.phone}px`;
+      if (r.innerWidth !== widthOf.phone) {
+        throw new Error(`${at}: the override asked for ${widthOf.phone} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!r.path.endsWith(path)) {
+        throw new Error(`${at}: the row is on ${JSON.stringify(r.path)}, not ${path} — something navigated between the mount and the override`);
+      }
+      if (r.title === "") {
+        throw new Error(`${at}: the page prints no .detail h1.title, so the composition measured is a skeleton or the not-found arm`);
+      }
+      if (r.colsDisplay !== "flex" || r.colsFlow !== "column") {
+        throw new Error(
+          `${at}: .cols computes to display ${JSON.stringify(r.colsDisplay)} flow ${JSON.stringify(r.colsFlow)} — the phone reads one column of main then aside, not a squeezed grid`,
+        );
+      }
+      if (r.colsTracks.length !== 0) {
+        throw new Error(`${at}: .cols (display ${JSON.stringify(r.colsDisplay)}) still resolves to the grid tracks ${JSON.stringify(r.colsTracks)} — it is meant to be a flex column there`);
+      }
+      if (!(r.aside.top < r.main.top - 1)) {
+        throw new Error(
+          `${at}: .aside sits at top ${r.aside.top} and .main at top ${r.main.top} — the aside is not above the description, so a reader scrolls the whole prose to find Like (order: -1 is the mobile argument)`,
+        );
+      }
+      if (Math.abs(r.aside.width - r.main.width) > 1) {
+        throw new Error(`${at}: .aside measures ${r.aside.width}px and .main ${r.main.width}px — one column means one width, and a mismatched pair is a second track`);
+      }
+      if (r.main.left < r.outlet.left - 0.5 || r.aside.right > r.outlet.right + 0.5) {
+        throw new Error(
+          `${at}: the columns spill outside the outlet: main ${r.main.left}–${r.main.right}, aside ${r.aside.left}–${r.aside.right}, outlet ${r.outlet.left}–${r.outlet.right}`,
+        );
+      }
+      if (r.countCells >= 0 && r.countCells !== 4) {
+        throw new Error(
+          `${at}: the engagement block draws ${r.countCells} .count cell(s), not the four the detail spec fixes (likes / dislikes / ratio / comments)${
+            counts === "require" ? "" : " — this page draws the list, so it is not an absence"
+          }`,
+        );
+      }
+      if (counts === "require" && r.countCells < 0) {
+        throw new Error(`${at}: the engagement block is missing entirely (.counts[aria-label="Engagement"] matched nothing)`);
+      }
+      // `>` and not `===`: `html` carries `scrollbar-gutter: stable`, so an unoverflowed document
+      // reports scrollWidth equal to its **client** width. The rule is "no horizontal scroll".
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the document scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+    };
+
+    const phoneEvidence = (label, r) =>
+      `${label} "${r.title}" at ${widthOf.phone}: .cols ${JSON.stringify(r.colsDisplay)} ${JSON.stringify(r.colsFlow)} → ${r.colsTracks.length} track(s), aside top ${r.aside.top} < main top ${r.main.top}, both ${r.aside.width}px inside the outlet ${r.outlet.left}–${r.outlet.right}, ${
+        r.countCells >= 0 ? `${r.countCells} count cells` : "no .counts block"
+      }, scrollWidth ${r.scrollWidth}/${r.innerWidth}`;
+
     let seen = "";
+    const phones = [];
     try {
       /* ---------------------------------------------- phone: one column, aside lifted above main */
       await send("Emulation.setDeviceMetricsOverride", { width: widthOf.phone, height: 740, deviceScaleFactor: 1, mobile: false });
       await sleep(260); // the media queries settle in two frames; a width read too early is the old box
       const phone = await read();
-      if (phone.innerWidth !== widthOf.phone) {
-        throw new Error(`the override asked for ${widthOf.phone} and the page measured ${phone.innerWidth} — the row refuses to measure a viewport it did not set`);
-      }
-      if (!phone.path.endsWith(DETAIL_SPLIT_PATH)) {
-        throw new Error(`the split row is on ${JSON.stringify(phone.path)}, not ${DETAIL_SPLIT_PATH} — something navigated between the mount and the override`);
-      }
-      if (phone.title === "") {
-        throw new Error(`the character page prints no .detail h1.title at ${widthOf.phone}px, so the composition measured is not a mounted detail page`);
-      }
-      if (phone.colsDisplay !== "flex" || phone.colsFlow !== "column") {
-        throw new Error(
-          `at ${widthOf.phone}px .cols computes to display ${JSON.stringify(phone.colsDisplay)} flow ${JSON.stringify(phone.colsFlow)} — the phone reads one column of main then aside, not a squeezed grid`,
-        );
-      }
-      if (phone.colsTracks.length !== 0) {
-        throw new Error(`at ${widthOf.phone}px .cols (display ${JSON.stringify(phone.colsDisplay)}) still resolves to the grid tracks ${JSON.stringify(phone.colsTracks)} — it is meant to be a flex column there`);
-      }
-      if (!(phone.aside.top < phone.main.top - 1)) {
-        throw new Error(
-          `at ${widthOf.phone}px .aside sits at top ${phone.aside.top} and .main at top ${phone.main.top} — the aside is not above the description, so a reader scrolls the whole prose to find Like (order: -1 is the mobile argument)`,
-        );
-      }
-      if (Math.abs(phone.aside.width - phone.main.width) > 1) {
-        throw new Error(`at ${widthOf.phone}px .aside measures ${phone.aside.width}px and .main ${phone.main.width}px — one column means one width, and a mismatched pair is a second track`);
-      }
-      if (phone.main.left < phone.outlet.left - 0.5 || phone.aside.right > phone.outlet.right + 0.5) {
-        throw new Error(
-          `at ${widthOf.phone}px the columns spill outside the outlet: main ${phone.main.left}–${phone.main.right}, aside ${phone.aside.left}–${phone.aside.right}, outlet ${phone.outlet.left}–${phone.outlet.right}`,
-        );
-      }
-      if (phone.countCells !== 4) {
-        throw new Error(`at ${widthOf.phone}px the engagement block draws ${phone.countCells} .count cell(s), not the four the detail spec fixes (likes / dislikes / ratio / comments)`);
-      }
-      // `>` and not `===`: `html` carries `scrollbar-gutter: stable`, so an unoverflowed document
-      // reports scrollWidth equal to its **client** width. The rule is "no horizontal scroll".
-      if (phone.scrollWidth > phone.innerWidth) {
-        throw new Error(`at ${widthOf.phone}px the document scrolls horizontally: scrollWidth ${phone.scrollWidth} > innerWidth ${phone.innerWidth}`);
-      }
+      assertPhone(phone, { label: "character", path: DETAIL_SPLIT_PATH, counts: "require" });
+      phones.push(phoneEvidence("character", phone));
 
       /* -------------------------------------- desktop: two tracks, the aside beside the description */
       await send("Emulation.setDeviceMetricsOverride", { width: widthOf.desktop, height: 740, deviceScaleFactor: 1, mobile: false });
@@ -6701,9 +6742,27 @@ results.push(
         throw new Error(`at ${widthOf.desktop}px the document scrolls horizontally: scrollWidth ${desk.scrollWidth} > innerWidth ${desk.innerWidth}`);
       }
 
-      /* ------------- the two other catalogue detail pages, each running its OWN copy of the rules */
-      // The override stays live across these mounts (it is browser-level, not page-level), so every
-      // reading below is still a 1200px reading — asserted, never assumed.
+      /* -------- phone arm of the two other catalogue detail pages, each running its OWN copy ---- */
+      // The override is browser-level and survives `go()`, so it is re-taken for each phase and each
+      // reading asserts `innerWidth` — a reading that falls through to the session's own ~500px
+      // would measure a page nobody ships.
+      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.phone, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260);
+      for (const target of SPLIT_COPIES) {
+        await go(target.path);
+        await waitFor(
+          'document.querySelector(".detail .cols .main") !== null && document.querySelector(".detail .cols .aside") !== null && (document.querySelector(".detail h1.title") || {}).textContent.trim() !== ""',
+          `the ${target.label} detail page's .main + .aside composition and its h1.title`,
+          12000,
+        );
+        const copyPhone = await read();
+        assertPhone(copyPhone, { label: target.label, path: target.path, counts: "read" });
+        phones.push(phoneEvidence(target.label, copyPhone));
+      }
+
+      /* ------------- the two other catalogue detail pages at 1200, each running its OWN copy */
+      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.desktop, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260);
       const copies = [];
       for (const target of SPLIT_COPIES) {
         await go(target.path);
@@ -6762,7 +6821,7 @@ results.push(
         );
       }
 
-      seen = `${copies.join(" · ")} · "${desk.title}" · at ${widthOf.phone}: .cols ${JSON.stringify(phone.colsDisplay)} ${JSON.stringify(phone.colsFlow)} → ${phone.colsTracks.length} track(s), aside top ${phone.aside.top} < main top ${phone.main.top}, both ${phone.aside.width}px inside the outlet ${phone.outlet.left}–${phone.outlet.right}, ${phone.countCells} count cells, scrollWidth ${phone.scrollWidth}/${phone.innerWidth} · at ${widthOf.desktop}: .cols grid → ${JSON.stringify(desk.colsTracks)} (aside ${column}px), aside left ${desk.aside.left} ≥ main right ${desk.main.right}, tops ${desk.aside.top}/${desk.main.top}, ${desk.countCells} count cells, scrollWidth ${desk.scrollWidth}/${desk.innerWidth}`;
+      seen = `${copies.join(" · ")} · ${phones.join(" · ")} · character "${desk.title}" at ${widthOf.desktop}: .cols grid → ${JSON.stringify(desk.colsTracks)} (aside ${column}px), aside left ${desk.aside.left} ≥ main right ${desk.main.right}, tops ${desk.aside.top}/${desk.main.top}, ${desk.countCells} count cells, scrollWidth ${desk.scrollWidth}/${desk.innerWidth}`;
     } finally {
       await send("Emulation.clearDeviceMetricsOverride");
       await sleep(240);

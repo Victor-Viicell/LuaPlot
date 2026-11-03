@@ -3,6 +3,35 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-76: the lorebook and preset detail pages' phone arm is rendered
+
+- **Changed:** `scripts/smoke.mjs` — **row 54 extended again** (no new row; `EXPECTED_ROWS` stays
+  **55**). The row's character-only phone block became one shared `assertPhone(r, { label, path,
+  counts })`, and `phoneEvidence()` prints the same three facts for all three pages. Phase order is
+  **character 360 → character 1200 → the lorebook+preset pair at 360 → the pair at 1200**: the
+  override is browser-level and survives `go()`, so each phase re-takes it (4 overrides, not 6) and
+  every reading asserts `innerWidth` instead of assuming the width carried over. Per page at 360:
+  `.cols` computes `flex`/`column` with **no** grid tracks (the display is read first — a flex box's
+  `gridTemplateColumns` is the literal `none`), `aside.top < main.top − 1`, `|aside.width −
+  main.width| ≤ 1`, both inside the outlet, and — only when drawn — four `.count` cells. Measured:
+  lorebook *Ashmarket Gazetteer* aside **545.58** < main **723.38**, preset *Long Table* **515.69** <
+  **641.48**, character **572.38** < **802.17**, all three 308px inside the 340px outlet, 4 count
+  cells each, `scrollWidth 350/360`. The 1200 arm is unchanged (lorebook and preset both
+  `["362px","320px"]`, aside left 747 ≥ main right 715, tops 477/477). No page file touched: both
+  pages were right — this ticket is the missing measurement, which is why the red proof is a
+  deletion.
+- **Verified:** red first, and the ticket's own edit worked this time (T-75's did not): deleting
+  `order: -1` from `preset-detail.tsrx`'s base `.aside` block put **row 54 alone** red — 54 PASS /
+  1 FAIL — reading *"preset at 360px: .aside sits at top 1102.64 and .main at top 515.69 — the aside
+  is not above the description, so a reader scrolls the whole prose to find Like (order: -1 is the
+  mobile argument)"*; the other 54 rows and the row's own 1200 arm stayed green. Bytes restored
+  (`cp` + `cmp` + `sha256sum -c`, identical; `git status` shows only `scripts/smoke.mjs`),
+  `check.sh` **GREEN** (all 8 sections), `./scripts/smoke.sh` **55/55**, `publish.sh` →
+  `LIVE=https://victor-viicell.github.io/LuaPlot/` (branch `gh-pages`, sha `1c41276`, asset
+  `index-DPoxP2Sr.js`), `curl` **200**, `./scripts/smoke.sh --live` **55/55**.
+- **Not verified:** nothing on a real device — the 360/1200 measurements are Chromium's
+  `Emulation.setDeviceMetricsOverride`; a physical phone's WebKit layout is still T-36's blocked arm.
+
 ## 2026-11-03 — T-75: the lorebook and preset detail pages' own copies of the `lg` split are rendered
 
 - **Changed:** `scripts/smoke.mjs` — **row 54 extended** (no new row; `EXPECTED_ROWS` stays **55**).

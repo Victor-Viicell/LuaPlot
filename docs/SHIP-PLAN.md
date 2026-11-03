@@ -634,6 +634,31 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-76 the two pages T-75 mounted still had an unrendered *phone* arm.** Each of the three
+      catalogue detail pages carries its own copy of the base block (`.cols { display: flex;
+      flex-direction: column; gap: 20px }`, `.aside { order: -1 }`) and only `character-detail`'s had
+      ever been measured — so deleting `order: -1` from `preset-detail.tsrx` dropped the engagement
+      row below a 60-line description on a phone while `check.sh`, the other 54 rows and the live walk
+      all stayed green. Row **54 was extended** again (no new row; `EXPECTED_ROWS` stays **55**): the
+      character-only phone assertions became one shared `assertPhone(r, { label, path, counts })` plus
+      a `phoneEvidence()` printer, and the row's phases are character 360 → character 1200 → the
+      lorebook+preset pair at 360 → the pair at 1200. The override is browser-level and survives
+      `go()`, so each phase re-takes it (four overrides, not six) and every reading asserts
+      `innerWidth` rather than assuming the width carried over. Per page at 360: `.cols` computes
+      `flex`/`column` with **no** grid tracks (the display is read first — a flex box's
+      `gridTemplateColumns` is the literal `none`), `aside.top < main.top − 1`, `|aside.width −
+      main.width| ≤ 1`, both inside the outlet, and — only where drawn — four `.count` cells. Measured:
+      lorebook *Ashmarket Gazetteer* aside **545.58** < main **723.38**, preset *Long Table* **515.69**
+      < **641.48**, character **572.38** < **802.17**, all three 308px inside the 340px outlet, 4 count
+      cells, `scrollWidth 350/360`. Red first: deleting `.aside { order: -1 }` from `preset-detail.tsrx`'s
+      base block put **row 54 alone** red (54/55) reading *"preset at 360px: .aside sits at top 1102.64
+      and .main at top 515.69 — the aside is not above the description…"*. Bytes restored (`cp` + `cmp`
+      + `sha256sum -c`), `check.sh` **GREEN**, 55/55 local, `publish.sh` → `LIVE` (asset
+      `index-DPoxP2Sr.js`), `curl` **200**, 55/55 `--live`. Brief: `docs/NEXT.md` (T-76).
+      Found: the same three pages' **`sm 640`** block (`title` 34px, `prose` 15px, `.vote`/`.save`
+      `min-width: 132px`, plus lorebook's `.entry-text` and character's `.start`) has still never been
+      rendered — filed as **T-77**.
+
 - [x] **T-75 the three catalogue detail pages each keep their *own copy* of the `lg` rules, and only one
       copy had ever been rendered.** `lorebook-detail.tsrx` and `preset-detail.tsrx` carry the same three
       declarations as `character-detail` (`.cols` = `minmax(0, 1fr) 320px`, `.aside`
