@@ -3,6 +3,35 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-73: the detail pages' `.main` + `.aside` split is rendered by a walk
+
+- **Changed:** `scripts/smoke.mjs` — **row 54** (`EXPECTED_ROWS` 53 → 54, read-only). Four detail pages
+  share one `lg` composition (`.cols`: a column of `.main` + `.aside` on a phone, a two-column grid from
+  1200 with a 320px aside) and no row had ever taken an override on it. The row opens
+  `/character/c0a1b2c3-0000-4000-8000-000000000002` (the page rows 6/32/40 already use, one Like left
+  behind by row 40), reads the name off the page, takes its **own** `360×740` and `1200×740` overrides,
+  settles two frames each, clears them in a `finally`, then **asserts** `innerWidth` came back. At 360:
+  `.cols` is `flex` `column` with **no** grid tracks (a flex box's `gridTemplateColumns` is `none`, so
+  tracks are only read when the display is a grid), `.aside` is **above** `.main` (`order: -1`), both
+  are 308px inside the 340px outlet, four `.count` cells, no horizontal scroll. At 1200: `.cols` is a
+  grid of `["362px","320px"]`, `.aside` sits at `left 747 ≥ main right 715`, both columns start at
+  `top 477`, four count cells, no horizontal scroll.
+- **Verified:** red first — deleting the mobile `.aside { order: -1 }` from `character-detail.tsrx` put
+  **row 54 alone** red (53/54) reading *"at 360px .aside sits at top 1276.13 and .main at top 572.38 —
+  the aside is not above the description, so a reader scrolls the whole prose to find Like"*; bytes
+  restored (`git checkout --` + `cmp` against `HEAD`, `git status` showing only `scripts/smoke.mjs`).
+  `check.sh` **GREEN**, `publish.sh` → `LIVE` (`assets/index-DPoxP2Sr.js`), `curl` **200**, **54/54**
+  local and **54/54** `--live`. Row 54's evidence: `"Sonic the Hedgehog" · at 360: .cols "flex" "column"
+  → 0 track(s), aside top 572.38 < main top 802.17, both 308px inside the outlet 0–340, 4 count cells,
+  scrollWidth 350/360 · at 1200: .cols grid → ["362px","320px"] (aside 320px), aside left 747 ≥ main
+  right 715, tops 477/477, 4 count cells, scrollWidth 1190/1200`.
+- **Not verified / found:** `lorebook-detail` and `preset-detail` carry the same three `lg` rules and are
+  read by no row either — the row proves the shared shape on one page, so a divergence introduced in the
+  other two would need its own row. `moderation-detail` is a **different** composition (a flex row from
+  `md 900`, `flex: 0 0 340px` sticky aside, no `order` at all) and is filed as **T-74**. Also found:
+  `scrollWidth` is 350/360 and 1190/1200 on a right page (`scrollbar-gutter: stable`), so the row asserts
+  `scrollWidth > innerWidth`. Lessons are in `docs/NEXT.md` → *Found while working*.
+
 ## 2026-11-03 — T-72: `/terms`' desktop rail is rendered by a walk for the first time
 
 - **Changed:** `scripts/smoke.mjs` — **row 53** (`EXPECTED_ROWS` 52 → 53, read-only). `/terms` is the

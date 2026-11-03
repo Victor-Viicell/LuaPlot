@@ -634,6 +634,25 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-73 the detail pages' `lg` two-column composition had never been rendered.**
+      Four detail pages share one `.cols` of `.main` + `.aside` — a column on a phone with the aside
+      lifted by `order: -1`, a two-column grid from `lg` with a 320px aside (and `moderation-detail`
+      different: a flex row from `md 900`, 340px sticky). No row had ever taken an override on it, so a
+      grid that collapsed, an aside under a 60-line description, or a 320px column past the 794px outlet
+      was green in `check.sh`, in all 53 rows and on the live walk. Row **54** (`EXPECTED_ROWS` 53 → 54,
+      **read-only**) opens `/character/…0002`, reads the name off the page (row 42 renames a character),
+      takes its own `360×740` and `1200×740` overrides, settles two frames each, clears them in a
+      `finally` and **asserts** `innerWidth` came back (T-32). At 360: `.cols` `flex`/`column`, **no**
+      grid tracks (a flex box's `gridTemplateColumns` is `none` — the read is guarded on the display),
+      aside above main, both 308px inside the 340px outlet, four `.count` cells, no horizontal scroll. At
+      1200: grid of `["362px","320px"]`, aside `left 747 ≥ main right 715`, tops equal, four count cells,
+      no horizontal scroll. Red first: deleting the mobile `.aside { order: -1 }` put **row 54 alone** red
+      (53/54) reading *"at 360px .aside sits at top 1276.13 and .main at top 572.38 — the aside is not
+      above the description"*. `check.sh` **GREEN**, `publish.sh` → `LIVE`, `curl` **200**, 54/54 local
+      and 54/54 `--live`. Brief: `docs/NEXT.md` (T-73).
+      Found: the fourth page's split is a *different* composition (a `md 900` flex row with a 340px
+      sticky aside and no `order`), so a copied row would be red on a right page — filed as **T-74**.
+
 - [x] **T-72 `/terms`' desktop rail had never been rendered by a walk.**
       Row 52 proves the page's copy at the walk's own 500×653; `/terms` is the only page with a
       page-level desktop composition (`.contents`: 200px, sticky, `display: none` below 1200) and no

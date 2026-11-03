@@ -1,68 +1,65 @@
 # Baton — what the next session does
 
-**T-72 landed.** `/terms` was the only page with a page-level desktop composition — a 200px sticky
-contents rail beside a prose column, `lg` only — and no row had ever taken an override on it. Row
-**53** (`EXPECTED_ROWS` 53, read-only) takes its own `360×740` and `1200×740` overrides (`measureAt()`
-is `/dev/primitives`-only), settles two frames each, clears them in a `finally`, then **asserts**
-`innerWidth` came back (T-32: a `finally` is not a proof). At 360: `.contents` is `none`, `.doc` is one
-track, `.lede` and every `.note-body` fit inside the outlet, no horizontal scroll. At 1200: `.contents`
-is `flex`, 200px, `sticky`; `.doc` is a grid of two tracks whose prose column is ≤ 720; the rail's
-fragments **equal** the page's heading ids in the page's own order (read off `.rule[id]`/`.note[id]`,
-never pinned to eight anchors) and every fragment resolves. Red first: the ticket's own edit
-(`minmax(0, 1fr)`) is **green** — the prose track resolves to 458px either way, because the shell's
-794px A4 outlet caps it long before 720 binds — so the red proof is deleting the `lg` block's
-`display: flex` on `.contents`, which put *row 53 alone* red (52/53) reading *"at 1200px .contents
-computes to \"none\" and measures 0px"*. `check.sh` GREEN, `publish.sh` → `LIVE`, `curl` 200, 53/53
-local and 53/53 `--live`.
+**T-73 landed.** The detail pages' `.main` + `.aside` split is rendered for the first time. Row **54**
+(`EXPECTED_ROWS` 53 → 54, read-only) takes its own `360×740` and `1200×740` overrides, settles two
+frames each, clears them in a `finally`, then **asserts** `innerWidth` came back (T-32). At 360:
+`.cols` is `flex`, `flex-direction: column`, **no** grid tracks (a flex box's `gridTemplateColumns` is
+`none`, so the read is guarded on the display and printed beside it), `.aside` sits **above** `.main`
+(572 < 802 — `order: -1` is the page's own mobile argument), both boxes are 308px inside the 340px
+outlet, four `.count` cells, no horizontal scroll. At 1200: `.cols` is a grid of `["362px","320px"]`,
+`.aside` starts at `left 747 ≥ main right 715` (beside the description, not under it), both columns
+start on the same row (tops 477/477), four count cells, no horizontal scroll. Red first: deleting the
+mobile `.aside { order: -1 }` put **row 54 alone** red (53/54) reading *"at 360px .aside sits at top
+1276.13 and .main at top 572.38 — the aside is not above the description…"*. `check.sh` GREEN,
+`publish.sh` → `LIVE`, `curl` 200, 54/54 local and 54/54 `--live`.
 
-## T-73 — the detail pages' `lg` two-column composition has never been rendered
+## T-74 — the fourth detail page's split is a *different* composition, and no row has read it
 
-**Why it is next.** Four detail pages share one composition and **no row has ever read it**: `.cols`
-is a column of `.main` + `.aside` on a phone and a two-column grid from `lg`, with the aside carrying
-the engagement counts and the primary action. T-72 just proved the shape of the argument for `/terms`;
-this is the same class of unrendered desktop decision on the pages a reader actually lands on.
-`character-detail.tsrx` @1200 is `grid-template-columns: minmax(0, 1fr) 320px`, gap 32, `.aside`
-`grid-column: 2 / grid-row: 1`, `.main` in column 1 — and below 1200 `.aside` is `order: -1` **on
-purpose** (the page's own comment: *a reader who has to scroll a whole description to find Like will
-not find it*). A grid that collapses to one column, an aside that ends up **under** a 60-line
-description, or a 320px column that overflows the 794px outlet is green in `check.sh`, in all 53 rows
-and on the live walk. `lorebook-detail` and `preset-detail` carry the same three rules;
-`moderation-detail` is **different** — a flex row from **`md 900`** with a `flex: 0 0 340px` sticky
-aside — so do not assume one selector's breakpoint covers the other three (see *Traps*).
+**Why it is next.** T-73 walked `character-detail`'s split; `lorebook-detail` and `preset-detail`
+carry the same three `lg` rules, but `moderation-detail` does **not** — its `.cols` is a flex column
+that becomes a **flex row at `md 900`** (not 1200), the aside is `flex: 0 0 340px` with
+`position: sticky; top: 24px`, the main is `flex: 1 1 auto`, and **nothing sets `order`**: on a phone
+the decision panel is deliberately **below** the description, the opposite of the three catalogue
+detail pages. A row that copies row 54's assertions would be red on a right page (it would demand the
+aside above the main, and a grid that this page never draws). It is the last page-level desktop
+composition in the app no row has rendered.
 
-**Approach.** **Row 54** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 53 → 54), owning its own overrides.
-Walk `/character/c0a1b2c3-0000-4000-8000-000000000002` (row 32 already opens its session; the page
-still draws `.cols`, and the row reads the name off the page rather than a fixture constant).
+**Approach.** **Row 55** in `scripts/smoke.mjs` (`EXPECTED_ROWS` 54 → 55), owning its own overrides.
+Open a case page the way row 20 does — `go("/moderation/4e90047a-0000-4000-8000-000000000002?admin=1")`
+— then read the case's own heading off the page rather than pinning a sentence. Read `.cols`, `.main`,
+`.aside`, `.outlet` in one expression (rects + computed display/flexDirection), and `.aside`'s computed
+`position`/`top`.
 
-- at **360×740** (`Emulation.setDeviceMetricsOverride`, 260ms settle): `.cols` resolves to **one**
-  track (it is `display: flex` there, so `gridTemplateColumns` answers `none` — print the display
-  beside the count, T-72), `.aside` is **above** `.main` in visual order (`aside.top < main.top`: that
-  is what `order: -1` buys and the whole mobile argument), both boxes sit inside `.outlet`, the
-  `.counts` row is four cells, and `document.documentElement.scrollWidth` is not greater than
-  `window.innerWidth`;
-- at **1200×740**: `.cols` is a grid of **two** tracks whose **second** is ~320px (tolerance 1px),
-  `.aside` is in **column 2** (`aside.left ≥ main.right`, i.e. it is beside the description, not under
-  it), both columns start on the same row (`Math.abs(aside.top - main.top) ≤ 2`), the four
-  `.count` cells are still there, and no horizontal scroll;
-- the override cleared in `finally`, then the row **asserts** `innerWidth` came back to the value it
+- at **360×740** (260ms settle): `.cols` is `flex` with `flexDirection: "column"`, **no** grid tracks,
+  `.aside.top > .main.top` (below — the deliberate order), `.aside` and `.main` are the same width and
+  both sit inside `.outlet`, `.aside`'s computed `position` is `static`, no horizontal scroll;
+- at **900×740** (its own breakpoint, not 1200): `.cols` `flexDirection: "row"`, `.aside` width
+  ≈ **340** (tolerance 1px), `aside.left ≥ main.right` (beside, not under), `|aside.top - main.top| ≤ 2`
+  (`align-items: flex-start` starts both at the top), `.aside` computes `position: sticky` and
+  `top: 24px`, no horizontal scroll;
+- at **1200×740**: the same facts still hold (the shell's outlet caps at 794 at every width ≥ 900, so
+  `.cols` is 714 at both — say so in the evidence, it is not independent evidence);
+- the override cleared in a `finally`, then the row **asserts** `innerWidth` came back to the value it
   read before the first override.
 
-**Traps.** (a) `go("/character/…")` is an app path; `go(await url())` doubles the base (T-59).
-(b) The detail page's heading is `h1.title`, not `h1.name` (T-50/T-53) — and row 42 renamed this
-character, so read the name off the page and pin nothing. Row 40 leaves a Like behind on `…0002`, so
-the counts are read for **count of cells and shape**, never for a value.
-(c) `.aside`'s `order: -1` is a *visual* order: compare `getBoundingClientRect().top`, never DOM order.
-(d) `moderation-detail`'s `.cols` is a flex row from **900px** with a 340px aside — a row written
-against `lg` must not claim it covers that page; file it as its own ticket if it is wanted.
-(e) A row that leaves the metrics override on breaks the sign-out row after it.
+**Traps.** (a) `?admin=1` is how the decision panel opens (row 20's own road); without it the page may
+mount a read-only body and the aside may not draw — assert the case mounted before measuring.
+(b) `.aside` here is the **decision** panel, not engagement counts: the four-cell `.counts` block is
+`character`/`lorebook`/`preset` only, so never assert it here. (c) `position: sticky` has no visible
+effect without a scroll; assert the computed `position` and `top`, never a scrolled offset. (d) this
+`.cols` is **flex at both ends** — a copied `grid-template-columns` read answers `none` on a right page.
+(e) the row is read-only: it presses no decision button and writes no store row, so the case stays open
+for any later row. (f) `go()` takes an app path and keeps the `?admin=1` query.
 
-**Accept.** Red first: delete `.aside { order: -1 }` from `character-detail.tsrx`'s **mobile** rule →
-row **54 alone** red, naming the aside's top against the main's; bytes restored (`git checkout --`
-or a `cp` + `cmp`), `check.sh` GREEN, **54/54** local and **54/54** `--live`, `publish.sh` prints
-`LIVE`, `curl` 200, gate section 10 green on the rebuilt bundle.
+**Accept.** Red first: deleting `.aside { flex: 0 0 340px }` from the `md` block → row **55 alone** red,
+naming the aside's measured width against 340. If the accept line wants the stronger proof, delete
+`flex-direction: row` instead → the aside lands **under** the main and the row names both tops. Bytes
+restored (`git checkout --` + `cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live`,
+`publish.sh` prints `LIVE`, `curl` 200.
 
-**Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
-owner's — see *Open decisions*. Do not invent tags to make a row pass.
+**Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the owner's
+— see *Open decisions*. Do not invent tags to make a row pass.
+
 
 ## Blocked — what a human must do
 
@@ -87,16 +84,17 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
 
 ## Open decisions
 
-- **T-73 is the ticket: the detail pages' `lg` two-column composition has never been rendered.**
+- **T-74 is the ticket: `moderation-detail`'s split is a different composition and no row has read it.**
   Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
   T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every route now has a row (48 the character catalog,
   49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and `/persona`, 52 `/terms`, **53
-  its desktop rail**), every bank entry that can be walked is walked, and the word break has a gate
-  section (10), so the unblocked work left is what no row has ever *rendered*: after `/terms` the one
-  page-level desktop composition nobody has measured is the `.main` + `.aside` split the four detail
-  pages share (`lg` on character/lorebook/preset, `md` on moderation). After T-73 the unblocked work
+  its desktop rail**, **54 the character detail's `.main` + `.aside`**), every bank entry that can be
+  walked is walked, and the word break has a gate section (10), so the unblocked work left is what no
+  row has ever *rendered*: T-73 measured the `.lg` split three detail pages share, and the fourth —
+  `moderation-detail`, a **`md 900` flex row with a 340px sticky decision panel and no `order` at all**
+  — is the last page-level desktop composition nobody has measured. After T-74 the unblocked work
   is whatever the gate or the walk finds next; the rest of the plan waits on Supabase (T-29…T-32), the
   Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep link dependency and
   `Ctrl/Cmd+K`, the tag vocabulary).
@@ -109,11 +107,11 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   either record a tag vocabulary for lorebooks and presets in `docs/DESIGN.md` (and then a ticket
   seeds two or three tags, leaving one card tagless so `catalog.md`'s *an item with none renders no
   row and no placeholder* finally has a target) or accept that the press stays unwalkable.
-- **Row count is 53 after T-72.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+- **Row count is 54 after T-73.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
   it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
   added 46; T-64 added 47; T-65 added 48; T-66 added 49; T-67 added 50; T-68 added 51; T-69 adds
-  none; T-71 added 52; T-72 added 53**). **Rows 36 and 37
+  none; T-71 added 52; T-72 added 53; T-73 added 54**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -171,6 +169,12 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   `1200×740`), clears them in a `finally`, and asserts `innerWidth` came back before it returns — a
   later row may assume no override is in play and no `.contents` width is pinned. It leaves the
   reader on `/terms` at the old position (`go()` pushes), and row 54 must therefore navigate itself.
+- **Row 54 (T-73) is read-only and takes two overrides of its own.** It opens
+  `/character/c0a1b2c3-0000-4000-8000-000000000002` (row 40 leaves one Like there, so nothing reads a
+  count as the fixture's), presses nothing, writes no store row and no preference. It measures
+  `360×740` and `1200×740`, clears both in a `finally`, and asserts `innerWidth` came back before it
+  returns — anything after it may assume no override is in play. It leaves the reader on the character
+  page (`go()` pushes), so a row added after it must navigate itself; the sign-out row does.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.
@@ -249,6 +253,23 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A flex container's `gridTemplateColumns` computes to the string `none` (T-73).** So
+  `split(" ").filter((t) => t.trim() !== "")` answers **one** track (the literal `none`) on a box that
+  has no grid at all: a row that counts tracks without checking the display reads a flex column as a
+  one-track grid and a missing grid as a pass. T-73 reads `display.indexOf("grid")` first and returns
+  `[]` otherwise, then asserts the *display* beside the count — the same order T-72 settled for
+  `display: none` boxes.
+- **The detail page's aside is lifted by `order`, so DOM order is the wrong witness (T-73).** `.aside`
+  is the **second** child of `.cols` and renders **first** at 360; only `getBoundingClientRect().top`
+  answers which one a reader meets. Deleting `.aside { order: -1 }` is the red proof (row 54 alone,
+  *"aside sits at top 1276.13 and .main at top 572.38"*) — and the opposite page exists: `moderation`
+  has **no** `order` at all, so its panel sits below on purpose. Never copy the assertion between the
+  two pages.
+- **Do the outlet arithmetic before pinning a track size (T-73).** At 1200 the shell's `.outlet` is
+  794 wide with 40px of padding each side, so `.cols` measures 714 and
+  `minmax(0, 1fr) 320px` with a 32px gap resolves to `["362px","320px"]` — the first track is
+  **714 − 32 − 320 = 362**, not `714 − 320`. The fixed track is the one to assert (320 ± 1) and the
+  fluid one only for being finite and non-zero.
 - **Collapse whitespace in Node, not inside a `js(…)` template (T-71).** A page expression is a
   template literal, so `\\s` written there unescapes once before `Runtime.evaluate` ever sees it — the
   T-49 trap, twice over. Row 52 reads `textContent` raw and collapses with a plain regex in the walk,

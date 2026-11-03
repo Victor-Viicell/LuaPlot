@@ -6544,6 +6544,157 @@ results.push(
   }),
 );
 
+/**
+ * T-73 — the detail pages' `lg` composition: `.cols` is a column of `.main` + `.aside` on a phone
+ * with the aside **visually first** (`order: -1`, the page's own argument: a reader who has to scroll
+ * a whole description to find Like will not find it), and a two-column grid from 1200 with a 320px
+ * aside **beside** the description. No row had ever rendered either half.
+ *
+ * The character walk opens the page it has opened since row 6 (Sonic, `…0002`); the name is read
+ * off the page (row 42 renames a character and nothing here pins one), and the counts are read for
+ * **shape** only — row 40 leaves a Like behind on this character.
+ */
+const DETAIL_SPLIT_PATH = "/character/c0a1b2c3-0000-4000-8000-000000000002";
+
+results.push(
+  await journey("/character/[id] puts its aside above the description on a phone and beside it at 1200", async () => {
+    await go(DETAIL_SPLIT_PATH);
+    await waitFor(
+      'document.querySelector(".detail .cols .main") !== null && document.querySelector(".detail .cols .aside") !== null && (document.querySelector(".detail h1.title") || {}).textContent !== ""',
+      "the detail page's .main + .aside composition",
+      12000,
+    );
+
+    /**
+     * One reading of the composition at one width. Two things the T-72 row could not answer are
+     * read here explicitly: the **display** beside the track count (a flex container's
+     * `gridTemplateColumns` is `none`, so tracks are only read when the box is a grid), and the
+     * geometry, because `order: -1` is a *visual* order — DOM order says the opposite.
+     */
+    const read = () =>
+      js(`
+        const rect = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width) };
+        };
+        const cols = document.querySelector(".detail .cols");
+        const cs = cols ? getComputedStyle(cols) : null;
+        const isGrid = !!cs && cs.display.indexOf("grid") >= 0;
+        const counts = document.querySelector('.detail .counts[aria-label="Engagement"]');
+        return {
+          path: location.pathname,
+          title: ((document.querySelector(".detail h1.title") || {}).textContent || "").trim(),
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          colsDisplay: cs ? cs.display : "",
+          colsFlow: cs ? (isGrid ? cs.gridTemplateColumns : cs.flexDirection) : "",
+          colsTracks: isGrid ? cs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          cols: rect(cols),
+          main: rect(document.querySelector(".detail .cols .main")),
+          aside: rect(document.querySelector(".detail .cols .aside")),
+          outlet: rect(document.querySelector(".outlet")),
+          countCells: counts ? counts.querySelectorAll(".count").length : -1,
+        };
+      `);
+
+    const restore = await js("return window.innerWidth;");
+    const widthOf = { phone: 360, desktop: 1200 };
+    let seen = "";
+    try {
+      /* ---------------------------------------------- phone: one column, aside lifted above main */
+      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.phone, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260); // the media queries settle in two frames; a width read too early is the old box
+      const phone = await read();
+      if (phone.innerWidth !== widthOf.phone) {
+        throw new Error(`the override asked for ${widthOf.phone} and the page measured ${phone.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!phone.path.endsWith(DETAIL_SPLIT_PATH)) {
+        throw new Error(`the split row is on ${JSON.stringify(phone.path)}, not ${DETAIL_SPLIT_PATH} — something navigated between the mount and the override`);
+      }
+      if (phone.title === "") {
+        throw new Error(`the character page prints no .detail h1.title at ${widthOf.phone}px, so the composition measured is not a mounted detail page`);
+      }
+      if (phone.colsDisplay !== "flex" || phone.colsFlow !== "column") {
+        throw new Error(
+          `at ${widthOf.phone}px .cols computes to display ${JSON.stringify(phone.colsDisplay)} flow ${JSON.stringify(phone.colsFlow)} — the phone reads one column of main then aside, not a squeezed grid`,
+        );
+      }
+      if (phone.colsTracks.length !== 0) {
+        throw new Error(`at ${widthOf.phone}px .cols (display ${JSON.stringify(phone.colsDisplay)}) still resolves to the grid tracks ${JSON.stringify(phone.colsTracks)} — it is meant to be a flex column there`);
+      }
+      if (!(phone.aside.top < phone.main.top - 1)) {
+        throw new Error(
+          `at ${widthOf.phone}px .aside sits at top ${phone.aside.top} and .main at top ${phone.main.top} — the aside is not above the description, so a reader scrolls the whole prose to find Like (order: -1 is the mobile argument)`,
+        );
+      }
+      if (Math.abs(phone.aside.width - phone.main.width) > 1) {
+        throw new Error(`at ${widthOf.phone}px .aside measures ${phone.aside.width}px and .main ${phone.main.width}px — one column means one width, and a mismatched pair is a second track`);
+      }
+      if (phone.main.left < phone.outlet.left - 0.5 || phone.aside.right > phone.outlet.right + 0.5) {
+        throw new Error(
+          `at ${widthOf.phone}px the columns spill outside the outlet: main ${phone.main.left}–${phone.main.right}, aside ${phone.aside.left}–${phone.aside.right}, outlet ${phone.outlet.left}–${phone.outlet.right}`,
+        );
+      }
+      if (phone.countCells !== 4) {
+        throw new Error(`at ${widthOf.phone}px the engagement block draws ${phone.countCells} .count cell(s), not the four the detail spec fixes (likes / dislikes / ratio / comments)`);
+      }
+      // `>` and not `===`: `html` carries `scrollbar-gutter: stable`, so an unoverflowed document
+      // reports scrollWidth equal to its **client** width. The rule is "no horizontal scroll".
+      if (phone.scrollWidth > phone.innerWidth) {
+        throw new Error(`at ${widthOf.phone}px the document scrolls horizontally: scrollWidth ${phone.scrollWidth} > innerWidth ${phone.innerWidth}`);
+      }
+
+      /* -------------------------------------- desktop: two tracks, the aside beside the description */
+      await send("Emulation.setDeviceMetricsOverride", { width: widthOf.desktop, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260);
+      const desk = await read();
+      if (desk.innerWidth !== widthOf.desktop) {
+        throw new Error(`the override asked for ${widthOf.desktop} and the page measured ${desk.innerWidth}`);
+      }
+      if (desk.colsDisplay.indexOf("grid") < 0 || desk.colsTracks.length !== 2) {
+        throw new Error(
+          `at ${widthOf.desktop}px .cols computes to display ${JSON.stringify(desk.colsDisplay)} → the tracks ${JSON.stringify(desk.colsTracks)} — the lg composition never turns on, so the detail page is a stretched phone with a 360-wide reading column`,
+        );
+      }
+      const column = parseFloat(desk.colsTracks[1]);
+      if (!Number.isFinite(column) || Math.abs(column - 320) > 1) {
+        throw new Error(`at ${widthOf.desktop}px the second track resolves to ${JSON.stringify(desk.colsTracks[1])} (tracks ${JSON.stringify(desk.colsTracks)}), not the 320px aside the page declares`);
+      }
+      if (!(desk.aside.left >= desk.main.right - 0.5)) {
+        throw new Error(
+          `at ${widthOf.desktop}px .aside spans ${desk.aside.left}–${desk.aside.right} and .main ends at ${desk.main.right} — the aside is not beside the description, it is under it (grid-column: 2 is the rule that places it)`,
+        );
+      }
+      if (Math.abs(desk.aside.top - desk.main.top) > 2) {
+        throw new Error(`at ${widthOf.desktop}px .aside starts at top ${desk.aside.top} and .main at ${desk.main.top} — the two columns do not start on the same row (grid-row: 1 for both)`);
+      }
+      if (desk.main.left < desk.outlet.left - 0.5 || desk.aside.right > desk.outlet.right + 0.5) {
+        throw new Error(
+          `at ${widthOf.desktop}px the columns spill outside the outlet: main ${desk.main.left}–${desk.main.right}, aside ${desk.aside.left}–${desk.aside.right}, outlet ${desk.outlet.left}–${desk.outlet.right}`,
+        );
+      }
+      if (desk.countCells !== 4) {
+        throw new Error(`at ${widthOf.desktop}px the engagement block draws ${desk.countCells} .count cell(s), not four`);
+      }
+      if (desk.scrollWidth > desk.innerWidth) {
+        throw new Error(`at ${widthOf.desktop}px the document scrolls horizontally: scrollWidth ${desk.scrollWidth} > innerWidth ${desk.innerWidth}`);
+      }
+
+      seen = `"${desk.title}" · at ${widthOf.phone}: .cols ${JSON.stringify(phone.colsDisplay)} ${JSON.stringify(phone.colsFlow)} → ${phone.colsTracks.length} track(s), aside top ${phone.aside.top} < main top ${phone.main.top}, both ${phone.aside.width}px inside the outlet ${phone.outlet.left}–${phone.outlet.right}, ${phone.countCells} count cells, scrollWidth ${phone.scrollWidth}/${phone.innerWidth} · at ${widthOf.desktop}: .cols grid → ${JSON.stringify(desk.colsTracks)} (aside ${column}px), aside left ${desk.aside.left} ≥ main right ${desk.main.right}, tops ${desk.aside.top}/${desk.main.top}, ${desk.countCells} count cells, scrollWidth ${desk.scrollWidth}/${desk.innerWidth}`;
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const after = await js("return window.innerWidth;");
+    if (after !== restore) {
+      throw new Error(`the override cleared to ${after}px, but the session runs at ${restore}px — a leaked override would mis-measure every later row (the sign-out row is next)`);
+    }
+    return seen;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -6568,9 +6719,9 @@ chrome.kill("SIGKILL");
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
  * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48, T-66: 49,
- * T-67: 50, T-68: 51, T-71: 52, T-72: 53).
+ * T-67: 50, T-68: 51, T-71: 52, T-72: 53, T-73: 54).
  */
-const EXPECTED_ROWS = 53;
+const EXPECTED_ROWS = 54;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");
