@@ -1,81 +1,63 @@
 # Baton — what the next session does
 
-**T-61 landed.** Row **44** (`EXPECTED_ROWS` 44) walks `/onboarding` — the one route in
-`src/router.ts` that `scripts/smoke.mjs` had never mentioned. It borrows `@you` from `/user/you`,
-opens the form (a first visit is **both fields blank**, the rule as the handle's help line, the
-Show/Blur pair, Finish disabled), reads `"ab"` → the schema's own `HANDLE_RULE` sentence with Finish
-shut, types the display name and proves a name alone opens nothing, reads `"Ada"` → **`Username
-taken`** with Finish shut (uppercase, so the comparison is case-insensitive), then claims
-`onboarding_walk` → `/user/onboarding_walk` reads `Walk Through` / `@onboarding_walk` and `/` reads
-`signed in as Walk Through` with *Open profile* at the new handle, revisits `/onboarding` (the pair
-**restored**, not blank), and hands `@you` back with `/` read again. Red first twice: the whole gate
-ignored (*"Finish is enabled with both required fields blank"*, step 2) and, surgically,
-`&& !taken.value` dropped from `canFinish` → *"Finish stayed enabled on a taken handle — @ada is a
-fixture handle and \"Ada\" must read taken case-insensitively"*; bytes restored, `sha256sum -c`
-clean. 44/44 local, 44/44 `--live`.
+**T-62 landed.** Row **45** (`EXPECTED_ROWS` 45) walks `/user/you/edit`'s one write: it reads
+`/user/you`'s name, handle, bio, both follow figures and creations count, mounts the form and
+asserts its prefill (the URL's handle, the row's name and bio — `input[name="username"]`, **not**
+`handle` — with **Save** enabled), retypes the username to `edit_walk`, presses **Save**, and
+re-reads the landing: the same name, bio, figures and creations count; then `/user/you` answers
+*This user doesn't exist.* with no profile, the account's own comment reads `@edit_walk`, `/` reads
+`signed in as You` with *Open profile* at the new handle, and the way back restores the whole pair.
+Two red proofs, each aimed at one loop of `renameAccount` (see PROGRESS). 45/45 local, 45/45 `--live`.
 
-**Two product bugs the row found and this tick fixed.** (1) `saveProfile` wrote only the session
-record, so the landing after **Finish** read *This user doesn't exist.* and the old handle stayed
-claimed — `renameAccount()` in `memory.ts` is now the one body for a claim *and* a rename (profile
-row, every authored edge, both sides of the follow graph; a claim with no row creates one). (2) The
-uniqueness verdict rode the draft write, so a taken handle read **silent** until a display name
-existed; `askUniqueness()` now asks on the handle's own settle.
+**One product bug the row found and this tick fixed.** A comment is signed by its author's handle,
+and `renameAccount()` moved characters, lorebooks, presets and posts but **not comments** — after a
+rename every comment the account wrote still read `@you` on a profile that now answers not-found,
+while `user/edit.md` says the account *keeps its content*. `store.comments` moves with the rest now.
 
-## T-62 — `/user/you/edit` has never been saved: the rename moves the account, the content and the graph
+## T-63 — the edit form's gate and a stranger's edit URL have never been read
 
-**Why it is next.** Row 3 mounts the account form and stops at the push proof (T-45). **No row has
-ever pressed Save** on it, so the one write that can *move* an account — `saveProfileEdit()`, which
-moves the profile row, `author` on every character/lorebook/preset/post the account signed, and both
-sides of the follow graph — has never been exercised. T-61 made onboarding's claim share that body
-(`renameAccount`), and the claim half is walked; the edit half is not. A rename that moved the row
-but not the authored rows, that re-created rather than moved the row (losing bio/joinedAt), that
-left the old handle claimed, or that failed to re-point the session is green in every gate and in
-all 44 rows.
+**Why it is next.** Row 45 walked the page's one write. Its other three states are still unwalked:
+*Not the owner → forbidden* (`/user/ada/edit` — a pasted URL cannot edit a stranger), the page's own
+**`Username taken`** refusal (the only `Username taken` assertion in the walk is onboarding's, row
+44), and the format rule as an *inline* error on this page. A form that enabled **Save** on a taken
+handle, that let a stranger's URL mount the fields, or that printed onboarding's copy while the
+schema said something else is green in every gate and in all 45 rows.
 
 **Approach**
 
-1. **Row 45**, `EXPECTED_ROWS` 44 → 45, placed **after row 44 and before `sign out`**. Mutating: it
-   renames the walk's account out and back.
-2. `go("/user/you")` — read the account's `h1.name`, `.handle`, its bio and its two figures, plus
-   the Creations tab's card count. These are the four things a rename must not lose.
-3. `go("/user/you/edit")`; wait for `input[name="handle"]` and `input[name="displayName"]`, read what
-   they prefill (the URL's handle and the row's name — read, never pin), and assert **Save** is
-   enabled with them.
-4. `retype('input[name="handle"]', <a free walk handle>)`, press **Save**, poll `/user/<handle>`.
-   Read the head again: same `h1.name`, `@<new>`, the same bio, the same followers/following
-   figures, the same creations count — *"the old one not-found, with no redirect offered"* is the
-   spec's other half.
-5. `go("/user/you")`: the **old handle answers Not found** (`This user doesn't exist.`), and it must
-   not render the profile. `/` then reads `signed in as <name>` with *Open profile* at the new
-   handle.
-6. The way back: `/user/<new>/edit` → handle `you`, Save → `/user/you`, then `/` again. Row 45 hands
-   the account back exactly as row 44 does; `sign out` still stays the walk's last row.
+1. **Row 46**, `EXPECTED_ROWS` 45 → 46, placed **after row 45 and before `sign out`**. **Read-only**:
+   it presses **Cancel** and never **Save**, so `/user/you` must read the same afterwards.
+2. `go("/user/ada/edit")` — a fixture account the walk does not hold. Read: the URL is still
+   `/user/ada/edit` (no redirect), the page prints **`You can't edit this account.`**, there is **no**
+   `input[name="username"]` and **no** Save, and *Back to your profile* points at the session's own
+   `/user/<handle>` (read that handle from the page, never pin it).
+3. `go("/user/<own>/edit")`, read the prefill, then `retype` the username to **`ada`** → poll the
+   field's `.field-error` for **`Username taken`** with Save disabled; `"ab"` → the schema's rule
+   sentence (`HANDLE_RULE`, read from the page, never pinned) with Save disabled; back to the own
+   handle → error gone, the rule back as the help line, Save enabled.
+4. **Cancel** → `/user/<own>`, and the profile there still reads the same name, handle and bio.
+5. Nothing else changes: no new row, no store write, and `sign out` still stays the walk's last row.
 
 **Traps**
 
-- **`saveProfileEdit` returns `null`, it does not throw.** A missing row or a taken handle leaves the
-  page printing *"Your changes couldn't be saved. Try again."* and staying put — a row that only
-  polls the path reads a timeout when the message is the fact. Poll the path **and** surface
-  `document.body.innerText` in the failure.
-- **A rename rewrites the avatar's initials** from the display name (`initialsOf`), so the avatar is
-  the page's own derivation, never the fixture's — do not assert it as unchanged.
-- **Personas are `owner`, not `author`, and `renameAccount` does not move them.** After a rename
-  `/persona` would list none of the account's personas, and nothing after row 34 (T-50) reads one.
-  Decide against `personas.md` (*a persona belongs to its owner*) whether `owner` belongs in the
-  same body or in its own ticket — **this is row 45's likeliest find**.
-- **The claim and the rename are now one body.** A red proof that edits only `saveProfileEdit`'s
-  copy of the move proves nothing: `renameAccount` is shared, so aim the red at the shared function
-  (drop the `store.profiles` move and watch `/user/<new>` read Not found; drop the authored-row loop
-  and watch the creations count fall to 0).
-- **`/user/you/edit` is not a `<form>`** — a `div.form` of `Field`s, so a row must key on
-  `input[name="..."]`, never `querySelector("form")`.
-- **The session is not the page.** `setAccount()` runs before `navigate()`, so a rename that landed
-  on the right URL with a stale session would read `@you` in the shell — assert both ends, as row 44
-  does.
+- **The username field is `input[name="username"]`** (onboarding's is `handle`). T-62's brief said
+  `handle` and the page names it `username`; key on the page, not the ticket.
+- **`taken` only reads a verdict about the current draft**, and the ask rides a 250 ms settle: a row
+  that types and reads immediately can see `save === false` before the ask has answered. Poll the
+  **error text**, not just the flag.
+- **Typing the handle you already hold asks nothing** (`onHandleInput` skips `checkHandle` when the
+  reading equals the URL's handle), so the way back is proven by *error gone + help back + Save
+  enabled*, never by a fresh verdict.
+- **The forbidden page is a state, not a redirect**: the URL stays `/user/ada/edit`, and the
+  `EmptyState`'s target is the session's own handle.
+- **`Cancel` is a `navigate()`** — poll the path, then re-read the head.
+- **Row 45 hands `@you` back** and row 44 grounds the session, so the account is `@you` here; read it
+  from `/user/you`'s own head rather than pinning the literal.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **45/45** locally and **45/45 `--live`**; the assertion
+**Accept:** `./scripts/check.sh` GREEN; walk **46/46** locally and **46/46 `--live`**; the assertion
 proved **red** first (name the edit and the message in PROGRESS); `publish.sh` prints `LIVE` and
 `curl` is 200.
+
 
 ## Blocked — what a human must do
 
@@ -104,17 +86,19 @@ proved **red** first (name the edit and the message in PROGRESS); `publish.sh` p
 
 ## Open decisions
 
-- **T-61 is the ticket: the one page no row has ever mounted.** Failure-bank entries 1 (T-54), 2
-  (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest are blocked on the
-  backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 → T-32, 11 → T-16,
-  12 → T-01, 13 → `check.sh`). With the session's **Delete** walked (T-60) the failure bank has no
-  walkable entry left, so the next row comes from coverage instead: `/onboarding` is the only route
-  in `src/router.ts` that `scripts/smoke.mjs` never mentions (grep it — zero hits). Its law is a gate
-  (a taken handle disables **Finish** and says `Username taken`, case-insensitively), a format rule
-  (`[a-z0-9_]` 3–24, lowercased on save) and a **draft that is a real write**.
-- **Row count is 44 after T-61.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+- **T-63 is the ticket: the edit page's gate and its forbidden state.** Failure-bank entries 1
+  (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest are
+  blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). The failure bank has no walkable entry left, so rows
+  come from coverage: `/onboarding` was the last unmentioned route and T-61 walked it, and T-62 then
+  walked the write on `/user/[user.username]/edit`. What is left on that page are the states nothing
+  has read — *Not the owner → forbidden* for a **stranger's** edit URL (no row visits one),
+  `Username taken` **on this page** (the only such assertion in the walk is onboarding's), and the
+  format rule as its inline error.
+- **Row count is 45 after T-62.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
-  it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 adds 45**). **Rows 36 and 37
+  it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
+  adds 46**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -142,6 +126,19 @@ proved **red** first (name the edit and the message in PROGRESS); `publish.sh` p
   It also renames the account for the length of the row, which **moves every authored row's
   `author` to `onboarding_walk` and back** — anything after it may read a creation count, but
   must not pin an author handle mid-row.
+- **Row 45 (T-62) is mutating and hands the account back too.** It renames `@you` → `@edit_walk` →
+  `@you`, reading the name, bio, both figures and the creations count from the page on both sides —
+  anything after it may read those, but must not pin a count (row 45 itself reads **5** creations on
+  a right tree, and the number changes whenever a fixture or an earlier row adds one). It ends by
+  pressing **Save** on `/user/you/edit`, so it writes through `saveProfileEdit` **and**
+  `savePreferences` (the pair is re-saved from the form's own toggles, which it never flips).
+- **`VIEWER` and `ownHandle()` diverge after a claim or a rename — and every ownership rule must pick
+  one.** `ownHandle()` is the profile row's handle and it *moves* (`renameAccount`); the constant
+  `VIEWER` does not. Personas, sessions, votes and bookmarks are owned/read by `VIEWER`, while the
+  profile, authored content and the follow graph ride `ownHandle()` — so after a rename the persona
+  dialog still lists the account's personas only because its filter reads the constant, not because
+  anything moved them. When T-30 wires Supabase, the ownership column must come from the **session**,
+  never a fixture handle: a row that renames the account is the shape that catches it.
 - **Row 39 (T-55, extended by T-57) leaves the thread at page 1 with no query.** It presses Load more
   once, so anything after it must assume the component state — not the store — held a second page,
   and that a fresh mount re-reads page 1. It writes nothing and takes no override.
@@ -219,6 +216,25 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   arithmetic, write a `.py` under `$TMPDIR` and run `python3 <file>`.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **A rename had to move comments too (T-62).** `renameAccount()` moved characters, lorebooks,
+  presets, posts, both sides of the follow graph, the claim set and the profile row — but a
+  `commentSchema.author` is a handle as well, so after a rename every comment the account wrote still
+  read `@you` on a profile that answered not-found. `user/edit.md` → *Username* says the account
+  *keeps its content*, and a comment it signed is content: `store.comments` is in the loop now. Red
+  proof: delete the loop → row 45 reads *"the comment the account wrote reads \"@you\" after the
+  rename, not @edit_walk"*.
+- **`renameAccount` has three separate halves, and each needs its own red proof (T-62).** Deleting
+  the authored-row loop was red on *"the renamed profile draws 0 creation card(s), not 5"*; deleting
+  the comment loop was red on the comment; a red aimed at `store.profiles` alone proves only the
+  landing. Aim the edit at the loop the assertion exists for.
+- **The account form's username field is `input[name="username"]`, not `handle` (T-62).** Onboarding's
+  is `handle`; this page's `Field name` is `username`. A row that keys on the ticket's word times out
+  on a page that is right — read the page (both rows now try `username, handle`).
+- **A row that renames the account must read the four things a rename can lose from the page on both
+  sides (T-62).** Name, bio, the two follow figures and the creations count are what a *re-created*
+  row or an *unmoved* authored set breaks; `joinedAt` has no page, so it is the one thing the walk
+  cannot read (the adapter keeps it from the old row).
 
 - **A first visit's two fields are both blank, and the ticket's prefill hypothesis was wrong
   (T-61).** `onboarding.tsrx`'s `load()` only prefills from a *saved* profile, and the mock ships no

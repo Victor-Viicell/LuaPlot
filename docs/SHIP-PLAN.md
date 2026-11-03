@@ -526,6 +526,25 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       5e551000-…0001 (8 turn(s), 4 copies)"* (42/43); bytes restored, `sha256sum -c` clean. 43/43 local
       and 43/43 `--live`. Brief: `docs/NEXT.md` (T-60).
 
+- [x] **T-62 A rename out of `/user/[user.username]/edit` moves the row, the content and the graph.**
+      `user/edit.md` is law in four places nothing had executed: the handle rule, *"Changing it moves
+      the profile URL and no alias is kept, so a link to the previous handle reports not-found rather
+      than redirecting; the account keeps its content, follows, and bookmarks"*, and *Handle changed*
+      — *the profile loads at the new URL*. Row 3 mounted the form and stopped at the push proof, so
+      `saveProfileEdit()` had never been pressed. Row **45** (`EXPECTED_ROWS` 45) reads `/user/you`'s
+      name, handle, bio, both follow figures and creations count, asserts the form's prefill
+      (`input[name="username"]`, not `handle`; **Save** enabled), renames to `edit_walk` with one
+      **Save**, re-reads the landing on all five, proves `/user/you` now answers *This user doesn't
+      exist.* with no profile, reads the account's own comment signed `@edit_walk`, `/`'s sentence at
+      the new handle, and renames back — restoring the whole pair with `/` read again. One product
+      bug fixed: a comment is signed by its author's handle and `renameAccount()` moved everything
+      *but* comments, so after a rename every comment the account wrote still read `@you` on a
+      profile that answered not-found; `store.comments` moves with the rest now. Red first, twice:
+      deleting the comment loop → *"the comment the account wrote reads \"@you\" after the rename,
+      not @edit_walk"*; deleting the authored-row loop → *"the renamed profile draws 0 creation
+      card(s), not 5"* (44/45 both times). Bytes restored, tree clean. 45/45 local and 45/45
+      `--live`. Brief: `docs/NEXT.md` (T-62).
+
 - [x] **T-61 Claiming a handle on /onboarding is a gate, a refusal and one draft write.**
       `onboarding.md` was law in four places nothing executed (the case-insensitive uniqueness gate
       with **Finish** disabled, the `[a-z0-9_]` 3–24 rule lowercased on save, *only Username and

@@ -3,6 +3,34 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-62: a rename out of /user/you/edit moves the row, the content and the graph
+
+- **Changed:** `scripts/smoke.mjs` — new walk **row 45**, `EXPECTED_ROWS` 44 → 45, after row 44 and
+  before `sign out` (mutating: it renames the walk's account out and back). It reads `/user/you`'s
+  name, handle, bio, both follow figures and creations count from the page, mounts
+  `/user/you/edit` and asserts the prefill (the URL's handle, the row's name and bio, **Save**
+  enabled), retypes `input[name="username"]` to `edit_walk`, presses **Save**, and re-reads the
+  landing: the same name, bio, figures and creations count, with the new handle; then `/user/you`
+  answers *This user doesn't exist.* with no profile, the account's own comment reads `@edit_walk`,
+  `/` reads `signed in as You` with *Open profile* at the new handle, and the way back (rename to
+  `you`, Save) restores the whole pair with `/` read again.
+- **Fixed:** `src/lib/data/memory.ts` → `renameAccount()` now moves `store.comments`' `author` with
+  the authored collections, the follow edges, the claim set and the profile row. A comment is signed
+  by its author's handle, so a rename that skipped it left every comment the account wrote reading
+  `@you` on a profile that now answered not-found — `user/edit.md`'s *the account keeps its content*,
+  broken while 44/44 rows stayed green.
+- **Verified:** `./scripts/check.sh` GREEN (30 routes, schema, links, tiers); walk **45/45** locally
+  and **45/45 `--live`** against https://victor-viicell.github.io/LuaPlot/ (200). Red first, twice,
+  each aimed at one half of `renameAccount`: deleting the comment loop → *"the comment the account
+  wrote reads \"@you\" after the rename, not @edit_walk — a comment is signed by its author, and the
+  account keeps its content"* (44/45); deleting the authored-row loop → *"the renamed profile draws
+  0 creation card(s), not 5 — the authored rows did not follow the handle"* (44/45). Bytes restored
+  (`git checkout -- src/lib/data/memory.ts`, tree clean) so the green run stays the proof.
+- **Not verified:** `joinedAt` (the adapter keeps it from the old row, but no page prints it, so the
+  walk cannot read it); the persona dialog after a rename — it still lists because personas are
+  owned by the constant `VIEWER`, not by the moving handle, which is a shape question for T-30
+  (recorded in `docs/NEXT.md` → *Open decisions*).
+
 ## 2026-11-02 — T-61: claiming a handle on /onboarding is a gate, a refusal and one draft write
 
 - **Changed:** `scripts/smoke.mjs` — new walk **row 44**, `EXPECTED_ROWS` 43 → 44, after row 43 and
