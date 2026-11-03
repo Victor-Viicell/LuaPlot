@@ -3,6 +3,47 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-65: the catalog's search, tags and sort, and the 250ms settle
+
+- **Changed:** `scripts/smoke.mjs` only — new walk **row 48**, `EXPECTED_ROWS` 47 → 48, after row 47
+  and before `sign out` (**read-only**: no store write, no preference touched). It reads the
+  vocabulary off the page it is about (the first card's own title, one of its tags, and a tag on a
+  card that does **not** carry the first), then: (1) types that title into `input[name="q"]` one
+  character at a time and reads `location.search` between keystrokes — **13 samples inside the 250ms
+  window, none carrying `q=`** — and after the settle reads the **whole** word and the narrowed grid
+  (1 of 20 cards, its own card still present); (2) leaves the catalog and comes back to
+  `?q=<word>` and proves the field is **preloaded** from the URL and the listing is the same one;
+  (3) `?q=zzqx-nothing-matches` reads *Nothing matches those filters.* with 0 cards, **no Retry** and
+  a **Clear filters** control; (4) `?sort=ratio` puts **Top rated** on the control and draws 22 ratios
+  that never rise, **Newest** drops the param and restores the order, `history.back()` returns both
+  the listing and the control; (5) `?tags=ghost` narrows to 5 cards that all carry it (the hidden
+  `is-measure` mirror is what makes a card's own tags readable), its chip's own remove control
+  rewrites the URL to `""` and the grid back to 20; (6) `?tags=ghost,artisan` draws **4 ghost-only +
+  7 artisan-only** (either, not both) and removing `artisan` leaves `?tags=ghost`; (7) at 360 the
+  first card folds `+2` behind its `+N` chip, the floating list holds exactly those two tags and closes
+  on the scrim — the override cleared in `finally` with `innerWidth` asserted back.
+- **Verified:** `./scripts/check.sh` GREEN (30 routes, schema, links, tiers), walk **48/48** locally
+  and **48/48 `--live`** against https://victor-viicell.github.io/LuaPlot/ (200). Red first, aimed at
+  the clause the debounce assertion exists for: `onSearchInput` calling `applySearch(next)` on every
+  keystroke → *"the search wrote the URL 13 time(s) while \"Lamplighter's\" was still being typed
+  (read [{\"typed\":\"L\",\"search\":\"?q=L\",\"elapsed\":75},{\"typed\":\"La\",\"search\":\"?q=La\",…}]) — a
+  per-keystroke writer, not the 250ms settle"* (47/48, failing in 1.2s). The bytes restored
+  (`git checkout -- src/pages/character-catalog.tsrx`, `git status` clean for it), so the green run is
+  the proof.
+- **Not verified / found:** two. (a) **A page's own query write never reaches the router.** The
+  settle commits with `replaceState`, so `router.state.search` and `App.tsrx`'s `lastKey` still say
+  `/character/catalog`; a `go()` back to that URL therefore does **not** remount (the row's first run
+  read `{"search":"","count":1,"field":"Lamplighter's"}` for twelve seconds on a page that was
+  right), and a reader who presses the **Catalog** tab in that state keeps the narrowed grid while the
+  address drops the query. The row routes through `go("/")` and back as a workaround; the defect is
+  filed as **T-66** with the fix, the rejected `navigate()` route (it would blur the search field on
+  every settle) and the red proof. (b) `catalog.md`'s *"an item with none renders no row and no
+  placeholder"* has **no page to read**: all 28 fixture characters carry at least one tag and this row
+  is read-only, so the empty-tags case stays untested until a tagless fixture exists.
+- **Publish:** `publish.sh` printed `LIVE` (the commit touches `scripts/` and `docs/`, so the bundle
+  hash is unchanged), `curl` 200, and the live walk re-read all 48 rows against the published build.
+
+
 ## 2026-11-03 — T-64: the profile's four tabs, the type filter and the follower card
 
 - **Changed:** `scripts/smoke.mjs` — new walk **row 47**, `EXPECTED_ROWS` 46 → 47, after row 46 and

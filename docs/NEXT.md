@@ -1,77 +1,82 @@
 # Baton — what the next session does
 
-**T-64 landed.** Row **47** (`EXPECTED_ROWS` 47) presses the profile's four tabs for the first time and
-reads the body, the URL and the card. It reads the session's own handle from `/`'s *Open profile*
-link, asserts the head (name, `@handle`, bio, `N followers` / `N following`, the four tab labels in
-order), marks the mounted `.profile-head` with a `data-walk-head` expando, then presses each tab and
-asserts `?tab=posts` / `followers` / `following`, the swapped body (`.feed .card.post` vs the people
-cards' `.card-handle` vs the creations' `.card-author`), `aria-selected`, **and the marker survived**.
-On creations: `Characters` narrows to cards whose title links `/character/`, `All` drops `type` from
-the URL, and a pasted `?tab=posts&type=preset` settles to `?tab=posts` with no type control. On
-followers: the first card's anatomy (title, `@handle`, the bio as `.card-tagline`, a two-figure
-footer, **no** `.card-author`, **no** `.card-ratio`), its title opens that person (name **and bio**
-compared with the card), `history.back()` polls the search and the body back. **Read-only** — no store
-write, no preference. 47/47 local, 47/47 `--live`.
+**T-65 landed.** Row **48** (`EXPECTED_ROWS` 48) reads the catalog's toolbar for the first time: it
+types the first card's own title into the search one character at a time and reads `location.search`
+between keystrokes (**13 in-window samples, none carrying `q=`**), then reads the settle's **whole**
+word and the narrowed grid; a mount from `?q=…` preloads the field and draws the same cards;
+`?q=zzqx-nothing-matches` reads *Nothing matches those filters.* with 0 cards, **no** Retry and a
+Clear filters control; `?sort=ratio` reorders the grid (22 ratios, never rising) and puts **Top
+rated** on the control, Newest drops the param, `history.back()` returns the listing **and** the
+control; `?tags=ghost` narrows to 5 cards all carrying it and its chip's own remove control rewrites
+the URL to `""`; `?tags=ghost,artisan` draws **4 ghost-only + 7 artisan-only** (either, not both) and
+removing `artisan` leaves `?tags=ghost`; at 360 one card folds `+2` behind its `+N` chip and the
+floating list opens and closes again. **Read-only** — no store write, no preference. 48/48 local.
 
-Two red proofs, each aimed at one clause (see PROGRESS): `chooseTab`'s `load()` swapped for
-`loadCreations()` → *"posts tab to draw its own body at tab=posts — read {"search":"?tab=posts",…,
-"posts":0,"empty":"No posts yet.","marked":true}"*; `UserCard`'s footer given a `.card-author` + a
-`.card-ratio` → *"the follower card grew [".card-author",".card-ratio"] … a person's card carries
-followers and following, never an author and a ratio"*.
+Red proof, aimed at the debounce clause: `onSearchInput` calling `applySearch(next)` on every
+keystroke → *"the search wrote the URL 13 time(s) while \"Lamplighter's\" was still being typed (read
+[{\"typed\":\"L\",\"search\":\"?q=L\",\"elapsed\":75},…]) — a per-keystroke writer, not the 250ms
+settle"* (47/48 in 1.2s). Bytes restored, so the green run is the proof.
 
-## T-65 — the catalog's search, tags and sort are three URL facts, and the search is debounced
+## T-66 — a page that writes its own query leaves the router believing something else
 
-**Why it is next.** `character/catalog.md` → *URL*: *"The search, the tags, and the sort live in the
-query string — `?q=…&tags=blue,haunted&sort=ratio` — so a narrowed view can be shared, bookmarked,
-and restored by back/forward"*, and `CONTRACT.md` → *Engineering law*: *"No per-keystroke network
-calls; debounce search at 250ms."* Rows 30, 36-38 and 53 read the grid, the card's footer and the
-NSFW pair — **no row has ever typed into the search**, picked a tag, pressed the sort control, or
-opened `/character/catalog?q=…&tags=…&sort=ratio` by address. A search that fires on every keystroke,
-a `q` that does not survive a reload, a tag chip that never reaches the adapter, or a `sort=ratio`
-that leaves the control on **Newest** is green in every gate and in all 47 rows.
+**Why it is next.** Found while writing row 48, and it is a **product** divergence, not a walk
+detail: `character-catalog.tsrx`'s `writeQuery()` writes `history.pushState`/`replaceState` directly
+(its header comment says why) and never notifies the router, so after a search settles the address
+reads `?q=sea` while `router.state.search` — and `App.tsrx`'s private `lastKey` — still say
+`/character/catalog`. Press the **Catalog** tab (or the catalog switcher's **Characters** tab) in that
+state and `navigate("/character/catalog")` emits exactly the key the shell already believes it
+mounted: **nothing reloads**, the URL drops the query, and the grid *keeps* it. Copying the address
+then shows the whole catalog — the spec's *"a narrowed view can be shared, bookmarked"* is broken in
+the one state the reader narrows by hand. Row 48 has to route through `go("/")` to force a mount;
+that workaround is the smell.
 
 **Approach**
 
-1. **Row 48**, `EXPECTED_ROWS` 47 → 48, placed **after row 47 and before `sign out`**. Read-only:
-   it types, presses one tag chip, one `+N` chip and the sort select, and writes nothing.
-2. **Read the vocabulary from the page, never pin it.** The first card's own title, one of its
-   `.card-tag` labels, and the picker's options come from the grid in front of the row — then
-   `go("/character/catalog?q=<that title>")` by address: the grid narrows to cards whose title
-   carries it, `location.search` keeps `q=`, and a second `go()` of the same URL restores the same
-   listing (a fresh mount, not a component value).
-3. **The debounce is the assertion, not a sleep.** Retype the search field one character at a time
-   (`input[name="q"]` — read the page, do not assume the name) and read `location.search` between
-   keystrokes: a per-keystroke writer leaves `?q=a` behind while the word is still being typed; a
-   debounced one writes nothing until the settle, then the **whole** word. Assert both halves.
-4. **Tags.** `?tags=<tag>` by address: the grid narrows to items carrying it, the field prints a
-   chip with its own remove control, and the remove control rewrites the param without that tag. Two
-   tags match **either** (`tags=a,b`), and an empty tag set drops the param entirely. An item with
-   no tags draws **no** tags row and no placeholder (`character/catalog.md` → *Data*).
-5. **Sort.** `?sort=ratio` keeps the control on **Top rated** and reorders the listing; **Newest**
-   writes no `sort` param; `history.back()` returns the previous listing and control (row 39's
-   shape — poll the search *and* the listing, never one of them).
-6. **No results** is a state, not an error: a query nothing matches reads the spec's sentence and
-   draws no card and no Retry.
+1. **Give the router the one fact the shell needs — the key it has mounted — instead of letting
+   `App.tsrx` keep a private `lastKey`.**
+   - `src/router.ts`: hold `mountedKey` (a string) beside `state`; export `getMountedKey()` /
+     `setMountedKey(key)`; `emit()` must not touch it.
+   - `src/App.tsrx`: the effect's `lastKey` becomes `getMountedKey()`; after a module loads (or a
+     missing/error verdict) it calls `setMountedKey(key)`.
+   - `src/router.ts`: a `commitQuery(path, mode)` for pages that write their own query — the
+     `history.pushState`/`replaceState` the page does today, then `state = readLocation()` **and**
+     `setMountedKey(path + search)`, **without** `emit()`.
+   - `character-catalog.tsrx`'s `writeQuery()` calls it; so does any other page that writes history
+     directly (grep `history.pushState` / `replaceState` first — the thread's `writeSort()` and the
+     profile's `writeQuery()` are the others).
+2. **Rejected: routing the settle through `navigate()`.** It emits, so every settle remounts the
+   page and the search field is a **new element with no focus** — a person who types four letters and
+   pauses loses the caret. A `go()`-driven row stays green through that, which is why the accept line
+   below names `document.activeElement`.
+3. **Row 49** (`EXPECTED_ROWS` 48 → 49), placed after row 48 (which leaves the reader on the catalog
+   with a clean URL and the 360 override cleared): type a word into `input[name="q"]`, wait for the
+   settle, assert **the field still has focus** and the URL carries `q`, then press **Characters** in
+   `.cat-switch` — the search clears, the grid is back to its unfiltered count, the field is empty,
+   and `location.search === ""`. Press the bottom bar's **Catalog** tab in a narrowed state and
+   assert the same. Then the reverse: `?q=` pasted **by address** still mounts a narrowed grid (that
+   half already exists in row 48 — do not duplicate it; extend, do not near-copy).
+4. Same commit: `docs/DESIGN.md` → *Catalog* and `docs/ARCHITECTURE.md` → *Router* must say what
+   "the query is the state" now costs — a page may commit its own query, and the router's mounted key
+   follows it. `docs/NEXT.md`'s row-48 comment about `go("/")` is re-read and simplified if the
+   same-URL `go()` has become honest.
 
 **Traps**
 
-- **The page writes its query with `history.pushState`** (its own header comment says why), so a
-  settle never notifies the router and nothing remounts. Read `location.search`; a poll on a
-  component value proves nothing.
-- **`tags` is one comma-joined param**, so a chip's remove control rewrites the whole string —
-  assert the joined value, never a single chip's presence alone.
-- **`choose()` returns what it read, so it never proves the page.** Assert the consequence: the URL,
-  the grid, the chip.
-- **The search field's own name may be `q`** (`readQuery()` reads `params.get("q")`), but the input
-  that writes it is the page's business — read it, and use `retype()` for a preloaded field.
-- **Rows 36-38 wrote the NSFW pair and row 38 added a flagged post**, and row 40 left a Like on
-  `…0002`: count the grid in front of you, never a fixture total, and never a card's percentage.
-- **The live walk runs under `/LuaPlot/`** — `go()` resolves the base, and a hand-built href with a
-  leading slash drops it (T-45's doubled base).
-- **A `+N` chip opens a floating list**; pressing it is a real gesture, and the list is in the DOM
-  only while open — if the row asserts it, close it again before moving on.
+- **The App's `key === lastKey` guard is the only thing that skips a load.** Delete it and every
+  query write remounts (the focus bug); keep it and the page's silent write must update
+  `mountedKey`, which is the whole ticket. Do not "fix" it by making the guard compare against
+  `path` alone: `/post/thread?sort=…` and `/user/<h>?tab=…` are links that must remount (rows 39, 47).
+- **`useQuery()` reads `state.search`**, so a page mounted *after* a commit must see the committed
+  query — that is what `commitQuery()`'s `state = readLocation()` buys.
+- **A row cannot prove focus loss with `go()`** — synthetic navigation keeps nothing focused or
+  everything focused. Use a real `retype()` into the field and read `document.activeElement`.
+- **Row 48's step 3 leaves the reader on the catalog with `?tags=` cleared and the width restored**
+  (it asserts `innerWidth`). Anything after it may read the full grid; nothing may assume the 360
+  override is still on.
+- **`data-walk-head`-style expandos do not survive a commit** if `commitQuery` ever re-renders the
+  page: today it must not, and a row that marks the page and presses a chip is the proof.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **48/48** locally and **48/48 `--live`**; the assertion
+**Accept:** `./scripts/check.sh` GREEN; walk **49/49** locally and **49/49 `--live`**; the assertion
 proved **red** first (name the edit and the message in PROGRESS); `publish.sh` prints `LIVE` and
 `curl` is 200.
 
@@ -102,17 +107,17 @@ proved **red** first (name the edit and the message in PROGRESS); `publish.sh` p
 
 ## Open decisions
 
-- **T-65 is the ticket: the catalog's search, tags and sort.** Failure-bank entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
+- **T-66 is the ticket: a page that writes its own query leaves the router blind (found by T-65).** Failure-bank entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
-  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). With the edit page's four states (rows 45 and 46) and
-  the **profile body** (row 47: `?tab=` / `?type=`, the follower card's anatomy) now walked, the next
-  coverage is the **catalog toolbar**: `?q=`, `?tags=` and `?sort=` are one URL contract nothing has
-  read, and `CONTRACT.md`'s *no per-keystroke network calls; debounce search at 250ms* has no row at
-  all — a search that fetches on every keystroke is invisible to the gate and to all 47 rows.
-- **Row count is 47 after T-64.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). With the catalog toolbar (row 48: `?q=`, `?tags=`, `?sort=`, the 250ms settle and the
+  `+N` fold) now walked, the next work is the **seam** that test exposed rather than new coverage: a
+  page's own query write never reaches the router, so the narrowed view and its address can disagree
+  — the one shape `character/catalog.md` → *URL* forbids, and invisible to the gate and to all 48
+  rows.
+- **Row count is 48 after T-65.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
   it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
-  added 46; T-64 added 47; T-65 adds 48**). **Rows 36 and 37
+  added 46; T-64 added 47; T-65 added 48; T-66 adds 49**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -238,6 +243,31 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   arithmetic, write a `.py` under `$TMPDIR` and run `python3 <file>`.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **A `replaceState` write leaves the router blind, and that is how a view and its URL can disagree
+  (T-65).** The catalog commits a search with `history.replaceState` and no `emit()`, so
+  `router.state.search` stays `""` while the address reads `?q=…`; `App.tsrx`'s `lastKey` is that
+  stale key, so a later `navigate("/character/catalog")` — the **Catalog** tab, or the switcher's own
+  **Characters** tab — emits the key the shell already believes it mounted and **nothing reloads**.
+  Row 48 could not therefore "reload" with a `go()` to the same URL (its first run read
+  `{"search":"","count":1,"field":"Lamplighter's"}` for twelve seconds on a page that was right); it
+  goes through `go("/")` and back. T-66 is the fix; when it lands, re-read that comment.
+- **Every catalog fixture carries tags, so `catalog.md`'s no-tags rule has no page to read (T-65).**
+  All 28 characters carry ≥1 tag (one is private), and row 48 is read-only, so *an item with none
+  renders no row and no placeholder* stays untested — the row instead proves the visible row + its
+  `+N` list together equal **the card's own tags** (the hidden `is-measure` mirror is what makes that
+  readable). A tagless fixture is a write; file it with whatever seeds fixtures next.
+- **A card's tags fold only on a phone (T-65).** At the walk's own window (~500px, one column of
+  468px) every fixture card fits its five tags and **no `+N` chip exists**; at 360 the first card
+  folds `+2`. So the fold half takes its own `Emulation.setDeviceMetricsOverride` 360×740 and clears
+  it in `finally`, asserting `innerWidth` came back — the same shape rows 30-32 use.
+- **`?sort=ratio` draws a *different* page-1 set, not the same rows reordered (T-65).** The
+  unfiltered grid drew **20** cards (24 listed, 4 flagged and Show is off) while `?sort=ratio` drew
+  **22**: the top-24 by ratio reaches rows Newest's first page does not hold. Read a count, never
+  pin one, and never compare a ratio listing to a newest listing by length.
+- **The row's own vocabulary is page-read, so its evidence names whatever it picked (T-65).** It
+  typed `Lamplighter's`, filtered `ghost` and `artisan`, and folded `+2 → ["family","debt"]` on this
+  tree; a fixture change moves all four, and nothing in the row pins them.
 
 - **`writeQuery()` never omits `tab` (T-64).** The baton predicted the creations default would write
   no `tab`; `user-profile.tsrx`'s `writeQuery()` always `params.set("tab", tab)` and only omits

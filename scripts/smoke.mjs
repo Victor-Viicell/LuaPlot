@@ -5271,6 +5271,315 @@ results.push(
   }),
 );
 
+/* ------------------------------------------------------------------------------------------------
+ * T-65 — the catalog's search, its tags and its sort are three **URL** facts
+ * (`src/specs/pages/character/catalog.md` → URL), and the search is debounced (`CONTRACT.md` →
+ * Engineering law). Rows 30 and 36-38 read this grid, the card's footer and the NSFW pair; no row had
+ * ever typed into the search, picked a tag, pressed the sort control or opened
+ * `?q=…&tags=…&sort=ratio` by address — so a per-keystroke writer, a `q` that dies on reload, a chip
+ * that never reaches the adapter and a `sort=ratio` that leaves the control on Newest were all green.
+ *
+ * Four things make this row honest:
+ *  - **the vocabulary comes from the page in front of it** — the first card's own title, two tags on
+ *    two different cards — never from `lib/fixtures`;
+ *  - **the debounce is proved by reading between keystrokes**, not by sleeping: a per-keystroke writer
+ *    leaves `?q=a` behind while the word is still being typed. A sample that arrives later than 250ms
+ *    proves nothing, so it is counted and reported instead of asserted (a slow walk is not a bug);
+ *  - **the sort is proved by the listing, not by the control**: `?sort=ratio` draws ratios that never
+ *    rise, and the row refuses to run if Newest is already ordered that way — otherwise it would pass
+ *    on a page that ignored the param;
+ *  - `choose()` returns what it read (T-41), so every press here asserts its **consequence**: the URL,
+ *    the grid, the chip.
+ *
+ * Read-only: it types, presses a chip's own remove control, the sort select and one `+N` chip. No
+ * store row and no preference is written.
+ * ---------------------------------------------------------------------------------------------- */
+const CATALOG_PATH = "/character/catalog";
+
+results.push(
+  await journey("the catalog's search, tags and sort are three URL facts, and the search settles", async () => {
+    /** The whole listing plus the three params that select it — one read, so no two facts drift. */
+    const readCatalog = () =>
+      js(`
+        const params = new URLSearchParams(location.search);
+        const text = (el) => (el ? (el.textContent || "").replace(/\\s+/g, " ").trim() : "");
+        const cards = [...document.querySelectorAll(".card-cell .card")];
+        const select = document.querySelector('select[name="sort"]');
+        return {
+          search: location.search,
+          q: params.get("q"),
+          tagsParam: params.get("tags"),
+          sortParam: params.get("sort"),
+          count: cards.length,
+          titles: cards.map((card) => text(card.querySelector(".card-title"))),
+          ratios: cards.map((card) => {
+            const el = card.querySelector(".card-ratio");
+            return el ? Number((text(el) || "").replace("%", "")) : -1;
+          }),
+          tagSets: cards.map((card) =>
+            [...card.querySelectorAll(".card-tags.is-measure .card-tag")].map((el) => text(el)),
+          ),
+          chips: [...document.querySelectorAll(".tagpicker .tag-chip-text")].map((el) => text(el)),
+          field: (document.querySelector('input[name="q"]') || {}).value || "",
+          sortValue: select ? select.value : "",
+          sortLabel: select && select.selectedOptions[0] ? text(select.selectedOptions[0]) : "",
+          busy: document.querySelector(".catalog [aria-busy='true']") !== null,
+          empty: text(document.querySelector(".empty-copy")),
+          actions: [...document.querySelectorAll(".catalog button, .catalog a.btn")].map((el) => text(el)),
+        };
+      `);
+
+    /** A poll that always throws with the whole listing it last read, never a bare timeout (T-53). */
+    const untilCatalog = async (label, check, timeout = 12000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await readCatalog();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${label} — read ${JSON.stringify(last)}`);
+    };
+
+    const descending = (values) => values.every((value, index) => index === 0 || value <= values[index - 1]);
+    const sameTitles = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+    // 1. A fresh mount: no query, no filter, no sort. The toolbar as it ships.
+    await go(CATALOG_PATH);
+    const full = await untilCatalog("the catalog to draw its first page", (s) => !s.busy && s.count > 0);
+    if (full.q !== null || full.tagsParam !== null || full.sortParam !== null) {
+      throw new Error(
+        `a fresh ${CATALOG_PATH} opens on ${JSON.stringify(full.search)} — the search, the tags and the sort are the reader's, so not one of them starts set`,
+      );
+    }
+    if (full.field !== "") throw new Error(`the search field opens holding ${JSON.stringify(full.field)}, not an empty one`);
+    if (full.sortValue !== "newest" || full.sortLabel !== "Newest") {
+      throw new Error(`the sort control opens reading ${JSON.stringify([full.sortValue, full.sortLabel])}, not newest / Newest`);
+    }
+    if (full.ratios.some((ratio) => !Number.isFinite(ratio) || ratio < 0)) {
+      throw new Error(`a card's ratio reads ${JSON.stringify(full.ratios)} — the footer's percentage is what the ratio sort is measured by`);
+    }
+
+    /** The word to type: the longest in the first card's own title, so it is a real search term. */
+    const firstTitle = full.titles[0] || "";
+    if (!firstTitle) throw new Error(`the catalog's first card draws no title (read ${JSON.stringify(full.titles.slice(0, 3))})`);
+    const word =
+      firstTitle
+        .split(/\s+/)
+        .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 5)
+        .sort((a, b) => b.length - a.length)[0] || firstTitle;
+
+    // 2. The debounce. One character at a time, and the URL stays clean until the settle — the sample
+    //    is only asserted when the read landed inside the 250ms window it is about.
+    const letters = [...word];
+    const samples = [];
+    for (let i = 1; i <= letters.length; i += 1) {
+      const started = Date.now();
+      await retype('input[name="q"]', letters.slice(0, i).join(""));
+      const search = await js(`return location.search;`);
+      samples.push({ typed: letters.slice(0, i).join(""), search, elapsed: Date.now() - started });
+    }
+    const fast = samples.filter((sample) => sample.elapsed < 250);
+    if (fast.length < 3) {
+      throw new Error(
+        `only ${fast.length} of ${samples.length} keystroke sample(s) landed inside 250ms (read ${JSON.stringify(samples.map((s) => s.elapsed))}) — the row cannot prove the settle at this speed`,
+      );
+    }
+    const early = fast.filter((sample) => sample.search.includes("q="));
+    if (early.length > 0) {
+      throw new Error(
+        `the search wrote the URL ${early.length} time(s) while ${JSON.stringify(word)} was still being typed (read ${JSON.stringify(early.slice(0, 3))}) — a per-keystroke writer, not the 250ms settle`,
+      );
+    }
+
+    const typed = await untilCatalog(`the settle to write the whole word ${JSON.stringify(word)}`, (s) => s.q === word && !s.busy);
+    if (typed.count === 0 || typed.count >= full.count) {
+      throw new Error(`?q=${word} draws ${typed.count} card(s) of the ${full.count} the unfiltered catalog draws — the search must narrow the grid and keep the card it names`);
+    }
+    if (!typed.titles.includes(firstTitle)) {
+      throw new Error(`?q=${word} dropped ${JSON.stringify(firstTitle)} (read ${JSON.stringify(typed.titles)}) — the card whose own title the word came from must survive its own search`);
+    }
+
+    // 3. The URL is the state: a fresh mount from `?q=` preloads the field and draws the same grid.
+    //    A `go()` cannot be used to "reload" here: the settle wrote the query with `replaceState`,
+    //    which never notifies the router, so `App.tsrx` still believes it is on a bare
+    //    `/character/catalog` and its `path + search` key does not change — no remount. Leaving the
+    //    catalog and coming back is the only shape that guarantees a mount. (Found while working:
+    //    that stale key is also how the view and the URL can disagree — recorded in docs/NEXT.md.)
+    await go("/");
+    await waitText("signed in as", 8000);
+    await go(`${CATALOG_PATH}?q=${encodeURIComponent(word)}`);
+    const restored = await untilCatalog(`a mount from ?q=${word} to draw the narrowed grid`, (s) => s.q === word && !s.busy && s.count > 0);
+    if (restored.field !== word) {
+      throw new Error(
+        `the search field reads ${JSON.stringify(restored.field)} on a mount from ?q=${JSON.stringify(word)} — the page reads its query at mount, so a shared or reloaded URL restores the view`,
+      );
+    }
+    if (!sameTitles(restored.titles, typed.titles)) {
+      throw new Error(`a mount from ?q=${word} draws ${JSON.stringify(restored.titles)}, not the ${JSON.stringify(typed.titles)} the typed query drew — one query, two listings`);
+    }
+
+    // 4. No results is a state, not an error: the no-results copy, no card, and a road out that is
+    //    Clear — never Retry (that is the failed fetch's).
+    await go(`${CATALOG_PATH}?q=zzqx-nothing-matches`);
+    const none = await untilCatalog("the no-results state", (s) => s.q === "zzqx-nothing-matches" && !s.busy && s.count === 0 && s.empty !== "");
+    if (none.empty === "No characters yet.") {
+      throw new Error(`a query nothing matches reads the empty catalog's own sentence (${JSON.stringify(none.empty)}) — the spec has a state for each`);
+    }
+    if (none.actions.includes("Retry")) throw new Error(`the no-results state offers Retry (read ${JSON.stringify(none.actions)}) — nothing failed, the query simply matched nothing`);
+    if (!none.actions.includes("Clear filters")) {
+      throw new Error(`the no-results state's road out is missing (read ${JSON.stringify(none.actions)}) — DESIGN.md asks for the query echoed with a Clear`);
+    }
+
+    // 5. The sort. `?sort=ratio` keeps the control on Top rated and reorders the listing; Newest
+    //    writes no param; Back returns the previous listing *and* its control.
+    await go(CATALOG_PATH);
+    const newest = await untilCatalog("the default listing to come back", (s) => s.sortParam === null && !s.busy && s.count === full.count);
+    if (descending(newest.ratios)) {
+      throw new Error(
+        `the Newest listing already reads the ratios ${JSON.stringify(newest.ratios)} in descending order — the row could not tell a reorder from a coincidence, so it refuses to run`,
+      );
+    }
+
+    await choose('select[name="sort"]', "ratio");
+    const rated = await untilCatalog(
+      "the ratio sort to reach the URL and reorder the grid",
+      (s) => s.sortParam === "ratio" && !s.busy && s.count > 0 && descending(s.ratios),
+    );
+    if (rated.sortLabel !== "Top rated") {
+      throw new Error(`?sort=ratio leaves the control reading ${JSON.stringify(rated.sortLabel)}, not Top rated — the select is the state's, not its own`);
+    }
+
+    await choose('select[name="sort"]', "newest");
+    const backToNewest = await untilCatalog(
+      "Newest to drop the param and restore the order",
+      (s) => s.sortParam === null && !s.busy && sameTitles(s.titles, newest.titles),
+    );
+    if (backToNewest.search !== "") {
+      throw new Error(`Newest left ${JSON.stringify(backToNewest.search)} in the URL — the default sort is the absence of the param`);
+    }
+
+    await js(`history.back(); return true;`);
+    const returnedSort = await untilCatalog(
+      "Back to return the ratio sort and its listing",
+      (s) => s.sortParam === "ratio" && !s.busy && s.sortLabel === "Top rated" && sameTitles(s.titles, rated.titles),
+    );
+
+    // 6. Tags. The vocabulary is read off the grid: one tag on the first card, one on a *different*
+    //    card that does not carry it — which is what lets the pair below prove either-matching.
+    const tagA = (full.tagSets[0] || [])[0] || "";
+    const otherIndex = full.tagSets.findIndex((set) => set.length > 0 && !set.includes(tagA));
+    const tagB = otherIndex >= 0 ? full.tagSets[otherIndex][0] || "" : "";
+    if (!tagA || !tagB || tagA === tagB) {
+      throw new Error(
+        `the page-1 grid reads the tag sets ${JSON.stringify(full.tagSets)} — the row needs two tags on two different cards, one of them carried without the other`,
+      );
+    }
+
+    await go(`${CATALOG_PATH}?tags=${encodeURIComponent(tagA)}`);
+    const oneTag = await untilCatalog(`?tags=${tagA} to narrow the grid`, (s) => s.tagsParam === tagA && !s.busy && s.count > 0);
+    if (JSON.stringify(oneTag.chips) !== JSON.stringify([tagA])) {
+      throw new Error(`the tag field reads ${JSON.stringify(oneTag.chips)} on ?tags=${tagA}, not one chip holding it — the field prints what the URL selects`);
+    }
+    const strays = oneTag.tagSets.filter((set) => !set.includes(tagA)).length;
+    if (strays > 0) {
+      throw new Error(
+        `?tags=${tagA} drew ${strays} of ${oneTag.count} card(s) without it (read ${JSON.stringify(oneTag.tagSets)}) — the filter is on each item's own tags`,
+      );
+    }
+
+    // A chip's own remove control rewrites the joined param; an empty set drops it entirely.
+    await click(`Remove ${tagA}`, { exact: true });
+    const clearedTags = await untilCatalog(
+      "the chip's remove control to drop the param and restore the listing",
+      (s) => s.tagsParam === null && s.chips.length === 0 && !s.busy && s.count === full.count,
+    );
+
+    await go(`${CATALOG_PATH}?tags=${encodeURIComponent(tagA)},${encodeURIComponent(tagB)}`);
+    const bothTags = await untilCatalog(
+      `?tags=${tagA},${tagB} to draw the union`,
+      (s) => s.tagsParam === `${tagA},${tagB}` && !s.busy && s.count > 0,
+    );
+    if (JSON.stringify(bothTags.chips) !== JSON.stringify([tagA, tagB])) {
+      throw new Error(`the tag field reads ${JSON.stringify(bothTags.chips)} on a two-tag URL, not both chips in the URL's order`);
+    }
+    const foreign = bothTags.tagSets.filter((set) => !set.includes(tagA) && !set.includes(tagB)).length;
+    if (foreign > 0) {
+      throw new Error(`?tags=${tagA},${tagB} drew ${foreign} card(s) carrying neither tag (read ${JSON.stringify(bothTags.tagSets)})`);
+    }
+    const onlyA = bothTags.tagSets.filter((set) => set.includes(tagA) && !set.includes(tagB)).length;
+    const onlyB = bothTags.tagSets.filter((set) => set.includes(tagB) && !set.includes(tagA)).length;
+    if (onlyA === 0 || onlyB === 0) {
+      throw new Error(
+        `?tags=${tagA},${tagB} drew ${onlyA} ${tagA}-only and ${onlyB} ${tagB}-only card(s) — two picks must match either tag, not both`,
+      );
+    }
+
+    await click(`Remove ${tagB}`, { exact: true });
+    const oneLeft = await untilCatalog(
+      `removing ${tagB} to leave one chip and one tag in the URL`,
+      (s) => s.tagsParam === tagA && s.chips.length === 1 && !s.busy,
+    );
+
+    // 7. A card's tags row is one line, and what does not fit opens behind `+N`. The fold needs a
+    //    phone card — at the walk's own window every fixture card fits its tags — so this half takes
+    //    its own 360×740 override and clears it (T-36a's shape; assert the width came back).
+    const restoreWidth = await js(`return window.innerWidth;`);
+    let folded = "";
+    try {
+      await send("Emulation.setDeviceMetricsOverride", { width: 360, height: 740, deviceScaleFactor: 1, mobile: false });
+      await sleep(260);
+      await go(CATALOG_PATH);
+      await untilCatalog("the phone-width grid", (s) => s.q === null && s.tagsParam === null && !s.busy && s.count === full.count);
+
+      const chip = await js(`
+        const more = document.querySelector(".card-tag.is-more");
+        if (!more) return null;
+        const card = more.closest(".card");
+        return {
+          label: (more.textContent || "").trim(),
+          hidden: Number((more.getAttribute("aria-label") || "").replace(/[^0-9]/g, "")),
+          visible: [...card.querySelectorAll(".card-tags:not(.is-measure) .card-tag")].map((el) => (el.textContent || "").trim()),
+          all: [...card.querySelectorAll(".card-tags.is-measure .card-tag")].map((el) => (el.textContent || "").trim()),
+          open: document.querySelectorAll(".card-menu").length,
+        };
+      `);
+      if (!chip) throw new Error(`at 360 no card folds a tag behind a +N chip — the tags row is meant to be one line`);
+      if (chip.open !== 0) throw new Error(`${chip.open} card tag list(s) were already floating before the press`);
+      if (chip.hidden < 1) throw new Error(`the +N chip reads ${JSON.stringify(chip.label)} and claims ${chip.hidden} hidden tag(s)`);
+
+      await clickSelector(".card-tag.is-more");
+      const menu = await waitFor(
+        `(() => { const el = document.querySelector(".card-menu"); return el ? [...el.querySelectorAll(".card-tag")].map((t) => (t.textContent || "").trim()) : null; })()`,
+        "the +N chip's floating list",
+        6000,
+      );
+      if (menu.length !== chip.hidden) {
+        throw new Error(`the chip reads ${JSON.stringify(chip.label)} but its list holds ${menu.length} tag(s) — ${chip.hidden} were behind it`);
+      }
+      const shown = [...chip.visible.filter((tag) => tag !== chip.label), ...menu].sort();
+      if (JSON.stringify(shown) !== JSON.stringify([...chip.all].sort())) {
+        throw new Error(`the visible row and its list read ${JSON.stringify(shown)}, not the card's own tags ${JSON.stringify([...chip.all])}`);
+      }
+
+      await clickSelector(".card-menu-scrim");
+      await waitFor(`document.querySelector(".card-menu") === null`, "the floating tag list to close", 6000);
+      folded = `${chip.label} opens ${JSON.stringify(menu)} and closes`;
+    } finally {
+      // A leaked override poisons every later row.
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const widthBack = await js(`return window.innerWidth;`);
+    if (widthBack !== restoreWidth) {
+      throw new Error(`the override cleared to ${widthBack}px, but the session runs at ${restoreWidth}px`);
+    }
+
+    return `a fresh mount reads ${JSON.stringify(full.search)} with ${full.count} card(s) and Newest selected · typing ${JSON.stringify(word)} a character at a time left the URL clean on all ${fast.length} in-window sample(s) and settled to ${JSON.stringify(typed.search)} with ${typed.count} card(s) · a mount from that URL preloads the field and draws the same ${restored.count} · ?q=zzqx-nothing-matches reads ${JSON.stringify(none.empty)} with 0 card(s), no Retry, a Clear filters control · ?sort=ratio reads ${JSON.stringify(rated.sortLabel)} at ${JSON.stringify(rated.search)} with ratios ${JSON.stringify(rated.ratios)} never rising, Newest drops the param (${JSON.stringify(backToNewest.search)}) and Back returns ${JSON.stringify(returnedSort.search)} · ?tags=${tagA} draws ${oneTag.count} card(s) all carrying it, its chip's remove control rewrites the URL to ${JSON.stringify(clearedTags.search)} · ?tags=${tagA},${tagB} draws ${onlyA} ${tagA}-only and ${onlyB} ${tagB}-only card(s) — either, not both — and removing ${tagB} leaves ${JSON.stringify(oneLeft.search)} · at 360 ${folded}`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -5294,9 +5603,9 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47).
+ * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48).
  */
-const EXPECTED_ROWS = 47;
+const EXPECTED_ROWS = 48;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

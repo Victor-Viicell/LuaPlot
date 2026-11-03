@@ -544,6 +544,32 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       write"* (45/46 both times). Bytes restored, `git diff` empty. 46/46 local and 46/46 `--live`.
       Brief: `docs/NEXT.md` (T-63).
 
+- [x] **T-65 The catalog's search, tags and sort are three URL facts, and the search settles.**
+      `character/catalog.md` → *URL*: *"The search, the tags, and the sort live in the query string —
+      `?q=…&tags=blue,haunted&sort=ratio` — so a narrowed view can be shared, bookmarked, and restored
+      by back/forward"*, and `CONTRACT.md` → *Engineering law*: *"No per-keystroke network calls;
+      debounce search at 250ms."* Rows 30, 36-38 and 53 read this grid, its footer and the NSFW pair;
+      **no row had ever typed into the search, picked a tag, pressed the sort control or opened
+      `?q=&tags=&sort=` by address** — a per-keystroke writer, a `q` that died on reload, a chip that
+      never reached the adapter and a `sort=ratio` that left the control on Newest were green in every
+      gate and all 47 rows. Row **48** (`EXPECTED_ROWS` 48, **read-only**) reads the vocabulary off the
+      page (the first card's own title, one tag on it and one on a card that does not carry it), types
+      the title one character at a time and reads `location.search` between keystrokes (**13 in-window
+      samples, none carrying `q=`**), then the settle's **whole** word and the narrowed grid; a mount
+      from `?q=…` preloads the field and draws the same cards; `?q=zzqx-nothing-matches` reads *Nothing
+      matches those filters.* with 0 cards, no Retry and a Clear filters control; `?sort=ratio` draws
+      **22 ratios never rising** with **Top rated** on the control, Newest drops the param, Back
+      returns the listing **and** the control; `?tags=ghost` narrows to 5 cards all carrying it and its
+      chip's remove control rewrites the URL to `""`; `?tags=ghost,artisan` draws **4 ghost-only + 7
+      artisan-only** (either, not both) and removing `artisan` leaves `?tags=ghost`; at 360 the first
+      card folds `+2` behind its `+N` chip and the list opens and closes (override cleared, `innerWidth`
+      asserted back). Red first: `onSearchInput` calling `applySearch(next)` on every keystroke →
+      *"the search wrote the URL 13 time(s) while \"Lamplighter's\" was still being typed (read
+      [{\"typed\":\"L\",\"search\":\"?q=L\",\"elapsed\":75},…]) — a per-keystroke writer, not the 250ms
+      settle"* (47/48). Bytes restored. 48/48 local and 48/48 `--live`. Brief: `docs/NEXT.md` (T-65).
+      Found: a page's own `replaceState` query write never notifies the router, so the view and its URL
+      can disagree — filed as **T-66**.
+
 - [x] **T-64 The profile's four tabs are a URL fact, and a follower is drawn as a catalog card.**
       `user/profile.md` → *Layout* / *Actions* / *URL*: four tabs in `?tab=`, the creations filter in
       `?type=` (**read on that tab only**), and *"Followers and Following are drawn with the catalog
