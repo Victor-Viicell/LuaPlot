@@ -1,69 +1,77 @@
 # Baton — what the next session does
 
-**T-63 landed.** Row **46** (`EXPECTED_ROWS` 46) walks the three states rows 3 and 45 never read.
-It reads the session's own handle from `/`'s *Open profile* link (never pinning `you`), then
-`/user/ada/edit` — a fixture account the walk does not hold — and asserts the URL **stays put**
-(`/user/ada/edit`, no redirect), `.empty-copy` reads *You can't edit this account.*, there is **no**
-`input[name="username"]`, no display-name field and no **Save**, and *Back to your profile* points
-at the session's own `/user/<own>`. Then `/user/<own>/edit`: the form prefills, `ada` →
-**`Username taken`** with Save disabled and the help line blank, `"ab"` → the page's own rule
-sentence as the inline error (read from the page, never pinned) with Save disabled, back to the own
-handle → error gone, the rule back as help, Save enabled; **Cancel** → `/user/<own>` with name,
-handle and bio unchanged. **Read-only** — it never presses Save. 46/46 local, 46/46 `--live`.
+**T-64 landed.** Row **47** (`EXPECTED_ROWS` 47) presses the profile's four tabs for the first time and
+reads the body, the URL and the card. It reads the session's own handle from `/`'s *Open profile*
+link, asserts the head (name, `@handle`, bio, `N followers` / `N following`, the four tab labels in
+order), marks the mounted `.profile-head` with a `data-walk-head` expando, then presses each tab and
+asserts `?tab=posts` / `followers` / `following`, the swapped body (`.feed .card.post` vs the people
+cards' `.card-handle` vs the creations' `.card-author`), `aria-selected`, **and the marker survived**.
+On creations: `Characters` narrows to cards whose title links `/character/`, `All` drops `type` from
+the URL, and a pasted `?tab=posts&type=preset` settles to `?tab=posts` with no type control. On
+followers: the first card's anatomy (title, `@handle`, the bio as `.card-tagline`, a two-figure
+footer, **no** `.card-author`, **no** `.card-ratio`), its title opens that person (name **and bio**
+compared with the card), `history.back()` polls the search and the body back. **Read-only** — no store
+write, no preference. 47/47 local, 47/47 `--live`.
 
-Two red proofs, each aimed at one clause (see PROGRESS): deleting `|| myHandle !== urlHandle` from
-`boot()` → *"/user/ada/edit mounted the account form for a stranger (read {\"copy\":\"\",\
-\"username\":true,…}) — the gate is the route's, not the entry point's"*; dropping `&& !taken.value`
-from `canSave` → *"Save stayed enabled on @ada, a fixture handle (… \"error\":\"Username taken\",
-\"saveDisabled\":false) — a taken username must block the write"*.
+Two red proofs, each aimed at one clause (see PROGRESS): `chooseTab`'s `load()` swapped for
+`loadCreations()` → *"posts tab to draw its own body at tab=posts — read {"search":"?tab=posts",…,
+"posts":0,"empty":"No posts yet.","marked":true}"*; `UserCard`'s footer given a `.card-author` + a
+`.card-ratio` → *"the follower card grew [".card-author",".card-ratio"] … a person's card carries
+followers and following, never an author and a ratio"*.
 
-## T-64 — the profile's four tabs are a URL fact, and a follower is drawn as a catalog card
+## T-65 — the catalog's search, tags and sort are three URL facts, and the search is debounced
 
-**Why it is next.** `pages/user/profile.md` is law about the tabbed body and **no row has ever
-pressed a tab**: rows 2, 45 and 46 read only `.profile-head`. The tab is `?tab=`, the type filter is
-`?type=`, both are written with `history.pushState` (never `navigate()`), and the followers/following
-tabs reuse the **catalog card with a different footer**. So a tab that renders another tab's body, a
-`type` that leaks onto the posts tab, a header that remounts on a tab swap, or a follower card that
-grew an author and a ratio are green in every gate and in all 46 rows.
+**Why it is next.** `character/catalog.md` → *URL*: *"The search, the tags, and the sort live in the
+query string — `?q=…&tags=blue,haunted&sort=ratio` — so a narrowed view can be shared, bookmarked,
+and restored by back/forward"*, and `CONTRACT.md` → *Engineering law*: *"No per-keystroke network
+calls; debounce search at 250ms."* Rows 30, 36-38 and 53 read the grid, the card's footer and the
+NSFW pair — **no row has ever typed into the search**, picked a tag, pressed the sort control, or
+opened `/character/catalog?q=…&tags=…&sort=ratio` by address. A search that fires on every keystroke,
+a `q` that does not survive a reload, a tag chip that never reaches the adapter, or a `sort=ratio`
+that leaves the control on **Newest** is green in every gate and in all 47 rows.
 
 **Approach**
 
-1. **Row 47**, `EXPECTED_ROWS` 46 → 47, placed **after row 46 and before `sign out`**. Read-only:
-   it presses tabs, the type control, and at most one **Load more**.
-2. Read the owner's handle from `/`'s *Open profile* link (as row 46 does), `go("/user/<own>")`, and
-   assert the header first: name, `@handle`, the bio, the two figures and the four tab labels.
-3. Mark the mounted header (`document.querySelector(".profile-head").dataset.walkHead = "1"`), then
-   press each tab and assert: `location.search` carries `tab=posts` / `tab=followers` /
-   `tab=following` (the creations default writes **no** `tab`), the body swaps (creations
-   `.card-cell` vs the posts tab's `.card.post` vs the follower cards), and **the marker survives** —
-   a header that remounted threw the body away and refetched.
-4. On creations, press the type row: `?type=character` narrows the grid to cards whose link carries
-   `/character/`, All drops `type` from the URL, and the **posts tab draws no type control**
-   (`?type=preset` on posts changes nothing).
-5. On **followers**, assert the card's anatomy: a display-name title, a `.handle` under it, the bio
-   in the tagline's slot, and a footer carrying the two figures — **no `.card-author`, no
-   `.card-ratio`**. Press one card, assert its profile mounts, `history.back()`, and poll the search
-   *and* the drawn body back at `tab=followers`.
-6. Nothing else changes: no store write, no preference touched, and `sign out` stays the walk's last
-   row.
+1. **Row 48**, `EXPECTED_ROWS` 47 → 48, placed **after row 47 and before `sign out`**. Read-only:
+   it types, presses one tag chip, one `+N` chip and the sort select, and writes nothing.
+2. **Read the vocabulary from the page, never pin it.** The first card's own title, one of its
+   `.card-tag` labels, and the picker's options come from the grid in front of the row — then
+   `go("/character/catalog?q=<that title>")` by address: the grid narrows to cards whose title
+   carries it, `location.search` keeps `q=`, and a second `go()` of the same URL restores the same
+   listing (a fresh mount, not a component value).
+3. **The debounce is the assertion, not a sleep.** Retype the search field one character at a time
+   (`input[name="q"]` — read the page, do not assume the name) and read `location.search` between
+   keystrokes: a per-keystroke writer leaves `?q=a` behind while the word is still being typed; a
+   debounced one writes nothing until the settle, then the **whole** word. Assert both halves.
+4. **Tags.** `?tags=<tag>` by address: the grid narrows to items carrying it, the field prints a
+   chip with its own remove control, and the remove control rewrites the param without that tag. Two
+   tags match **either** (`tags=a,b`), and an empty tag set drops the param entirely. An item with
+   no tags draws **no** tags row and no placeholder (`character/catalog.md` → *Data*).
+5. **Sort.** `?sort=ratio` keeps the control on **Top rated** and reorders the listing; **Newest**
+   writes no `sort` param; `history.back()` returns the previous listing and control (row 39's
+   shape — poll the search *and* the listing, never one of them).
+6. **No results** is a state, not an error: a query nothing matches reads the spec's sentence and
+   draws no card and no Retry.
 
 **Traps**
 
-- **The header is the page's, the body is the tab's.** `writeQuery()` pushes the URL without
-  notifying the router, so a tab swap keeps the mounted page; a re-read of the head proves nothing
-  (the same row prints the same name) — the expando is the proof.
-- **`App.tsrx`'s effect keys on `path + search`**, so a `popstate` (Back) *does* remount: after Back
-  the expando is gone and that is correct. Assert the search and the body, not the marker.
-- **Read the handle and the figures.** Rows 45/46 hand `@you` back, but row 45 also moves both sides
-  of the follow graph for the length of its row.
-- **The follower lists are fixture rows**: which handles appear is the adapter's answer, so assert
-  the *shape* of a card and one navigation, never a handle.
-- **`type` is read on the creations tab only** (`readQuery()`), and it leaves the URL whenever the
-  tab is not `creations` or the type is `all`.
-- **Paging stays out of the URL**, and `.pager-action button` is disabled while appending (T-57).
-- **Rows 36-38 wrote the NSFW pair and composed a flagged post**; read no pinned card count.
+- **The page writes its query with `history.pushState`** (its own header comment says why), so a
+  settle never notifies the router and nothing remounts. Read `location.search`; a poll on a
+  component value proves nothing.
+- **`tags` is one comma-joined param**, so a chip's remove control rewrites the whole string —
+  assert the joined value, never a single chip's presence alone.
+- **`choose()` returns what it read, so it never proves the page.** Assert the consequence: the URL,
+  the grid, the chip.
+- **The search field's own name may be `q`** (`readQuery()` reads `params.get("q")`), but the input
+  that writes it is the page's business — read it, and use `retype()` for a preloaded field.
+- **Rows 36-38 wrote the NSFW pair and row 38 added a flagged post**, and row 40 left a Like on
+  `…0002`: count the grid in front of you, never a fixture total, and never a card's percentage.
+- **The live walk runs under `/LuaPlot/`** — `go()` resolves the base, and a hand-built href with a
+  leading slash drops it (T-45's doubled base).
+- **A `+N` chip opens a floating list**; pressing it is a real gesture, and the list is in the DOM
+  only while open — if the row asserts it, close it again before moving on.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **47/47** locally and **47/47 `--live`**; the assertion
+**Accept:** `./scripts/check.sh` GREEN; walk **48/48** locally and **48/48 `--live`**; the assertion
 proved **red** first (name the edit and the message in PROGRESS); `publish.sh` prints `LIVE` and
 `curl` is 200.
 
@@ -94,17 +102,17 @@ proved **red** first (name the edit and the message in PROGRESS); `publish.sh` p
 
 ## Open decisions
 
-- **T-64 is the ticket: the profile tabs, the type filter and the follower card.** Failure-bank
-  entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
+- **T-65 is the ticket: the catalog's search, tags and sort.** Failure-bank entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
-  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). With the edit page's four states now walked (rows 45
-  and 46), the next coverage is the **profile body**: `?tab=` / `?type=` are a URL fact nothing has
-  read, and the followers/following tabs are the catalogue card with a swapped footer — the one card
-  in the app whose anatomy no row asserts.
-- **Row count is 46 after T-63.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). With the edit page's four states (rows 45 and 46) and
+  the **profile body** (row 47: `?tab=` / `?type=`, the follower card's anatomy) now walked, the next
+  coverage is the **catalog toolbar**: `?q=`, `?tags=` and `?sort=` are one URL contract nothing has
+  read, and `CONTRACT.md`'s *no per-keystroke network calls; debounce search at 250ms* has no row at
+  all — a search that fetches on every keystroke is invisible to the gate and to all 47 rows.
+- **Row count is 47 after T-64.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
   it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
-  added 46; T-64 adds 47**). **Rows 36 and 37
+  added 46; T-64 added 47; T-65 adds 48**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -141,6 +149,11 @@ proved **red** first (name the edit and the message in PROGRESS); `publish.sh` p
 - **Row 46 (T-63) is read-only and hands nothing over.** It presses **Cancel** and reads the profile
   it lands on against the head it read before the form, so a later row may rely on `/user/<own>`'s
   name, handle and bio and on the NSFW pair being untouched. It takes no override and no probe.
+- **Row 47 (T-64) is read-only and presses tabs, not writes.** It leaves the reader on
+  `/user/<own>?tab=following` (the last tab it pressed) and writes no preference and no store row, so
+  a later row may rely on the profile's name, bio, figures and all four lists as it found them. It
+  adds five browser history entries (three tab pushes, one pasted URL, one card navigation + Back),
+  so a later row that calls `history.back()` must not expect row 42's post page.
 - **`VIEWER` and `ownHandle()` diverge after a claim or a rename — and every ownership rule must pick
   one.** `ownHandle()` is the profile row's handle and it *moves* (`renameAccount`); the constant
   `VIEWER` does not. Personas, sessions, votes and bookmarks are owned/read by `VIEWER`, while the
@@ -226,6 +239,22 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **`writeQuery()` never omits `tab` (T-64).** The baton predicted the creations default would write
+  no `tab`; `user-profile.tsrx`'s `writeQuery()` always `params.set("tab", tab)` and only omits
+  `type` when it is `all`, so a bare `/user/<own>` **rewrites its own URL to `?tab=creations`** on
+  boot. A row that pinned the absence would have been red on a right page — read the URL the page
+  produces, and treat a ticket's URL sketch as the hypothesis it is.
+- **`.card-handle` is what tells a person card from a catalog card (T-64).** Both are
+  `li.card-cell > article.card`, and a follower card carries **no** `.card-author` and **no**
+  `.card-ratio` — so a "count the creations" expression on a shared reader must be
+  `.card-cell .card:not(:has(.card-handle)) .card-author`, or the follower tab reads as a creation
+  grid. The post card's root is `article.card.post` and it is never a `.card-cell`, so
+  `.feed .card.post` is the posts tab and nothing else.
+- **A tab swap keeps the page; only a `popstate` remounts it (T-64).** `writeQuery()` pushes without
+  notifying the router, so an expando on `.profile-head` survives every tab/type press and is gone
+  after `history.back()` — the row marks the head, asserts the marker on each press, and after Back
+  asserts only the search and the body. Two independent marks are cheap (one after a fresh mount from
+  a pasted URL, one after Back); a single mark across a `go()` cannot be read.
 - **A rename had to move comments too (T-62).** `renameAccount()` moved characters, lorebooks,
   presets, posts, both sides of the follow graph, the claim set and the profile row — but a
   `commentSchema.author` is a handle as well, so after a rename every comment the account wrote still

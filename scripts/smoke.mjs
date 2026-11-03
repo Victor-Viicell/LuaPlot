@@ -5022,6 +5022,255 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-64 — `pages/user/profile.md` → *Layout* / *Actions* / *URL*: the body is **four tabs in
+ * `?tab=`**, the creations tab's filter is `?type=` (read on that tab only), and a follower is the
+ * **catalog card with two fields swapped** — the bio in the tagline's slot, followers/following in
+ * the footer instead of an author and a ratio.
+ *
+ * No row has ever pressed a tab: rows 2, 45 and 46 read only `.profile-head`. A tab that renders
+ * another tab's body, a `type` that leaks onto the posts tab, a header that remounts on a tab swap
+ * and a follower card that grew a `.card-author` and a `.card-ratio` were green in every gate and
+ * in all 46 rows.
+ *
+ * **Read-only.** It presses tabs, the type chips and one card; it writes no store row, touches no
+ * preference, and hands the account back exactly as it found it.
+ * ---------------------------------------------------------------------------------------------- */
+const PROFILE_TABS = ["Creations", "Posts", "Followers", "Following"];
+const TAB_SCOPE = ".tabs[role=tablist] [role=tab]";
+
+results.push(
+  await journey("the profile's four tabs are a URL fact, and a follower is drawn as a catalog card", async () => {
+    /** The head — the five things a tab swap must not disturb. */
+    const readHead = () =>
+      js(`
+        const text = (selector) => {
+          const el = document.querySelector(selector);
+          return el ? (el.textContent || "").replace(/\\s+/g, " ").trim() : "";
+        };
+        const tabs = [...document.querySelectorAll(${JSON.stringify(TAB_SCOPE)})];
+        return {
+          present: document.querySelector(".profile-head") !== null,
+          name: text(".profile-head h1.name"),
+          handle: text(".profile-head .handle"),
+          bio: text(".profile-head .bio"),
+          figures: [...document.querySelectorAll(".profile-head .figures .figure")].map((el) =>
+            (el.textContent || "").replace(/\\s+/g, " ").trim(),
+          ),
+          tabs: tabs.map((el) => (el.textContent || "").trim()),
+          selected: tabs.filter((el) => el.getAttribute("aria-selected") === "true").map((el) => (el.textContent || "").trim()),
+          marked: document.querySelector(".profile-head[data-walk-head='1']") !== null,
+        };
+      `);
+
+    /** The body the selected tab draws, plus the two URL facts that select it. */
+    const readBody = () =>
+      js(`
+        const params = new URLSearchParams(location.search);
+        const cards = [...document.querySelectorAll(".card-cell .card")];
+        return {
+          search: location.search,
+          tab: params.get("tab"),
+          type: params.get("type"),
+          typeRow: document.querySelector(".type-row") !== null,
+          creations: cards.filter((el) => el.querySelector(".card-handle") === null && el.querySelector(".card-author") !== null).length,
+          people: cards.filter((el) => el.querySelector(".card-handle") !== null).length,
+          posts: document.querySelectorAll(".card.post").length,
+          links: [...document.querySelectorAll(".card-cell .card .card-title")].map((a) => a.getAttribute("href") || ""),
+          busy: document.querySelector(".profile [aria-busy='true']") !== null,
+          empty: (document.querySelector(".empty-copy")?.textContent || "").trim(),
+          marked: document.querySelector(".profile-head[data-walk-head='1']") !== null,
+        };
+      `);
+
+    /** A poll that always throws with the whole body it last read, never a bare timeout. */
+    const untilBody = async (label, check, timeout = 12000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await readBody();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${label} — read ${JSON.stringify(last)}`);
+    };
+
+    /** Mark the mounted header: a push that does not notify the router keeps the page, and a
+     *  remount throws the expando away — the one honest proof that the header survived the swap. */
+    const markHead = () =>
+      js(`const head = document.querySelector(".profile-head"); if (head) head.dataset.walkHead = "1"; return head !== null;`);
+
+    const headSwap = async (label, wantTab, wantCount, wanted) => {
+      await click(wanted, { exact: true, scope: TAB_SCOPE });
+      const body = await untilBody(`${label} to draw its own body at tab=${wantTab}`, (b) => b.tab === wantTab && !b.busy && wantCount(b), 12000);
+      if (!body.marked) {
+        throw new Error(
+          `${label} threw the header away (read ${JSON.stringify(body)}) — a tab swap writes the URL with pushState, so the page that booted must still be mounted`,
+        );
+      }
+      const head = await readHead();
+      if (head.name !== opened.name || head.handle !== opened.handle || head.bio !== opened.bio || head.figures.join("|") !== opened.figures.join("|")) {
+        throw new Error(
+          `the header reads ${JSON.stringify([head.name, head.handle, head.bio, head.figures])} after the ${label}, not ${JSON.stringify([opened.name, opened.handle, opened.bio, opened.figures])} — a tab swap is the body's, not the header's`,
+        );
+      }
+      if (head.selected.join(",") !== wanted) {
+        throw new Error(`the strip marks ${JSON.stringify(head.selected)} selected on the ${label}, not ${JSON.stringify(wanted)}`);
+      }
+      return { ...body, selected: head.selected };
+    };
+
+    // 1. The session's own handle, read from the shell (row 45 hands `@you` back; never pin it).
+    await go("/");
+    await waitText("signed in as", 8000);
+    const ownHref = await js(`
+      const link = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Open profile");
+      return link ? link.getAttribute("href") || "" : "";
+    `);
+    const ownHandle = ownHref.split("/").filter(Boolean).pop() || "";
+    if (!ownHandle) throw new Error(`/ draws no Open profile link (read ${JSON.stringify(ownHref)}) — the row cannot know whose profile it is walking`);
+
+    await go(`/user/${ownHandle}`);
+    await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the account's profile header", 10000);
+    const opened = await readHead();
+    if (!opened.present || !opened.name || !opened.bio || opened.handle !== `@${ownHandle}`) {
+      throw new Error(`/user/${ownHandle} reads ${JSON.stringify(opened)} — the row needs the owner's own name, handle and bio to prove the header survives a tab swap`);
+    }
+    if (JSON.stringify(opened.tabs) !== JSON.stringify(PROFILE_TABS)) {
+      throw new Error(`the tab strip reads ${JSON.stringify(opened.tabs)}, not ${JSON.stringify(PROFILE_TABS)} — the spec's four tabs, in that order`);
+    }
+    if (opened.figures.length !== 2 || !opened.figures.every((figure) => /^\d+ (followers?|following)$/.test(figure))) {
+      throw new Error(`the header's figures read ${JSON.stringify(opened.figures)} — the spec asks for followers and following as plain figures`);
+    }
+
+    // The creations tab is the default: its grid, its type row, and `tab=creations` in the URL.
+    const created = await untilBody("the creations tab to draw its grid", (b) => b.tab === "creations" && !b.busy && b.creations > 0);
+    if (!created.typeRow) {
+      throw new Error(`the creations tab draws no type control (read ${JSON.stringify(created)}) — All / Characters / Lorebooks / Presets refines that grid`);
+    }
+    if (created.type !== null) {
+      throw new Error(`/user/${ownHandle} opens with ?type=${created.type} in the URL — All is the absence of a filter, and paging is not in the URL either`);
+    }
+    if (created.posts !== 0 || created.people !== 0) {
+      throw new Error(`the creations tab draws ${created.posts} post card(s) and ${created.people} profile card(s) — one tab, one body`);
+    }
+    if (!(await markHead())) throw new Error(`/user/${ownHandle} mounted no .profile-head to mark`);
+
+    // 2. Posts: `tab=posts`, the thread card, no type control, and the header still the one that booted.
+    const posts = await headSwap("posts tab", "posts", (b) => b.posts > 0, "Posts");
+    if (posts.creations !== 0 || posts.people !== 0) {
+      throw new Error(`the posts tab still draws ${posts.creations} creation card(s) and ${posts.people} profile card(s) (read ${JSON.stringify(posts)}) — a tab that renders another tab's body`);
+    }
+    if (posts.typeRow) {
+      throw new Error(`the posts tab draws a type control (read ${JSON.stringify(posts)}) — ?type= is read on the creations tab only`);
+    }
+
+    // 3. A pasted `?type=` on a post tab changes nothing, and leaves the URL: the filter is the
+    //    creations tab's, not the profile's.
+    await go(`/user/${ownHandle}?tab=posts&type=preset`);
+    const leaked = await untilBody("a post tab asked for ?type=preset to draw a post feed", (b) => b.tab === "posts" && !b.busy && b.posts > 0);
+    if (leaked.type !== null) {
+      throw new Error(`/user/${ownHandle}?tab=posts&type=preset left type=${JSON.stringify(leaked.type)} in the URL (read ${JSON.stringify(leaked.search)}) — the creations filter must not survive on another tab`);
+    }
+    if (leaked.typeRow) throw new Error(`a posts tab asked for ?type=preset drew a type control — the filter belongs to the creations grid`);
+
+    // 4. Back to creations, then the type chips: Characters narrows the grid it filters and All
+    //    drops `type` from the URL. A fresh mount from step 3 means a fresh mark.
+    await click("Creations", { exact: true, scope: TAB_SCOPE });
+    const again = await untilBody("the creations tab to come back", (b) => b.tab === "creations" && !b.busy && b.creations > 0);
+    if (!again.typeRow) throw new Error(`the creations tab came back without its type control (read ${JSON.stringify(again)})`);
+    await markHead();
+
+    await click("Characters", { exact: true, scope: ".type-row button" });
+    const chars = await untilBody(
+      "the Characters chip to narrow the grid to characters",
+      (b) => b.type === "character" && !b.busy && b.links.length > 0 && b.links.every((href) => href.includes("/character/")),
+    );
+    if (!chars.marked) {
+      throw new Error(`the type filter remounted the page (read ${JSON.stringify(chars)}) — a chip rewrites ?type= with pushState, so the mounted header must survive it`);
+    }
+    if (chars.creations !== chars.links.length) {
+      throw new Error(`?type=character draws ${chars.creations} creation card(s) but ${chars.links.length} title link(s) (read ${JSON.stringify(chars)})`);
+    }
+
+    await click("All", { exact: true, scope: ".type-row button" });
+    const all = await untilBody("the All chip to drop the filter", (b) => b.type === null && !b.busy && b.links.length > chars.links.length);
+    if (!all.marked) throw new Error(`the All chip remounted the page (read ${JSON.stringify(all)}) — dropping a filter rewrites ?type= with pushState`);
+
+    // 5. Followers: the catalog card with two fields swapped, and no author and no ratio.
+    const followers = await headSwap("followers tab", "followers", (b) => b.people > 0, "Followers");
+    if (followers.creations !== 0 || followers.posts !== 0) {
+      throw new Error(`the followers tab draws ${followers.creations} creation card(s) and ${followers.posts} post card(s) (read ${JSON.stringify(followers)}) — a tab that renders another tab's body`);
+    }
+    if (followers.typeRow) throw new Error(`the followers tab draws a type control (read ${JSON.stringify(followers)}) — ?type= is read on the creations tab only`);
+
+    const follower = await js(`
+      const card = document.querySelector(".card-cell .card");
+      if (!card) return null;
+      const one = (selector) => card.querySelector(selector);
+      const text = (selector) => {
+        const el = one(selector);
+        return el ? (el.textContent || "").replace(/\\s+/g, " ").trim() : "";
+      };
+      return {
+        title: text(".card-title"),
+        handle: text(".card-handle"),
+        tagline: text(".card-tagline"),
+        foot: [...card.querySelectorAll(".card-foot > *")].map((el) => (el.textContent || "").replace(/\\s+/g, " ").trim()),
+        author: one(".card-author") !== null,
+        ratio: one(".card-ratio") !== null,
+        cover: one(".card-cover") !== null,
+      };
+    `);
+    if (!follower) throw new Error(`the followers tab draws ${followers.people} .card-cell(s) and no .card to read`);
+    if (!follower.title) throw new Error(`the follower card draws the title ${JSON.stringify(follower.title)} — the display name is the card's title`);
+    if (!/^@[a-z0-9_]+$/.test(follower.handle)) {
+      throw new Error(`the follower card's handle reads ${JSON.stringify(follower.handle)} — the handle sits under the title as @handle`);
+    }
+    if (!follower.tagline) {
+      throw new Error(`the follower card draws no .card-tagline (read ${JSON.stringify(follower)}) — the bio takes the tagline's slot`);
+    }
+    if (follower.author || follower.ratio) {
+      throw new Error(
+        `the follower card grew ${JSON.stringify([follower.author ? ".card-author" : null, follower.ratio ? ".card-ratio" : null].filter(Boolean))} (read ${JSON.stringify(follower)}) — a person's card carries followers and following, never an author and a ratio`,
+      );
+    }
+    if (follower.foot.length !== 2 || !/^\d+ followers?$/.test(follower.foot[0]) || !/^\d+ following$/.test(follower.foot[1])) {
+      throw new Error(`the follower card's footer reads ${JSON.stringify(follower.foot)}, not followers then following — the two fields the catalog card spends on an author and a ratio`);
+    }
+
+    // 6. A card opens that person: the title is their name and the tagline is their bio. Back
+    //    remounts (the effect keys on path + search), so assert the search and the body, not the mark.
+    const personHandle = follower.handle.replace(/^@/, "");
+    await clickSelector(".card-cell .card .card-title");
+    await expectPath(`/user/${personHandle}`, "a follower card's title", 12000);
+    await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the follower's profile", 10000);
+    const landed = await readHead();
+    if (landed.handle !== `@${personHandle}` || landed.name !== follower.title) {
+      throw new Error(`the card titled ${JSON.stringify(follower.title)} opened ${JSON.stringify([landed.name, landed.handle])} — a follower card links to that person`);
+    }
+    if (landed.bio !== follower.tagline) {
+      throw new Error(`@${personHandle} reads the bio ${JSON.stringify(landed.bio)} where the card's tagline read ${JSON.stringify(follower.tagline)} — the bio must land in the tagline's slot`);
+    }
+
+    await js(`history.back(); return true;`);
+    const returned = await untilBody("the followers tab to return on Back", (b) => b.tab === "followers" && !b.busy && b.people === followers.people, 12000);
+    if (returned.creations !== 0 || returned.posts !== 0) {
+      throw new Error(`Back landed on ${JSON.stringify([returned.tab, returned.creations, returned.posts])} — the tab must come back as the followers list it was`);
+    }
+    await markHead();
+
+    // 7. Following is the same card, the other edge.
+    const following = await headSwap("following tab", "following", (b) => b.people > 0, "Following");
+    if (following.creations !== 0 || following.posts !== 0) {
+      throw new Error(`the following tab draws ${following.creations} creation card(s) and ${following.posts} post card(s) (read ${JSON.stringify(following)}) — a tab that renders another tab's body`);
+    }
+
+    return `@${ownHandle} reads ${JSON.stringify([opened.name, opened.bio, opened.figures])} with the tabs ${JSON.stringify(opened.tabs)} · creations ?tab=creations&type= draws ${created.creations} card(s) with the type row · Posts → ${JSON.stringify(posts.search)} draws ${posts.posts} thread card(s), no type row, the marked header intact · a pasted ?tab=posts&type=preset reads ${JSON.stringify(leaked.search)} with ${leaked.posts} post card(s) · Characters → ${JSON.stringify(chars.search.split("type=")[1])} narrows ${chars.creations} card(s) all /character/ · All → ${JSON.stringify(all.search)} draws ${all.links.length} card(s) · Followers → ${JSON.stringify(followers.search)} draws ${followers.people} card(s) whose first is ${JSON.stringify([follower.title, follower.handle, follower.foot])} with no .card-author and no .card-ratio · its title opens @${personHandle} reading ${JSON.stringify([landed.name, landed.bio])} · Back returns to ${JSON.stringify(returned.search)} with ${returned.people} card(s) · Following → ${JSON.stringify(following.search)} draws ${following.people} card(s)`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -5045,9 +5294,9 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46).
+ * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47).
  */
-const EXPECTED_ROWS = 46;
+const EXPECTED_ROWS = 47;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

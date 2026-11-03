@@ -3,6 +3,44 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-64: the profile's four tabs, the type filter and the follower card
+
+- **Changed:** `scripts/smoke.mjs` — new walk **row 47**, `EXPECTED_ROWS` 46 → 47, after row 46 and
+  before `sign out` (**read-only**: no store write, no preference touched). It reads the session's
+  own handle from `/`'s *Open profile* link (never pinning `you`), opens `/user/<own>` and asserts
+  the head — name, `@handle`, bio, the two figures as `N followers` / `N following`, and the four
+  tab labels in the spec's order — then marks the mounted `.profile-head` with a `data-walk-head`
+  expando and presses each tab: `?tab=posts` / `followers` / `following`, the body swapped (the
+  posts' `.feed .card.post`, the people's `.card-handle` cards, the creations' `.card-author`
+  cards), `aria-selected` on the pressed pill, and **the marker survived** (a remount is the only
+  honest proof the page was not re-booted). On creations it presses `Characters` (every card's
+  title links `/character/`, the count matches the card count), `All` (`type` leaves the URL, the
+  grid grows back), and proves a pasted `?tab=posts&type=preset` settles to `?tab=posts` with no
+  type control. On followers it reads the first card's anatomy (title, `@handle`, the bio as
+  `.card-tagline`, a two-figure footer, **no** `.card-author`, **no** `.card-ratio`), presses its
+  title, asserts the landing's name **and bio** equal the card's (the bio lands in the tagline's
+  slot), `history.back()`, and polls the search *and* the body back at `tab=followers`.
+- **Verified:** `./scripts/check.sh` GREEN (30 routes, schema, links, tiers); walk **47/47** locally
+  and **47/47 `--live`** against https://victor-viicell.github.io/LuaPlot/ (200). Red first, twice,
+  each aimed at one clause the row exists for: `chooseTab`'s `load(1, "replace")` swapped for
+  `loadCreations(1, "replace")` (a tab that renders another tab's body) → *"posts tab to draw its own
+  body at tab=posts — read {"search":"?tab=posts","tab":"posts","typeRow":false,"posts":0,
+  "empty":"No posts yet.","marked":true}"* (46/47); `UserCard`'s footer given a `.card-author` and a
+  `.card-ratio` → *"the follower card grew [".card-author",".card-ratio"] (read {"title":"Ada
+  Whitlock","handle":"@ada","tagline":"Slow-burn fantasy…","foot":["@ada","96%","4
+  followers","3 following"],"author":true,"ratio":true}) — a person's card carries followers and
+  following, never an author and a ratio"* (46/47). Both bytes restored (`git diff
+  src/pages/user-profile.tsrx src/components/UserCard.tsrx` empty), so the green run is the proof.
+- **Not verified / found:** the baton predicted the creations default would write **no** `tab`;
+  the page writes `?tab=creations` on every boot (`writeQuery()` always sets it), so the row asserts
+  the URL the page actually produces — the ticket's parenthetical was a hypothesis, the page is the
+  fact. Rows 36-38's NSFW pair and row 38's extra flagged post are read dynamically here (the
+  row counts `.card-author` cards and people cards, never a pinned total), so no seed came in
+  contact with them. Row 47 presses **no Load more**: on this account's numbers (5 creations, 4
+  followers, 2 following) every tab fits page 1, and a pager that does not exist cannot be pressed.
+- **Publish:** `publish.sh` printed `LIVE` (`assets/index-AwPh3k_B.js` — unchanged, the commit only
+  touches `scripts/`), `curl` 200, and the live walk re-read all 47 rows against the published build.
+
 ## 2026-11-02 — T-63: the edit page's forbidden state, taken handle and format error
 
 - **Changed:** `scripts/smoke.mjs` — new walk **row 46**, `EXPECTED_ROWS` 45 → 46, after row 45 and

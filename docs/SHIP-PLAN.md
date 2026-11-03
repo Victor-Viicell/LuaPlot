@@ -544,6 +544,30 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       write"* (45/46 both times). Bytes restored, `git diff` empty. 46/46 local and 46/46 `--live`.
       Brief: `docs/NEXT.md` (T-63).
 
+- [x] **T-64 The profile's four tabs are a URL fact, and a follower is drawn as a catalog card.**
+      `user/profile.md` → *Layout* / *Actions* / *URL*: four tabs in `?tab=`, the creations filter in
+      `?type=` (**read on that tab only**), and *"Followers and Following are drawn with the catalog
+      card … the bio in the tagline's slot, and a footer carrying followers and following instead of
+      an author and a ratio"*. Rows 2, 45 and 46 read only `.profile-head`, so **no row had ever
+      pressed a tab**: a tab drawing another tab's body, a `type` leaking onto posts, a header that
+      remounted on a swap and a follower card that grew `.card-author` + `.card-ratio` were green in
+      every gate and all 46 rows. Row **47** (`EXPECTED_ROWS` 47, read-only — no store write, no
+      preference) reads the session's own handle from `/`'s *Open profile* link, asserts the head
+      (name, `@handle`, bio, two figures, the four tab labels in order), marks the mounted
+      `.profile-head` with an expando, then presses each tab and asserts the search (`tab=posts` /
+      `followers` / `following`), the body (`.feed .card.post` vs `.card-handle` people cards vs the
+      creations grid), `aria-selected`, and that **the marker survived** — a remount is the only proof
+      a tab swap kept the page. On creations it presses `Characters` (every card's title links
+      `/character/`), then `All` (`type` leaves the URL), and proves `?tab=posts&type=preset` settles
+      to `?tab=posts` with no type control. On followers it reads the card's anatomy (title, `@handle`,
+      the bio as `.card-tagline`, a two-figure footer, no author, no ratio), presses a card, asserts
+      the landing's name **and bio** match the card, `history.back()`, and polls the search and the body
+      back. Red first, twice: `chooseTab`'s `load()` swapped for `loadCreations()` → *"posts tab to draw
+      its own body at tab=posts — read {…"posts":0,…"empty":"No posts yet.","marked":true}"*;
+      `UserCard`'s footer given `.card-author` + `.card-ratio` → *"the follower card grew
+      [".card-author",".card-ratio"] … a person's card carries followers and following, never an
+      author and a ratio"*. 47/47 local and 47/47 `--live`. Brief: `docs/NEXT.md` (T-64).
+
 - [x] **T-62 A rename out of `/user/[user.username]/edit` moves the row, the content and the graph.**
       `user/edit.md` is law in four places nothing had executed: the handle rule, *"Changing it moves
       the profile URL and no alias is kept, so a link to the previous handle reports not-found rather
