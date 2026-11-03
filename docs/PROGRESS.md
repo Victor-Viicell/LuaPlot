@@ -22,11 +22,15 @@ could not be verified.
   `NEXT.md` (T-67 baton + three new "found while working" notes).
 - **Verified:** `./scripts/check.sh` GREEN (30 routes, schema, 52 links, tiers, new history section:
   *4 history write(s), all in src/router.ts*). Walk **49/49** locally and **49/49 `--live`** against
-  https://victor-viicell.github.io/LuaPlot/ (200, `assets/index-0WXkfKKh.js`; `publish.sh` printed
-  `LIVE`). Row 49's evidence: *typing "Lamplighter's" committed "?q=Lamplighter%27s" with 1 of 20
-  card(s) and kept the caret in the field (activeElement INPUT.field-input) · the switcher's Characters
-  tab cleared the query, the field and the grid (20 card(s), "") · a second settle then the bottom
-  bar's Catalog tab did the same (20 card(s), "", crumb "/character/catalog")*.
+  https://victor-viicell.github.io/LuaPlot/ (200; `publish.sh` printed `LIVE`). Row 49's evidence:
+  *typing "Lamplighter's" committed "?q=Lamplighter%27s" with 1 of 20 card(s) and kept the caret in the
+  field (activeElement INPUT.field-input) · the switcher's Characters tab cleared the query, the field
+  and the grid (20 card(s), "") · a second settle then the bottom bar's Catalog tab did the same
+  (20 card(s), "", crumb "/character/catalog")*. The first `--live` run walked
+  `assets/index-0WXkfKKh.js`; the commit's comment-only edits changed the bundle hash, so `publish.sh`
+  was re-run (`assets/index-B3OaSzoU.js`) and the walk re-run against **that**: the first attempt read
+  **46/49** — three `/dev/state` rows timed out on their own toggles, the recorded mid-propagation chunk
+  404 — and the re-run 60s later was **49/49**. No row was touched between them.
 - **Red first, twice, aimed separately** (a full revert red-lit two rows and the earlier aborted the
   later, so the caret clause never got its run): (1) dropping `mountedKey = …` from `commitQuery()` →
   47/49, row 48 *"the bare catalog to remount after the settle's commit — read
