@@ -3,6 +3,43 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-67: the saved page's tabs are the query, and a tab pressed on itself leaves the search
+
+- **Changed:** `src/pages/bookmarks.tsrx` — `chooseTab()` no longer returns early when the pressed tab
+  is the one already selected: a same-tab press is *this tab, unfiltered*, so it clears `draft` and
+  `applied`, cancels a settle timer that has not fired, and (only when there was a search to clear)
+  commits `?type=<same>` with a `push` and reloads. `scripts/smoke.mjs` — new walk **row 50**,
+  `EXPECTED_ROWS` 49 → 50. Docs: `DESIGN.md` → *Bookmarks* (the press rule and why the search
+  survives a *different* tab), `SHIP-PLAN.md` (T-67 ticked), `NEXT.md` (T-68 baton + four new
+  "found while working" notes).
+- **Verified:** `./scripts/check.sh` GREEN (30 routes, schema, 52 links, tiers, history *4 write(s),
+  all in src/router.ts*). Walk **50/50** locally and **50/50 `--live`** against
+  https://victor-viicell.github.io/LuaPlot/ (200; `publish.sh` printed
+  `LIVE_JS=assets/index-BWZZlNKL.js`, and the live `index.html` already referenced that bundle when the
+  walk started). Row 50's evidence: *a fresh /bookmarks writes "?type=character" (the default tab
+  "character", counts [3,2,1,2]) · pressing "Lorebooks" pushed "?type=lorebook" and drew 2 row(s) of
+  "Saved lorebooks" · a mount from ?type=lorebook draws the same ["The Salt Archive","Ashmarket
+  Gazetteer"] · ?sort=name reads "Title A–Z" at "?type=lorebook&sort=name" with the titles ["Ashmarket
+  Gazetteer","The Salt Archive"] ascending, and Back returns "?type=lorebook" with 2 row(s) · typing
+  "Archive" committed "?type=lorebook&q=Archive" with 1 of 2 row(s) and **kept the caret** (activeElement
+  INPUT.field-input) · a mount from ?type=lorebook remounted the whole tab (2 row(s), field "") · a sort
+  under the search reads "?type=lorebook&q=Archive&sort=name" and Back returns
+  "?type=lorebook&q=Archive" with the field holding "Archive" · the Lorebooks tab, pressed on itself,
+  cleared the search to "?type=lorebook" with 2 row(s) and an empty field*.
+- **Red first, twice, aimed separately** (the first edit aborted row 50 *before* its seam clause, so
+  the second edit was aimed at that clause alone): (1) dropping `mountedKey = …` from `commitQuery()`
+  → 47/50, row 50 at *"Back to return the unsorted tab — read {"search":"?type=lorebook",…,
+  "titles":["Ashmarket Gazetteer","The Salt Archive"],…}"* with `sortValue` still `name` (the URL
+  dropped `?sort=` and the select kept it); (2) `if (mode === "push") mountedKey = …` — a **replace**
+  commit leaves the key stale, which is T-66's own shape — → 47/50, row 50 alone at the seam:
+  *"a mount from ?type=lorebook (the URL the page wrote before the search) to remount the whole tab —
+  read {"search":"?type=lorebook",…,"count":1,"titles":["The Salt Archive"],"field":"Archive",
+  "focused":true}"*. Rows 48 and 49 went red with it both times (they walk the same seam from the
+  catalog's side). `src/router.ts` restored from a copy taken before the first edit — `git diff
+  src/router.ts` is empty, so the tree that passed is the tree that was measured.
+- **Not verified:** nothing new. The row is read-only (no store write, no preference), it does not
+  touch `/dev/*`, and it takes no CDP override.
+
 ## 2026-11-03 — T-66: the router owns the mounted key, and a page's query write reaches it
 
 - **Changed:** `src/router.ts` — new `getMountedKey()`/`setMountedKey()` (the `path + search` the shell

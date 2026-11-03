@@ -299,9 +299,31 @@ export function Bookmarks() @{
     load(1, "replace");
   }
 
+  /**
+   * A tab press is the page's own route with a **different query**, and the tab you are already on is
+   * a press too: it means *this tab, unfiltered*, which is the only way back to a tab's whole saved
+   * list once a search narrows it (the search has no other road out — `Clear search` only exists in
+   * the no-results state). With nothing to clear it is not a reload. The write is a `push`, so Back
+   * returns the narrowed view; `commitQuery()` is what moves the router's key (T-66).
+   */
   function chooseTab(next: string): void {
     const parsed = bookmarkKindSchema.safeParse(next);
-    if (!parsed.success || parsed.data === tab.value) return;
+    if (!parsed.success) return;
+
+    if (parsed.data === tab.value) {
+      // A keystroke that has not settled yet dies with the press: it would narrow the tab the
+      // reader just asked to see whole.
+      if (settleTimer) clearTimeout(settleTimer);
+
+      const narrowed = applied.value !== "";
+      draft.value = "";
+      applied.value = "";
+      if (!narrowed) return;
+
+      writeQuery(tab.value, "", sort.value, "push");
+      load(1, "replace");
+      return;
+    }
 
     tab.value = parsed.data;
     writeQuery(parsed.data, applied.value, sort.value, "push");

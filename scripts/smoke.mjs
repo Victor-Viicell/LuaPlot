@@ -5670,6 +5670,250 @@ results.push(
   }),
 );
 
+/* ------------------------------------------------------------------------------------------------
+ * T-67 — the saved page's **tabs are the query** (`bookmarks.md` → *URL*: type, search and sort all
+ * live in the query string). T-66 changed seven pages' query writes in one commit and walked **one**
+ * of them; `/bookmarks` is the only page whose *tab* write is a `push` and whose *search* write is a
+ * `replace`, so a regression in its tab press was invisible to all 49 rows.
+ *
+ * Eight steps, each the shape of the next one's failure:
+ *  1. a fresh `/bookmarks` writes its own `?type=` on boot (the default tab is the most recently
+ *     saved kind, and the spec's counts are saved rows) — the strip carries four counts;
+ *  2. a tab press is a **push** to the page's own route with a different query;
+ *  3. `?type=` pasted by address mounts that tab directly (the shareable half);
+ *  4. the sort is a `push` and Title A–Z really orders the list by title; Back is the proof;
+ *  5. the search commits **silently and keeps the caret** — row 49's clause on this page;
+ *  6. a mount from the URL the page wrote **before** the search must remount it: the mounted-key
+ *     seam (T-66), and the one clause a missing key move turns red;
+ *  7. a sort pressed *under a search* keeps the search, and Back returns it with the field holding
+ *     the word (the URL is the state, not the component);
+ *  8. the tab you are already on is a press too: it clears the search and rewrites the URL.
+ *
+ * Read-only: types, presses tabs, the sort select and Back. No store row, no preference.
+ * ---------------------------------------------------------------------------------------------- */
+const BOOKMARKS_PATH = "/bookmarks";
+/** The four types with the label the strip draws — the spec's own tab order (`bookmarks.md`). */
+const SAVED_TABS = [
+  { type: "character", label: "Characters" },
+  { type: "lorebook", label: "Lorebooks" },
+  { type: "preset", label: "Presets" },
+  { type: "post", label: "Posts" },
+];
+const labelOfType = (type) => (SAVED_TABS.find((tab) => tab.type === type) || {}).label || "";
+
+results.push(
+  await journey("the saved page's tabs are the query: a push per tab, a silent search, and Back restores both", async () => {
+    /** One read of everything these eight steps assert: the URL, the strip, the field, the grid. */
+    const read = () =>
+      js(`
+        const params = new URLSearchParams(location.search);
+        const text = (el) => (el ? String(el.textContent || "").trim() : "");
+        const labelOf = (el) => {
+          const first = el.childNodes[0];
+          return String(first && first.nodeType === 3 ? first.textContent : el.textContent || "").trim();
+        };
+        const tabs = [...document.querySelectorAll(${JSON.stringify(TAB_SCOPE)})];
+        const cells = [...document.querySelectorAll(".card-cell")];
+        const field = document.querySelector('input[name="q"]');
+        const select = document.querySelector('select[name="sort"]');
+        const grid = document.querySelector(".card-grid");
+        const active = document.activeElement;
+        return {
+          search: location.search,
+          type: params.get("type"),
+          q: params.get("q"),
+          sort: params.get("sort"),
+          labels: tabs.map(labelOf),
+          counts: tabs.map((el) => {
+            const badge = el.querySelector(".tab-count");
+            return badge ? Number(String(badge.textContent || "").trim()) : NaN;
+          }),
+          selected: tabs.filter((el) => el.getAttribute("aria-selected") === "true").map(labelOf),
+          grid: grid ? String(grid.getAttribute("aria-label") || "") : "",
+          count: cells.length,
+          titles: cells.map((cell) => text(cell.querySelector(".card-title"))),
+          skeletons: document.querySelectorAll(".skel-card").length,
+          busy: document.querySelector(".bookmarks [aria-busy='true']") !== null,
+          field: field ? field.value : "",
+          focused: !!field && active === field,
+          active: active ? active.tagName + "." + (active.className || "") : "none",
+          sortValue: select ? select.value : "",
+          sortLabel: select && select.selectedOptions[0] ? text(select.selectedOptions[0]) : "",
+          empty: text(document.querySelector(".empty-copy")),
+        };
+      `);
+
+    /** A poll that always throws with the whole read it last saw, never a bare timeout (T-53). */
+    const until = async (label, check, timeout = 12000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await read();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${label} — read ${JSON.stringify(last)}`);
+    };
+
+    const settled = (s) => !s.busy && s.skeletons === 0;
+    const ascending = (values) => values.every((value, i) => i === 0 || values[i - 1].localeCompare(value) <= 0);
+    const sameTitles = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+    // 1. A fresh mount: the page writes its own `?type=` on boot (it writes `type` unconditionally,
+    //    so the bare route is rewritten to the default tab — a fact to read, not to pin) and every
+    //    tab carries its saved count.
+    await go(BOOKMARKS_PATH);
+    const opened = await until(
+      "the saved page to draw its default tab",
+      (s) => settled(s) && s.labels.length === 4 && (s.count > 0 || s.empty !== ""),
+    );
+    if (opened.labels.length !== 4 || JSON.stringify(opened.labels) !== JSON.stringify(SAVED_TABS.map((tab) => tab.label))) {
+      throw new Error(`the strip reads ${JSON.stringify(opened.labels)}, not ${JSON.stringify(SAVED_TABS.map((tab) => tab.label))} — four tabs, the spec's own order`);
+    }
+    if (opened.counts.some((n) => !Number.isFinite(n))) {
+      throw new Error(`the strip's counts read ${JSON.stringify(opened.counts)} — every tab carries its saved count, even the one you are not on`);
+    }
+    if (!labelOfType(opened.type)) {
+      throw new Error(`a fresh ${BOOKMARKS_PATH} opens reading ${JSON.stringify(opened.search)} — the page writes its own ?type= on boot (writeQuery), so the address names one of the four types`);
+    }
+    if (opened.selected.length !== 1 || opened.selected[0] !== labelOfType(opened.type)) {
+      throw new Error(`the strip marks ${JSON.stringify(opened.selected)} selected on ${JSON.stringify(opened.search)} — the tab and the URL are the same fact`);
+    }
+    if (opened.field !== "" || opened.q !== null || opened.sort !== null) {
+      throw new Error(`a fresh ${BOOKMARKS_PATH} opens with ${JSON.stringify([opened.field, opened.q, opened.sort])} — no search, no sort, an empty field`);
+    }
+    if (opened.count === 0) {
+      throw new Error(`the default tab ${JSON.stringify(opened.type)} draws no saved row (read ${JSON.stringify(opened)}) — the row needs rows to read: the fixture saves three characters, one of them dead`);
+    }
+
+    // 2. The tab press: the page's own route with a different query, and a **push**. The target is
+    //    the card tab with the most saved rows (a saved post draws `PostCard`, which has no
+    //    `.card-title`), so the row never pins which tab this page opens on.
+    const target = SAVED_TABS.filter((tab) => tab.type !== "post" && tab.type !== opened.type)
+      .map((tab) => ({ ...tab, saved: opened.counts[opened.labels.indexOf(tab.label)] }))
+      .sort((a, b) => b.saved - a.saved)[0];
+    if (!target || !Number.isFinite(target.saved) || target.saved < 1) {
+      throw new Error(`the other card tabs read ${JSON.stringify(opened.counts)} saved row(s) — the row needs a tab with rows to press`);
+    }
+
+    await click(target.label, { scope: TAB_SCOPE });
+    const pressed = await until(
+      `the ${target.label} tab to mount at ?type=${target.type}`,
+      (s) => s.type === target.type && settled(s) && s.count > 0 && s.selected[0] === target.label,
+    );
+    if (pressed.grid !== `Saved ${target.type}s`) {
+      throw new Error(`?type=${target.type} draws the grid labelled ${JSON.stringify(pressed.grid)}, not ${JSON.stringify(`Saved ${target.type}s`)} — the tab selects the type's own catalog`);
+    }
+    if (sameTitles(pressed.titles, opened.titles)) {
+      throw new Error(`?type=${target.type} draws the same rows as the ${JSON.stringify(opened.type)} tab (${JSON.stringify(pressed.titles)}) — the tab is the type, and the type is the listing`);
+    }
+    if (pressed.field !== "" || pressed.q !== null) {
+      throw new Error(`the ${target.label} press left ${JSON.stringify([pressed.field, pressed.q])} — a tab press carries no search of its own`);
+    }
+
+    // 3. The reverse half: the URL the press wrote, pasted by address, mounts that tab directly.
+    await go(`${BOOKMARKS_PATH}?type=${target.type}`);
+    const mounted = await until(
+      `a mount from ?type=${target.type} to draw that tab`,
+      (s) => s.type === target.type && settled(s) && s.field === "" && s.count === pressed.count,
+    );
+    if (!sameTitles(mounted.titles, pressed.titles)) {
+      throw new Error(`a mount from ?type=${target.type} draws ${JSON.stringify(mounted.titles)}, not the ${JSON.stringify(pressed.titles)} the pressed tab drew — one URL, two listings`);
+    }
+    if (mounted.selected[0] !== target.label) {
+      throw new Error(`a mount from ?type=${target.type} marks ${JSON.stringify(mounted.selected)} selected, not ${JSON.stringify(target.label)}`);
+    }
+    if (mounted.count < 2) {
+      throw new Error(`?type=${target.type} draws ${mounted.count} saved row(s) — the sort half needs two to reorder, and the row refuses to prove nothing`);
+    }
+
+    // 4. The sort is a `push` and Title A–Z orders by title. It never changes how many rows match.
+    await choose('select[name="sort"]', "name");
+    const byName = await until(
+      "the Title A–Z sort to reach the URL and reorder the list",
+      (s) => s.sort === "name" && settled(s) && s.count === mounted.count,
+    );
+    if (byName.sortLabel !== "Title A–Z") {
+      throw new Error(`?sort=name leaves the control reading ${JSON.stringify(byName.sortLabel)} — the select prints the state, it does not own it`);
+    }
+    if (!ascending(byName.titles)) {
+      throw new Error(`?sort=name draws ${JSON.stringify(byName.titles)} — a Title A–Z sort orders the rows by their own title`);
+    }
+
+    await js(`history.back(); return true;`);
+    const backToTab = await until(
+      "Back to return the unsorted tab",
+      (s) => s.sort === null && settled(s) && s.count === mounted.count && s.sortValue === "recent" && s.q === null,
+    );
+    if (!sameTitles(backToTab.titles, mounted.titles)) {
+      throw new Error(`Back landed on ${JSON.stringify(backToTab.titles)}, not the ${JSON.stringify(mounted.titles)} the tab drew before the sort — a sort is a history entry, and Back undoes it`);
+    }
+
+    // 5. The search is a **replace**, silent, and the caret stays: a `navigate()` here would remount
+    //    the page mid-typing and hand the reader a new field (row 49's clause, this page's write).
+    const word = mounted.titles[0]
+      .split(/\s+/)
+      .filter((part) => part.replace(/[^A-Za-z0-9]/g, "").length >= 5)
+      .sort((a, b) => b.length - a.length)[0] || mounted.titles[0];
+    if (!word) throw new Error(`?type=${target.type} draws a row with no title (read ${JSON.stringify(mounted.titles)})`);
+
+    await retype('input[name="q"]', word);
+    const narrowed = await until(`the settle to commit q=${JSON.stringify(word)}`, (s) => s.q === word && settled(s));
+    if (narrowed.count === 0 || narrowed.count >= mounted.count) {
+      throw new Error(`?q=${word} draws ${narrowed.count} of the ${mounted.count} row(s) the tab draws — the word came from a row's own title, so it must narrow the listing and keep that row`);
+    }
+    if (narrowed.type !== target.type) {
+      throw new Error(`the search moved the tab to ${JSON.stringify(narrowed.type)} (read ${JSON.stringify(narrowed.search)}) — a search narrows the tab it is on`);
+    }
+    if (!narrowed.focused) {
+      throw new Error(
+        `the search field lost the caret the moment it settled (document.activeElement is ${narrowed.active}, the field reads ${JSON.stringify(narrowed.field)}, URL ${JSON.stringify(narrowed.search)}) — a query write that emits remounts the page mid-typing, so the commit has to stay silent`,
+      );
+    }
+
+    // 6. The mounted-key seam. `?type=<x>` is the URL this page itself wrote **before** the search,
+    //    so the router must not believe it is still there: without a key that follows the commit,
+    //    this navigation is a no-op that rewrites the address and leaves the narrowed DOM behind.
+    await go(`${BOOKMARKS_PATH}?type=${target.type}`);
+    const reopened = await until(
+      `a mount from ?type=${target.type} (the URL the page wrote before the search) to remount the whole tab`,
+      (s) => s.type === target.type && settled(s) && s.q === null && s.field === "" && s.count === mounted.count,
+    );
+    if (!sameTitles(reopened.titles, mounted.titles)) {
+      throw new Error(`?type=${target.type} remounts to ${JSON.stringify(reopened.titles)}, not the ${JSON.stringify(mounted.titles)} the tab holds — the URL is the state`);
+    }
+
+    // 7. A sort pressed under a search keeps the search (it is a `push`), so Back returns the
+    //    **searched** view with the field holding the word — the page reads `?q=` at mount.
+    await retype('input[name="q"]', word);
+    const again = await until(`the second settle to commit q=${JSON.stringify(word)}`, (s) => s.q === word && settled(s) && s.count === narrowed.count);
+    await choose('select[name="sort"]', "name");
+    const sortedUnderSearch = await until(
+      "the sort to reach the URL without dropping the search",
+      (s) => s.sort === "name" && s.q === word && settled(s) && s.count === again.count,
+    );
+    await js(`history.back(); return true;`);
+    const backToSearch = await until(
+      `Back to return the searched view with the field holding ${JSON.stringify(word)}`,
+      (s) => s.sort === null && s.q === word && settled(s) && s.field === word && s.count === again.count,
+    );
+
+    // 8. The tab you are already on is a press too: it means *this tab, unfiltered*, which is the
+    //    only road back to the whole tab once a search narrows it. A `push`, through `commitQuery()`.
+    await click(target.label, { scope: TAB_SCOPE });
+    const leftByTab = await until(
+      `the ${target.label} tab, pressed while it is already selected, to clear the search`,
+      (s) => s.type === target.type && s.q === null && settled(s) && s.field === "" && s.count === mounted.count,
+    );
+    if (leftByTab.selected.length !== 1 || leftByTab.selected[0] !== target.label) {
+      throw new Error(`after the press the strip marks ${JSON.stringify(leftByTab.selected)} selected, not ${JSON.stringify(target.label)} — the tab that leaves a narrowed view is the tab it is on`);
+    }
+
+    return `a fresh ${BOOKMARKS_PATH} writes ${JSON.stringify(opened.search)} (the default tab ${JSON.stringify(opened.type)}, counts ${JSON.stringify(opened.counts)}) · pressing ${JSON.stringify(target.label)} pushed ${JSON.stringify(pressed.search)} and drew ${pressed.count} row(s) of ${JSON.stringify(pressed.grid)} · a mount from ?type=${target.type} draws the same ${JSON.stringify(mounted.titles)} · ?sort=name reads ${JSON.stringify(byName.sortLabel)} at ${JSON.stringify(byName.search)} with the titles ${JSON.stringify(byName.titles)} ascending, and Back returns ${JSON.stringify(backToTab.search)} with ${backToTab.count} row(s) · typing ${JSON.stringify(word)} committed ${JSON.stringify(narrowed.search)} with ${narrowed.count} of ${mounted.count} row(s) and **kept the caret** (activeElement ${narrowed.active}) · a mount from ?type=${target.type} remounted the whole tab (${reopened.count} row(s), field ${JSON.stringify(reopened.field)}) · a sort under the search reads ${JSON.stringify(sortedUnderSearch.search)} and Back returns ${JSON.stringify(backToSearch.search)} with the field holding ${JSON.stringify(backToSearch.field)} · the ${target.label} tab, pressed on itself, cleared the search to ${JSON.stringify(leftByTab.search)} with ${leftByTab.count} row(s) and an empty field`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -5693,9 +5937,10 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48, T-66: 49).
+ * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46, T-64: 47, T-65: 48, T-66: 49,
+ * T-67: 50).
  */
-const EXPECTED_ROWS = 49;
+const EXPECTED_ROWS = 50;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

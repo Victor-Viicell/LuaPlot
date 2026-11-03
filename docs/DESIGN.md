@@ -1081,6 +1081,13 @@ lives **on the card**. The four page decisions below are that.
   are never reconciled. A tab whose saved rows are all hidden gets its own one-line state
   (*Everything saved here is hidden by your NSFW preference.*) rather than the lie *Nothing saved
   here yet.*
+- **A tab press is the page's own route with a different query, and it is a `push`.** Switching to
+  another type keeps the search — `?type=lorebook&q=arch` is one view of another tab, and the reader
+  who typed the word did not ask to lose it. Pressing the tab you are **already on** means *this tab,
+  unfiltered*: it clears the search and drops a keystroke that has not settled, because `Clear search`
+  exists only in the no-results state and a narrowed tab would otherwise have no road back to its
+  whole list. With nothing to clear the press is a no-op, not a reload. Both writes go through
+  `commitQuery()` (T-66), so `Back` returns the narrowed view.
 - **Remove bookmark is a page-owned wrapper, not a `Card` prop.** `Card`'s footer is author + ratio
   and the control belongs to the saved view on every card of every tab; a prop would have to be
   threaded through four drawings (three `Card` hosts plus `PostCard`) to say the same thing. The

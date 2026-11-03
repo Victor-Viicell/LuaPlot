@@ -600,6 +600,40 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: six pages commit a query the walk never reads (`/bookmarks`, the two other catalogs,
       `/persona`) — filed as **T-67**.
 
+- [x] **T-67 The saved page's tabs are the query, and a tab pressed on itself leaves the search.**
+      `bookmarks.md` → *URL*: *"Type, search, sort, and filter all live in the query string —
+      `?type=character&q=&sort=recent&tag=` — … so a narrowed view can be shared, bookmarked, and
+      restored by back/forward."* T-66 changed **seven** pages' `writeQuery()` in one commit and
+      walked one of them (`/character/catalog`, row 49), so `/bookmarks` — the only page whose tab
+      write is a `push` and whose search write is a `replace` — had no row at all. Row **50**
+      (`EXPECTED_ROWS` 49 → 50, **read-only**) reads eight facts on the page's own vocabulary: a
+      fresh `/bookmarks` writes `?type=character` on boot (the default tab is the most recently saved
+      kind, counts `[3,2,1,2]` = saved rows); pressing **Lorebooks** pushes `?type=lorebook` and draws
+      `Saved lorebooks`; a mount from that URL draws the same two titles; `?sort=name` reads **Title
+      A–Z** and orders the titles ascending, and Back returns `?type=lorebook` with the control back
+      on Newest saved; typing `Archive` commits `?type=lorebook&q=Archive` with 1 of 2 rows **and keeps
+      the caret** (`INPUT.field-input`); a mount from `?type=lorebook` — the URL the page wrote
+      *before* the search — remounts the whole tab (2 rows, empty field); a sort pressed under the
+      search reads `?type=lorebook&q=Archive&sort=name` and Back returns
+      `?type=lorebook&q=Archive` **with the field holding `Archive`**; and pressing **Lorebooks** while
+      it is already selected clears the search to `?type=lorebook` with an empty field. That last
+      clause needed a page fix: `chooseTab()` returned early on the selected tab, so the one road back
+      to a tab's whole list from a narrowed view (there is no `Clear search` outside the no-results
+      state) was dead. `bookmarks.tsrx` now treats a same-tab press as *this tab, unfiltered* — it
+      clears the search and a pending settle, pushes the URL, and is a no-op when there is nothing to
+      clear; `DESIGN.md` → *Bookmarks* carries the rule. Red first, twice: (1) dropping
+      `mountedKey = …` from `commitQuery()` → 47/50, row 50 *"Back to return the unsorted tab — read
+      {"search":"?type=lorebook",…,"titles":["Ashmarket Gazetteer","The Salt Archive"]…} — the select
+      kept Title A–Z on a URL that no longer carries it"* (`sortValue` still `name`); (2) the aimed
+      edit `if (mode === "push") mountedKey = …` (a replace commit leaves the key stale, T-66's own
+      shape) → 47/50, row 50 alone at the seam: *"a mount from ?type=lorebook (the URL the page wrote
+      before the search) to remount the whole tab — read {"search":"?type=lorebook",…,"count":1,
+      "titles":["The Salt Archive"],"field":"Archive","focused":true}"* — the address dropped the
+      query and the field kept the word. Bytes restored (`git diff src/router.ts` empty). 50/50 local
+      and 50/50 `--live`. Brief: `docs/NEXT.md` (T-67).
+      Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
+      write their own query with no row reading them — filed as **T-68**.
+
 - [x] **T-64 The profile's four tabs are a URL fact, and a follower is drawn as a catalog card.**
       `user/profile.md` → *Layout* / *Actions* / *URL*: four tabs in `?tab=`, the creations filter in
       `?type=` (**read on that tab only**), and *"Followers and Following are drawn with the catalog
