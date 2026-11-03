@@ -397,8 +397,8 @@ export function Terms() @{
         <section class="note" id="accepting-the-terms">
           <h2 class="note-title">Accepting the terms</h2>
           <p class="note-body">
-            Finishing <a href={href("/onboarding")} onClick={follow("/onboarding")}>onboarding</a> is the acceptance: that page
-            states, beside <strong>Finish</strong>, that continuing accepts these terms, and links
+            Finishing{" "}<a href={href("/onboarding")} onClick={follow("/onboarding")}>onboarding</a>{" "}is the acceptance: that page
+            states, beside{" "}<strong>Finish</strong>, that continuing accepts these terms, and links
             here. No separate acceptance record is kept and there is no version to accept, so a
             change to the rules is never re-asked — the text as it stands is what applies to
             everything published from then on.

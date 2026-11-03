@@ -648,8 +648,8 @@ export function UserProfile() @{
               <p class="bio">{row.value.bio}</p>
             }
             <p class="figures">
-              <span class="figure"><strong>{row.value?.followers ?? 0}</strong> followers</span>
-              <span class="figure"><strong>{row.value?.following ?? 0}</strong> following</span>
+              <span class="figure"><strong>{row.value?.followers ?? 0}</strong>{" "}followers</span>
+              <span class="figure"><strong>{row.value?.following ?? 0}</strong>{" "}following</span>
             </p>
           </div>
 

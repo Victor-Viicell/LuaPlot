@@ -219,7 +219,7 @@ export function PersonaDetail() @{
 
           @if (choices.value.length === 0) {
             <p class="picker-note">
-              No characters yet. <a class="picker-link" href={href("/character/create")} onClick={follow("/character/create")}>Create one</a>.
+              No characters yet.{" "}<a class="picker-link" href={href("/character/create")} onClick={follow("/character/create")}>Create one</a>.
             </p>
           } @else {
             <ul class="picker-list">

@@ -508,7 +508,7 @@ export function Onboarding() @{
               {busy.value ? "Saving…" : "Finish"}
             </Button>
             <p class="note">
-              By finishing you accept the <a href={href("/terms")} onClick={follow("/terms")}>terms of use</a>. Both
+              By finishing you accept the{" "}<a href={href("/terms")} onClick={follow("/terms")}>terms of use</a>. Both
               preferences can be changed later in account settings; only the handle and the name are
               required.
             </p>

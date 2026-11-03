@@ -220,7 +220,7 @@ export function PersonaCollection() @{
       } @else if (items.value.length === 0) {
         <p class="no-results" role="status">
           No persona matches that name.{" "}
-          <a class="no-results-link" href={href("/persona/create")} onClick={follow("/persona/create")}>Create one</a> if it is not here yet.
+          <a class="no-results-link" href={href("/persona/create")} onClick={follow("/persona/create")}>Create one</a>{" "}if it is not here yet.
         </p>
       } @else {
         <ul class="card-grid" aria-label="Your personas">

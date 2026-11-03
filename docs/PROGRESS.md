@@ -3,6 +3,39 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-69: a sentence that lost its word break, and the class behind it
+
+- **Changed:** `src/pages/persona-collection.tsrx` — the no-match sentence writes `</a>{" "}if it is not
+  here yet.` (an explicit space node, not a literal), so Ripple's trimming of a literal that follows an
+  element cannot eat the word break. The **same edit swept the whole class** in the built bundle:
+  `terms.tsrx` (both sides of the *onboarding* link — `Finishing<a>onboarding</a>is` — and *beside*
+  before *Finish*), `onboarding.tsrx` (*accept the* / *terms of use*), `persona-detail.tsrx`'s picker
+  sentence (*No characters yet.* / *Create one*), `user-profile.tsrx`'s two figures
+  (`</strong> followers` / `following`), and the dev pages' badge rows (`dev-data` adapter/viewer/page,
+  `dev-state` session/handle/admin, `dev-native` shell/chunk/title/last/never/through plus its own
+  code samples, `dev-primitives` *author and ratio* / *Press Reveal on it*). `scripts/smoke.mjs` — row
+  **51** gained one clause (no row added; `EXPECTED_ROWS` stays 51): the sentence must contain
+  `Create one if` and must not contain `oneif`, and its evidence line now reads *with its word break*.
+  Docs: `SHIP-PLAN.md` (T-69 ticked), `NEXT.md` (T-70 baton + three new notes).
+- **Verified:** red first, aimed at the one site — the literal put back (bytes otherwise identical) →
+  **50/51**, row 51 alone: *"/persona: the no-match sentence reads \"No persona matches that name.
+  Create oneif it is not here yet.\" — it runs the words either side of the link together (the DOM
+  drops a literal's leading space after </a>; the source needs an explicit {\" \"})"*. Bytes restored
+  (the file's diff is one word), then **51/51** locally and **51/51 `--live`** against
+  https://victor-viicell.github.io/LuaPlot/ (curl **200**; `publish.sh` printed
+  `LIVE_JS=assets/index-CswUCCHj.js`). The live row reads `?q=zzqx-nothing-matches` →
+  `"No persona matches that name. Create one if it is not here yet."`. The sweep itself was checked
+  against the **compiled** bundle, not the source: `grep -oE
+  "[A-Za-z0-9.)]<(a|b|span|strong|em|code|i|small)[ >][^\"\`]{0,50}"` and the mirror
+  `"</(a|b|span|strong|em|code|i|small)>[A-Za-z]…"` listed **6** real breakages before the edits
+  (`/terms`, `/user`, `/dev/native` ×3, `/dev/primitives`) and read **zero** after the build — which
+  is why the seven `{" "}` sites above are exactly the ones the bundle needed.
+- **Not verified:** the sweep's mechanism is **not** in the gate — row 51 proves `/persona` only, and
+  the other six sites are proved by a hand grep over `dist` (recorded above so T-70 can make it a
+  section). `/terms`' own sentence has no row, and the `/dev/*` pages have none either. Also open:
+  the tag vocabulary for lorebooks/presets is still the owner's decision (row 51's press branch waits
+  on it, unchanged from T-68).
+
 ## 2026-11-03 — T-68: the other three toolbars, one press each
 
 - **Changed:** `scripts/smoke.mjs` — new walk **row 51**, `EXPECTED_ROWS` 50 → 51, read-only: a

@@ -634,6 +634,26 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-69 The persona no-match sentence ran two words together, and the class was everywhere.**
+      Row 51 read `/persona`'s no-match state and it came back `No persona matches that name. Create
+      oneif it is not here yet.` — Ripple trims a **literal's boundary whitespace when its neighbour is
+      an element**, so the source's `</a> if` rendered `</a>if` (an explicit `{" "}` survives; a
+      literal next to a `}` *expression* keeps its space — `NsfwControl`'s `` ` … flagged ` +
+      (noun + ` in listings.`) `` in the built bundle proves it, so the sweep is element-only).
+      `persona-collection.tsrx` writes the explicit space now, and the same edit was applied to
+      **every** site the class touched in the built bundle: `/terms` (`Finishingonboardingis the
+      acceptance` — both sides of the link), `/onboarding` (*the* / *terms of use*), `/persona/<id>`'s
+      picker sentence, `/user/<handle>`'s two figures (`3followers`), and `/dev/{data,state,native,
+      primitives}`' badge rows. Row **51** gained one clause (no row added, `EXPECTED_ROWS` stays 51):
+      the sentence must contain `Create one if` and must not contain `oneif`, and its evidence line
+      reads **with its word break**. Red proof: the literal restored, bytes otherwise identical →
+      **50/51**, row 51 alone: *"/persona: the no-match sentence reads \"No persona matches that name.
+      Create oneif it is not here yet.\" — it runs the words either side of the link together …"*.
+      Bytes restored, then 51/51 local and 51/51 `--live`. Brief: `docs/tickets/T-69-no-results-copy.md`.
+      Found: **the hand sweep is still the only check for this class** — the walk visits a page per
+      row, and the mechanism is mechanical over the built bundle (two greps over `dist/assets/*.js`
+      found every site and then read zero after the fix) — filed as **T-70**.
+
 - [x] **T-68 The other three pages that commit a query, one press each.**
       T-66 moved seven pages onto `commitQuery()` and one row walked each half of that: row 49 the
       character catalog, row 50 `/bookmarks`. `/lorebook/catalog`, `/preset/catalog` and `/persona`

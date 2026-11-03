@@ -263,10 +263,10 @@ export function DevState() @{
           every listing follow the same two objects.
         </p>
         <div class="badges">
-          <span class="badge">session <b>{user.value ? "signed in" : "signed out"}</b></span>
-          <span class="badge">handle <b>{user.value ? `@${user.value.handle}` : "—"}</b></span>
+          <span class="badge">session{" "}<b>{user.value ? "signed in" : "signed out"}</b></span>
+          <span class="badge">handle{" "}<b>{user.value ? `@${user.value.handle}` : "—"}</b></span>
           <span class="badge">
-            admin <b>{user.value?.isAdmin ? "yes" : "no"}</b>
+            admin{" "}<b>{user.value?.isAdmin ? "yes" : "no"}</b>
           </span>
         </div>
       </header>

@@ -1,45 +1,66 @@
 # Baton — what the next session does
 
-**T-68 landed.** The three pages T-66 moved onto `commitQuery()` and no row had ever typed into are
-walked: **row 51** reads `/lorebook/catalog`, `/preset/catalog` and `/persona` with one shared
-reader and a `TOOLBAR_PAGES` table, so every failure message names the page it was on. It proves a
-fresh mount is blank (`""`, empty field, Newest selected, the grid's own label), that a word from a
-row's own name commits `?q=` **and keeps the caret**, that a mount from that URL preloads the field
-and draws the same rows, that the sort writes `?sort=` with its **label** on the control
-(`ratio` → **Top rated** on both catalogues, `name` → **Name** with the persona names ascending),
-and that `/persona`'s no-match state is its own sentence with **no** Retry. 51/51 local and
-51/51 `--live`.
+**T-69 landed.** `/persona`'s no-match sentence is written `</a>{" "}if it is not here yet.`, and row
+**51** now proves the words rather than a non-empty string: its clause requires *Create one if* and
+forbids *oneif*, and the walk's evidence line reads **`"No persona matches that name. Create one if it
+is not here yet."` with its word break**. Red proof was the literal put back and nothing else —
+**50/51**, row 51 alone at *"/persona: the no-match sentence reads \"…Create oneif it is not here
+yet.\" — it runs the words either side of the link together"*. Then 51/51 local and 51/51 `--live`.
 
-Red first, aimed at one page's seam: `lorebook-catalog.tsrx`'s `writeQuery()` → `navigate(path,
-{ replace })` gave **50/51** with row 51 alone at *"/lorebook/catalog: the search field lost the
-caret the moment it settled (document.activeElement is BODY., the field reads "Cartographer's", URL
-"?q=Cartographer%27s")"*. Two things the ticket got wrong, both recorded in `PROGRESS.md`: the
-catalogues' sort vocabulary is `newest` / `ratio` (not `recent` / `oldest`), and the tag half has no
-fixture to press (see below).
+The trim was **not** one sentence. Ripple drops a **literal's boundary whitespace when its neighbour is
+an element**, in both directions, and the built bundle showed six more sites: `/terms`
+(`Finishingonboardingis the acceptance`, plus *beside*/*Finish*), `/onboarding` (*the* / *terms of
+use*), `/persona/<id>`'s picker sentence, `/user/<handle>`'s `3followers`, and the
+`/dev/{data,state,native,primitives}` badge rows. All of them write `{" "}` now, and the two greps over
+`dist/assets/*.js` that listed **6** breakages before the build read **zero** after it (the exact
+commands are in `PROGRESS.md`).
 
-## T-69 — the persona no-match sentence runs two words together
+## T-70 — the word break between a literal and an element has no guard
 
-**Brief: `docs/tickets/T-69-no-results-copy.md`** — read it before touching the page.
+**Why it is next.** T-69 fixed seven sites with a hand sweep and a grep over `dist`, and only
+`/persona` has a row that would notice the bug coming back. This repo has answered that argument twice
+already — T-48 turned a hand sweep of accent text into `scripts/tier-check.mjs`, T-46 turned 52 bare
+anchors into `scripts/link-check.mjs`, and its own lesson is written below as *a hand sweep is a list;
+the gate is the guard*. The mechanism is pure text over a file `check.sh` already builds, so it costs
+nothing at gate time and covers pages no journey visits (`/terms`, every `/dev/*`).
 
-**Why it is next.** Row 51 read the no-match state's own text and it came back
-`No persona matches that name. Create oneif it is not here yet.` — the source writes `</a> if it is
-not here yet.`, so the **text node after an inline element lost its leading space** to Ripple's
-literal trimming. A reader sees a misspelt sentence on a page whose copy the spec quotes; the walk
-proved it and nothing yet fails on it. That is the same class of defect as a dead control: visible,
-harmless to every gate, and cheap to catch once a row reads the string.
+**Approach.** New `scripts/wordbreak-check.mjs`, wired as **section 10** of `scripts/check.sh`. It
+reads `dist/assets/*.js`, so it must run **after the build section** — the compiled template is the
+truth, because the same source line keeps or loses its space depending on how the compiler buckets it
+into a piece array (`[`a`,…,`Create one`],`if it is…`]`) or a static HTML string (`…</strong>
+followers`). A source-only grep is a false green: that is T-69's own find. Both directions, over every
+asset:
 
-**Approach.** One `{" "}` after the link on `/persona`, then **sweep the class** (`</a> `, `</span `,
-`</b ` followed immediately by a letter in a text block — write the sweep as a `.py` under `$TMPDIR`
-and apply it bottom-up), then **one clause in row 51**: the sentence must contain `"Create one if"`
-and must not contain `"oneif"`. `EXPECTED_ROWS` stays **51** — the row gains a clause, not a row.
+```js
+// a letter glued to an inline element's opening tag
+/[A-Za-z0-9.)]<(a|b|span|strong|em|code|i|small)[ >]/
+// …and its mirror: a closing tag glued to the following word
+/<\/(a|b|span|strong|em|code|i|small)>[A-Za-z]/
+```
 
-**Traps.** The reader must keep reading `textContent` collapsed through `\s+` (a real space survives
-that, so the absence is the DOM's); the empty-collection branch is a different sentence and a
-different state (`?q=zzqx-nothing-matches` is what draws this one); the catalogues use
-`.empty-copy`, not `.no-results`. The ticket carries all of it.
+Zero matches is green; each hit prints `file: …60 chars around it…` so a red names the copy. Take
+**file arguments** (`node scripts/wordbreak-check.mjs $TMPDIR/x.js`) so the red proof runs on a copy
+with an injected break, never an edit to the tree (T-48's scanner shape). Keep the inline set in one
+constant with a comment: block-level tags are excluded on purpose — whitespace beside a `div` carries
+no word break. Print what was scanned (the `5822 declarations across 46 stylesheet region(s)` line is
+the shape to copy).
 
-**Accept.** `check.sh` GREEN, 51/51 local and 51/51 `--live`, the clause proved red by reverting the
-`{" "}` (name the message in `PROGRESS.md`), `publish.sh` prints `LIVE`, `curl` is 200.
+**Traps.** Minified JS is full of `a<b` comparisons, so the opening pattern must demand the tag's own
+shape (`<a ` / `<b ` / `<code>`), which is why it ends in `[ >]`; and the bundle writes
+`<code class=tsrx-…>`, so `class=` has to match too. `{" "}` compiles to a **separate text piece**, so
+a correct site has no glue and stays green — verify that on the seven T-69 sites, which read zero
+today. Do not "fix" a hit by widening the pattern; the fix is `{" "}` in the `.tsrx`, exactly as
+`terms.tsrx` and `user-profile.tsrx` now write it. Run `node --check scripts/wordbreak-check.mjs`
+first; `scripts/*.mjs` take no type annotations.
+
+**Accept.** `check.sh` GREEN with section 10 listed and a count printed; the check proved **red on
+both directions** from one injected copy (`</a>if` and `letter<code>`, both messages named in
+`PROGRESS.md`); the seven T-69 sites pass unchanged; 51/51 local and 51/51 `--live`; `publish.sh`
+prints `LIVE`, `curl` 200. No row added — `EXPECTED_ROWS` stays **51**.
+
+**Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
+owner's: `DESIGN.md` records it (then a ticket seeds two or three tags, leaving one card tagless) or
+row 51's chip **press** branch stays unwalkable. Do not invent tags to make a row pass.
 
 ## Blocked — what a human must do
 
@@ -68,15 +89,17 @@ different state (`?q=zzqx-nothing-matches` is what draws this one); the catalogu
 
 ## Open decisions
 
-- **T-69 is the ticket: a sentence that lost a word break (found by T-68's row 51).** Failure-bank
+- **T-70 is the ticket: the word break has no guard.** Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
   T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every page that commits a query now has a row
   (48 the character catalog, 49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and
-  `/persona`), so what is left unblocked is the **defects those rows find** rather than more
-  surface. Row 51's first find is copy: `/persona`'s no-match state renders
-  `Create oneif it is not here yet.` — a literal after an inline element loses its leading space to
-  Ripple's trimming.
+  `/persona`), and every bank entry that can be walked is walked, so what is left unblocked is the
+  **classes of defect the rows keep finding made mechanical** — T-69 fixed seven sites of one class by
+  hand and only one of them had a row, which is exactly the shape T-46 and T-48 turned into gate
+  sections. After T-70 the unblocked work is whatever the gate or the walk finds next; the rest of the
+  plan waits on Supabase (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision
+  (T-33B's deep link dependency and `Ctrl/Cmd+K`, the tag vocabulary).
 - **The tag field's press is blocked on a decision, not on work.** Every lorebook and preset
   fixture ships `tags: []`, and `schema.ts`'s own comment says they stay empty *while the taxonomy is
   undecided* — so `listTags("lorebook")` / `("preset")` answer `[]`, the picker opens its empty
@@ -216,6 +239,26 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   arithmetic, write a `.py` under `$TMPDIR` and run `python3 <file>`.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **Ripple trims a literal's *boundary* whitespace when its neighbour is an element, on both sides
+  (T-69).** `</a> if` renders `</a>if` and `Finishing <a>` renders `Finishing<a>`, because the
+  literal is trimmed at the edge it touches. An explicit `{" "}` is a text piece of its own and
+  survives, and a literal whose neighbour is a `}` **expression** keeps its space (`NsfwControl`'s
+  `` ` … flagged ` + (noun + ` in listings.`) `` and `moderation-queue`'s `String(n) + " open"` in the
+  built bundle both prove it) — so the class is *element-only*, never "any text node near a tag".
+- **Whether a site loses its break is decided by the compiler's bucketing, so the source is not the
+  evidence (T-69).** The same source shape compiles two ways: a **piece array**
+  `[`a`,…,`Create one`],`if it is not here yet.`]` (space gone) or a **static HTML string**
+  `…<strong class=tsrx-…> </strong> followers…` (space kept, and fine). A source grep therefore flags
+  both and proves neither; scan `dist/assets/*.js` — that is what the browser parses. T-69's two
+  commands: `grep -oE "[A-Za-z0-9.)]<(a|b|span|strong|em|code|i|small)[ >][^\"\`]{0,50}" dist/assets/*.js`
+  and `grep -oE "</(a|b|span|strong|em|code|i|small)>[A-Za-z][^\"\`]{0,40}" dist/assets/*.js`.
+- **Seven sites lost a word break and only one of them had a row (T-69).** `/persona` (walked),
+  `/terms` (*Finishingonboardingis the acceptance* — both sides of the link), `/onboarding`,
+  `/persona/<id>`'s picker sentence, `/user/<handle>`'s figures, and the four `/dev/*` pages. Row 51
+  covers `/persona` alone; the rest were found by the bundle scan, which is the argument for
+  **T-70**'s gate section. Any copy that wraps an inline element in a sentence deserves `{" "}` on
+  both sides at write time.
 
 - **A literal after an inline element loses its word break, and only a row that reads the string sees
   it (T-68).** `/persona`'s no-match sentence is written `</a> if it is not here yet.` and renders

@@ -306,16 +306,16 @@ export function DevNative() @{
         <p class="kicker">dev · hardware</p>
         <h1 class="title">Native bridge</h1>
         <p class="lede">
-          Five capabilities, one typed answer each. Every call returns
-          <code>{"{ ok }"}</code> or <code>{"{ ok: false, reason }"}</code>, so a page never needs a
-          <code>try</code> to render “nothing happened”. In this build the shell registers no
+          Five capabilities, one typed answer each. Every call returns{" "}
+          <code>{"{ ok }"}</code>{" "}or{" "}<code>{"{ ok: false, reason }"}</code>, so a page never needs a
+          <code>try</code>{" "}to render “nothing happened”. In this build the shell registers no
           haptics, badge or clipboard plugin, so the browser road answers and the plugin rung stays
           inert.
         </p>
         <div class="badges">
-          <span class="badge">shell <b>{shell ? "tauri" : "browser"}</b></span>
-          <span class="badge">chunk <b>{shell ? "loaded" : "never requested"}</b></span>
-          <span class="badge">title <b>{title.value || "—"}</b></span>
+          <span class="badge">shell{" "}<b>{shell ? "tauri" : "browser"}</b></span>
+          <span class="badge">chunk{" "}<b>{shell ? "loaded" : "never requested"}</b></span>
+          <span class="badge">title{" "}<b>{title.value || "—"}</b></span>
         </div>
       </header>
 
@@ -323,7 +323,7 @@ export function DevNative() @{
         <div class="sec-head">
           <h2 class="sec-title">Capabilities</h2>
           <p class="sec-note">
-            The road column is imported from <code>lib/native.ts</code>, not retyped: if the module
+            The road column is imported from{" "}<code>lib/native.ts</code>, not retyped: if the module
             changes its ladder, this page changes with it. A shell-only rung that this build does
             not compile in is named — and falling through it is the point, not a failure.
           </p>
@@ -334,9 +334,9 @@ export function DevNative() @{
             <div class="cap">
               <span class="cap-name">{cap.name}</span>
               <span class="cap-road">
-                shell <code>{cap.native}</code> · web <code>{cap.web}</code>
+                shell{" "}<code>{cap.native}</code> · web{" "}<code>{cap.web}</code>
                 @if (latest(cap.name)) {
-                  <span> · last <b>{latest(cap.name)!.read}</b></span>
+                  <span> · last{" "}<b>{latest(cap.name)!.read}</b></span>
                 }
               </span>
               <span class="cap-action">
@@ -395,7 +395,7 @@ export function DevNative() @{
 
         <p class="note">
           Cancel a share or dismiss the picker on purpose: the answer must read
-          <b> cancelled</b>, never <b>failed</b> — a toast on dismissal is a bug. Badge writes the
+          <b> cancelled</b>, never{" "}<b>failed</b> — a toast on dismissal is a bug. Badge writes the
           title, so the tab strip shows what the shell would have badged; press it again with 0 to
           see the title come back, which is why the module remembers the unbranded one.
         </p>
@@ -411,7 +411,7 @@ export function DevNative() @{
           <h2 class="sec-title">Last answers</h2>
           <p class="sec-note">
             Newest first, six deep. The shape shown is the parsed result — the module already ran it
-            through <code>nativeResultSchema</code>, so nothing here can print a reason the schema
+            through{" "}<code>nativeResultSchema</code>, so nothing here can print a reason the schema
             does not allow.
           </p>
         </div>

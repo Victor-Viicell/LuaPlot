@@ -432,8 +432,8 @@ export function DevPrimitives() @{
             </div>
             <p class="g-sec-note">
               The second card is the fixture flagged NSFW, covered pre-reveal: the avatar and tagline
-              blur behind the scrim while the title, author and <code>ratio</code> stay at full
-              contrast. Press <strong>Reveal</strong> on it — that is the third state, and the same
+              blur behind the scrim while the title, author and{" "}<code>ratio</code>{" "}stay at full
+              contrast. Press{" "}<strong>Reveal</strong>{" "}on it — that is the third state, and the same
               component one click later, because reveal state is created inside the card and lasts
               exactly this mount. The third and fourth cards hold the longest title and the longest
               tagline in the set: the title ellipses on one line, the tagline clamps at two.

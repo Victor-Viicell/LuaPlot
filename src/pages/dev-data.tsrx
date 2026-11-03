@@ -410,9 +410,9 @@ export function DevData() @{
         counts, names, and the adapter that answered. Development only.
       </p>
       <div class="badges">
-        <span class="badge">adapter <b>{snap.value?.adapter ?? "…"}</b></span>
-        <span class="badge">viewer <b>{snap.value?.viewer ?? "…"}</b></span>
-        <span class="badge">page <b>{PAGE_SIZE}</b></span>
+        <span class="badge">adapter{" "}<b>{snap.value?.adapter ?? "…"}</b></span>
+        <span class="badge">viewer{" "}<b>{snap.value?.viewer ?? "…"}</b></span>
+        <span class="badge">page{" "}<b>{PAGE_SIZE}</b></span>
       </div>
     </header>
 
