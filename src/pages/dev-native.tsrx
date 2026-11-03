@@ -307,7 +307,7 @@ export function DevNative() @{
         <h1 class="title">Native bridge</h1>
         <p class="lede">
           Five capabilities, one typed answer each. Every call returns{" "}
-          <code>{"{ ok }"}</code>{" "}or{" "}<code>{"{ ok: false, reason }"}</code>, so a page never needs a
+          <code>{"{ ok }"}</code>{" "}or{" "}<code>{"{ ok: false, reason }"}</code>, so a page never needs a{" "}
           <code>try</code>{" "}to render “nothing happened”. In this build the shell registers no
           haptics, badge or clipboard plugin, so the browser road answers and the plugin rung stays
           inert.
@@ -394,8 +394,8 @@ export function DevNative() @{
         </div>
 
         <p class="note">
-          Cancel a share or dismiss the picker on purpose: the answer must read
-          <b> cancelled</b>, never{" "}<b>failed</b> — a toast on dismissal is a bug. Badge writes the
+          Cancel a share or dismiss the picker on purpose: the answer must read{" "}
+          <b>cancelled</b>, never{" "}<b>failed</b> — a toast on dismissal is a bug. Badge writes the
           title, so the tab strip shows what the shell would have badged; press it again with 0 to
           see the title come back, which is why the module remembers the unbranded one.
         </p>

@@ -634,6 +634,32 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
+- [x] **T-70 The word break between a literal and an element had no guard.**
+      T-69 fixed seven sites by hand and only `/persona` had a row that would notice the bug coming
+      back; the argument this repo has answered twice (T-46's `link-check.mjs`, T-48's
+      `tier-check.mjs`) is that a hand sweep is a list and the gate is the guard. `scripts/wordbreak-check.mjs`
+      is **gate section 10**, after the build because it reads `dist/assets/*.js` — the compiled
+      template is the truth, since the same source line keeps or loses its space depending on whether
+      the compiler buckets it into a piece array or a static HTML string (T-69's own find). Both
+      directions, over every asset: a letter/digit/dot/paren glued to an inline `OPENING` tag
+      (`[ >]` demands the tag's own shape, so minified `a<b` comparisons and `class=` stay out) and a
+      closing tag glued to the following word. Zero hits is green; each hit prints ~60 chars either
+      side of the glue; file arguments make the red proof run on a copy, never an edit to the tree
+      (T-48's scanner shape). Inline set in one constant (`a|b|span|strong|em|code|i|small`), block
+      tags exempt on purpose — whitespace beside a `div` carries no word break. Drift guards: no
+      asset or no inline tag at all is a red, not a green. **The guard earned its keep on its first
+      run**: besides the seven T-69 sites (green, unchanged), it read **two** hits in
+      `dev-native.tsrx`'s prose — `…never needs a` + newline + `<code>try</code>`, which really
+      rendered *"needs atry"* on `/dev/native` (`{" "}` added), and `must read` + `<b> cancelled</b>`,
+      which rendered correctly only because of the space *inside* the element and now writes the
+      house shape `read{" "}<b>cancelled</b>`. Red proof from **one** injected copy, both directions
+      named: *(an opening tag): …page never needs a&lt;code&gt;try&lt;/code&gt;…* and *(a closing tag):
+      …&lt;/a&gt;if to render “nothing happened”…* — then 51/51 local and 51/51 `--live`. No row added;
+      `EXPECTED_ROWS` stays **51**. Docs: `ARCHITECTURE.md` → *Copy and markup* (the rule, the
+      compiled-bucketing reason, and the dynamic half this scan cannot see).
+      Found: **`/terms` is the one route no row has ever mounted** — and it is the page where T-69
+      found this class twice by hand — filed as **T-71**.
+
 - [x] **T-69 The persona no-match sentence ran two words together, and the class was everywhere.**
       Row 51 read `/persona`'s no-match state and it came back `No persona matches that name. Create
       oneif it is not here yet.` — Ripple trims a **literal's boundary whitespace when its neighbour is

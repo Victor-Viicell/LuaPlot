@@ -1,62 +1,65 @@
 # Baton — what the next session does
 
-**T-69 landed.** `/persona`'s no-match sentence is written `</a>{" "}if it is not here yet.`, and row
-**51** now proves the words rather than a non-empty string: its clause requires *Create one if* and
-forbids *oneif*, and the walk's evidence line reads **`"No persona matches that name. Create one if it
-is not here yet."` with its word break**. Red proof was the literal put back and nothing else —
-**50/51**, row 51 alone at *"/persona: the no-match sentence reads \"…Create oneif it is not here
-yet.\" — it runs the words either side of the link together"*. Then 51/51 local and 51/51 `--live`.
+**T-70 landed.** `scripts/wordbreak-check.mjs` is **gate section 10** (`== wordbreak`), and it runs
+after the build because it reads `dist/assets/*.js`: a letter/digit/dot/paren glued to an inline
+opening tag, and a closing tag glued to the following word. Green line: `62 asset(s), 620 KB, 233
+inline tag(s); no literal is glued to an inline element`. Red proof from **one** injected copy read
+`2 literal(s) are glued to an inline element:` naming *"…page never needs a&lt;code&gt;try&lt;/code&gt;…"*
+and *"…&lt;/a&gt;if to render “nothing happened”…"*, exit 1, tree untouched.
 
-The trim was **not** one sentence. Ripple drops a **literal's boundary whitespace when its neighbour is
-an element**, in both directions, and the built bundle showed six more sites: `/terms`
-(`Finishingonboardingis the acceptance`, plus *beside*/*Finish*), `/onboarding` (*the* / *terms of
-use*), `/persona/<id>`'s picker sentence, `/user/<handle>`'s `3followers`, and the
-`/dev/{data,state,native,primitives}` badge rows. All of them write `{" "}` now, and the two greps over
-`dist/assets/*.js` that listed **6** breakages before the build read **zero** after it (the exact
-commands are in `PROGRESS.md`).
+The guard **found an eighth site on its first run**: `dev-native.tsrx`'s lede rendered *"needs atry"*
+on `/dev/native` (`never needs a` + newline + `<code>try</code>`), so T-69's hand sweep missed one;
+its note also wrote `read<b> cancelled</b>`, which rendered correctly only because the space sits
+*inside* the element, and now writes the house shape `read{" "}<b>cancelled</b>`. Both fixed in the
+same commit. 51/51 local, 51/51 `--live`, `publish.sh` → `LIVE`, `curl` 200.
 
-## T-70 — the word break between a literal and an element has no guard
+## T-71 — `/terms` is the one route no row has ever mounted
 
-**Why it is next.** T-69 fixed seven sites with a hand sweep and a grep over `dist`, and only
-`/persona` has a row that would notice the bug coming back. This repo has answered that argument twice
-already — T-48 turned a hand sweep of accent text into `scripts/tier-check.mjs`, T-46 turned 52 bare
-anchors into `scripts/link-check.mjs`, and its own lesson is written below as *a hand sweep is a list;
-the gate is the guard*. The mechanism is pure text over a file `check.sh` already builds, so it costs
-nothing at gate time and covers pages no journey visits (`/terms`, every `/dev/*`).
+**Why it is next.** A scan of `src/router.ts` against `scripts/smoke.mjs` leaves exactly one page: the
+other unmatched paths are param routes the walk lands on with a concrete id, and `/terms` has **no
+mention anywhere in the walk** (`grep -n "terms" scripts/smoke.mjs` → nothing). It is also the page
+T-69 found this class on twice by hand — *Finishingonboardingis the acceptance* and *beside Finish* —
+so the one page whose copy is legal prose, and whose copy has already broken, is the one page nothing
+reads. Gate section 10 now proves the *bundle* has no glue; a row proves the *sentence* a reader
+gets, which is the half every walk row exists for (`/persona`'s row 51 is the shape).
 
-**Approach.** New `scripts/wordbreak-check.mjs`, wired as **section 10** of `scripts/check.sh`. It
-reads `dist/assets/*.js`, so it must run **after the build section** — the compiled template is the
-truth, because the same source line keeps or loses its space depending on how the compiler buckets it
-into a piece array (`[`a`,…,`Create one`],`if it is…`]`) or a static HTML string (`…</strong>
-followers`). A source-only grep is a false green: that is T-69's own find. Both directions, over every
-asset:
+**Approach.** Row **52**, `EXPECTED_ROWS` 51 → 52, **read-only** — `/terms` reads no store, writes no
+preference, takes no override and commits no query, so it is safe anywhere after row 51 and leaves
+nothing behind. Read from the page, never from a sketch: mount `/terms` with `go("/terms")`, then
+assert —
 
-```js
-// a letter glued to an inline element's opening tag
-/[A-Za-z0-9.)]<(a|b|span|strong|em|code|i|small)[ >]/
-// …and its mirror: a closing tag glued to the following word
-/<\/(a|b|span|strong|em|code|i|small)>[A-Za-z]/
-```
+- the page is the terms page: `.kicker` reads **content rules**, `h1.title` **Three prohibitions**,
+  and the lede is non-empty (its exact words are the product's, not the row's);
+- the **five** `section.note` ids in order — `where-the-line-sits`, `what-the-rules-apply-to`,
+  `what-the-flag-covers`, `accepting-the-terms`, `how-enforcement-works` — each with a
+  `.note-title`, so a deleted or reordered section is red;
+- the three rule cards' `.rule-title`s are non-empty and distinct (they come from `TERMS_RULES`, so
+  read them, never pin them);
+- **the accepting-the-terms paragraph's words**, which is the clause this row exists for: it must
+  read `Finishing onboarding is the acceptance` and `beside Finish`, and must not contain
+  `Finishingonboarding` or `besideFinish`. Read that section's `p` and collapse whitespace before
+  comparing (no `text-transform` here, so `innerText` is honest);
+- the in-app link is a **push, not a load**: press *onboarding* inside that sentence, assert the
+  landing (`/onboarding`'s own heading), press Back, and poll the `/terms` heading back. A URL
+  assertion cannot see a re-boot — if a full load would otherwise pass, prove the push with document
+  identity (`window` marker + `performance.timeOrigin`, row 45's shape);
+- **no fragment navigation**: `/terms#accepting-the-terms` is a real document load on purpose
+  (`follow()` drops the fragment; `ARCHITECTURE.md` → Router carries the three `link-check`
+  exemptions), so do **not** assert a fragment press "stays in the app" — assert only that the
+  section id is in the DOM.
 
-Zero matches is green; each hit prints `file: …60 chars around it…` so a red names the copy. Take
-**file arguments** (`node scripts/wordbreak-check.mjs $TMPDIR/x.js`) so the red proof runs on a copy
-with an injected break, never an edit to the tree (T-48's scanner shape). Keep the inline set in one
-constant with a comment: block-level tags are excluded on purpose — whitespace beside a `div` carries
-no word break. Print what was scanned (the `5822 declarations across 46 stylesheet region(s)` line is
-the shape to copy).
+**Traps.** (a) `/terms` draws no `.detail` wrapper, so key it on `.kicker` + `h1.title`, never a
+shared class — `CommentThread.tsrx`'s `.thread` is the cautionary tale (T-51). (b) The section copy is
+long; collapse whitespace before comparing (`\\s` per template level — T-49's escaping trap), or a
+right page reads red on a line break. (c) `TERMS_RULES` titles are the product's, not the ticket's:
+read them. (d) `go("/terms")` is an app path — never `go(await url())`, which doubles the base
+(T-59). (e) Row 52 adds a history entry and nothing else, so a later row calling `history.back()`
+must not expect row 47's `?tab=following`.
 
-**Traps.** Minified JS is full of `a<b` comparisons, so the opening pattern must demand the tag's own
-shape (`<a ` / `<b ` / `<code>`), which is why it ends in `[ >]`; and the bundle writes
-`<code class=tsrx-…>`, so `class=` has to match too. `{" "}` compiles to a **separate text piece**, so
-a correct site has no glue and stays green — verify that on the seven T-69 sites, which read zero
-today. Do not "fix" a hit by widening the pattern; the fix is `{" "}` in the `.tsrx`, exactly as
-`terms.tsrx` and `user-profile.tsrx` now write it. Run `node --check scripts/wordbreak-check.mjs`
-first; `scripts/*.mjs` take no type annotations.
-
-**Accept.** `check.sh` GREEN with section 10 listed and a count printed; the check proved **red on
-both directions** from one injected copy (`</a>if` and `letter<code>`, both messages named in
-`PROGRESS.md`); the seven T-69 sites pass unchanged; 51/51 local and 51/51 `--live`; `publish.sh`
-prints `LIVE`, `curl` 200. No row added — `EXPECTED_ROWS` stays **51**.
+**Accept.** Red first, aimed at the copy clause: put the literal back in `terms.tsrx` (`</a> is the
+acceptance` — drop the `{" "}` before *is*) → row 52 alone red, reading the sentence it read; bytes
+restored, then `check.sh` GREEN, **52/52** local and **52/52** `--live`, `publish.sh` prints `LIVE`,
+`curl` 200, and gate section 10 stays green on the rebuilt bundle.
 
 **Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
 owner's: `DESIGN.md` records it (then a ticket seeds two or three tags, leaving one card tagless) or
@@ -65,10 +68,6 @@ row 51's chip **press** branch stays unwalkable. Do not invent tags to make a ro
 ## Blocked — what a human must do
 
 
-- **T-29/T-30/T-31/T-32 (Supabase):** create a project and export `SUPABASE_URL` +
-  `SUPABASE_ANON_KEY` (server key stays out of the client). Nothing about the data seam can move past
-  the memory adapter until then. T-30 also owns the real auth body (`lib/auth.ts` writes no session
-  today) and the redirect matrix; T-29's migration is the first thing after the ref lands.
 - **T-29/T-30/T-31/T-32 (Supabase):** create a project and export `SUPABASE_URL` +
   `SUPABASE_ANON_KEY` (server key stays out of the client). Nothing about the data seam can move past
   the memory adapter until then. T-30 also owns the real auth body (`lib/auth.ts` writes no session
@@ -89,17 +88,17 @@ row 51's chip **press** branch stays unwalkable. Do not invent tags to make a ro
 
 ## Open decisions
 
-- **T-70 is the ticket: the word break has no guard.** Failure-bank
+- **T-71 is the ticket: `/terms` is the one page no row has ever mounted.** Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
-  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every page that commits a query now has a row
-  (48 the character catalog, 49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and
-  `/persona`), and every bank entry that can be walked is walked, so what is left unblocked is the
-  **classes of defect the rows keep finding made mechanical** — T-69 fixed seven sites of one class by
-  hand and only one of them had a row, which is exactly the shape T-46 and T-48 turned into gate
-  sections. After T-70 the unblocked work is whatever the gate or the walk finds next; the rest of the
-  plan waits on Supabase (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision
-  (T-33B's deep link dependency and `Ctrl/Cmd+K`, the tag vocabulary).
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). Every page that commits a query has a row (48 the
+  character catalog, 49 the router seam, 50 `/bookmarks`, 51 the two other catalogues and
+  `/persona`), every bank entry that can be walked is walked, and the word break now has a gate
+  section (10), so what is left unblocked is **the page nobody reads**: `/terms` is the only route
+  whose path never appears in `scripts/smoke.mjs`, and it is the page T-69's class broke twice. After
+  T-71 the unblocked work is whatever the gate or the walk finds next; the rest of the plan waits on
+  Supabase (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep
+  link dependency and `Ctrl/Cmd+K`, the tag vocabulary).
 - **The tag field's press is blocked on a decision, not on work.** Every lorebook and preset
   fixture ships `tags: []`, and `schema.ts`'s own comment says they stay empty *while the taxonomy is
   undecided* — so `listTags("lorebook")` / `("preset")` answer `[]`, the picker opens its empty
@@ -240,6 +239,23 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A hand sweep's "zero today" is a hypothesis too (T-70).** T-69's baton recorded that its two
+  greps over `dist/assets/*.js` read zero after the fix; the **same** two greps on the same build read
+  **two** hits, both in `dev-native.tsrx`'s prose. The scanner then found a real eighth site —
+  `never needs a` + newline + `<code>try</code>` rendered *"needs atry"* on `/dev/native`. Re-run a
+  sweep's own command before reusing its conclusion; the guard that replaces it is what settles the
+  class.
+- **An inline element's own leading space hides the class from any text scan (T-70).**
+  `must read<b> cancelled</b>` renders correctly (the space is inside the `b`), yet a letter is glued
+  to the tag, so the scanner cannot tell it from a defect. The house shape is the space **outside**
+  (`read{" "}<b>cancelled</b>`); write it that way and the guard's message is always a real bug.
+- **A gate over the bundle cannot see a dynamic value glued to an element (T-70).**
+  `{n}<strong>followers</strong>` has no letter in the source and glues just the same when the value
+  carries no trailing space — `/notifications` is safe only because its `.subject` string starts with
+  `" — "`. Any banner that names a count writes its space explicitly; nothing gates that half yet.
+- **`/terms` is the only route no walk row has mounted (T-70).** Matching `src/router.ts`'s paths
+  against `scripts/smoke.mjs` leaves 13 param routes (landed on with ids) and `/terms`, which appears
+  nowhere in the walk — and it is the page T-69's copy class broke twice. Filed as **T-71**.
 - **Ripple trims a literal's *boundary* whitespace when its neighbour is an element, on both sides
   (T-69).** `</a> if` renders `</a>if` and `Finishing <a>` renders `Finishing<a>`, because the
   literal is trimmed at the edge it touches. An explicit `{" "}` is a text piece of its own and

@@ -100,7 +100,25 @@ off `history` directly.
 
 Pages live flat in `src/pages/` as `<type>-<view>.tsrx` (`character-catalog`, `lorebook-detail`,
 `session-detail`, `moderation-queue`), each exporting a named component plus a default for the lazy
-import. `src/components/PagePlaceholder.tsrx` is the scaffold every route renders until its ticket.
+import. `src/components/PagePlaceholder.tsrx` is the scaffold a route rendered until its ticket; no
+route imports it now.
+
+## Copy and markup
+
+Ripple trims a **literal's boundary whitespace when its neighbour is an element**, in both
+directions: `</a> if` renders `</a>if`, and `Finishing <a>` renders `Finishing<a>`. A literal next to
+a `}` **expression** keeps its space, so the class is *element-only*. The fix is always an explicit
+`{" "}` in the `.tsrx` — it compiles to a text piece of its own and survives the trim; a leading space
+*inside* the element (`<b> cancelled</b>`) renders too, but the house shape puts the space outside.
+
+Whether a site loses its break is decided by the compiler's bucketing (a piece array `[…,"Create
+one"],"if it is…"` loses it; a static HTML string keeps it), so **the source is not the evidence**.
+`scripts/wordbreak-check.mjs` (gate section 10) therefore scans `dist/assets/*.js` — the file the
+browser parses — for a letter glued to an inline opening tag and for a closing tag glued to a word,
+and it runs after the build for that reason. Block-level tags are exempt on purpose: whitespace beside
+a `div`/`p`/`li` carries no word break. The dynamic half (`{n}<strong>followers</strong>`) is invisible
+to this scan — a value with no trailing space glues just the same — so a banner that names a count
+writes the space explicitly.
 
 ## Data
 

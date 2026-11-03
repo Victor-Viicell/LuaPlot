@@ -3,6 +3,32 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-70: the word break has a gate section, and the gate found an eighth site
+
+- **Changed:** new `scripts/wordbreak-check.mjs` (node stdlib only): scans `dist/assets/*.js` for a
+  letter/digit/dot/paren glued to an inline opening tag (the inline set is one constant —
+  `a|b|span|strong|em|code|i|small`; block tags are exempt because whitespace beside a `div` carries
+  no word break) and for a closing tag glued to the following word. Zero hits is green, each hit
+  prints ~60 chars either side, and file arguments let the red proof run on a copy. Two drift guards:
+  no assets, or no inline tag at all, is a red. `scripts/check.sh` gained **section 10** (`==
+  wordbreak`), placed after the build because the compiled bundle is the truth. `dev-native.tsrx`'s
+  lede writes `never needs a{" "}` (it rendered *"needs atry"* on `/dev/native`, the sweep's eighth
+  site) and its note writes `read{" "}<b>cancelled</b>`; `docs/ARCHITECTURE.md` gained *Copy and
+  markup*; `PagePlaceholder`'s stale "every route renders" sentence corrected (no route imports it);
+  `SHIP-PLAN.md` T-70 ticked, `NEXT.md` rewritten for T-71.
+- **Verified:** `node --check scripts/wordbreak-check.mjs`; `check.sh` → **GREEN** with `62 asset(s),
+  620 KB, 233 inline tag(s); no literal is glued to an inline element` on section 10; red proof from
+  **one** injected copy (`$TMPDIR/red-wordbreak.js`, injected by `$TMPDIR/inject-wordbreak.mjs`) —
+  `2 literal(s) are glued to an inline element:` naming *"…page never needs a<code>try</code>…"* (an
+  opening tag) and *"…</a>if to render “nothing happened”…"* (a closing tag), exit 1, tree untouched;
+  the seven T-69 sites pass unchanged (their `{" "}` is a separate piece, so no glue); `publish.sh`
+  printed `LIVE=https://victor-viicell.github.io/LuaPlot/` and `curl` answered **200** on the first
+  attempt; `smoke: 51/51 journeys` local and `51/51 --live`.
+- **Not verified:** the scan's dynamic blind spot — `{n}<strong>followers</strong>` produces no letter
+  in the source and glues just the same if the value has no trailing space; nothing gates that half
+  (recorded in `ARCHITECTURE.md`, filed as a note for T-71's brief, not a row). `EXPECTED_ROWS` is
+  unchanged at 51 by design.
+
 ## 2026-11-03 — T-69: a sentence that lost its word break, and the class behind it
 
 - **Changed:** `src/pages/persona-collection.tsrx` — the no-match sentence writes `</a>{" "}if it is not

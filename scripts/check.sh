@@ -104,6 +104,18 @@ else
   FAIL=1
 fi
 
+# 10. A literal beside an inline element keeps its word break (T-70). Ripple trims a text node's
+# boundary whitespace when its neighbour is an element, so `</a> if` renders `</a>if` — and an
+# explicit {" "} is a text piece of its own that survives. Whether a site loses the break is decided
+# by the compiler's bucketing, so this reads the BUILT bundle, which is why it sits after section 1.
+say "== wordbreak"
+if node scripts/wordbreak-check.mjs; then
+  say "   wordbreak ok"
+else
+  say '   GLUED TEXT — write {" "} in the .tsrx, an explicit space survives the trim'
+  FAIL=1
+fi
+
 if [[ $FAIL -eq 0 ]]; then
   say "GREEN"
   exit 0
