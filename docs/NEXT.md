@@ -1,63 +1,71 @@
 # Baton — what the next session does
 
-**T-62 landed.** Row **45** (`EXPECTED_ROWS` 45) walks `/user/you/edit`'s one write: it reads
-`/user/you`'s name, handle, bio, both follow figures and creations count, mounts the form and
-asserts its prefill (the URL's handle, the row's name and bio — `input[name="username"]`, **not**
-`handle` — with **Save** enabled), retypes the username to `edit_walk`, presses **Save**, and
-re-reads the landing: the same name, bio, figures and creations count; then `/user/you` answers
-*This user doesn't exist.* with no profile, the account's own comment reads `@edit_walk`, `/` reads
-`signed in as You` with *Open profile* at the new handle, and the way back restores the whole pair.
-Two red proofs, each aimed at one loop of `renameAccount` (see PROGRESS). 45/45 local, 45/45 `--live`.
+**T-63 landed.** Row **46** (`EXPECTED_ROWS` 46) walks the three states rows 3 and 45 never read.
+It reads the session's own handle from `/`'s *Open profile* link (never pinning `you`), then
+`/user/ada/edit` — a fixture account the walk does not hold — and asserts the URL **stays put**
+(`/user/ada/edit`, no redirect), `.empty-copy` reads *You can't edit this account.*, there is **no**
+`input[name="username"]`, no display-name field and no **Save**, and *Back to your profile* points
+at the session's own `/user/<own>`. Then `/user/<own>/edit`: the form prefills, `ada` →
+**`Username taken`** with Save disabled and the help line blank, `"ab"` → the page's own rule
+sentence as the inline error (read from the page, never pinned) with Save disabled, back to the own
+handle → error gone, the rule back as help, Save enabled; **Cancel** → `/user/<own>` with name,
+handle and bio unchanged. **Read-only** — it never presses Save. 46/46 local, 46/46 `--live`.
 
-**One product bug the row found and this tick fixed.** A comment is signed by its author's handle,
-and `renameAccount()` moved characters, lorebooks, presets and posts but **not comments** — after a
-rename every comment the account wrote still read `@you` on a profile that now answers not-found,
-while `user/edit.md` says the account *keeps its content*. `store.comments` moves with the rest now.
+Two red proofs, each aimed at one clause (see PROGRESS): deleting `|| myHandle !== urlHandle` from
+`boot()` → *"/user/ada/edit mounted the account form for a stranger (read {\"copy\":\"\",\
+\"username\":true,…}) — the gate is the route's, not the entry point's"*; dropping `&& !taken.value`
+from `canSave` → *"Save stayed enabled on @ada, a fixture handle (… \"error\":\"Username taken\",
+\"saveDisabled\":false) — a taken username must block the write"*.
 
-## T-63 — the edit form's gate and a stranger's edit URL have never been read
+## T-64 — the profile's four tabs are a URL fact, and a follower is drawn as a catalog card
 
-**Why it is next.** Row 45 walked the page's one write. Its other three states are still unwalked:
-*Not the owner → forbidden* (`/user/ada/edit` — a pasted URL cannot edit a stranger), the page's own
-**`Username taken`** refusal (the only `Username taken` assertion in the walk is onboarding's, row
-44), and the format rule as an *inline* error on this page. A form that enabled **Save** on a taken
-handle, that let a stranger's URL mount the fields, or that printed onboarding's copy while the
-schema said something else is green in every gate and in all 45 rows.
+**Why it is next.** `pages/user/profile.md` is law about the tabbed body and **no row has ever
+pressed a tab**: rows 2, 45 and 46 read only `.profile-head`. The tab is `?tab=`, the type filter is
+`?type=`, both are written with `history.pushState` (never `navigate()`), and the followers/following
+tabs reuse the **catalog card with a different footer**. So a tab that renders another tab's body, a
+`type` that leaks onto the posts tab, a header that remounts on a tab swap, or a follower card that
+grew an author and a ratio are green in every gate and in all 46 rows.
 
 **Approach**
 
-1. **Row 46**, `EXPECTED_ROWS` 45 → 46, placed **after row 45 and before `sign out`**. **Read-only**:
-   it presses **Cancel** and never **Save**, so `/user/you` must read the same afterwards.
-2. `go("/user/ada/edit")` — a fixture account the walk does not hold. Read: the URL is still
-   `/user/ada/edit` (no redirect), the page prints **`You can't edit this account.`**, there is **no**
-   `input[name="username"]` and **no** Save, and *Back to your profile* points at the session's own
-   `/user/<handle>` (read that handle from the page, never pin it).
-3. `go("/user/<own>/edit")`, read the prefill, then `retype` the username to **`ada`** → poll the
-   field's `.field-error` for **`Username taken`** with Save disabled; `"ab"` → the schema's rule
-   sentence (`HANDLE_RULE`, read from the page, never pinned) with Save disabled; back to the own
-   handle → error gone, the rule back as the help line, Save enabled.
-4. **Cancel** → `/user/<own>`, and the profile there still reads the same name, handle and bio.
-5. Nothing else changes: no new row, no store write, and `sign out` still stays the walk's last row.
+1. **Row 47**, `EXPECTED_ROWS` 46 → 47, placed **after row 46 and before `sign out`**. Read-only:
+   it presses tabs, the type control, and at most one **Load more**.
+2. Read the owner's handle from `/`'s *Open profile* link (as row 46 does), `go("/user/<own>")`, and
+   assert the header first: name, `@handle`, the bio, the two figures and the four tab labels.
+3. Mark the mounted header (`document.querySelector(".profile-head").dataset.walkHead = "1"`), then
+   press each tab and assert: `location.search` carries `tab=posts` / `tab=followers` /
+   `tab=following` (the creations default writes **no** `tab`), the body swaps (creations
+   `.card-cell` vs the posts tab's `.card.post` vs the follower cards), and **the marker survives** —
+   a header that remounted threw the body away and refetched.
+4. On creations, press the type row: `?type=character` narrows the grid to cards whose link carries
+   `/character/`, All drops `type` from the URL, and the **posts tab draws no type control**
+   (`?type=preset` on posts changes nothing).
+5. On **followers**, assert the card's anatomy: a display-name title, a `.handle` under it, the bio
+   in the tagline's slot, and a footer carrying the two figures — **no `.card-author`, no
+   `.card-ratio`**. Press one card, assert its profile mounts, `history.back()`, and poll the search
+   *and* the drawn body back at `tab=followers`.
+6. Nothing else changes: no store write, no preference touched, and `sign out` stays the walk's last
+   row.
 
 **Traps**
 
-- **The username field is `input[name="username"]`** (onboarding's is `handle`). T-62's brief said
-  `handle` and the page names it `username`; key on the page, not the ticket.
-- **`taken` only reads a verdict about the current draft**, and the ask rides a 250 ms settle: a row
-  that types and reads immediately can see `save === false` before the ask has answered. Poll the
-  **error text**, not just the flag.
-- **Typing the handle you already hold asks nothing** (`onHandleInput` skips `checkHandle` when the
-  reading equals the URL's handle), so the way back is proven by *error gone + help back + Save
-  enabled*, never by a fresh verdict.
-- **The forbidden page is a state, not a redirect**: the URL stays `/user/ada/edit`, and the
-  `EmptyState`'s target is the session's own handle.
-- **`Cancel` is a `navigate()`** — poll the path, then re-read the head.
-- **Row 45 hands `@you` back** and row 44 grounds the session, so the account is `@you` here; read it
-  from `/user/you`'s own head rather than pinning the literal.
+- **The header is the page's, the body is the tab's.** `writeQuery()` pushes the URL without
+  notifying the router, so a tab swap keeps the mounted page; a re-read of the head proves nothing
+  (the same row prints the same name) — the expando is the proof.
+- **`App.tsrx`'s effect keys on `path + search`**, so a `popstate` (Back) *does* remount: after Back
+  the expando is gone and that is correct. Assert the search and the body, not the marker.
+- **Read the handle and the figures.** Rows 45/46 hand `@you` back, but row 45 also moves both sides
+  of the follow graph for the length of its row.
+- **The follower lists are fixture rows**: which handles appear is the adapter's answer, so assert
+  the *shape* of a card and one navigation, never a handle.
+- **`type` is read on the creations tab only** (`readQuery()`), and it leaves the URL whenever the
+  tab is not `creations` or the type is `all`.
+- **Paging stays out of the URL**, and `.pager-action button` is disabled while appending (T-57).
+- **Rows 36-38 wrote the NSFW pair and composed a flagged post**; read no pinned card count.
 
-**Accept:** `./scripts/check.sh` GREEN; walk **46/46** locally and **46/46 `--live`**; the assertion
+**Accept:** `./scripts/check.sh` GREEN; walk **47/47** locally and **47/47 `--live`**; the assertion
 proved **red** first (name the edit and the message in PROGRESS); `publish.sh` prints `LIVE` and
 `curl` is 200.
-
 
 ## Blocked — what a human must do
 
@@ -86,19 +94,17 @@ proved **red** first (name the edit and the message in PROGRESS); `publish.sh` p
 
 ## Open decisions
 
-- **T-63 is the ticket: the edit page's gate and its forbidden state.** Failure-bank entries 1
-  (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest are
-  blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
-  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). The failure bank has no walkable entry left, so rows
-  come from coverage: `/onboarding` was the last unmentioned route and T-61 walked it, and T-62 then
-  walked the write on `/user/[user.username]/edit`. What is left on that page are the states nothing
-  has read — *Not the owner → forbidden* for a **stranger's** edit URL (no row visits one),
-  `Username taken` **on this page** (the only such assertion in the walk is onboarding's), and the
-  format rule as its inline error.
-- **Row count is 45 after T-62.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
+- **T-64 is the ticket: the profile tabs, the type filter and the follower card.** Failure-bank
+  entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
+  are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
+  T-32, 11 → T-16, 12 → T-01, 13 → `check.sh`). With the edit page's four states now walked (rows 45
+  and 46), the next coverage is the **profile body**: `?tab=` / `?type=` are a URL fact nothing has
+  read, and the followers/following tabs are the catalogue card with a swapped footer — the one card
+  in the app whose anatomy no row asserts.
+- **Row count is 46 after T-63.** `scripts/smoke.mjs` keeps it in an explicit `EXPECTED_ROWS`, so a
   row that stops running is a red walk — **extend** an existing row rather than adding a near-copy of
   it, and bump the count only when a row is genuinely new (**T-61 added row 44; T-62 added 45; T-63
-  adds 46**). **Rows 36 and 37
+  added 46; T-64 adds 47**). **Rows 36 and 37
   are read-only apart from the NSFW pair** (row 36 reads the catalogue, one detail page and the
   thread; row 37 flips Show and restores it), so no CDP override, no probe and no un-restored write
   is left behind. **Row 38 (T-54) owns the NSFW pair too** — it needs Show + Blur *on* to render a
@@ -132,6 +138,9 @@ proved **red** first (name the edit and the message in PROGRESS); `publish.sh` p
   a right tree, and the number changes whenever a fixture or an earlier row adds one). It ends by
   pressing **Save** on `/user/you/edit`, so it writes through `saveProfileEdit` **and**
   `savePreferences` (the pair is re-saved from the form's own toggles, which it never flips).
+- **Row 46 (T-63) is read-only and hands nothing over.** It presses **Cancel** and reads the profile
+  it lands on against the head it read before the form, so a later row may rely on `/user/<own>`'s
+  name, handle and bio and on the NSFW pair being untouched. It takes no override and no probe.
 - **`VIEWER` and `ownHandle()` diverge after a claim or a rename — and every ownership rule must pick
   one.** `ownHandle()` is the profile row's handle and it *moves* (`renameAccount`); the constant
   `VIEWER` does not. Personas, sessions, votes and bookmarks are owned/read by `VIEWER`, while the
@@ -231,6 +240,17 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 - **The account form's username field is `input[name="username"]`, not `handle` (T-62).** Onboarding's
   is `handle`; this page's `Field name` is `username`. A row that keys on the ticket's word times out
   on a page that is right — read the page (both rows now try `username, handle`).
+- **A poll on the *symptom* names nothing when the page draws the wrong state (T-63).** Row 46
+  waited on *"You can't edit this account."* first and the red run read `timed out waiting for "You
+  can't edit this account." (last: false)` — a page that had mounted the whole form. The row now
+  polls until the route has **decided** (the copy, a form field, or the not-found sentence) and then
+  asserts *which* it decided, and the form-absence assertion sits **before** the copy assertion, so
+  the red names the bug: *"/user/ada/edit mounted the account form for a stranger (read …) — the
+  gate is the route's, not the entry point's"*.
+- **The edit page's rule comes from the page, not from the walk (T-63).** Row 46 captures the
+  `.field-help` sentence while the form is valid and then asserts the malformed `"ab"` prints
+  *that same* string as the `.field-error` — so the row proves error and help agree with each other
+  and with the schema, without a second copy of `HANDLE_RULE` in `scripts/smoke.mjs` to drift.
 - **A row that renames the account must read the four things a rename can lose from the page on both
   sides (T-62).** Name, bio, the two follow figures and the creations count are what a *re-created*
   row or an *unmoved* authored set breaks; `joinedAt` has no page, so it is the one thing the walk

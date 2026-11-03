@@ -526,6 +526,24 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       5e551000-…0001 (8 turn(s), 4 copies)"* (42/43); bytes restored, `sha256sum -c` clean. 43/43 local
       and 43/43 `--live`. Brief: `docs/NEXT.md` (T-60).
 
+- [x] **T-63 The edit page's gate, its `Username taken` refusal and its format error are read.**
+      `user/edit.md` → *States* names five, and rows 3 and 45 only ever read **Owner**: nothing had
+      visited a **stranger's** edit URL (a pasted `/user/ada/edit`), the walk's only `Username taken`
+      assertion belonged to onboarding (row 44), and the schema's rule had never been read as this
+      page's **inline** error. Row **46** (`EXPECTED_ROWS` 46, read-only — **Cancel**, never
+      **Save**) reads the session's own handle from `/`'s *Open profile* link, asserts the forbidden
+      state is a **state** (the URL stays at `/user/ada/edit`, `.empty-copy` is *You can't edit this
+      account.*, no username or display-name field, no **Save**, *Back to your profile* at
+      `/user/<own>`), then walks the owner's form: prefill, `ada` → **`Username taken`** with Save
+      disabled and no help line, `"ab"` → the page's own rule sentence as the inline error with Save
+      disabled, the own handle again → error gone, rule back as help, Save enabled; **Cancel** →
+      `/user/<own>` with name, handle and bio unchanged. Red first, twice: deleting
+      `|| myHandle !== urlHandle` from `boot()` → *"/user/ada/edit mounted the account form for a
+      stranger … the gate is the route's, not the entry point's"*; dropping `&& !taken.value` from
+      `canSave` → *"Save stayed enabled on @ada, a fixture handle … a taken username must block the
+      write"* (45/46 both times). Bytes restored, `git diff` empty. 46/46 local and 46/46 `--live`.
+      Brief: `docs/NEXT.md` (T-63).
+
 - [x] **T-62 A rename out of `/user/[user.username]/edit` moves the row, the content and the graph.**
       `user/edit.md` is law in four places nothing had executed: the handle rule, *"Changing it moves
       the profile URL and no alias is kept, so a link to the previous handle reports not-found rather

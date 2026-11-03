@@ -4823,6 +4823,205 @@ results.push(
   }),
 );
 
+/* ----------------------------------------------------------------------------------------------
+ * T-63 — `pages/user/edit.md` → *States* names five the page must draw; rows 3 and 45 only ever
+ * read **Owner**. **Not the owner → forbidden** (`/user/ada/edit` — a pasted stranger's URL),
+ * **Username taken** *on this page* (the walk's only such assertion is onboarding's, row 44) and
+ * **Validation error** as its inline form were unwalked, so a page that let a stranger's URL mount
+ * the fields, enabled **Save** on a taken handle, or printed onboarding's copy where the schema
+ * says otherwise would be green in every gate and in all 45 rows.
+ *
+ * **Read-only.** It presses **Cancel** and never **Save**, and re-reads `/user/<own>`'s name,
+ * handle and bio afterwards, so the account is handed back exactly as it was found.
+ * ---------------------------------------------------------------------------------------------- */
+const STRANGER_HANDLE = "ada"; // a fixture account (lib/fixtures/profiles.ts) the walk does not hold
+
+results.push(
+  await journey("a stranger's edit URL is refused, and the form refuses a taken handle and a malformed one", async () => {
+    /** The form as it mounts: prefill, the handle field's error and help, and Save's own flag. */
+    const readForm = () =>
+      js(`
+        const one = (selector) => document.querySelector(selector);
+        const handleInput = one('input[name="username"]') || one('input[name="handle"]');
+        const fieldOf = (el) => (el ? el.closest(".field") : null);
+        const save = [...document.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Save");
+        return {
+          path: location.pathname,
+          mounted: handleInput !== null && one('input[name="displayName"]') !== null,
+          handle: handleInput ? handleInput.value : "",
+          name: one('input[name="displayName"]') ? one('input[name="displayName"]').value : "",
+          bio: one('textarea[name="bio"]') ? one('textarea[name="bio"]').value : "",
+          error: ((fieldOf(handleInput)?.querySelector(".field-error") || {}).textContent || "").trim(),
+          help: ((fieldOf(handleInput)?.querySelector(".field-help") || {}).textContent || "").trim(),
+          saveDisabled: save ? save.disabled : null,
+        };
+      `);
+
+    /** The profile head — the three things a read-only row must hand back untouched. */
+    const readProfile = () =>
+      js(`
+        const text = (selector) => {
+          const el = document.querySelector(selector);
+          return el ? (el.textContent || "").replace(/\\\\s+/g, " ").trim() : "";
+        };
+        return {
+          path: location.pathname,
+          present: document.querySelector(".profile-head") !== null,
+          name: text(".profile-head h1.name"),
+          handle: text(".profile-head .handle"),
+          bio: text(".profile-head .bio"),
+          missing: document.body.innerText.includes("This user doesn't exist."),
+        };
+      `);
+
+    /** A poll that always throws with the whole form it last read, never a bare timeout. */
+    const until = async (label, check, timeout = 8000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await readForm();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${label} — read ${JSON.stringify(last)}`);
+    };
+
+    const HEAD_FIELD = 'input[name="username"], input[name="handle"]';
+
+    // 1. The session's own handle, read from the shell (row 45 hands `@you` back, but never pin it).
+    await go("/");
+    await waitText("signed in as", 8000);
+    const ownHref = await js(`
+      const link = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Open profile");
+      return link ? link.getAttribute("href") || "" : "";
+    `);
+    const ownHandle = ownHref.split("/").filter(Boolean).pop() || "";
+    if (!ownHandle) throw new Error(`/ draws no Open profile link (read ${JSON.stringify(ownHref)}) — the row cannot know whose account it is borrowing`);
+
+    await go(`/user/${ownHandle}`);
+    await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the account's profile header", 10000);
+    const before = await readProfile();
+    if (!before.present || !before.name || !before.bio || before.handle !== `@${ownHandle}`) {
+      throw new Error(`/user/${ownHandle} reads ${JSON.stringify(before)} — the row needs the owner's own name, handle and bio to prove nothing moved`);
+    }
+
+    // 2. A stranger's edit URL: the route refuses as a **state** (the URL stays put, no redirect),
+    //    draws no form, and its way back is the session's own profile.
+    const readStranger = () =>
+      js(`
+        const one = (selector) => document.querySelector(selector);
+        const save = [...document.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Save");
+        const back = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Back to your profile");
+        return {
+          path: location.pathname,
+          copy: (document.querySelector(".empty-copy")?.textContent || "").trim(),
+          username: one('input[name="username"]') !== null,
+          displayName: one('input[name="displayName"]') !== null,
+          save: save ? save.disabled : null,
+          back: back ? back.getAttribute("href") || "" : "",
+          missing: document.body.innerText.includes("This user doesn't exist."),
+        };
+      `);
+
+    /** Poll until the route has *decided* — forbidden, a form, or the not-found sentence — then
+     *  assert which. A poll on the copy alone would report a bare timeout on a page that mounted
+     *  the wrong thing, which is exactly the failure this state exists to catch. */
+    const settle = async (label, check, read, timeout = 10000) => {
+      const deadline = Date.now() + timeout;
+      let last = null;
+      for (;;) {
+        last = await read();
+        if (check(last)) return last;
+        if (Date.now() > deadline) break;
+        await sleep(150);
+      }
+      throw new Error(`${label} — read ${JSON.stringify(last)}`);
+    };
+
+    await go(`/user/${STRANGER_HANDLE}/edit`);
+    const stranger = await settle(
+      `a stranger's edit URL to draw the forbidden state`,
+      (s) => s.copy !== "" || s.username || s.displayName || s.missing,
+      readStranger,
+    );
+    if (!stranger.path.endsWith(`/user/${STRANGER_HANDLE}/edit`)) {
+      throw new Error(`a stranger's edit URL redirected to ${JSON.stringify(stranger.path)} — the state must stay at /user/${STRANGER_HANDLE}/edit, not move the reader`);
+    }
+    if (stranger.username || stranger.displayName || stranger.save !== null) {
+      throw new Error(`/user/${STRANGER_HANDLE}/edit mounted the account form for a stranger (read ${JSON.stringify(stranger)}) — the gate is the route's, not the entry point's`);
+    }
+    if (stranger.copy !== "You can't edit this account.") {
+      throw new Error(`/user/${STRANGER_HANDLE}/edit reads ${JSON.stringify(stranger.copy)} where the spec's *Not the owner — forbidden* state belongs (read ${JSON.stringify(stranger)}) — a pasted URL must not reach the form`);
+    }
+    if (!stranger.back.endsWith(`/user/${ownHandle}`)) {
+      throw new Error(`the forbidden state's way back points at ${JSON.stringify(stranger.back)}, not the session's own /user/${ownHandle}`);
+    }
+
+    // 3. The owner's form, and the two refusals that live on it.
+    await go(`/user/${ownHandle}/edit`);
+    let form = await until("the account form to mount", (f) => f.mounted, 12000);
+    const rule = form.help; // the schema's own sentence, read from the page rather than pinned
+    if (!rule) throw new Error(`the username field prints no help line (read ${JSON.stringify(form)}) — the row needs the schema's rule as the page says it`);
+    if (form.handle !== ownHandle || form.name !== before.name || form.bio !== before.bio) {
+      throw new Error(`the form prefilled ${JSON.stringify([form.handle, form.name, form.bio])}, not ${JSON.stringify([ownHandle, before.name, before.bio])}`);
+    }
+    if (form.error !== "" || form.saveDisabled !== false) {
+      throw new Error(`the form opens with ${JSON.stringify([form.error, form.saveDisabled])} — a prefilled valid pair must read no error and Save enabled`);
+    }
+
+    // 3a. A handle the adapter already holds: the spec's copy, verbatim, with Save disabled.
+    await retype(HEAD_FIELD, STRANGER_HANDLE);
+    form = await until(
+      `the page to print "Username taken" for @${STRANGER_HANDLE}`,
+      (f) => f.error === "Username taken",
+      8000,
+    );
+    if (form.saveDisabled !== true) {
+      throw new Error(`Save stayed enabled on @${STRANGER_HANDLE}, a fixture handle (read ${JSON.stringify(form)}) — a taken username must block the write`);
+    }
+    if (form.help !== "") {
+      throw new Error(`the taken handle prints ${JSON.stringify(form.help)} as help under the error — the field says one thing once`);
+    }
+
+    // 3b. A handle the schema refuses: the *same* sentence as its inline error, and the help line
+    //     gives way so the rule is not printed twice.
+    await retype(HEAD_FIELD, "ab");
+    form = await until(`the field to print the handle rule ${JSON.stringify(rule)}`, (f) => f.error === rule, 8000);
+    if (form.saveDisabled !== true) {
+      throw new Error(`Save stayed enabled on the malformed handle "ab" (read ${JSON.stringify(form)})`);
+    }
+    if (form.help !== "") {
+      throw new Error(`the malformed handle prints the rule twice — error ${JSON.stringify(form.error)} beside help ${JSON.stringify(form.help)}`);
+    }
+
+    // 3c. Typing the handle the account already holds asks the adapter nothing (`onHandleInput`
+    //     skips `checkHandle` for the URL's handle), so the way back is proven by the three reads.
+    await retype(HEAD_FIELD, ownHandle);
+    form = await until(
+      `the error to clear on @${ownHandle} with the rule back as help`,
+      (f) => f.error === "" && f.help === rule && f.saveDisabled === false,
+      8000,
+    );
+
+    // 4. Cancel is a `navigate()`, and the profile it lands on is the row the form was prefilled from.
+    await click("Cancel", { exact: true });
+    await expectPath(`/user/${ownHandle}`, "Cancel", 12000);
+    await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the profile after Cancel", 10000);
+    const after = await readProfile();
+    if (after.missing || !after.present) {
+      throw new Error(`/user/${ownHandle} after Cancel reads ${JSON.stringify(after)} — Cancel must land on the profile it came from`);
+    }
+    if (after.name !== before.name || after.handle !== before.handle || after.bio !== before.bio) {
+      throw new Error(
+        `the profile after Cancel reads ${JSON.stringify([after.name, after.handle, after.bio])}, not ${JSON.stringify([before.name, before.handle, before.bio])} — a read-only row wrote something`,
+      );
+    }
+
+    return `/user/${STRANGER_HANDLE}/edit stays put and reads "You can't edit this account." with no username field, no Save and Back to your profile at /user/${ownHandle} · the owner's form prefills ${JSON.stringify([form.handle, form.name, before.bio])} with the rule ${JSON.stringify(rule)} as help · @${STRANGER_HANDLE} → ${JSON.stringify("Username taken")} with Save disabled and no help · "ab" → the same rule as the inline error with Save disabled · back to @${ownHandle} → error gone, rule back as help, Save enabled · Cancel → /user/${ownHandle} reads ${JSON.stringify([after.name, after.handle])} unchanged`;
+  }),
+);
+
 results.push(
   await journey("sign out", async () => {
     await go("/");
@@ -4846,9 +5045,9 @@ chrome.kill("SIGKILL");
  * mode is a `@for`/`journey()` call that got deleted while the run still reads green. Bump it in
  * the commit that adds or removes a row (T-45: 27 → 28, T-46: 28 → 29, T-47: 29 → 30, T-37B: 31,
  * T-36a: 32, T-49: 33, T-50: 34, T-51: 35, T-52: 36, T-53: 37, T-54: 38, T-55: 39, T-56: 40,
- * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45).
+ * T-58: 41, T-59: 42, T-60: 43, T-61: 44, T-62: 45, T-63: 46).
  */
-const EXPECTED_ROWS = 45;
+const EXPECTED_ROWS = 46;
 
 const passed = rows.filter((r) => r.ok).length;
 console.log("");

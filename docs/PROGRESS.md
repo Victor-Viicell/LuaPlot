@@ -3,6 +3,39 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-02 — T-63: the edit page's forbidden state, taken handle and format error
+
+- **Changed:** `scripts/smoke.mjs` — new walk **row 46**, `EXPECTED_ROWS` 45 → 46, after row 45 and
+  before `sign out` (**read-only**: it presses **Cancel**, never **Save**). It reads the session's
+  own handle from `/`'s *Open profile* link rather than pinning `you`, then `go("/user/ada/edit")`
+  (a fixture account the walk does not hold) and asserts the spec's *Not the owner → forbidden*
+  state: the URL **stays** at `/user/ada/edit` (no redirect), `.empty-copy` reads *You can't edit
+  this account.*, there is no `input[name="username"]`, no display-name field and no **Save**, and
+  *Back to your profile* points at the session's own `/user/<own>`. Then `/user/<own>/edit`: the
+  form prefills the URL's handle with the row's name and bio and Save enabled; retyping the username
+  to `ada` prints **`Username taken`** with Save disabled and no help line; `"ab"` prints the
+  page's own rule sentence (captured from `.field-help` while the form was valid, never pinned) as
+  its inline error with Save disabled and no duplicate help; the own handle again → error gone, the
+  rule back as help, Save enabled. **Cancel** → `/user/<own>`, whose name, handle and bio are
+  re-read and compared with the head taken before the form.
+- **Verified:** `./scripts/check.sh` GREEN (30 routes, schema, links, tiers); walk **46/46** locally
+  and **46/46 `--live`** against https://victor-viicell.github.io/LuaPlot/ (200). Red first, twice,
+  each aimed at one clause the row exists for: deleting `|| myHandle !== urlHandle` from
+  `boot()` → *"/user/ada/edit mounted the account form for a stranger (read
+  {\"path\":\"/user/ada/edit\",\"copy\":\"\",\"username\":true,\"displayName\":true,
+  \"save\":false,…}) — the gate is the route's, not the entry point's"* (45/46); dropping
+  `&& !taken.value` from `canSave` → *"Save stayed enabled on @ada, a fixture handle (read
+  {…\"error\":\"Username taken\",\"help\":\"\",\"saveDisabled\":false}) — a taken username must
+  block the write"* (45/46). Bytes restored (`git diff src/pages/user-edit.tsrx` empty), so the
+  green run is the proof.
+- **Not verified:** the page's **Saving…** and **Save failed** states — the memory adapter's writes
+  never fail and a Save is a write, so a read-only row cannot reach them without inventing a fault
+  the product does not have (a ticket would need a fault hook in `repo`). The row also proves the
+  error and help **agree**, not that either equals the spec's words independently: the sentence is
+  read from the page, so a schema message that changed wrongly would still pass.
+- **Publish:** `publish.sh` printed `LIVE` (`assets/index-AwPh3k_B.js`), `curl` 200, and the live
+  walk re-read all 46 rows against the published build.
+
 ## 2026-11-02 — T-62: a rename out of /user/you/edit moves the row, the content and the graph
 
 - **Changed:** `scripts/smoke.mjs` — new walk **row 45**, `EXPECTED_ROWS` 44 → 45, after row 44 and
