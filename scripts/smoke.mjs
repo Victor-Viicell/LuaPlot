@@ -1624,7 +1624,160 @@ results.push(
     await waitFor(`document.querySelectorAll(".row.is-unread").length === ${before - 1}`, "one row to lose its unread mark", 8000);
     const after = await badge();
     if (after === unreadBefore) throw new Error(`the badge still reads "${after}" after opening a row (${before} unread rows before)`);
-    return `${before} unread rows → ${before - 1}; the tab bar went "${unreadBefore}" → "${after}"`;
+
+    // 1b. The inbox at the three widths its own stylesheet draws it for (T-86). `notifications.tsrx`'s
+    //     `sm 640` block is a step a reader can see — the row's `padding-left` 12 → 16, its `gap`
+    //     10 → 12, the `.sentence` 14 → 15 and `.title` 24 → 28 — and the `md 900` block pads the
+    //     toolbar 4 → 8 (its only declaration on this page). The row's own mount is the walk's ~500px,
+    //     below the breakpoint, so no declaration of either block had ever been rendered.
+    //
+    //     It runs **last**, after the badge re-read, because this row's whole proof is
+    //     `unreadBefore → after`: its two controls are real writes, and a width phase before them
+    //     would be measuring a list it is about to change. Nothing here presses, types or navigates —
+    //     the no-write proof is the row count *and* the unread count, read before and after (the
+    //     route carries no query, so the URL cannot prove it).
+    const readInbox = () =>
+      js(`
+        const round = (n) => Math.round(n * 100) / 100;
+        const all = [...document.querySelectorAll(".rows .row")];
+        const first = all.find((row) => row.querySelector(".sentence"));
+        const cell = first ? (() => {
+          const sentence = first.querySelector(".sentence");
+          const rs = getComputedStyle(first);
+          const ss = getComputedStyle(sentence);
+          const r = first.getBoundingClientRect();
+          return {
+            classes: first.className,
+            unread: first.classList.contains("is-unread"),
+            box: { left: round(r.left), right: round(r.right), width: round(r.width) },
+            padLeft: rs.paddingLeft,
+            gap: rs.gap,
+            sentenceFont: ss.fontSize,
+            sentenceWeight: ss.fontWeight,
+            sentenceColor: ss.color,
+            text: (sentence.textContent || "").trim().slice(0, 56),
+          };
+        })() : null;
+        const title = document.querySelector(".title");
+        const toolbar = document.querySelector(".toolbar");
+        const skel = document.querySelector(".skel-row");
+        return {
+          path: location.pathname,
+          search: location.search,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          rows: all.length,
+          unreadRows: document.querySelectorAll(".rows .row.is-unread").length,
+          skeletons: document.querySelectorAll(".skel-row").length,
+          skelPadLeft: skel ? getComputedStyle(skel).paddingLeft : "",
+          cell,
+          titleFont: title ? getComputedStyle(title).fontSize : "",
+          toolbarPadBottom: toolbar ? getComputedStyle(toolbar).paddingBottom : "",
+        };
+      `);
+
+    /**
+     * The sm block's four members plus the md padding. Every failure names the element it read —
+     * the row (with its own class list) and the sentence are **separate rules of the same block**, so
+     * the padding and the font-size are asserted apart and a red proof cannot confuse the two.
+     * The unread mark is a `box-shadow` inset, so padding is never inferred from geometry, and
+     * `.row.is-unread .sentence` sets a colour and a weight — this reader asserts **font-size only**
+     * and keeps the other two as evidence.
+     */
+    const assertInbox = (r, width) => {
+      const at = `/notifications at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!r.path.endsWith("/notifications")) {
+        throw new Error(`${at}: the inbox was measured on ${JSON.stringify(r.path)} — a ladder that navigates proves another page's facts`);
+      }
+      if (r.skeletons !== 0) {
+        throw new Error(`${at}: ${r.skeletons} .skel-row(s) still draw — a skeleton carries .skel-lines, not .sentence, and the sm block is the sentence's`);
+      }
+      if (!r.cell) {
+        throw new Error(`${at}: no drawn .rows .row carries a .sentence (${r.rows} row(s)) — the inbox drew no notification to measure`);
+      }
+      if (!r.toolbarPadBottom) {
+        throw new Error(`${at}: the inbox draws no .toolbar — the md block's only declaration on this page has no box to land on`);
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the inbox scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+
+      const base = width === 360;
+      const want = {
+        padLeft: base ? "12px" : "16px",
+        gap: base ? "10px" : "12px",
+        sentence: base ? "14px" : "15px",
+        title: base ? "24px" : "28px",
+        toolbar: width === 900 ? "8px" : "4px",
+      };
+
+      if (r.cell.padLeft !== want.padLeft) {
+        throw new Error(
+          `${at}: .row ${JSON.stringify(r.cell.classes)} computes padding-left ${r.cell.padLeft} (row ${r.cell.box.left}→${r.cell.box.right}), not the ${base ? "base 12px" : "sm block's 16px (base is 12px)"} — the sm block's .row list is the only rule that moves it, and the unread mark is an inset box-shadow, never a padding`,
+        );
+      }
+      if (r.cell.gap !== want.gap) {
+        throw new Error(
+          `${at}: .row ${JSON.stringify(r.cell.classes)} computes gap ${r.cell.gap}, not ${want.gap} (${base ? "base 10px" : "sm 12px, base 10px"}) across the avatar, the sentence and the stamp`,
+        );
+      }
+      if (r.cell.sentenceFont !== want.sentence) {
+        throw new Error(
+          `${at}: the .sentence inside .row ${JSON.stringify(r.cell.classes)} computes font-size ${r.cell.sentenceFont} (weight ${r.cell.sentenceWeight}), not ${want.sentence} — the row stepped (padding ${r.cell.padLeft}, gap ${r.cell.gap}) but the sentence's own rule did not, and the block gives them in two separate rules`,
+        );
+      }
+      if (r.titleFont !== want.title) {
+        throw new Error(`${at}: .title computes ${r.titleFont}, not ${want.title} (${base ? "base" : "sm, base is 24px"})`);
+      }
+      if (r.toolbarPadBottom !== want.toolbar) {
+        throw new Error(
+          `${at}: the toolbar's padding-bottom computes ${r.toolbarPadBottom}, not ${want.toolbar} — ${
+            width === 900
+              ? "the md block's only declaration on this page"
+              : "the md block's 8px must not leak below 900, where the base 4px is the law"
+          }`,
+        );
+      }
+    };
+
+    const inboxRestore = await js("return window.innerWidth;");
+    const inboxBefore = await readInbox();
+    const inboxLines = [];
+    let inboxSeen = "";
+    try {
+      for (const width of [640, 900, 360]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        await waitFor(`document.querySelector(".rows .row .sentence") !== null`, `the inbox's first sentence at ${width}px`, 10000);
+        const r = await readInbox();
+        assertInbox(r, width);
+        inboxLines.push(
+          `${width}px: .row ${JSON.stringify(r.cell.classes)} padding-left ${r.cell.padLeft} · gap ${r.cell.gap} · .sentence ${r.cell.sentenceFont} ${r.cell.sentenceWeight} ${r.cell.sentenceColor} (${JSON.stringify(r.cell.text)}) · title ${r.titleFont} · toolbar padding-bottom ${r.toolbarPadBottom} · ${r.rows} row(s), ${r.unreadRows} unread`,
+        );
+      }
+      inboxSeen = inboxLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const inboxAfter = await js("return window.innerWidth;");
+    if (inboxAfter !== inboxRestore) {
+      throw new Error(`the inbox's overrides cleared to ${inboxAfter}px, but the session runs at ${inboxRestore}px — a leaked override would mis-measure every later row`);
+    }
+    const back = await readInbox();
+    if (back.path !== inboxBefore.path || back.search !== inboxBefore.search || back.rows !== inboxBefore.rows || back.unreadRows !== inboxBefore.unreadRows) {
+      throw new Error(
+        `the width phase left ${JSON.stringify(back.path + back.search)} with ${back.rows} row(s) and ${back.unreadRows} unread, not the ${inboxBefore.rows} row(s) and ${inboxBefore.unreadRows} unread the mount drew — the ladder navigated or wrote, so this row would be measuring a list it changed`,
+      );
+    }
+    if (back.rows === 0) {
+      throw new Error(`the inbox measured 0 rows after the ladder — an empty list satisfies every count above, so the reading proves nothing`);
+    }
+
+    return `${before} unread rows → ${before - 1}; the tab bar went "${unreadBefore}" → "${after}"; the sm step rendered — ${inboxSeen}`;
   }),
 );
 

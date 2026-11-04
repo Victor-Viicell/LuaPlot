@@ -1,6 +1,104 @@
 # Baton — what the next session does
 
-**T-85 landed.** Row 22 (`report a post and land on the case`) was **extended, not duplicated** —
+**T-86 landed.** Row 23 (`read a notification (the badge drops)`) was **extended, not duplicated** —
+`EXPECTED_ROWS` stays **55** — and `/notifications`' `sm 640` block is now rendered at **640, 900 and
+360**, read at the **end** of the row: after its `Mark read` press, after the `go("/notifications")`
+re-mount and after the badge re-read, because the row's whole proof is `unreadBefore → after` and
+both its controls are real writes. **Not one page declaration changed**; all five were live. Measured
+**640**: `.row` `padding-left 16px`, `gap 12px`, `.sentence` **15px** (weight 400, `rgb(92,95,119)`),
+`.title` 28px, toolbar `padding-bottom 4px` (the `md` block must not leak down); **900**: the same four
+plus the toolbar's **8px**, the `md` block's only declaration on this page; **360**: 12 / 10 / 14 / 24 /
+4. The ladder takes `640×740`, `900×740`, `360×740`, one `readInbox()` per width into
+`assertInbox(r, width)`, clears every override in one `finally`, asserts `innerWidth` came back, then
+re-reads the bare mount and asserts the **`.row` count and the `.row.is-unread` count together** (7
+rows / 3 unread here) — the route carries no query, so the URL cannot prove the ladder stayed put. Red
+proofs are the block's **two separate rules**: `.row, .skel-row { padding-left: 12px }` red-lit row 23
+alone (54 ok / 1 fail) at *"the .row \"row tsrx-de1bc11c\" computes padding-left 12px (row 24→596),
+not the sm block's 16px (base is 12px) — … the unread mark is an inset box-shadow, never a padding"*;
+deleting `.sentence { font-size: 15px }` alone red-lit it at *"the .sentence inside .row … computes
+font-size 14px (weight 400), not 15px — the row stepped (padding 16px, gap 12px) but the sentence's own
+rule did not"*.
+
+**Two facts this row settles.** The unread mark is `box-shadow: inset`, so the 12 → 16 step is only
+readable as `getComputedStyle(row).paddingLeft` — and the first drawn row is **not** unread (this walk
+had already opened its first unread row), which is why the evidence line prints the class list instead
+of assuming the mark. And `.row.is-unread .sentence` sets a `color` and `font-weight: 600`: this
+reader asserts **font-size only** and prints the other two, so a weight or colour change can never red
+the size rule.
+
+**Also settled:** `/notifications` needed no `DESIGN.md` change — the block is the same spacing/type
+step the other list pages carry. **Fourth ticket in a row** (T-83, T-84, T-85, T-86) where the
+declarations were live and only the row was missing. Expect live declarations and no page change until
+a rule measures dead — and the first *dead* one is already in sight: see T-87.
+
+## T-87 — `/session/[id]`'s `sm 640` block: two live steps and one declaration that names nothing
+
+**Why it is next.** `session-detail.tsrx`'s `@media (min-width: 640px)` block is the transcript's own
+step, and no row has ever run it: the pages that mount a session do so at the walk's own ~500px. It
+declares **five** things — `.title { font-size: 26px }` (base 24), `.turn-text { font-size: 15px }`
+(base 14), `.composer-actions { flex-direction: row; justify-content: space-between }` plus
+`.composer-actions > * { flex: 0 0 auto; min-width: 140px }`, `.menu-actions { flex-direction: row;
+justify-content: flex-end }` (base `column-reverse`), and `.copy-actions { justify-content: flex-start }`
+(base declares none). The `lg 1200` block then restates `.composer-actions > * { min-width: 160px }`.
+
+**The finding (read this before writing the row).** `grep -rn "composer-actions" src/` finds the class
+**only in `session-detail.tsrx`'s two `<style>` blocks** (lines 1023, 1028, 1071) — **no element on any
+page carries it**. The composer's markup is `<div class="composer">` with a `.say` textarea and a
+`.send` button; `src/specs/pages/session.md` and `docs/DESIGN.md` describe no action row there. So
+these are **dead declarations**, and they are the family's first: unlike T-82's `.actions .btn` they are
+**not pruned** — the built `dist/assets/session-detail-*.css` carries
+`.composer-actions.tsrx-…{flex-direction:row;…}` — they simply match nothing. A walk cannot prove a
+deletion, so the proof of *dead* is the built CSS diff plus unchanged pixels, and the accept line must
+say so.
+
+**Approach.** Two halves, one commit, and the row is extended (no new row; `EXPECTED_ROWS` stays 55):
+1. **Delete the dead declarations** — both `.composer-actions` rules in the `sm` block and the `lg`
+   restatement of `> *`. That is the ticket's only page change and it must move no pixel.
+2. **Extend the row that mounts a session** (`the session's copies are the snapshot: closed, stated,
+   and restorable`) with a read-only ladder at the very end, after its **Restore copy** press: `640×740`,
+   `900×740`, `360×740`, one `readSession()` per width into `assertSession(r, width)`, every override
+   cleared in one `finally`, `innerWidth` re-read, then a re-read of the **`.turn` count** (a session
+   URL has no query either, so the URL proves nothing about whether the ladder navigated).
+
+At **640** assert `.title` **26px**, the first `.turn-text` **15px**, and the toolbar-side facts below;
+at **900** the same three (nothing un-steps them); at **360** `.title` **24px** and `.turn-text`
+**14px**. `.menu-actions` is the one layout fact: its base is `column-reverse` and the `sm` block makes
+it `row` with `justify-content: flex-end` — but it lives inside the **session settings sheet**, so
+reading it costs a press (`Session settings`, the header's own icon button). Open it **once per width**
+after the text reads, read `flexDirection` / `justifyContent` on `.menu-actions`, and press the sheet's
+close control before changing width. If the sheet turns out to be a primitive whose body the page's
+scoped block cannot reach (T-82's prune), record that and gate only the two text facts.
+
+**Traps.**
+(a) **`.copy-actions`' `sm` rule restates the default** — the base block declares no `justify-content`,
+so `getComputedStyle(.copy-actions).justifyContent` reads `flex-start` at **every** width. An assertion
+on it is vacuous (T-80's lesson, one page over): print it as evidence, never gate it.
+(b) **A dead declaration is not a pruned one.** T-82's `.btn` rule vanished from the bundle; this one
+is compiled and inert. Read the markup, not `dist`, and prove the deletion with the CSS diff.
+(c) `.turn-text` has `white-space: pre-wrap` and `max-width: 68ch` — read `fontSize` on the **first**
+`.turn-text`, never a wrap count or a line height.
+(d) The transcript is a list: `.turn` count before and after the ladder is the no-navigation proof, and
+the session page **animates** its turns (`prefers-reduced-motion: no-preference`) — poll for the
+`.turn-text`, do not sleep a guess.
+(e) `document.documentElement.scrollWidth > innerWidth` at each width (T-72: equality is false on a
+right page because of `scrollbar-gutter: stable`).
+(f) Row 33's own gesture is a **write** (Restore copy). Put the ladder after it, press nothing that
+writes, and never re-read the copies' state as part of the width phase.
+(g) The row's conclusion is a **mutation of session 2's copies**, so anything after it must assume the
+restore already happened — the ladder only reads type and layout.
+
+**Accept.** Red first, in the block's separate rules: set `.turn-text { font-size: 15px }` to `14px`
+and the row must red at 640 naming the **`.turn-text`** element and the measured 14px (not the title);
+then restore and set `.title { font-size: 26px }` to `24px` and it must name `.title`. The dead half is
+proved by `grep` over the rebuilt `dist/assets/session-detail-*.css` (the selector is gone) plus a green
+walk with byte-identical layout numbers. Bytes restored (`cmp`), `check.sh` GREEN, **55/55** local and
+**55/55** `--live`, `publish.sh` prints `LIVE`, `curl` 200.
+
+**Brief:** this section. When it lands, replace it with the next ticket's and keep T-86's section below
+as the record.
+
+## T-85 (the tick before — record)
+
 `EXPECTED_ROWS` stays **55** — and `/moderation`'s `sm 640` queue block is now rendered at **640, 900
 and 360**, read at the **end** of the row: after the mount's `4 open` assertion and before the row that
 presses a verdict. Not one page declaration changed; all six were live. Measured **640**: `.weight`
@@ -30,7 +128,7 @@ in a fixed 44/56px leading column"* was already the law. Third ticket in a row (
 the declarations were live and only the row was missing: **expect live declarations and no page change
 until a rule measures dead.**
 
-## T-86 — `/notifications`' `sm 640` row block has never been rendered
+## T-86 — `/notifications`' `sm 640` row block (landed; brief kept for the record)
 
 **Why it is next.** `/notifications` is the app's inbox, and its `@media (min-width: 640px)` block is a
 step a reader can see: base `.row` is `padding: 14px 0 14px 12px` with `gap: 10px`, `.sentence` is
@@ -115,15 +213,15 @@ conclude. Read the walk before trusting a brief's claim about which row does wha
   `finally` and asserts `innerWidth` came back, so anything after it may assume no override is in
   play — but it leaves the reader on `/persona` at that page's own `?sort=name`-less mount with
   **two** persona cards (row 41 deleted the third).
-- **T-80 through T-85 are landed; T-86 is the ticket: `/notifications`' `sm 640` row block.** The
-  row's `padding-left` steps 12 → 16px and its `gap` 10 → 12px, the `.sentence` 14 → 15px and the
-  `.title` 24 → 28px, with `md 900` padding the toolbar 4 → 8px — and the row that mounts the page
-  (`read a notification (the badge drops)`) does so at the walk's own ~500px with no width phase of
-  its own. That is the same argument T-85 just closed on `/moderation`, where **every** declaration of
-  the queue block was **live** (56px column, 26px numeral, `16px 0` padding, and the `md` 10px toolbar
-  pad) — unlike T-82's `/onboarding`, where `.actions .btn { min-width: 200px }` **was** dead (the
-  compiler pruned it; the page now sizes a page-owned `.primary`). A ticket in this family should
-  expect *live* declarations and no page change until a rule is measured dead.
+- **T-80 through T-86 are landed; T-87 is the ticket: `/session/[id]`'s `sm 640` block.** It holds the
+  family's **first dead declaration**: `.composer-actions` (two rules at `sm`, one restatement at `lg`)
+  names a class **no element carries** — the composer is one `.say` field and one `.send` button — and
+  unlike T-82's pruned `.btn` rule it *is* compiled into `dist`, so the bundle cannot tell you either.
+  The two live steps are `.title` 24 → 26px and `.turn-text` 14 → 15px; `.menu-actions`'
+  `column-reverse` → `row` lives inside the settings sheet, so it costs a press. `/notifications`' block
+  (T-86) is now walked — `.row` `padding-left` 16, `gap` 12, `.sentence` 15px, `.title` 28px and the
+  `md` 8px toolbar, with 360 back at 12 / 10 / 14 / 24 / 4 — the fourth ticket in a row where **every**
+  declaration was live and only the row was missing (T-83, T-84, T-85, T-86).
   Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
@@ -134,10 +232,10 @@ conclude. Read the walk before trusting a brief's claim about which row does wha
   walked, and the word break has a gate section (10). What is left is *copies of the same rules in
   other files*: T-75/T-76/T-77 closed base, `lg` **and** `sm` for the three detail pages, T-78 closed
   `user-profile`'s `sm` head, T-79 closed `/bookmarks`' toolbar, T-81 closed `/persona`'s, T-82 and
-  T-83 closed the two entry screens, T-84 closed `/character/catalog`'s and T-85 closed `/moderation`'s —
-  so the same argument now points at the **other** pages whose `sm 640` block no row has ever rendered:
-  `/notifications` is T-86, and 28 page files still carry one — plus whatever the gate or the walk finds
-  next. The rest of
+  T-83 closed the two entry screens, T-84 closed `/character/catalog`'s, T-85 closed `/moderation`'s and
+  T-86 closed `/notifications`' — so the same argument now points at the **other** pages whose `sm 640`
+  block no row has ever rendered: `/session/[id]` is T-87, and 28 page files still carry one — plus
+  whatever the gate or the walk finds next. The rest of
   the plan waits on Supabase
   (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep link
   dependency and `Ctrl/Cmd+K`, the tag vocabulary).
@@ -323,6 +421,18 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A page's `sm` block can hold a rule that matches nothing, and `dist` cannot tell you (T-86 → T-87).**
+  `session-detail.tsrx` declares `.composer-actions` (two rules at `sm`, one restatement at `lg`) and
+  `grep -rn "composer-actions" src/` finds it **only inside the two `<style>` blocks** — the composer's
+  markup is `.composer` with a `.say` field and a `.send` button. The built
+  `dist/assets/session-detail-*.css` **does** carry `.composer-actions.tsrx-…{flex-direction:row;…}`, so
+  this is *not* T-82's prune: the rule is compiled and simply matches no element. Compare a block's
+  selectors against the page's own markup; a selector in the bundle is not a selector with a target,
+  and no red walk can prove a deletion (the CSS diff plus unchanged pixels is the proof).
+- **`getComputedStyle().gap` answers the shorthand's used value, so a `gap` step is read directly
+  (T-86).** `.row { gap: 10px }` → `12px` at `sm` reads `"10px"` / `"12px"` with no geometry at all —
+  while the *same* block's unread rule is a `box-shadow: inset`, so `paddingLeft` is the only honest
+  witness that the row stepped and the mark is never a padding. Read the property the rule declares.
 - **`justify-self` decides whether a spanning box stretches, so "it spans" is the left edge plus the
   crossing (T-84).** `/character/catalog`'s `.prefs` measures the **whole** 572 at 640 (`24→596`) where
   `/post/thread`'s measured `24→445.63` in the same kind of `1 / -1` span — the difference is

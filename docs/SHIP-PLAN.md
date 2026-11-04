@@ -697,6 +697,26 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       font-size: 26px }` alone red-lit it at *"the numeral's font-size computes 20px, not the 26px …
       the column stepped (56px) but the numeral did not"*.
 
+- [x] **T-86 `/notifications`' `sm 640` row block has never been rendered.** `notifications.tsrx`'s `sm`
+      block is a step a reader can see: `.row, .skel-row` `padding-left` 12 → **16px** and `gap` 10 →
+      **12px**, `.sentence` 14 → **15px**, `.title` 24 → **28px**, and `md 900` pads the toolbar
+      `padding-bottom` 4 → **8px** (its only declaration here). The row that mounts the page
+      (`read a notification (the badge drops)`) does so at the walk's own ~500px, below the
+      breakpoint, and its two controls are real writes. Brief: `docs/NEXT.md` (T-86).
+      **Landed:** row 23 extended — no new row, 55 stays — with a read-only ladder at the **end** of
+      the row (after the badge re-read), because a phase before the presses would measure a list it is
+      about to change: `640×740` / `900×740` / `360×740`, one `readInbox()` into `assertInbox(r, width)`,
+      one `finally` clearing every override, `innerWidth` re-read, then the bare mount re-read with the
+      `.row` count **and** the `.row.is-unread` count (the route has no query, so the URL proves nothing).
+      Measured 640: `padding-left 16px`, `gap 12px`, `.sentence` 15px (400, `rgb(92,95,119)`), title 28,
+      toolbar 4; 900: the same four and toolbar **8px**; 360: 12 / 10 / 14 / 24 / 4. Red proofs, the
+      block's two separate rules one at a time: `.row, .skel-row { padding-left: 12px }` red-lit row 23
+      alone at *"computes padding-left 12px (row 24→596), not the sm block's 16px (base is 12px) … the
+      unread mark is an inset box-shadow, never a padding"*; deleting `.sentence { font-size: 15px }`
+      alone red-lit it at *"the .sentence inside .row … computes font-size 14px … not 15px — the row
+      stepped (padding 16px, gap 12px) but the sentence's own rule did not"*. No page change: every
+      declaration was live (fourth ticket in a row of that shape).
+
 - [x] **T-83 `/authentification`'s `sm 640` 420 measure has never been rendered.** The entry screen's
       `@media (min-width: 640px)` block caps `.providers`, `.nsfw` and `.status` at `max-width: 420px`
       (*"A 420 measure for the controls, not three buttons stretched across 640"*) and steps `.screen`'s

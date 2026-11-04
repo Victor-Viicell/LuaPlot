@@ -3,6 +3,43 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-04 — T-86: `/notifications`' `sm 640` row block is rendered at 640, 900 and 360
+
+- **Changed:** row 23 of `scripts/smoke.mjs` (`read a notification (the badge drops)` — **extended,
+  no new row**, `EXPECTED_ROWS` stays **55**) — **no page change**: all five declarations of the
+  block were live, none had ever been rendered. The width phase sits at the **end** of the row, after
+  its `Mark read` press, its `go("/notifications")` re-mount and the badge re-read, because the row's
+  whole proof is `unreadBefore → after` and both its controls are real writes — a ladder before them
+  would be measuring a list it is about to change. It presses, types and navigates **nothing**:
+  `640×740`, `900×740`, `360×740` in that order, one `readInbox()` per width into
+  `assertInbox(r, width)`, every override cleared in one `finally`, `innerWidth` re-read, then the bare
+  mount re-read — asserting the `.row` count **and** the `.row.is-unread` count together (7 rows / 3
+  unread here), because the route carries no query so the URL cannot prove the ladder stayed put.
+  Measured: **640** `.row` `padding-left 16px`, `gap 12px`, `.sentence` **15px** (weight 400,
+  `rgb(92,95,119)`), `.title` 28px, toolbar `padding-bottom 4px` (the `md` block must not leak down);
+  **900** the same four and the toolbar's **8px**, the `md` block's only declaration on this page;
+  **360** 12 / 10 / 14 / 24 / 4.
+- **Verified:** red first, in the block's **two separate rules**. `.row, .skel-row { padding-left:
+  16px }` → `12px` put **row 23 alone** red (54 ok / 1 fail) at *"/notifications at 640px: .row
+  \"row tsrx-de1bc11c\" computes padding-left 12px (row 24→596), not the sm block's 16px (base is
+  12px) — the sm block's .row list is the only rule that moves it, and the unread mark is an inset
+  box-shadow, never a padding"*; then, with the bytes restored, deleting `.sentence { font-size: 15px }`
+  alone put it red again at *"the .sentence inside .row \"row tsrx-efb0cdff\" computes font-size 14px
+  (weight 400), not 15px — the row stepped (padding 16px, gap 12px) but the sentence's own rule did
+  not"*, naming the **sentence**, not the row. Bytes restored (`cmp` against the saved copy, md5
+  `8100643172901019779be93fb727741c`, `git status` then lists `scripts/smoke.mjs` only), `check.sh`
+  **GREEN**, `./scripts/smoke.sh` **55/55** local, `publish.sh` → `LIVE`, `curl` **200**,
+  `./scripts/smoke.sh --live` **55/55**.
+- **Not verified / next:** `docs/DESIGN.md` needed no change — the block is the same spacing/type step
+  the other list pages carry, and the page's own *"unread is a left rule and weight, not a dot"*
+  decision already covered the mark. A walk fact, not a device one: no APK (T-35 blocked). The first
+  drawn row was **not** unread (the walk had opened the first unread one), so the evidence line prints
+  the class list instead of assuming the mark — and `.row.is-unread .sentence`'s colour/600 weight are
+  evidence only, the size rule is the gate. Next: **T-87** — `/session/[id]`'s `sm 640` block, which
+  holds the family's **first dead declaration**: `.composer-actions` (three `sm` declarations and one
+  `lg` restatement) names a class **no element on any page carries** — the composer is one `.say`
+  field and one `.send` button. No new dependency, no schema/adapter/JEV change, no store write.
+
 ## 2026-11-04 — T-85: `/moderation`'s `sm 640` queue block is rendered at 640, 900 and 360
 
 - **Changed:** row 22 of `scripts/smoke.mjs` (`report a post and land on the case` — **extended, no
