@@ -3,6 +3,41 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-82: `/onboarding`'s `sm 640` form measure and action row are rendered in both directions
+
+- **Changed:** `src/pages/onboarding.tsrx` + row 44 of `scripts/smoke.mjs` (**extended, no new row** —
+  `EXPECTED_ROWS` stays **55**) + `docs/DESIGN.md`. The `sm` block's `.actions .btn { width: auto;
+  min-width: 200px }` was **dead**: a page's scoped `<style>` cannot reach the `Button` primitive's own
+  element, and the rule did not even survive compilation (the built `onboarding-*.css` carries no
+  `.actions … .btn` selector at all). The page now wraps the `Button` in a page-owned `.primary` (the
+  shape `.search` / `.prefs` / `.pager-action` already use), sizes *that* at `sm`, and `btn-block`'s
+  100% fills it — so 360's full-width submit is untouched. The row's ladder runs on its **second**
+  visit, inside the restore's `try`, after `resumed` is read and **before** the restore's
+  retype/Finish pair: `640×740`, `900×740`, `360×740`, one `readSetup()` per width into
+  `assertSetup(r, width)`, nothing pressed (a settle here would fire the draft write and claim the
+  borrowed handle). Measured: at 640 `max-width 520px`, `.setup` **520** in an outlet whose content
+  box is **572** (620 box), `.actions` row/centre/gap 16px, `.primary` `24→224` **200** `min-width
+  200px`, `.btn` `200`, note `240→456` **216** cap `216.002px`; at 900 the same 520 inside **730**
+  (794 box), `.primary` `122→322`, note `338→554`; at 360 `max-width none`, `.setup` **308** = the
+  outlet's 308 content box, `.actions` column/gap 10 (308), `.primary` and `.btn` at the column's full
+  width with no 200px floor.
+- **Verified:** red first. Deleting `.setup { max-width: 520px }` from the `sm` block put row 44 red at
+  *"/onboarding at 640px: .setup measures 572 in an outlet whose content box is 572 (620 box) — the sm
+  block caps it at 520"*. Putting the rule **back on the primitive** (wrapper unsized) put it red at
+  *".primary measures 85.25, not the 200px its floor asks for"* — 85.25 is the button's own content
+  width, which is the dead rule proved. Bytes restored (`cp` + `cmp` identical), `check.sh` **GREEN**,
+  `./scripts/smoke.sh` **55/55** local, `publish.sh` → `LIVE`, `curl` **200**, `./scripts/smoke.sh
+  --live` **55/55**.
+- **Not verified / next:** a throw anywhere in row 44 after the claim still cascades into row 45 (the
+  row's own `catch` leaves the account as `@onboarding_walk`), so a red run reads 53 PASS / 2 FAIL
+  rather than 54/1 — expected, not a second bug. The outlet is a **content** box fact: its box is 620
+  at 640 and its content 572 (24px of padding each side), 794/730 at 900 — a row that compares
+  `.setup` to the outlet's border box is red on a right page (this tick's first run, 308 vs 340).
+  `.note`'s `30ch` resolves to `216.002px` on this tree, so assert it is a finite length inside the
+  row, never a constant. Next: **T-83** — `/authentification`'s `sm 640` 420 measure, the other entry
+  screen, whose `.providers` / `.nsfw` / `.status` caps have never been rendered (row 1 mounts it at
+  the walk's own ~500px). No new dependency, no schema/adapter/JEV change, no store write.
+
 ## 2026-11-03 — T-81: `/persona`'s `sm 640` and `lg 900` toolbars are rendered in both directions
 
 - **Changed:** `scripts/smoke.mjs` only — **row 51 extended, no new row** (`EXPECTED_ROWS` stays

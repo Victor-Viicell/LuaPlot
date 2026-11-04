@@ -310,7 +310,12 @@ instead of inventing a second answer.
   there is no box, no card, no legend.
 - **`Finish` is the last element in the column, never pinned.** It is `btn-primary btn-block` at
   360 (thumb reach, 328×44) and a left-aligned 200px minimum from `sm`, where a line of note sits
-  beside it. The page scrolls (five rows do not fit 360×740) and the shell's 60px tab-bar
+  beside it. The floor lives on a **page-owned `.primary` wrapper**, not on `.actions .btn`: a page's
+  scoped `<style>` cannot reach a primitive's own element, and `.actions .btn { min-width: 200px }`
+  was pruned at compile time — the button measured its own content (85.25px) while the row claimed a
+  floor (T-82). The wrapper is the box the `sm` block sizes; `btn-block`'s 100% fills it at both
+  widths, so 360's full-width submit is untouched. The page scrolls (five rows do not fit 360×740)
+  and the shell's 60px tab-bar
   clearance + outlet padding keeps the button clear of the bar: measured at 360×740 the scroller
   scrolls 277px and `Finish` lands at y 477–521 against a bar top of 680. Nothing on this page is
   fixed or sticky, so the phone keyboard cannot cover a field — it is all in flow.

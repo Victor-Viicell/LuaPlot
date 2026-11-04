@@ -4773,7 +4773,212 @@ results.push(
       );
     }
 
+    /* 7b. The setup form's own `sm 640` block (T-82). Four declarations have never been rendered:
+     *     `.setup { max-width: 520px }`, `.actions` becoming a row, the `Finish` floor beside the
+     *     note, and the note's `30ch` — every earlier mount of this page happened at the session's
+     *     own ~500px. The ladder presses **nothing**: the form's draft is a real `saveProfile` write
+     *     ~250ms after a settle (T-61), so a retype here would claim the borrowed handle. It runs
+     *     inside the restore's `try`, so a throw still reports the account left as
+     *     @onboarding_walk, and every override comes off in one `finally` that asserts `innerWidth`
+     *     came back (T-78's leak).
+     *
+     *     The **finding** is `.actions .btn`: a page's scoped `<style>` cannot reach a primitive's
+     *     own element (DESIGN.md → Primitives), and the rule did not even survive compilation — the
+     *     form now wraps the `Button` in a page-owned `.primary` and sizes *that*, which is the
+     *     shape the design already uses for `.search`, `.prefs` and `.pager-action`.
+     */
+    const readSetup = () =>
+      js(`
+        const box = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width), height: round(r.height) };
+        };
+        const setup = document.querySelector(".setup");
+        const ss = setup ? getComputedStyle(setup) : null;
+        const outlet = setup ? setup.parentElement : null;
+        const os = outlet ? getComputedStyle(outlet) : null;
+        const pad = os ? parseFloat(os.paddingLeft) + parseFloat(os.paddingRight) : 0;
+        const outletContent = outlet ? Math.round((outlet.getBoundingClientRect().width - pad) * 100) / 100 : null;
+        const actions = document.querySelector(".setup .actions");
+        const as = actions ? getComputedStyle(actions) : null;
+        const isGrid = !!as && as.display.indexOf("grid") >= 0;
+        const primary = document.querySelector(".setup .actions .primary");
+        const ps = primary ? getComputedStyle(primary) : null;
+        const btn = document.querySelector(".setup .actions .btn");
+        const bs = btn ? getComputedStyle(btn) : null;
+        const note = document.querySelector(".setup .actions .note");
+        const ns = note ? getComputedStyle(note) : null;
+        const input = (name) => document.querySelector('input[name="' + name + '"]');
+        return {
+          path: location.pathname,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          setupMaxWidth: ss ? ss.maxWidth : "",
+          setup: box(setup),
+          outlet: box(outlet),
+          outletContent: outletContent,
+          actions: box(actions),
+          actionsDisplay: as ? as.display : "",
+          actionsDirection: as ? as.flexDirection : "",
+          actionsAlign: as ? as.alignItems : "",
+          actionsGap: as ? as.gap : "",
+          tracks: isGrid ? as.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          primary: box(primary),
+          primaryMinWidth: ps ? ps.minWidth : "",
+          btn: box(btn),
+          btnMinWidth: bs ? bs.minWidth : "",
+          note: box(note),
+          noteMaxWidth: ns ? ns.maxWidth : "",
+          noteGrow: ns ? ns.flexGrow : "",
+          noteBasis: ns ? ns.flexBasis : "",
+          handle: input("handle") ? input("handle").value : "",
+          name: input("displayName") ? input("displayName").value : "",
+        };
+      `);
+
+    /** One width of the setup form: the measure first (it is the cap), then the action row. */
+    const assertSetup = (r, width) => {
+      const at = `/onboarding at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!String(r.path).endsWith("/onboarding")) {
+        throw new Error(`${at}: the setup form was measured on ${JSON.stringify(r.path)}, not the onboarding page`);
+      }
+      if (!r.setup || !r.outlet || !r.actions || !r.primary || !r.btn || !r.note) {
+        throw new Error(
+          `${at}: the setup form is incomplete — setup ${JSON.stringify(r.setup)}, outlet ${JSON.stringify(r.outlet)}, actions ${JSON.stringify(r.actions)}, primary ${JSON.stringify(r.primary)}, button ${JSON.stringify(r.btn)}, note ${JSON.stringify(r.note)}`,
+        );
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the onboarding page scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+      if (r.actionsDisplay.indexOf("flex") < 0) {
+        throw new Error(`${at}: .actions computes ${JSON.stringify(r.actionsDisplay)}, not the flex box both blocks declare`);
+      }
+      if (r.tracks.length !== 0) {
+        throw new Error(`${at}: .actions resolves ${JSON.stringify(r.tracks)} on a box that is not a grid — the display and the track list have to agree (T-73)`);
+      }
+      if (Math.abs(r.btn.width - r.primary.width) > 1) {
+        throw new Error(`${at}: the Finish button measures ${r.btn.width} in a .primary wrapper ${r.primary.width} wide — the wrapper is the box the design sizes, so the button fills it`);
+      }
+      // The note's measure is a resolved px length, never the `ch` string (a computed `max-width`
+      // is the used value, but a row that printed `30ch` would prove nothing about the layout).
+      const noteCap = parseFloat(r.noteMaxWidth);
+
+      if (width === 640 || width === 900) {
+        // The cap: `.setup` keeps a 520 measure inside a wider outlet. The outlet's own width is the
+        // *other* half of the fact — read both and say both, because "520" alone could be a filled
+        // parent on a narrow window.
+        if (Math.abs(r.setup.width - 520) > 1) {
+          throw new Error(`${at}: .setup measures ${r.setup.width} in an outlet whose content box is ${r.outletContent} (${r.outlet.width} box) — the sm block caps it at 520`);
+        }
+        if (r.setupMaxWidth !== "520px") {
+          throw new Error(`${at}: .setup measures ${r.setup.width} in a ${r.outletContent} outlet and computes max-width ${JSON.stringify(r.setupMaxWidth)}, not the 520px the sm block declares — a form is not a poster`);
+        }
+        if (!(r.outletContent > r.setup.width + 1)) {
+          throw new Error(`${at}: .setup measures ${r.setup.width} and its outlet's content box ${r.outletContent} — the cap is a cap only while the outlet is wider`);
+        }
+        // The column→row rewrite: `flex-direction: row; align-items: center; gap: 16px`.
+        if (r.actionsDirection !== "row") {
+          throw new Error(`${at}: .actions computes flex-direction ${JSON.stringify(r.actionsDirection)}, not the row the sm block declares`);
+        }
+        if (r.actionsAlign !== "center") {
+          throw new Error(`${at}: .actions computes align-items ${JSON.stringify(r.actionsAlign)}, not the centre the sm block declares`);
+        }
+        if (r.actionsGap !== "16px") {
+          throw new Error(`${at}: .actions computes gap ${JSON.stringify(r.actionsGap)}, not the 16px the sm block declares`);
+        }
+        if (!(r.primary.left < r.note.left)) {
+          throw new Error(`${at}: the primary control starts at ${r.primary.left} and the note at ${r.note.left} — the sm row puts the button first`);
+        }
+        if (!(r.note.left > r.primary.right - 1)) {
+          throw new Error(`${at}: the note starts at ${r.note.left} inside a button ending at ${r.primary.right} — the row's gap is what separates them`);
+        }
+        // The floor: `.btn-block`'s 100% is dead on a flex item, so the 200px is the wrapper's and
+        // the button is exactly that wide — the design's "200px minimum from sm".
+        if (Math.abs(r.primary.width - 200) > 1) {
+          throw new Error(`${at}: .primary measures ${r.primary.width}, not the 200px its floor asks for — a rule on the primitive's own element never reaches it (DESIGN.md → Primitives), so the wrapper is the only box that can hold this floor`);
+        }
+        if (r.primaryMinWidth !== "200px") {
+          throw new Error(`${at}: .primary computes min-width ${JSON.stringify(r.primaryMinWidth)}, not the 200px floor the sm block declares — the Finish control has no minimum`);
+        }
+        if (r.btnMinWidth === "200px") {
+          throw new Error(`${at}: the button's own element computes min-width 200px — that is the primitive's, and the wrapper is where the design's floor lives`);
+        }
+        if (!(Number.isFinite(noteCap) && noteCap > 0)) {
+          throw new Error(`${at}: the note's max-width computes ${JSON.stringify(r.noteMaxWidth)}, not a resolved length — 30ch has to land as px`);
+        }
+        if (noteCap > r.actions.width) {
+          throw new Error(`${at}: the note caps at ${r.noteMaxWidth} inside a ${r.actions.width} row — 30ch cannot exceed the box it sits in`);
+        }
+        if (r.note.width > noteCap + 1) {
+          throw new Error(`${at}: the note measures ${r.note.width} against its own ${r.noteMaxWidth} cap`);
+        }
+        if (r.note.right > r.actions.right + 1) {
+          throw new Error(`${at}: the note ends at ${r.note.right} past the row's ${r.actions.right} — the 30ch cap is what keeps it inside`);
+        }
+        if (!(r.noteGrow === "1" && r.noteBasis === "auto")) {
+          throw new Error(`${at}: the note computes flex-grow ${JSON.stringify(r.noteGrow)} / basis ${JSON.stringify(r.noteBasis)}, not the flex: 1 1 auto the sm block declares`);
+        }
+        return;
+      }
+
+      // 360: the base block — a column, the button above the note, and both at the column's width.
+      if (r.actionsDirection !== "column") {
+        throw new Error(`${at}: .actions computes flex-direction ${JSON.stringify(r.actionsDirection)}, not the column the base block declares — the sm row is leaking below 640`);
+      }
+      if (!(r.primary.top < r.note.top)) {
+        throw new Error(`${at}: the primary control tops at ${r.primary.top} and the note at ${r.note.top} — below 640 the button sits above the note`);
+      }
+      if (Math.abs(r.primary.width - r.actions.width) > 1 || Math.abs(r.btn.width - r.actions.width) > 1) {
+        throw new Error(
+          `${at}: the button measures ${r.btn.width} (wrapper ${r.primary.width}) in a ${r.actions.width} column — the base block stretches Finish to the full width`,
+        );
+      }
+      if (r.primaryMinWidth === "200px") {
+        throw new Error(`${at}: .primary still computes min-width 200px below the breakpoint — that is the sm block's, and it has to clear`);
+      }
+      if (Math.abs(r.setup.width - r.outletContent) > 1) {
+        throw new Error(`${at}: .setup measures ${r.setup.width} in an outlet content box of ${r.outletContent} — below 640 the form fills its column (the 520 cap is the sm block's)`);
+      }
+    };
+
     try {
+      await until("the resumed form's fields before the width ladder", (f) => f.handle.present && f.name.present, 12000);
+      const setupRestore = await js("return window.innerWidth;");
+      const setupLines = [];
+      let setupSeen = "";
+      try {
+        for (const width of [640, 900, 360]) {
+          await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+          await sleep(260);
+          const setup = await readSetup();
+          assertSetup(setup, width);
+          setupLines.push(
+            `${width}px: max-width ${setup.setupMaxWidth} · .setup ${setup.setup.width} in an outlet ${setup.outletContent} content / ${setup.outlet.width} box · .actions ${JSON.stringify(setup.actionsDirection)} ${JSON.stringify(setup.actionsAlign)} gap ${setup.actionsGap} (${setup.actions.width}) · .primary ${setup.primary.left}→${setup.primary.right} ${setup.primary.width} min-width ${setup.primaryMinWidth} · .btn ${setup.btn.left}→${setup.btn.right} ${setup.btn.width} · note ${setup.note.left}→${setup.note.right} ${setup.note.width} cap ${setup.noteMaxWidth}`,
+          );
+        }
+        setupSeen = setupLines.join(" · ");
+      } finally {
+        await send("Emulation.clearDeviceMetricsOverride");
+        await sleep(240);
+      }
+      const setupAfter = await js("return window.innerWidth;");
+      if (setupAfter !== setupRestore) {
+        throw new Error(`the setup form's overrides cleared to ${setupAfter}px, but the session runs at ${setupRestore}px — a leaked override would mis-measure every later row`);
+      }
+      // A width change re-lays-out in place and does not remount, so the restored pair surviving the
+      // ladder is the evidence that no `go()` ran inside it (and no retype fired the draft write).
+      form = await readForm();
+      if (form.handle.value !== resumed.handle || form.name.value !== resumed.name) {
+        throw new Error(
+          `the width ladder left the form reading ${JSON.stringify([form.handle.value, form.name.value])}, not the restored pair ${JSON.stringify([resumed.handle, resumed.name])} — a remount inside the ladder would drop the restored text`,
+        );
+      }
+
       await retype('input[name="handle"]', accountHandle);
       await retype('input[name="displayName"]', account.name);
       form = await until(`Finish to enable on @${accountHandle}`, (f) => f.finish === false && f.handle.error === "");
@@ -4791,7 +4996,7 @@ results.push(
         throw new Error(`/ reads ${JSON.stringify([home.sentence, home.profile])} after the restore, not ${JSON.stringify([`signed in as ${account.name}`, `/user/${accountHandle}`])}`);
       }
 
-      return `@${accountHandle} (${JSON.stringify(account.name)}) · a first visit opens blank with the rule as the handle's help line, and Finish enables on the pair only once the settle asked the adapter · "ab" → ${JSON.stringify(HANDLE_RULE_SENTENCE)} with Finish disabled · "Ada" → "Username taken" with Finish disabled · Finish → /user/${ONBOARDING_HANDLE} reads ${JSON.stringify([claimed.name, claimed.handle])}, / reads ${JSON.stringify(shell.sentence)} with Open profile at ${shell.profile} · a second visit restored ${JSON.stringify([resumed.handle, resumed.name])} → Finish back to /user/${accountHandle}, / reads ${JSON.stringify(home.sentence)}`;
+      return `@${accountHandle} (${JSON.stringify(account.name)}) · a first visit opens blank with the rule as the handle's help line, and Finish enables on the pair only once the settle asked the adapter · "ab" → ${JSON.stringify(HANDLE_RULE_SENTENCE)} with Finish disabled · "Ada" → "Username taken" with Finish disabled · Finish → /user/${ONBOARDING_HANDLE} reads ${JSON.stringify([claimed.name, claimed.handle])}, / reads ${JSON.stringify(shell.sentence)} with Open profile at ${shell.profile} · a second visit restored ${JSON.stringify([resumed.handle, resumed.name])} → Finish back to /user/${accountHandle}, / reads ${JSON.stringify(home.sentence)} · the setup form at ${setupSeen}`;
     } catch (error) {
       throw new Error(
         `${error.message} — the account was left as @${ONBOARDING_HANDLE} (${JSON.stringify(ONBOARDING_NAME)}); the walk's borrowed @${accountHandle} was not handed back`,

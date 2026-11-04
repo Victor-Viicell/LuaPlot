@@ -1,86 +1,78 @@
 # Baton — what the next session does
 
-**T-81 landed.** Row 51 was **extended, not duplicated** — `EXPECTED_ROWS` stays **55** — and
-`/persona`'s `.toolbar` is now read at **640, 900 and 360**, which is both of its media blocks plus
-the base beneath them. The width phase runs after the row's last press (`sortPass`), presses
-nothing, mounts `/persona` once and takes `640×740`, `900×740`, `360×740` in that ladder — one
-`readBar()` per width into `assertBar(r, width)`. At 640 it asserts a `grid`, **exactly two** tracks
-**equal within 1px** (a fluid `minmax(0, 1fr)` pair, so the assertion is *equality*, never a constant,
-T-77's rule read the other way), `.search` spanning **both** of `.toolbar`'s edges, `.sort` and
-`.create` below the field (`top > search.bottom − 1`) sharing row 2 by their **bottoms**
-(`align-items: end`), `sort.left < create.left`, `.create .btn`'s `min-width: 120px`, and the button
-filling its column. At 900 **three** tracks with the middle one `200 ± 1`, all three children on one
-line (`search.left < sort.left < create.left`) sharing a bottom, and `.create .btn` at exactly
-**120px** — the `auto` track is the one place the sm block's floor can bind. At 360 a `flex` column
-(`tracks` `[]`, T-73), the three children stacked in DOM order, and the button at the column's full
-width with `min-width` back to `0px`. Measured at 640 `["283px","283px"]` gap `16px`, search
-`24→606`, sort `24→307`, create `323→606`, both bottoms `283.58`, `.btn` `283px`; at 900
-`["378px","200px","120px"]`, search `122→500`, sort `516→716`, create `732→852`, three bottoms
-`205.98`, `.btn` `120px`; at 360 `flex`, search `16→324` top `127.59`, sort top `209.19`, create top
-`290.78`, `.btn` `308px` / `min-width 0px`. One `finally` clears the override and `innerWidth` is
-asserted back. **The ticket's `.create .btn` sketch was wrong:** `width: auto` on a block-level flex
-container is the *fill*, so at 640 the button is the whole 283px column and the 120px floor binds
-only at 900. Red proof: deleting the sm block's `.search { grid-column: 1 / span 2 }` red-lit **row
-51 alone** (54 PASS / 1 FAIL) at *".search spans 24→307 in a toolbar 24→606"*. Bytes restored
-(`cmp`), `check.sh` GREEN, 55/55 local, 55/55 `--live`, `publish.sh` → `LIVE` (asset
-`index-DPoxP2Sr.js`, unchanged), `curl` 200.
+**T-82 landed.** Row 44 was **extended, not duplicated** — `EXPECTED_ROWS` stays **55** — and
+`/onboarding`'s `sm 640` block is now read at **640, 900 and 360**. The ladder runs on the row's
+**second** visit, inside the restore's `try`, after `resumed` is read and before the restore's own
+`retype`/Finish pair: it presses **nothing** (a settle there fires the draft write and would claim the
+borrowed handle), mounts nothing, and takes `640×740`, `900×740`, `360×740` in that order — one
+`readSetup()` per width into `assertSetup(r, width)`. At 640 it asserts `max-width: 520px` computed,
+`.setup` at **520** inside an outlet whose **content** box is **572** (620 box), `.actions`
+`flex`/`row`/`center`/gap `16px`, the primary control **left** of the note and the note's `30ch` a
+finite `216.002px` length inside the row; at 900 the same 520 in a **730** content box (794 box); at
+360 `max-width: none`, `.setup` **308** = the outlet's 308 content box, `.actions` a `column` with the
+button above the note at the column's full width and no 200px floor. One `finally` clears the override
+and `innerWidth` is asserted back; the restored pair is then re-read, which is the evidence that no
+`go()` ran inside the ladder.
 
-## T-82 — `/onboarding`'s `sm 640` form measure and its action row have never been rendered
+**The ticket's suspicion was right: `.actions .btn` was dead.** The compiled
+`dist/assets/onboarding-*.css` carries **no** `.actions … .btn` selector at all — the compiler prunes a
+scoped rule whose target is a child **component's** element — so at 640 the `btn-block` tier kept
+`width: 100%` and the 200px floor never existed. The page now wraps the `Button` in a page-owned
+`.primary`, the `sm` block sizes that, and `btn-block` fills it at both widths (360's full-width
+submit untouched). `DESIGN.md` → *Onboarding* records the rule and the measurement. Red proofs:
+deleting `.setup { max-width: 520px }` red-lit row 44 at *".setup measures 572 in an outlet whose
+content box is 572 (620 box)"*; putting the floor **back on the primitive** (wrapper unsized) red-lit
+it at *".primary measures 85.25, not the 200px its floor asks for"*. Bytes restored (`cmp`),
+`check.sh` GREEN, 55/55 local, 55/55 `--live`, `publish.sh` → `LIVE`, `curl` 200.
 
-**Why it is next.** `onboarding.tsrx` keeps one `@media (min-width: 640px)` block over the setup
-form: `.setup { max-width: 520px }` (its own comment: *"A form is not a poster: the fields keep a 520
-measure rather than filling a 640 outlet."*), `.actions { flex-direction: row; align-items: center;
-gap: 16px }` (the base is `flex-direction: column; gap: 10px`), `.actions .btn { width: auto;
-min-width: 200px }` and `.actions .note { flex: 1 1 auto; max-width: 30ch }`. Row 44 (T-61) mounts
-`/onboarding` **only at the session's own ~500px**, below the breakpoint, so not one of those four
-declarations has ever been rendered — and the second one is suspected **dead**: `.actions .btn`
-targets the `Button` **primitive's** element, and `DESIGN.md` → *Primitives* records that a page's
-scoped `<style>` cannot touch those (`.toolbar .field`, `.prefs .toggle` and `.pager .btn` all
-silently matched nothing), which is why every other page wraps its primitive in a page-owned box
-(`.search`, `.prefs`, `.pager-action`) and sizes *that*. If it is dead, the 640 action row is a
-`width: 100%` button sitting in a flex row beside a note — the exact near-bug T-80's comment records
-for the thread's `.prefs`.
+## T-83 — `/authentification`'s `sm 640` 420 measure has never been rendered
 
-**Approach.** Extend **row 44** (no new row; `EXPECTED_ROWS` stays **55**). The width phase belongs
-on the row's **second visit**: after `resumed` is read (both fields restored, Finish enabled) and
-**before** the restore's own `retype`/Finish pair, so the ladder presses nothing and the borrowed
-account is still the walk's to hand back. Take `640×740`, `900×740`, `360×740` in that ladder, one
-`readSetup()` per width into `assertSetup(r, width)` (the shape row 51 just wrote: `box()` with
-2-decimal rounding, `tracks` from `display.indexOf("grid") >= 0` first). At 640 assert: `.setup`
-measures **520 ± 1** while its parent (the outlet) is **620** — read both and print both, the *cap*
-is the fact, not a width; `.actions` computes `display: flex` with `flex-direction: row` and
-`align-items: center`; the primary control sits **left** of the note (`button.left < note.left`) and
-the note's width is a finite length `≤ 30ch` in px; `.setup`'s `max-width` computes `520px`. At 900
-assert the same 520 measure inside the wider outlet (the outlet is 794 there) and the same row. At
-360 assert the base: `.setup` fills the outlet (its width equals the outlet's), `.actions` is a
-**column** with the button **above** the note and the button at the container's full width.
+**Why it is next.** `authentification.tsrx` keeps one `@media (min-width: 640px)` block over the entry
+screen: `.providers, .nsfw, .status { max-width: 420px }` (its own comment: *"A 420 measure for the
+controls, not three buttons stretched across 640: the paragraph above already holds 44ch, so the two
+left edges agree and the rule still spans the column."*) plus `.screen { min-height: calc(100dvh -
+240px) }` against the base `calc(100dvh - 228px)`. Row 1 is the **only** row that mounts
+`/authentification`, and it does so at the session's own ~500px, below the breakpoint — so not one of
+those declarations has ever been rendered, on the app's other entry screen. It is the same argument
+T-82 just closed: a rule no row can go red on is not a rule.
 
-**Traps.** (a) **Read the rule before you believe it.** If `.actions .btn` computes `width: 100%` at
-640 (the `.btn-block` tier) rather than a 200px floor, the scoped rule never matched: that is the
-ticket's real finding, and the fix is the design's own — wrap the `Button` in a page-owned element
-(e.g. `.actions .primary`) and size the wrapper, leaving 360's `block` full width intact. Prove the
-fix by putting the rule back on the primitive and watching the row read the wrapper's width instead.
-(b) **Row 44 borrows the walk's account.** A throw inside the ladder lands in the row's own `catch`,
-which already says *the account was left as @onboarding_walk* — keep the ladder inside the `try`, and
-take every override off in one `finally` that also asserts `innerWidth` came back, or row 45's
-rename carries a leaked 360 (T-78's shape). (c) **Do not retype anything inside the ladder.** Each
-settle calls `persistDraft()` ~250 ms later and the borrowed handle would be claimed by the draft
-write; the fields must be read, not written, at all three widths — and the handle field's value
-surviving the ladder is itself the proof that a width change does not remount the form (a remount
-would drop the restored text). (d) **`.actions .note` is a `<p>` with a `flex` basis.** Its
-`max-width: 30ch` resolves to a px length — assert the length is finite and within the row, never the
-`ch` string. (e) The form can be in `loading` (a skeleton `.form`) or `failed`; the second visit
-polls `resumed` already, so gate the ladder on `.actions` existing, never on a card count or a
-skeleton absence you did not read. (f) `document.documentElement.scrollWidth > innerWidth` is the
-no-horizontal-scroll rule (T-72: `scrollbar-gutter: stable` makes equality false on a right page) — a
-100%-wide button in a flex row at 640 is exactly how a page starts scrolling sideways, so read it at
-every width.
+**Approach.** Extend **row 1** (no new row; `EXPECTED_ROWS` stays **55**). The width phase belongs
+**between** `await expectNoReload(mark, "home's Sign in")` and the `click("Continue with Google")`
+press: nothing is pressed or typed inside the ladder, the press still happens at the session's own
+width so its `cancelled` outcome and the row's reading of it are unchanged. Take `640×740`, `900×740`,
+`360×740`, one `readGate()` per width into `assertGate(r, width)` (the shape row 51/row 44 wrote:
+`box()` with 2-decimal rounding, and read `display` before treating a track list as meaningful). At
+640 assert: `.providers` computes `max-width: 420px` and measures **420 ± 1** while its outlet's
+**content** box is wider (read both, print both — the outlet is 572 at 640 and 730 at 900, T-82's own
+measurements); `.status` and `.nsfw` the same 420 cap when they draw (the NSFW control is drawn
+signed-out, `systems/nsfw.md` → one action, never the pair); the three boxes share a **left** edge
+(`|providers.left − nsfw.left| ≤ 1`, the comment's "two left edges agree"); the three provider buttons
+stay a column inside the capped box. At 900 the same 420 inside the wider outlet. At 360 there is no
+cap: `.providers` measures the outlet's 308 content box and the boxes fill it. `.screen`'s `min-height`
+is read at 360 and 640 as a resolved px length and **compared** (the sm block subtracts 12 more), never
+pinned — the walk's own window height is not the design's.
 
-**Accept.** Red first: delete `.setup { max-width: 520px }` from `onboarding.tsrx`'s `sm` block →
-**row 44 alone** red, naming `/onboarding`, `640px`, the `.setup` width and the outlet's. If the
-`.actions .btn` rule proves dead, the same commit carries the page-owned wrapper and its own red
-proof (rule restored on the primitive → the button's width disagrees with 640's assertion). Bytes
-restored (`cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row),
+**Traps.** (a) **Do not assert anything on `.providers .btn`.** The buttons are the `Button` primitive,
+and a scoped rule on a primitive's element is dead (T-82 just proved it twice, and the compiler prunes
+it). The block sizes `.providers` — a page-owned element — so *that* is the box to measure; if a later
+edit moves the cap onto `.btn`, the row reds on the width, not on a missing selector.
+(b) **The ladder must not navigate.** Row 1 is the walk's first page: a `go()` inside it re-boots the
+session's first read at a different path, and a leaked override leaves 54 rows measuring 360. Clear in
+one `finally` and assert `innerWidth` came back (T-78's shape), *then* press.
+(c) **`.screen` centres its column** (`justify-content: center`, `min-height`), so a width change moves
+every box vertically — assert widths, left edges and order (providers above the status line), never
+tops.
+(d) **`status` is a live machine.** Pressing nothing keeps it `idle`, and `.status` reserves its own
+height while idle, so it is measurable at every width — but read it by its role (`role="status"`), not
+by the copy, which changes with the state.
+(e) `document.documentElement.scrollWidth > innerWidth` is the no-horizontal-scroll rule at each width
+(T-72: `scrollbar-gutter: stable` makes equality false on a right page).
+
+**Accept.** Red first: delete `.providers, .nsfw, .status { max-width: 420px }` from
+`authentification.tsrx`'s `sm` block → **row 1 alone** red, naming `/authentification`, `640px`, the
+`.providers` width and the outlet's. Then a second, narrower edit — drop only `.status` from that
+selector list — and the row must name `.status`, so the acceptance can tell which member of the list
+bound. Bytes restored (`cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row),
 `publish.sh` prints `LIVE`, `curl` 200.
 
 **Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
@@ -115,11 +107,12 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   `finally` and asserts `innerWidth` came back, so anything after it may assume no override is in
   play — but it leaves the reader on `/persona` at that page's own `?sort=name`-less mount with
   **two** persona cards (row 41 deleted the third).
-- **T-80 is landed; T-81 landed this tick and T-82 is the ticket: `/onboarding`'s `sm 640` form
-  measure (`.setup { max-width: 520px }`) and its action row (a column→row rewrite whose
-  `.actions .btn { min-width: 200px }` may be a dead rule, since it targets the `Button` primitive's
-  own element).** Row 44 mounts `/onboarding` at the walk's own ~500px, so the 520 cap, the row and
-  the note's `30ch` have never been rendered.
+- **T-80 is landed; T-81 and T-82 landed; T-83 is the ticket: `/authentification`'s `sm 640` 420
+  measure (`.providers, .nsfw, .status { max-width: 420px }`) and its `.screen` `min-height` step.**
+  Row 1 is the only row that mounts `/authentification`, and it does so at the walk's own ~500px, so
+  none of those declarations has ever been rendered — the same argument T-82 just closed on
+  `/onboarding`, whose `.actions .btn { min-width: 200px }` **was** dead (the compiler pruned it; the
+  page now sizes a page-owned `.primary`).
   Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
@@ -317,6 +310,22 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **A scoped rule on a primitive's element is pruned at compile time, not merely inert (T-82).**
+  `onboarding.tsrx`'s `sm` block declared `.actions .btn { width: auto; min-width: 200px }`; the built
+  `onboarding-*.css` contains **no** such selector — the compiler drops a rule whose target element the
+  page does not own — so the `btn-block` tier kept `width: 100%` and the floor never existed. The row
+  read `.primary measures 85.25` (the button's own content width) when the rule was put back, which is
+  the dead rule proved without a second page copy. **A page sizes a page-owned wrapper** (`.primary`,
+  `.search`, `.prefs`, `.pager-action`) and lets the primitive fill it.
+- **Not every `.x .btn` in a page's style block is dead (T-82).** `home.tsrx`'s `.entry .btn` targets an
+  **`<a class="btn">` the page writes itself** (home's entry control is an anchor, T-45), so that rule
+  binds normally. Read the markup before concluding the class is a primitive's: `.btn` is shared by the
+  `Button` component *and* by hand-written anchors, and only the component's own element is out of a
+  page's reach.
+- **The `.outlet` is a padding box: `.setup` fills its *content* box (T-82).** At 640 the outlet measures
+  620 and its content 572 (24px each side); at 360 it is 340 / 308; at 900 it is 794 / 730. A row that
+  compares a page root to the outlet's border box is red on a right page — read the paddings and subtract
+  them, and print both numbers, because the cap (520) is only a cap while the content box is wider.
 - **`width: auto` on a block-level flex container is the fill, not the content (T-81).** The sm
   block's `.create .btn { width: auto; min-width: 120px }` measures **283px** at 640 — the whole
   `1fr` column — because `.btn` is `display: flex` (block-level) and a block-level box with

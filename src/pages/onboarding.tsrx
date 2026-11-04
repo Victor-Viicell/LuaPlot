@@ -345,6 +345,12 @@ export function Onboarding() @{
         gap: 10px;
       }
 
+      /* The wrapper exists because a page cannot size the primitive (see the sm block). A flex
+         box kills the inline-flex button's baseline gap, so the row's height is the button's. */
+      .primary {
+        display: flex;
+      }
+
       .note {
         margin: 0;
         color: var(--color-text-subtle);
@@ -399,7 +405,11 @@ export function Onboarding() @{
           gap: 16px;
         }
 
-        .actions .btn {
+        /* A page cannot style a primitive's own element (`.actions .btn` was pruned at compile
+           time — the button kept the block's 100%), so the sm row sizes this wrapper and the
+           button fills it: `width: auto` on a *flex item* is its content, and the 200px floor
+           is what makes it the design's 200px minimum rather than a shrunken block. */
+        .actions .primary {
           width: auto;
           min-width: 200px;
         }
@@ -504,9 +514,11 @@ export function Onboarding() @{
           }
 
           <div class="actions">
-            <Button variant="primary" type="submit" block disabled={blocked}>
-              {busy.value ? "Saving…" : "Finish"}
-            </Button>
+            <div class="primary">
+              <Button variant="primary" type="submit" block disabled={blocked}>
+                {busy.value ? "Saving…" : "Finish"}
+              </Button>
+            </div>
             <p class="note">
               By finishing you accept the{" "}<a href={href("/terms")} onClick={follow("/terms")}>terms of use</a>. Both
               preferences can be changed later in account settings; only the handle and the name are

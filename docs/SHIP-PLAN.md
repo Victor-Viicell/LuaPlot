@@ -645,7 +645,7 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       block's `.search { grid-column: 1 / span 2 }` red-lit row 51 alone at *".search spans 24→307 in
       a toolbar 24→606"*.
 
-- [ ] **T-82 `/onboarding`'s `sm 640` form measure and action row have never been rendered.** The
+- [x] **T-82 `/onboarding`'s `sm 640` form measure and action row have never been rendered.** The
       page's `@media (min-width: 640px)` block sets `.setup { max-width: 520px }` (*"A form is not a
       poster"*), turns `.actions` from a stack into a row (`flex-direction: row; align-items: center;
       gap: 16px`), gives `.actions .btn { width: auto; min-width: 200px }` and lets `.actions .note`
@@ -654,6 +654,16 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       which `DESIGN.md` says a scoped page `<style>` cannot reach** (`.toolbar .field`, `.prefs
       .toggle`, `.pager .btn` all matched nothing), so the ticket may be a *dead rule* plus the
       page-owned-wrapper fix the design already prescribes. Brief: `docs/NEXT.md` (T-82).
+      **Landed:** the rule *was* dead (pruned from the compiled CSS); the page now wraps `Button` in a
+      page-owned `.primary`, row 44 reads the ladder at 640/900/360.
+
+- [ ] **T-83 `/authentification`'s `sm 640` 420 measure has never been rendered.** The entry screen's
+      `@media (min-width: 640px)` block caps `.providers`, `.nsfw` and `.status` at `max-width: 420px`
+      (*"A 420 measure for the controls, not three buttons stretched across 640"*) and steps `.screen`'s
+      `min-height` from `100dvh - 228px` to `100dvh - 240px`. Row 1 is the only row that mounts
+      `/authentification`, and it does so at the walk's own ~500px, below the breakpoint — so neither
+      declaration has ever run, on the app's other entry screen. Extend row 1's width phase between its
+      push proof and its provider press. Brief: `docs/NEXT.md` (T-83).
 
 - [x] **T-80 `/post/thread`'s `sm 640` controls had never been rendered.** `post-thread.tsrx` stacks
       **two** media blocks over `.controls`: `sm` turns the base two-track stack into
