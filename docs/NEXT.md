@@ -1,81 +1,91 @@
 # Baton — what the next session does
 
-**T-84 landed.** Row 48 was **extended, not duplicated** — `EXPECTED_ROWS` stays **55** — and
-`/character/catalog`'s **two** toolbar blocks are now read at **640, 900 and 360**, at the **top** of the
-row (right after the fresh-mount assertion, before the first keystroke), so the debounce half's field,
-caret and 250ms settle are untouched and the row's existing 360 tag-fold override stays last. The
-ladder presses and types **nothing**, takes `640×740`, `900×740`, `360×740` (one `readToolbar()` per
-width into `assertToolbar(r, width)`), clears every override in one `finally`, asserts `innerWidth` came
-back, then re-reads the bare mount (search `""`, the same card count) — the evidence that no `go()` ran
-inside it. Measured: 640 tracks `["220px","328px"]` gap `12px 24px` align `end`, sort `24→244` (220),
-`.prefs` `24→596` **row** / `center` / gap `32px` / `border-top 0px` (the `640–899` span) crossing the
-fixed column, `.head` `flex-end`, pager min-width `200px`; 900 tracks `["220px","486px"]`, sort
-`117→337`, `.prefs` `361→847` = `sort.right + 24` **and** the toolbar's right edge, bottoms
-`438.78`/`438.78`; 360 one `308px` track, sort and `.prefs` both `16→324`, `.prefs` **column** with
-`border-top: 1px`, pager `auto`. Red proofs: `220px minmax(0, 1fr)` → `minmax(0, 1fr)` red-lit row 48
-**alone** at *"1 track(s) ["572px"] … the sort measures 572 wide"*; replacing the range block's
-`.prefs { grid-column: 1 / -1 }` red-lit it alone at *".prefs starts at 268 in a toolbar starting at 24
-(it measures 328 of the 572 toolbar)"*. Bytes restored (`cmp`), `check.sh` GREEN, 55/55 local, 55/55
-`--live`, `publish.sh` → `LIVE`, `curl` 200.
+**T-85 landed.** Row 22 (`report a post and land on the case`) was **extended, not duplicated** —
+`EXPECTED_ROWS` stays **55** — and `/moderation`'s `sm 640` queue block is now rendered at **640, 900
+and 360**, read at the **end** of the row: after the mount's `4 open` assertion and before the row that
+presses a verdict. Not one page declaration changed; all six were live. Measured **640**: `.weight`
+`24→80` (56 wide, numeral **26px**), `.col-weight` 56, row padding `16px/16px`, `.title` 28, `.label`
+16, `.causes`/`.meta` 13, toolbar `padding-bottom 8px`; **900**: the same 56/26 with `.row`
+`117→173` — the `md` block only pads the toolbar (**10px**, its only declaration here), which is the
+proof the step does not undo itself one breakpoint up; **360**: `.weight` `16→60` (44 wide, numeral
+20px), `.col-weight` 44, padding `14px/14px`, title 24, label 15, causes/meta 12, toolbar 8. The ladder
+takes `640×740`, `900×740`, `360×740`, one `readQueue()` per width into `assertQueue(r, width)`, clears
+every override in one `finally`, asserts `innerWidth` came back, then re-reads the bare mount
+(`/moderation?admin=1`, the same **4** cases) — the evidence that no `go()` ran inside it. Red proofs
+are the block's **two separate rules**: `.weight, .col-weight` 56 → 44 red-lit row 22 alone at *"the
+row's .weight numeral column measures 44px (24→68) around the numeral \"6\", not the 56px the sm
+block's `.weight, .col-weight` list declares"*; deleting `.weight { font-size: 26px }` alone red-lit it
+at *"the numeral's font-size computes 20px … the column stepped (56px) but the numeral did not"*. One
+selector list, two edits, two messages — T-83's shape.
 
-**Two facts this row settles.** The declarations were all live, so nothing needed a page change — and
-`DESIGN.md` needed none either: it already carried *"A select keeps a fixed 220px column; the switches
-take the rest"* and *"Between 640 and 899 the pair therefore takes its own full-width row"*. What was
-missing was the row, not the decision. And `.prefs` at 640 **does** stretch (`24→596`), unlike
-`/post/thread`'s, because nothing here sets `justify-self` — **`justify-self: start` is what made
-T-80's spanning box content-sized**, so "it spans" stays the left edge plus the crossing, and the right
-edge is evidence only.
+**Two facts this row settles.** `.col-weight` (the header) and `.weight` (the row's numeral) are **two
+elements**, and the block gives them their width in **one list**: both are measured, each failure names
+its own, and the font-size rule is asserted separately so a red proof can never confuse the column with
+the numeral. And on this page a drawn numeral's colour is **not** evidence of anything while the
+default `open` filter is on — the queue draws no concluded row, so `.row.is-concluded .weight`'s dim
+never appears: read the colour, print it, gate on the width.
 
-## T-85 — `/moderation`'s `sm 640` queue block has never been rendered
+**Also settled:** `/moderation` needed no `DESIGN.md` change — *"a 20px (26px at `sm`) tabular numeral
+in a fixed 44/56px leading column"* was already the law. Third ticket in a row (T-83, T-84, T-85) where
+the declarations were live and only the row was missing: **expect live declarations and no page change
+until a rule measures dead.**
 
-**Why it is next.** `/moderation` (the queue, `moderation-queue.tsrx`) is the app's admin surface and its
-`@media (min-width: 640px)` block is a **column step a reader can see**: base `.weight` and `.col-weight`
-are `width: 44px` with `.weight { font-size: 20px }`, `.row` is `padding: 14px 0`, `.title` is `24px`,
-`.label` is `15px`, `.meta` is `12px` — and at `sm` the numeral column becomes **56px**, the numeral
-**26px**, the row padding `16px 0`, the title `28px`, the label `16px`, `.causes`/`.meta` `13px`. The row
-that mounts this page (`report a post and land on the case`) does so at the walk's own ~500px, **below
-the breakpoint**, and it is also the row that presses a verdict — so not one declaration of that block
-has ever been rendered, on the one page whose rows are a ranked list rather than a grid.
+## T-86 — `/notifications`' `sm 640` row block has never been rendered
 
-**Approach.** Extend that row (no new row; `EXPECTED_ROWS` stays **55**). Put the width phase **right
-after the queue mount and before the first verdict press**, for the same reason T-84 put its phase
-before the first keystroke: the verdict half's state (the open case, the decision record, the item
-panel) is what the rest of the row proves, and a phase after it would be reading a concluded case. The
-row already carries a `640`/`360` pair nowhere, so this phase introduces them: take `640×740`,
-`900×740`, `360×740` — one `readQueue()` per width into `assertQueue(r, width)` — and clear them in one
-`finally` that asserts `innerWidth` came back (T-78's leak), then re-read the route and the case count
-so the row also proves the ladder navigated nothing.
+**Why it is next.** `/notifications` is the app's inbox, and its `@media (min-width: 640px)` block is a
+step a reader can see: base `.row` is `padding: 14px 0 14px 12px` with `gap: 10px`, `.sentence` is
+`14px`, `.title` is `24px`; at `sm` the row's `padding-left` becomes **16px**, its `gap` **12px**, the
+sentence **15px** and the title **28px**. The `md 900` block then pads the `.toolbar` `4px → 8px` (its
+only declaration on this page). The row that mounts the page (`read a notification (the badge drops)`)
+does so at the walk's own ~500px, **below the breakpoint**, so not one declaration of either block has
+ever been rendered — on the page whose rows *are* the app's notification list.
 
-At **640** assert: a drawn `.row`'s `.weight` (or `.col-weight` in the header) computes **56px** wide and
-its numeral **26px**; the row's `padding-top`/`padding-bottom` compute **16px**; `.title` **28px**,
-`.label` **16px**, `.meta` **13px**. At **900** the same 56px column (the `md` block only pads the
-toolbar, so the step must not undo itself). At **360** the base: **44px**, numeral **20px**, row padding
-**14px**, `.title` **24px**. Read `getComputedStyle` for the fonts and `getBoundingClientRect().width`
-for the column, and print both — a 12px column step is the whole ticket.
+**Approach.** Extend that row (no new row; `EXPECTED_ROWS` stays **55**) with a **read-only ladder at
+the very end**, after the badge re-read. The row's whole proof is `unreadBefore → after` and the
+`Mark all read` / `Mark read` controls are real writes, so a width phase before its presses would be
+measuring a list it is about to change — put it last, press nothing, navigate nothing. Take `640×740`,
+`900×740`, `360×740` in that order, one `readQueue()` per width into `assertQueue(r, width)`, clear
+every override in one `finally` that asserts `innerWidth` came back (T-78's leak), then re-read the
+`.row` count **and** the `.row.is-unread` count.
 
-**Traps.** (a) **The header's column and the row's numeral are two elements** (`.col-weight` vs
-`.weight`) and the sm block lists them in one selector; assert **both** where both draw, or a red proof
-cannot tell which member of the list bound (T-83's `.status` finding). (b) **A concluded case dims its
-numeral** (`.row.is-concluded .weight { color: var(--color-text-subtle) }`) but keeps the width — read
-the colour only as evidence, never gate on it. (c) **A font-size assertion must not be taken on the
-`.btn`** — the verdict controls are the `Button` primitive and a page-scoped rule cannot reach them
-(T-82); the six declarations above are all page-owned. (d) **The queue may draw a skeleton first**
-(`.skel-row` mirrors `.row`), and a skeleton has no `.weight` numeral — poll for `.row` with a numeral
-before measuring, and never assert a row count into existence (row 18's own reporting may have left the
-queue a different length than the fixture's). (e) `document.documentElement.scrollWidth > innerWidth` is
-the no-horizontal-scroll rule at each width (T-72: equality is false on a right page). (f) The ladder
-must not navigate: `go()` mid-phase re-boots and the verdict press afterwards would land on a fresh
-queue with a different first case.
+At **640** assert: a drawn `.row`'s computed `padding-left` is **16px** (base 12px), its `gap` is
+**12px** (base 10px), the `.sentence` inside it computes **15px** (base 14px), `.title` **28px** (base
+24px), and the toolbar's `padding-bottom` is still the base **4px** — the `md` block must not leak
+down. At **900**: the same 16 / 12 / 15 / 28 (nothing un-steps the block) **and** the toolbar's
+`padding-bottom` **8px**, the `md` block's only declaration. At **360**: `padding-left` 12, `gap` 10,
+`.sentence` 14, `.title` 24, toolbar 4.
 
-**Accept.** Red first: change the sm block's `.weight, .col-weight { width: 56px }` to `44px` and the
-row must red at `/moderation`, `640px`, naming the measured column width and the element it belongs to
-— then a second, narrower edit: drop `.weight { font-size: 26px }` alone and the row must name the
-**numeral**, not the column (the two members of the block are separate edits, T-83's shape). Bytes
-restored (`cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row), `publish.sh`
-prints `LIVE`, `curl` 200.
+**Traps.**
+(a) **The unread mark is a `box-shadow` inset, not a border or padding** (`.row.is-unread`), so the
+12 → 16px step is read as `getComputedStyle(row).paddingLeft` and never inferred from geometry. The
+walk's own row has just *read* a notification, so pick the first `.row` that carries a `.sentence` and
+print its class list beside the reading instead of assuming unread.
+(b) **`.row.is-unread .sentence` sets `color` and `font-weight: 600`** — a font-size fact and a weight
+fact on two different rows. Assert `font-size` only.
+(c) **`.row-action` wraps a `Button` primitive** and a page-scoped rule cannot reach it (T-82), so no
+font-size or padding assertion on `Mark read`; the six declarations above are all page-owned.
+(d) **The page draws 5 `.skel-row`s first** and a skeleton carries `.skel-lines`, not `.sentence` —
+poll for `.row .sentence` before measuring, and never assert a row count into existence (this row
+deletes one unread mark as it runs).
+(e) `document.documentElement.scrollWidth > innerWidth` is the no-horizontal-scroll rule at each width
+(T-72: equality is false on a right page because of `scrollbar-gutter: stable`).
+(f) **The route has no query** (`/notifications`), so a URL read cannot prove the ladder stayed put:
+the no-navigation/no-write proof is the `.row` count **and** the unread count, both read before and
+after. Assert them together and name both numbers in the failure.
+(g) The skeleton's `padding-left` is **0** in the base block while `.row`'s is 12 — the sm block gives
+both 16. Read the skeleton as evidence only, never as the gate: it is gone by the time the list draws.
 
-**Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
-owner's — see *Open decisions*. Do not invent tags to make a row pass.
+**Accept.** Red first: change the sm block's `.row, .skel-row { padding-left: 16px }` to `12px` and the
+row must red at `/notifications`, `640px`, naming the measured `padding-left` and the element it was
+read on — then a second, narrower edit: drop `.sentence { font-size: 15px }` alone and the row must
+name the **sentence**, not the row (the two are separate rules, T-83's shape). Bytes restored (`cmp`),
+`check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row), `publish.sh` prints `LIVE`,
+`curl` 200.
+
+**Found while working.** T-85's own brief said its mounting row *"is also the row that presses a
+verdict"* — it is not: row 22 mounts the queue, row 23 (`conclude a case as removed`) presses. The
+width phase therefore went at the **end** of row 22, where it still reads the case row 23 is about to
+conclude. Read the walk before trusting a brief's claim about which row does what.
 
 ## Blocked — what a human must do
 
@@ -105,15 +115,15 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   `finally` and asserts `innerWidth` came back, so anything after it may assume no override is in
   play — but it leaves the reader on `/persona` at that page's own `?sort=name`-less mount with
   **two** persona cards (row 41 deleted the third).
-- **T-80 through T-84 are landed; T-85 is the ticket: `/moderation`'s `sm 640` queue block.** The
-  numeral column steps 44 → 56px, the numeral 20 → 26px, the row padding `14px 0` → `16px 0`, and the
-  title / label / meta fonts step with it — and the row that mounts `/moderation` does so at the walk's
-  own ~500px with no width phase of its own. That is the same argument T-84 just closed on
-  `/character/catalog`, where **every** declaration of both toolbar blocks was **live** (220px track,
-  sort 24→244, `.prefs` spanning at 640 and in column 2 at 900) — unlike T-82's `/onboarding`, where
-  `.actions .btn { min-width: 200px }` **was** dead (the compiler pruned it; the page now sizes a
-  page-owned `.primary`). A ticket in this family should expect *live* declarations and no page change
-  until a rule is measured dead.
+- **T-80 through T-85 are landed; T-86 is the ticket: `/notifications`' `sm 640` row block.** The
+  row's `padding-left` steps 12 → 16px and its `gap` 10 → 12px, the `.sentence` 14 → 15px and the
+  `.title` 24 → 28px, with `md 900` padding the toolbar 4 → 8px — and the row that mounts the page
+  (`read a notification (the badge drops)`) does so at the walk's own ~500px with no width phase of
+  its own. That is the same argument T-85 just closed on `/moderation`, where **every** declaration of
+  the queue block was **live** (56px column, 26px numeral, `16px 0` padding, and the `md` 10px toolbar
+  pad) — unlike T-82's `/onboarding`, where `.actions .btn { min-width: 200px }` **was** dead (the
+  compiler pruned it; the page now sizes a page-owned `.primary`). A ticket in this family should
+  expect *live* declarations and no page change until a rule is measured dead.
   Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
@@ -124,9 +134,10 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   walked, and the word break has a gate section (10). What is left is *copies of the same rules in
   other files*: T-75/T-76/T-77 closed base, `lg` **and** `sm` for the three detail pages, T-78 closed
   `user-profile`'s `sm` head, T-79 closed `/bookmarks`' toolbar, T-81 closed `/persona`'s, T-82 and
-  T-83 closed the two entry screens and T-84 closed `/character/catalog`'s — so the same argument now
-  points at the **other** pages whose `sm 640` block no row has ever rendered: `/moderation`'s queue is
-  T-85, and 29 page files still carry one — plus whatever the gate or the walk finds next. The rest of
+  T-83 closed the two entry screens, T-84 closed `/character/catalog`'s and T-85 closed `/moderation`'s —
+  so the same argument now points at the **other** pages whose `sm 640` block no row has ever rendered:
+  `/notifications` is T-86, and 28 page files still carry one — plus whatever the gate or the walk finds
+  next. The rest of
   the plan waits on Supabase
   (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep link
   dependency and `Ctrl/Cmd+K`, the tag vocabulary).

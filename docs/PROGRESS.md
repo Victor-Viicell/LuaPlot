@@ -3,6 +3,39 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-04 — T-85: `/moderation`'s `sm 640` queue block is rendered at 640, 900 and 360
+
+- **Changed:** row 22 of `scripts/smoke.mjs` (`report a post and land on the case` — **extended, no
+  new row**, `EXPECTED_ROWS` stays **55**) — **no page change**: every declaration of the block was
+  live, it had simply never been rendered. The width phase sits at the **end** of the row, after the
+  mount's `4 open` assertion and **before** the next row presses a verdict, so the case it concludes is
+  still the case the queue drew. It presses, types and navigates **nothing**: `640×740`, `900×740`,
+  `360×740` in that order, one `readQueue()` per width into `assertQueue(r, width)`, every override
+  cleared in one `finally`, `innerWidth` re-read, then the bare mount re-read (`/moderation?admin=1`,
+  the same 4 cases) as the evidence that no `go()` ran inside it. Measured: **640** `.weight` `24→80`
+  (56 wide, numeral **26px** `rgb(76,79,105)`), `.col-weight` 56, row padding `16px/16px`, title 28px,
+  label 16px, causes 13px, meta 13px, toolbar `padding-bottom 8px`; **900** the same 56/26 with row
+  `117→173` — and the `md` block's toolbar `padding-bottom 10px` (its only declaration on this page);
+  **360** `.weight` `16→60` (44 wide, numeral **20px**), `.col-weight` 44, padding `14px/14px`, title
+  24px, label 15px, causes/meta 12px, toolbar 8px.
+- **Verified:** red first, in the two separate edits the block is written as. `sm`'s `.weight,
+  .col-weight { width: 56px }` → `44px` put **row 22 alone** red (54 ok / 1 fail) at *"/moderation at
+  640px: the row's .weight numeral column measures 44px (24→68) around the numeral \"6\", not the 56px
+  the sm block's `.weight, .col-weight` list declares — row 24→596, header column 44px"*; then, with
+  the column restored, deleting `.weight { font-size: 26px }` alone put it red again at *"the numeral's
+  font-size computes 20px, not the 26px … — the column stepped (56px) but the numeral did not"*, naming
+  the numeral and not the column. Bytes restored (`git checkout` of the page file, `git diff --stat`
+  then lists `scripts/smoke.mjs` only), `check.sh` **GREEN**, `./scripts/smoke.sh` **55/55** local,
+  `publish.sh` → `LIVE`, `curl` **200**, `./scripts/smoke.sh --live` **55/55**.
+- **Not verified / next:** `docs/DESIGN.md` already carried the rule (*"a 20px (26px at `sm`) tabular
+  numeral in a fixed 44/56px leading column"*), so no doc changed — again the row was missing, not the
+  decision. A walk fact, not a device one: no APK (T-35 blocked). Note the `.weight` colour read
+  `rgb(76,79,105)` because the default `open` filter draws no concluded row — **evidence only, never a
+  gate** (a concluded numeral dims but keeps its width). Next: **T-86** — `/notifications`' `sm 640`
+  row block (`padding-left 12 → 16px`, `gap 10 → 12px`, `.sentence` 14 → 15px, `.title` 24 → 28px, and
+  `md`'s toolbar `padding-bottom 4 → 8px`), which the badge row mounts only at the walk's ~500px. No
+  new dependency, no schema/adapter/JEV change, no store write.
+
 ## 2026-11-03 — T-84: `/character/catalog`'s `sm 640` toolbar is rendered at 640, 900 and 360
 
 - **Changed:** row 48 of `scripts/smoke.mjs` (**extended, no new row** — `EXPECTED_ROWS` stays **55**)

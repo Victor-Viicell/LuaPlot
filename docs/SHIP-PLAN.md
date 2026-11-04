@@ -677,6 +677,26 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       the sort measures 572 wide"*; replacing the range block's `.prefs { grid-column: 1 / -1 }` red-lit
       it at *".prefs starts at 268 in a toolbar starting at 24 (it measures 328 of the 572 toolbar)"*.
 
+- [x] **T-85 `/moderation`'s `sm 640` queue block has never been rendered.** `moderation-queue.tsrx`'s
+      `sm` block is a column step a reader can see: `.weight, .col-weight` 44 → **56px**, `.weight`
+      font 20 → **26px**, `.row, .skel-row` `padding: 14px 0` → **`16px 0`**, `.title` 24 → 28px,
+      `.label` 15 → 16px, `.causes`/`.meta` 12 → 13px (`md 900` pads only the toolbar). The row that
+      mounts the page does so at the walk's own ~500px, below the breakpoint, so not one declaration
+      had ever run. Brief: `docs/NEXT.md` (T-85).
+      **Landed:** row 22 (`report a post and land on the case`) extended — no new row, 55 stays — with
+      a read-only ladder at the **end** of the row, after the mount's `4 open` assertion and before the
+      next row's verdict: `640×740` / `900×740` / `360×740`, one `readQueue()` into
+      `assertQueue(r, width)`, one `finally` clearing every override, `innerWidth` re-read, then the
+      bare mount re-read (`?admin=1`, same 4 cases) as the no-navigation proof. Measured 640: `.weight`
+      `24→80` (56 wide, numeral 26px), `.col-weight` 56, row padding `16px/16px`, title 28, label 16,
+      causes/meta 13, toolbar 8; 900: 56/26 again, row `117→173`, toolbar **10px** (the md block's only
+      declaration here); 360: 44 wide, numeral 20px, `.col-weight` 44, padding `14px/14px`, title 24,
+      label 15, causes/meta 12. Red proofs, the block's **two separate rules** edited one at a time:
+      `.weight, .col-weight` 56 → 44 red-lit row 22 alone at *"the row's .weight numeral column measures
+      44px (24→68) around the numeral "6", not the 56px … list declares"*; deleting `.weight {
+      font-size: 26px }` alone red-lit it at *"the numeral's font-size computes 20px, not the 26px …
+      the column stepped (56px) but the numeral did not"*.
+
 - [x] **T-83 `/authentification`'s `sm 640` 420 measure has never been rendered.** The entry screen's
       `@media (min-width: 640px)` block caps `.providers`, `.nsfw` and `.status` at `max-width: 420px`
       (*"A 420 measure for the controls, not three buttons stretched across 640"*) and steps `.screen`'s

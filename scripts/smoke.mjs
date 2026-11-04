@@ -1408,7 +1408,181 @@ results.push(
     if (!queueText.includes("4 open")) {
       throw new Error(`queue says: ${queueText.slice(0, 120)} | dialog after submit: ${confirmation || afterSubmit.slice(-120)}`);
     }
-    return "the report closed the dialog and the queue went 3 open → 4 open";
+
+    // 1b. The queue at the three widths its own stylesheet draws it for (T-85). `moderation-queue`'s
+    //     `sm 640` block is a step a reader can see — the 44px numeral column becomes 56, the numeral
+    //     20 → 26, the row `14px 0` → `16px 0`, the title 24 → 28, the label 15 → 16, `.causes`/`.meta`
+    //     12 → 13 — and the `md 900` block pads the toolbar to 10px. This row's own mount is the
+    //     walk's ~500px, below the breakpoint, so not one declaration of it had ever been rendered.
+    //     It runs **after** the mount assertions and **before** the next row presses a verdict, so the
+    //     case it concludes is still the one the queue drew; nothing here presses, types or navigates.
+    const readQueue = () =>
+      js(`
+        const round = (n) => Math.round(n * 100) / 100;
+        const box = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { left: round(r.left), right: round(r.right), top: round(r.top), bottom: round(r.bottom), width: round(r.width) };
+        };
+        const all = [...document.querySelectorAll(".row")];
+        const first = all.find((row) => row.querySelector(".weight"));
+        const cell = first ? (() => {
+          const weight = first.querySelector(".weight");
+          const label = first.querySelector(".label");
+          const causes = first.querySelector(".causes");
+          const meta = first.querySelector(".meta");
+          const rs = getComputedStyle(first);
+          const ws = getComputedStyle(weight);
+          return {
+            concluded: first.classList.contains("is-concluded"),
+            box: box(first),
+            weightBox: box(weight),
+            weightText: (weight.textContent || "").trim(),
+            weightFont: ws.fontSize,
+            weightColor: ws.color,
+            padTop: rs.paddingTop,
+            padBottom: rs.paddingBottom,
+            labelFont: label ? getComputedStyle(label).fontSize : "",
+            causesFont: causes ? getComputedStyle(causes).fontSize : "",
+            metaFont: meta ? getComputedStyle(meta).fontSize : "",
+          };
+        })() : null;
+        const colWeight = document.querySelector(".col-weight");
+        const title = document.querySelector(".title");
+        const toolbar = document.querySelector(".toolbar");
+        return {
+          path: location.pathname,
+          search: location.search,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          rows: all.length,
+          skeletons: document.querySelectorAll(".skel-row").length,
+          cell,
+          colWeight: box(colWeight),
+          colWeightText: colWeight ? (colWeight.textContent || "").trim() : "",
+          titleFont: title ? getComputedStyle(title).fontSize : "",
+          toolbarPadBottom: toolbar ? getComputedStyle(toolbar).paddingBottom : "",
+        };
+      `);
+
+    /**
+     * The sm block's six members plus the md padding. The header's `.col-weight` and the row's
+     * `.weight` are **two elements** one selector list gives the same width (T-83's lesson), so both
+     * are measured and each failure names its own; a font-size assertion is only ever taken on the
+     * page's own text, never on a `Button` primitive the scoped block cannot reach (T-82).
+     */
+    const assertQueue = (r, width) => {
+      const at = `/moderation at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!r.path.endsWith("/moderation")) {
+        throw new Error(`${at}: the queue was measured on ${JSON.stringify(r.path)} — a ladder that navigates proves another page's facts`);
+      }
+      if (r.skeletons !== 0) {
+        throw new Error(`${at}: ${r.skeletons} .skel-row(s) still draw — a skeleton has a .skel-weight, not a .weight numeral, and the sm block is the numeral's`);
+      }
+      if (!r.cell) {
+        throw new Error(`${at}: no drawn .row carries a .weight numeral (${r.rows} row(s)) — the queue drew no case to measure`);
+      }
+      if (!r.colWeight) {
+        throw new Error(`${at}: the queue draws ${r.rows} row(s) and no .col-head .col-weight — the one-time weight/case header is missing`);
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the queue scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+
+      const col = r.cell.weightBox.width;
+      const head = r.colWeight.width;
+
+      if (width === 360) {
+        if (Math.abs(col - 44) > 1) {
+          throw new Error(
+            `${at}: the row's .weight numeral column measures ${col}px (${r.cell.weightBox.left}→${r.cell.weightBox.right}), not the base block's 44px — the sm block's 56px column is leaking below its breakpoint`,
+          );
+        }
+        if (Math.abs(head - 44) > 1) {
+          throw new Error(
+            `${at}: the header's .col-weight measures ${head}px (${r.colWeight.left}→${r.colWeight.right}), not the base block's 44px — it is the same selector list as .weight, so the two must not disagree`,
+          );
+        }
+        if (r.cell.weightFont !== "20px") {
+          throw new Error(`${at}: the numeral computes ${r.cell.weightFont}, not the base 20px — the sm font step is leaking below 640`);
+        }
+        if (r.cell.padTop !== "14px" || r.cell.padBottom !== "14px") {
+          throw new Error(`${at}: the row's padding computes ${r.cell.padTop}/${r.cell.padBottom}, not the base 14px/14px`);
+        }
+        if (r.titleFont !== "24px") throw new Error(`${at}: .title computes ${r.titleFont}, not the base 24px`);
+        if (r.cell.labelFont !== "15px") throw new Error(`${at}: .label computes ${r.cell.labelFont}, not the base 15px`);
+        if (r.cell.causesFont !== "12px" || r.cell.metaFont !== "12px") {
+          throw new Error(`${at}: .causes/.meta compute ${r.cell.causesFont}/${r.cell.metaFont}, not the base 12px`);
+        }
+        if (r.toolbarPadBottom === "10px") {
+          throw new Error(`${at}: the toolbar's padding-bottom computes the md 10px below its breakpoint`);
+        }
+        return;
+      }
+
+      // 640 and 900 — the step itself, and (at 900) the md block that must not undo it.
+      if (Math.abs(col - 56) > 1) {
+        throw new Error(
+          `${at}: the row's .weight numeral column measures ${col}px (${r.cell.weightBox.left}→${r.cell.weightBox.right}) around the numeral ${JSON.stringify(r.cell.weightText)}, not the 56px the sm block's \`.weight, .col-weight\` list declares — row ${r.cell.box.left}→${r.cell.box.right}, header column ${head}px`,
+        );
+      }
+      if (Math.abs(head - 56) > 1) {
+        throw new Error(
+          `${at}: the header's .col-weight measures ${head}px (${r.colWeight.left}→${r.colWeight.right}), not the 56px the sm block's \`.weight, .col-weight\` list declares — the row's numeral column measures ${col}px, so the two members of that list disagree`,
+        );
+      }
+      if (r.cell.weightFont !== "26px") {
+        throw new Error(
+          `${at}: the numeral's font-size computes ${r.cell.weightFont}, not the 26px the sm block's own \`.weight { font-size }\` rule declares — the column stepped (${col}px) but the numeral did not, and the block gives them in two separate rules`,
+        );
+      }
+      if (r.cell.padTop !== "16px" || r.cell.padBottom !== "16px") {
+        throw new Error(`${at}: the row's padding computes ${r.cell.padTop}/${r.cell.padBottom}, not the sm 16px/16px (base is 14px)`);
+      }
+      if (r.titleFont !== "28px") throw new Error(`${at}: .title computes ${r.titleFont}, not the sm 28px (base is 24px)`);
+      if (r.cell.labelFont !== "16px") throw new Error(`${at}: .label computes ${r.cell.labelFont}, not the sm 16px (base is 15px)`);
+      if (r.cell.causesFont !== "13px" || r.cell.metaFont !== "13px") {
+        throw new Error(`${at}: .causes/.meta compute ${r.cell.causesFont}/${r.cell.metaFont}, not the sm 13px (base is 12px)`);
+      }
+      if (width === 900 && r.toolbarPadBottom !== "10px") {
+        throw new Error(`${at}: the toolbar's padding-bottom computes ${r.toolbarPadBottom}, not the md block's 10px — the only declaration that block makes on this page`);
+      }
+    };
+
+    const queueRestore = await js("return window.innerWidth;");
+    const queueBefore = await readQueue();
+    const queueLines = [];
+    let queueSeen = "";
+    try {
+      for (const width of [640, 900, 360]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        await waitFor(`document.querySelector(".row .weight") !== null`, `the queue's first numeral at ${width}px`, 10000);
+        const r = await readQueue();
+        assertQueue(r, width);
+        queueLines.push(
+          `${width}px: .row ${r.cell.weightBox.left}→${r.cell.weightBox.right} (.weight ${r.cell.weightBox.width} wide, numeral ${r.cell.weightFont} ${JSON.stringify(r.cell.weightText)}, ${r.cell.weightColor}) · .col-weight ${r.colWeight.width} (${JSON.stringify(r.colWeightText)}) · row padding ${r.cell.padTop}/${r.cell.padBottom} · title ${r.titleFont} · label ${r.cell.labelFont} · causes ${r.cell.causesFont} · meta ${r.cell.metaFont} · toolbar padding-bottom ${r.toolbarPadBottom} · ${r.rows} row(s)`,
+        );
+      }
+      queueSeen = queueLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const queueAfter = await js("return window.innerWidth;");
+    if (queueAfter !== queueRestore) {
+      throw new Error(`the queue's overrides cleared to ${queueAfter}px, but the session runs at ${queueRestore}px — a leaked override would mis-measure every later row`);
+    }
+    const back = await readQueue();
+    if (!back.path.endsWith("/moderation") || back.search !== "?admin=1" || back.rows !== queueBefore.rows) {
+      throw new Error(
+        `the width phase left ${JSON.stringify(back.path + back.search)} with ${back.rows} case(s), not the bare /moderation?admin=1 with ${queueBefore.rows} the mount drew — the ladder navigated, so the verdict row would land on a fresh queue`,
+      );
+    }
+    return `the report closed the dialog and the queue went 3 open → 4 open; the sm step rendered — ${queueSeen}`;
   }),
 );
 
