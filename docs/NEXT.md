@@ -1,84 +1,91 @@
 # Baton — what the next session does
 
-**T-80 landed.** Row 39 was **extended, not duplicated** — `EXPECTED_ROWS` stays **55** — and
-`/post/thread`'s `.controls` is now read at **640 and 900**, which is both media blocks over it.
-After the paging half (no press, no `go()`: a remount there would drop the appended page) the row
-takes `640×740` then `900×740`, reads one `readControls()` at each and hands it to
-`assertControls(r, width)`: 640 asserts a `grid` of **exactly three** tracks with the first
-`200 ± 1`, `.sort` and `.create` sharing row 1 by their **bottoms** (`|create.bottom − sort.bottom|
-≤ 2`) with `sort.left < create.left`, `.prefs` **below both** and **starting at the controls' left
-edge and running past the 200px sort column** (`flex-direction: row`), `.feed` gap `16px`, and
-`.pager-action`'s 200px minimum where the pager is drawn; 900 asserts **four** tracks with the first
-`220 ± 1` and `.prefs` back **on row 1** (`sort.left < prefs.left < create.left`). Measured at 640:
-`["200px","238.75px","85.25px"]`, gap `24px`, sort `24→224` bottom `180.39`, prefs `24→445.63` top
-`204.39` (`row`), create `510.75→596` bottom `180.39`, pager min-width `200px`; at 900
-`["220px","421.625px","16.375px","0px"]`, sort `117→337`, prefs `361→782.63`, create `737.75→823`.
-Both overrides clear in one `finally` and `innerWidth` is asserted back. **The baton's own red
-proof was a no-op** — deleting the range block's `grid-row: 2` walks **green, 55/55**: the pair spans
-all three columns and cannot share row 1 with `.sort` and `.create`, so auto-placement lands it on
-row 2 regardless. The declaration that binds is its sibling `grid-column: 1 / -1`, and *that*
-deletion red-lit **row 39 alone** (54 PASS / 1 FAIL) at *".prefs starts at 248 in a controls box
-starting at 24"*. Bytes restored (`cmp`), `check.sh` GREEN, 55/55 local, 55/55 `--live`, `publish.sh`
-→ `LIVE` (asset `index-DPoxP2Sr.js`, unchanged), `curl` 200.
+**T-81 landed.** Row 51 was **extended, not duplicated** — `EXPECTED_ROWS` stays **55** — and
+`/persona`'s `.toolbar` is now read at **640, 900 and 360**, which is both of its media blocks plus
+the base beneath them. The width phase runs after the row's last press (`sortPass`), presses
+nothing, mounts `/persona` once and takes `640×740`, `900×740`, `360×740` in that ladder — one
+`readBar()` per width into `assertBar(r, width)`. At 640 it asserts a `grid`, **exactly two** tracks
+**equal within 1px** (a fluid `minmax(0, 1fr)` pair, so the assertion is *equality*, never a constant,
+T-77's rule read the other way), `.search` spanning **both** of `.toolbar`'s edges, `.sort` and
+`.create` below the field (`top > search.bottom − 1`) sharing row 2 by their **bottoms**
+(`align-items: end`), `sort.left < create.left`, `.create .btn`'s `min-width: 120px`, and the button
+filling its column. At 900 **three** tracks with the middle one `200 ± 1`, all three children on one
+line (`search.left < sort.left < create.left`) sharing a bottom, and `.create .btn` at exactly
+**120px** — the `auto` track is the one place the sm block's floor can bind. At 360 a `flex` column
+(`tracks` `[]`, T-73), the three children stacked in DOM order, and the button at the column's full
+width with `min-width` back to `0px`. Measured at 640 `["283px","283px"]` gap `16px`, search
+`24→606`, sort `24→307`, create `323→606`, both bottoms `283.58`, `.btn` `283px`; at 900
+`["378px","200px","120px"]`, search `122→500`, sort `516→716`, create `732→852`, three bottoms
+`205.98`, `.btn` `120px`; at 360 `flex`, search `16→324` top `127.59`, sort top `209.19`, create top
+`290.78`, `.btn` `308px` / `min-width 0px`. One `finally` clears the override and `innerWidth` is
+asserted back. **The ticket's `.create .btn` sketch was wrong:** `width: auto` on a block-level flex
+container is the *fill*, so at 640 the button is the whole 283px column and the 120px floor binds
+only at 900. Red proof: deleting the sm block's `.search { grid-column: 1 / span 2 }` red-lit **row
+51 alone** (54 PASS / 1 FAIL) at *".search spans 24→307 in a toolbar 24→606"*. Bytes restored
+(`cmp`), `check.sh` GREEN, 55/55 local, 55/55 `--live`, `publish.sh` → `LIVE` (asset
+`index-DPoxP2Sr.js`, unchanged), `curl` 200.
 
-## T-81 — `/persona`'s `sm 640` toolbar (two rows) and its `lg 900` one-line rewrite have never
+## T-82 — `/onboarding`'s `sm 640` form measure and its action row have never been rendered
 
-**Why it is next.** `persona-collection.tsrx` keeps **two** blocks over `.toolbar`: the base is a
-`flex-direction: column` stack, `sm 640` makes it `grid-template-columns: minmax(0, 1fr) minmax(0,
-1fr)` with `align-items: end; gap: 16px`, pins `.search` into `grid-column: 1 / span 2` so the field
-keeps the top row, and lets `.sort` and `.create` auto-place on the line beneath — with `.create .btn`
-widened from the base `width: 100%` to `width: auto; min-width: 120px` (its comment: *"Search keeps
-the row; sort and Create share the line beneath it."*). Then `lg 900` rewrites the same grid to
-**three** tracks `minmax(0, 1fr) 200px auto` and puts `.search` back into `grid-column: 1`, so all
-three share one line with the sort in a **fixed 200px middle column**. Row 51 mounts `/persona` (and
-the two other catalogues) at the session's ~500px only, so every one of those declarations is
-untestable today: delete `.search { grid-column: 1 / span 2 }` and the field drops into column 1 with
-the sort beside it and **every gate stays green**.
+**Why it is next.** `onboarding.tsrx` keeps one `@media (min-width: 640px)` block over the setup
+form: `.setup { max-width: 520px }` (its own comment: *"A form is not a poster: the fields keep a 520
+measure rather than filling a 640 outlet."*), `.actions { flex-direction: row; align-items: center;
+gap: 16px }` (the base is `flex-direction: column; gap: 10px`), `.actions .btn { width: auto;
+min-width: 200px }` and `.actions .note { flex: 1 1 auto; max-width: 30ch }`. Row 44 (T-61) mounts
+`/onboarding` **only at the session's own ~500px**, below the breakpoint, so not one of those four
+declarations has ever been rendered — and the second one is suspected **dead**: `.actions .btn`
+targets the `Button` **primitive's** element, and `DESIGN.md` → *Primitives* records that a page's
+scoped `<style>` cannot touch those (`.toolbar .field`, `.prefs .toggle` and `.pager .btn` all
+silently matched nothing), which is why every other page wraps its primitive in a page-owned box
+(`.search`, `.prefs`, `.pager-action`) and sizes *that*. If it is dead, the 640 action row is a
+`width: 100%` button sitting in a flex row beside a note — the exact near-bug T-80's comment records
+for the thread's `.prefs`.
 
-**Approach.** Extend **row 51** (T-68's journey — no new row; `EXPECTED_ROWS` stays **55**). Its
-toolbar half already reads `.toolbar`'s grid `aria-label` on three pages; the width phase belongs
-**after** its last tab/press clause, where no read follows. Mount `/persona` once (`go()` is allowed
-*before* the first override if the row's own reads are done), then take `640×740`, `900×740` and
-`360×740` in that ladder, one `readToolbar()` per width into an `assertToolbar(r, width)` — the shape
-T-79 wrote for `/bookmarks` is the one to copy (`box()` with 2-decimal rounding, `tracks` from
-`display.indexOf("grid") >= 0` first, then `gridTemplateColumns.split(" ")`). At 640 assert: a
-`grid`; **exactly two** tracks, both fluid and **equal within 1px** (a `minmax(0, 1fr)` pair, so
-sizing the first against a constant is wrong here — T-77's rule is "size the one the block declares",
-and this block declares *two equal* tracks); `.search` spanning **both** edges of `.toolbar`
-(`|search.left − toolbar.left| ≤ 1` and `|search.right − toolbar.right| ≤ 1` — the field *is* a
-`1fr` span here, unlike T-80's content-sized pair, so measure before choosing); `.sort` and
-`.create` sharing **row 2** (`sort.top > search.bottom − 1`, `create.top > search.bottom − 1`,
-`|sort.bottom − create.bottom| ≤ 2` per `align-items: end`) with `sort.left < create.left`;
-`.create .btn` computing `width` **auto** and `min-width: 120px`. At 900 assert **three** tracks with
-the **middle one `200 ± 1`** and **all three children on one row** (`.search.left < .sort.left`,
-`sort.left < create.left`, and `.search.top`, `.sort.top`, `.create.top` within 2 of each other or
-bottoms if `align-items: end` still rules — measure first, T-79's trap). At 360 assert the base: **no
-grid** (`display` is `flex`, and remember a flex container's `gridTemplateColumns` computes to the
-string `none`, T-73), the three children stacked (`search.top < sort.top < create.top`) and
-`.create .btn` at `width: 100%` / `min-width` a length, not `120px`. Clear every override in one
-`finally` and assert `innerWidth` back.
+**Approach.** Extend **row 44** (no new row; `EXPECTED_ROWS` stays **55**). The width phase belongs
+on the row's **second visit**: after `resumed` is read (both fields restored, Finish enabled) and
+**before** the restore's own `retype`/Finish pair, so the ladder presses nothing and the borrowed
+account is still the walk's to hand back. Take `640×740`, `900×740`, `360×740` in that ladder, one
+`readSetup()` per width into `assertSetup(r, width)` (the shape row 51 just wrote: `box()` with
+2-decimal rounding, `tracks` from `display.indexOf("grid") >= 0` first). At 640 assert: `.setup`
+measures **520 ± 1** while its parent (the outlet) is **620** — read both and print both, the *cap*
+is the fact, not a width; `.actions` computes `display: flex` with `flex-direction: row` and
+`align-items: center`; the primary control sits **left** of the note (`button.left < note.left`) and
+the note's width is a finite length `≤ 30ch` in px; `.setup`'s `max-width` computes `520px`. At 900
+assert the same 520 measure inside the wider outlet (the outlet is 794 there) and the same row. At
+360 assert the base: `.setup` fills the outlet (its width equals the outlet's), `.actions` is a
+**column** with the button **above** the note and the button at the container's full width.
 
-**Traps.** (a) **Two blocks govern `.toolbar` and the *later* one wins at 900**; aim the red proof at
-`sm`'s `.search { grid-column: 1 / span 2 }` (it is the one no later block repeats) and let the
-message name the two edges it read. Aiming at `lg`'s `.search { grid-column: 1 }` proves nothing —
-column 1 is where an auto-placed `.search` would land anyway. (b) `.create` holds an `<a class="btn">`,
-so read `.create .btn` for width/min-width and `.create` for placement — never the `<a>` for a grid
-position. (c) **Row 51 is the tag-picker row**: its press branch runs only when a fixture carries a
-tag, and it ends on `/persona` (or wherever its last paste left it) — the width phase must not press
-anything and must not assume `?tags=`. (d) `/persona`'s listing can be **filtered to nothing** by an
-earlier clause; the toolbar draws regardless, so never gate the width phase on a card count. (e) An
-`auto` track sized by a long caption is the class T-09 recorded — at 900 the middle track is
-**fixed 200px**, so assert that number, not the fluid ones. (f) `document.documentElement.scrollWidth
-> innerWidth` is the no-horizontal-scroll rule (T-72: `scrollbar-gutter: stable` makes equality
-false on a right page).
+**Traps.** (a) **Read the rule before you believe it.** If `.actions .btn` computes `width: 100%` at
+640 (the `.btn-block` tier) rather than a 200px floor, the scoped rule never matched: that is the
+ticket's real finding, and the fix is the design's own — wrap the `Button` in a page-owned element
+(e.g. `.actions .primary`) and size the wrapper, leaving 360's `block` full width intact. Prove the
+fix by putting the rule back on the primitive and watching the row read the wrapper's width instead.
+(b) **Row 44 borrows the walk's account.** A throw inside the ladder lands in the row's own `catch`,
+which already says *the account was left as @onboarding_walk* — keep the ladder inside the `try`, and
+take every override off in one `finally` that also asserts `innerWidth` came back, or row 45's
+rename carries a leaked 360 (T-78's shape). (c) **Do not retype anything inside the ladder.** Each
+settle calls `persistDraft()` ~250 ms later and the borrowed handle would be claimed by the draft
+write; the fields must be read, not written, at all three widths — and the handle field's value
+surviving the ladder is itself the proof that a width change does not remount the form (a remount
+would drop the restored text). (d) **`.actions .note` is a `<p>` with a `flex` basis.** Its
+`max-width: 30ch` resolves to a px length — assert the length is finite and within the row, never the
+`ch` string. (e) The form can be in `loading` (a skeleton `.form`) or `failed`; the second visit
+polls `resumed` already, so gate the ladder on `.actions` existing, never on a card count or a
+skeleton absence you did not read. (f) `document.documentElement.scrollWidth > innerWidth` is the
+no-horizontal-scroll rule (T-72: `scrollbar-gutter: stable` makes equality false on a right page) — a
+100%-wide button in a flex row at 640 is exactly how a page starts scrolling sideways, so read it at
+every width.
 
-**Accept.** Red first: delete `.search { grid-column: 1 / span 2 }` from `persona-collection.tsrx`'s
-`sm` block → **row 51 alone** red, naming `/persona`, `640px`, and the `.search`/`.toolbar` edges it
-read. Bytes restored (`cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row),
+**Accept.** Red first: delete `.setup { max-width: 520px }` from `onboarding.tsrx`'s `sm` block →
+**row 44 alone** red, naming `/onboarding`, `640px`, the `.setup` width and the outlet's. If the
+`.actions .btn` rule proves dead, the same commit carries the page-owned wrapper and its own red
+proof (rule restored on the primitive → the button's width disagrees with 640's assertion). Bytes
+restored (`cmp`), `check.sh` GREEN, **55/55** local and **55/55** `--live` (no new row),
 `publish.sh` prints `LIVE`, `curl` 200.
 
 **Open decision (not this ticket).** The tag vocabulary for lorebooks and presets is still the
 owner's — see *Open decisions*. Do not invent tags to make a row pass.
+
 
 ## Blocked — what a human must do
 
@@ -103,11 +110,16 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
 
 ## Open decisions
 
-- **T-80 is landed; T-81 is the ticket: `/persona`'s `sm 640` `.toolbar` grid and its `lg 900`
-  one-line rewrite have never been rendered.** Row 51 mounts `/persona` at the walk's own ~500px, so
-  the two equal tracks with the search spanning them, the sort + Create pair on the line beneath,
-  and the 900-width three-track row with its fixed 200px middle column are declarations nothing
-  can go red on.
+- **T-81 is landed and row 51 now takes three metrics overrides of its own** (`640×740`, `900×740`,
+  `360×740`, at the very end of the T-68 journey, after its last press). It clears them in one
+  `finally` and asserts `innerWidth` came back, so anything after it may assume no override is in
+  play — but it leaves the reader on `/persona` at that page's own `?sort=name`-less mount with
+  **two** persona cards (row 41 deleted the third).
+- **T-80 is landed; T-81 landed this tick and T-82 is the ticket: `/onboarding`'s `sm 640` form
+  measure (`.setup { max-width: 520px }`) and its action row (a column→row rewrite whose
+  `.actions .btn { min-width: 200px }` may be a dead rule, since it targets the `Button` primitive's
+  own element).** Row 44 mounts `/onboarding` at the walk's own ~500px, so the 520 cap, the row and
+  the note's `30ch` have never been rendered.
   Failure-bank
   entries 1 (T-54), 2 (T-59), 3 (T-55 + T-57), 4 (T-53), 5 (T-56) and 8 (T-58) are walked; the rest
   are blocked on the backend or the toolchain (6 → T-27's joins, 7 → T-29's cascade, 9 → T-27, 10 →
@@ -117,10 +129,10 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   1200**, **55 the moderation case's `md 900` flex row**), every bank entry that can be walked is
   walked, and the word break has a gate section (10). What is left is *copies of the same rules in
   other files*: T-75/T-76/T-77 closed base, `lg` **and** `sm` for the three detail pages, T-78 closed
-  `user-profile`'s `sm` head and T-79 closed `/bookmarks`' toolbar, so the same argument now points at
-  the **other** pages whose `sm 640` block no row has ever rendered — `/persona`'s `.toolbar` is T-81
-  (two blocks over one grid: two rows at 640, one line at 900), and 32 page files still carry one —
-  plus whatever the gate or the walk finds next. The rest of the plan waits on Supabase
+  `user-profile`'s `sm` head, T-79 closed `/bookmarks`' toolbar and T-81 closed `/persona`'s — so the
+  same argument now points at the **other** pages whose `sm 640` block no row has ever rendered:
+  `/onboarding`'s form and action row is T-82, and 31 page files still carry one — plus whatever the
+  gate or the walk finds next. The rest of the plan waits on Supabase
   (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep link
   dependency and `Ctrl/Cmd+K`, the tag vocabulary).
 - **The tag field's press is blocked on a decision, not on work.** Every lorebook and preset
@@ -132,7 +144,7 @@ owner's — see *Open decisions*. Do not invent tags to make a row pass.
   either record a tag vocabulary for lorebooks and presets in `docs/DESIGN.md` (and then a ticket
   seeds two or three tags, leaving one card tagless so `catalog.md`'s *an item with none renders no
   row and no placeholder* finally has a target) or accept that the press stays unwalkable.
-- **Row count is 55 after T-74 — T-75, T-76, T-77, T-78, T-79 and T-80 added none.** `scripts/smoke.mjs` keeps
+- **Row count is 55 after T-74 — T-75, T-76, T-77, T-78, T-79, T-80 and T-81 added none.** `scripts/smoke.mjs` keeps
   it in an explicit `EXPECTED_ROWS`, so a row that stops running is a red walk — **extend** an existing
   row rather than
   adding a near-copy of it, and bump the count only when a row is genuinely new (**T-61 added row 44;
@@ -305,6 +317,25 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
 
 ## Found while working (carried forward — keep this list growing)
 
+- **`width: auto` on a block-level flex container is the fill, not the content (T-81).** The sm
+  block's `.create .btn { width: auto; min-width: 120px }` measures **283px** at 640 — the whole
+  `1fr` column — because `.btn` is `display: flex` (block-level) and a block-level box with
+  `width: auto` fills its container, exactly as the base `width: 100%` did. The 120px floor binds only
+  where the column is content-sized: at 900 the `lg` block's `auto` third track resolves **120px** and
+  the button is 120. So a ticket that says "assert the button computes `width: auto`" is asking for an
+  unobservable value — `getComputedStyle().width` is always a *used* length — and asserting "≈120 at
+  640" is red on a right page. Assert the **floor** where it can bind and the **fill** where it
+  cannot.
+- **Two `sm` toolbars that look alike are not (T-81).** `/bookmarks`' `sm` toolbar is
+  `minmax(0, 1fr) 220px` — the sort sits in a **fixed** column and the assertion sizes it. `/persona`'s
+  is `minmax(0, 1fr) minmax(0, 1fr)` — a **fluid pair**, so the assertion is equality within 1px and
+  any constant (283 at this tree) is the fixture's, not the rule's. Read the block, then decide
+  whether the number or the relation is the fact.
+- **A width ladder does not remount, so a field's value surviving it is free evidence (T-81 → T-82).**
+  The `Emulation` override is browser-level and a media-query change re-lays-out in place: a value the
+  page held before the ladder (row 44's restored handle) is still there after it, which proves no
+  `go()` ran mid-ladder — the clause a retype inside a width phase would silently break (and a
+  retype also fires the page's own draft write, T-61).
 - **A span across every column cannot be moved off row 2 by deleting its `grid-row` (T-80).** The
   `640–899` block sets `.prefs { grid-column: 1 / -1; grid-row: 2 }`; deleting the **`grid-row`** left
   the walk **green, 55/55** with byte-identical numbers, because a three-column span cannot share row 1

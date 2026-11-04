@@ -6388,6 +6388,11 @@ results.push(
  * The two catalogues are one toolbar over another entity and write `?q=&tags=&sort=`; `/persona`
  * writes `?q=&sort=` only and draws `.persona-card` rows instead of catalogue cards. Each descriptor
  * carries the **page's own** selectors and labels, so a red names the page it was reading.
+ *
+ * Since T-81 the row also reads **`/persona`'s `.toolbar` at 640, 900 and 360** — two media blocks
+ * govern that box (a two-track `sm` grid with the search across it, then a three-track `lg` one with
+ * a fixed 200px sort column), and every earlier row mounted the page at ~500px where neither is
+ * live. It is a read: no press, no store row, and every override clears in one `finally`.
  */
 const TOOLBAR_PAGES = [
   { path: "/lorebook/catalog", owner: "catalog", grid: "Lorebooks", emptyCatalog: "No lorebooks yet." },
@@ -6677,7 +6682,210 @@ results.push(
     }
     const personaSort = await sortPass(persona, "name", "Name");
 
-    return `${lorebook.path}: a fresh mount reads ${JSON.stringify(lorebookFull.search)} with ${lorebookFull.count} card(s) of ${JSON.stringify(lorebookFull.grid)} and Newest selected · typing ${JSON.stringify(lorebookSearch.word)} committed ${JSON.stringify(lorebookSearch.narrowed.search)} with ${lorebookSearch.count} of ${lorebookFull.count} card(s) and **kept the caret** (activeElement ${lorebookSearch.narrowed.active}), and a mount from that URL preloads the field and draws the same rows · ${lorebookTag} · ?sort=ratio reads ${JSON.stringify(lorebookSort.sortLabel)} at ${JSON.stringify(lorebookSort.search)} · ${preset.path} reads ${JSON.stringify(presetFull.search)} with ${presetFull.count} card(s), typing ${JSON.stringify(presetSearch.word)} committed ${JSON.stringify(presetSearch.narrowed.search)} with ${presetSearch.count} and kept the caret, ${presetTag}, and ?sort=ratio reads ${JSON.stringify(presetSort.sortLabel)} · ${persona.path} reads ${JSON.stringify(personaFull.search)} with ${personaFull.personas} persona card(s), typing ${JSON.stringify(personaSearch.word)} committed ${JSON.stringify(personaSearch.narrowed.search)} with ${personaSearch.count} and kept the caret, ?q=zzqx-nothing-matches reads ${JSON.stringify(personaNone.noResults)} **with its word break** and no Retry, and ?sort=name reads ${JSON.stringify(personaSort.sortLabel)} with ${JSON.stringify(rowsOf(persona, personaSort))}`;
+    // D. `/persona`'s toolbar at the three widths its own stylesheet draws it for (T-81). **Two**
+    //    blocks govern this box: `sm 640` rewrites `.toolbar` into a two-track grid with the search
+    //    pinned across both (`sort` + `create` auto-place on the line beneath it, `.create .btn`
+    //    widening from the base `width: 100%` to `width: auto; min-width: 120px`), and `lg 900`
+    //    rewrites the same grid to three tracks with the sort in a **fixed** 200px middle column and
+    //    `.search` back in column 1. Every earlier row mounts `/persona` at the session's own ~500px,
+    //    below both blocks, so each of those declarations was a rule nothing could go red on. 360 is
+    //    read as well: a breakpoint is a pair, and the base is the other half (T-77/T-78).
+    //
+    //    No press follows: the toolbar draws whatever the listing holds (an earlier clause can leave
+    //    this page filtered to nothing), so the width phase reads the bar and nothing else.
+    const readBar = () =>
+      js(`
+        const box = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width), height: round(r.height) };
+        };
+        const bar = document.querySelector(".toolbar");
+        const bs = bar ? getComputedStyle(bar) : null;
+        const isGrid = !!bs && bs.display.indexOf("grid") >= 0;
+        const btn = document.querySelector(".toolbar > .create .btn");
+        const bsBtn = btn ? getComputedStyle(btn) : null;
+        return {
+          path: location.pathname,
+          search: location.search,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          personas: document.querySelectorAll(".persona-card").length,
+          display: bs ? bs.display : "",
+          tracks: isGrid ? bs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          gap: bs ? bs.gap : "",
+          toolbar: box(bar),
+          field: box(document.querySelector(".toolbar > .search")),
+          sort: box(document.querySelector(".toolbar > .sort")),
+          create: box(document.querySelector(".toolbar > .create")),
+          btn: box(btn),
+          btnWidth: bsBtn ? bsBtn.width : "",
+          btnMinWidth: bsBtn ? bsBtn.minWidth : "",
+        };
+      `);
+
+    /** One width's worth of the one box: the declared tracks, then the placement they produce. */
+    const assertBar = (r, width) => {
+      const at = `${persona.path} at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!String(r.path).endsWith(persona.path)) {
+        throw new Error(`${at}: the toolbar was measured on ${JSON.stringify(r.path)}, not the persona page`);
+      }
+      if (!r.toolbar || !r.field || !r.sort || !r.create || !r.btn) {
+        throw new Error(
+          `${at}: the toolbar is incomplete — toolbar ${JSON.stringify(r.toolbar)}, search ${JSON.stringify(r.field)}, sort ${JSON.stringify(r.sort)}, create ${JSON.stringify(r.create)}, button ${JSON.stringify(r.btn)}`,
+        );
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the persona page scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+
+      if (width === 640) {
+        // `sm 640`: two equal `minmax(0, 1fr)` tracks — a *fluid pair*, so neither may be sized
+        // against a constant (T-77's rule is to size what the block declares, and this block declares
+        // equality); the search spans both, so both edges are the bar's.
+        if (r.display.indexOf("grid") < 0) {
+          throw new Error(`${at}: .toolbar computes ${JSON.stringify(r.display)}, not the grid the sm block declares`);
+        }
+        if (r.tracks.length !== 2) {
+          throw new Error(`${at}: .toolbar resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the two the sm block declares (minmax(0, 1fr) twice)`);
+        }
+        const [first, second] = r.tracks.map((track) => parseFloat(track));
+        if (!Number.isFinite(first) || !Number.isFinite(second) || first <= 0 || second <= 0) {
+          throw new Error(`${at}: the two tracks resolve to ${JSON.stringify(r.tracks)} — both are fluid, so both have to be a real length`);
+        }
+        if (Math.abs(first - second) > 1) {
+          throw new Error(`${at}: the two tracks resolve to ${JSON.stringify(r.tracks)} — the sm block declares a minmax(0, 1fr) pair, so they are equal`);
+        }
+        if (Math.abs(r.field.left - r.toolbar.left) > 1 || Math.abs(r.field.right - r.toolbar.right) > 1) {
+          throw new Error(
+            `${at}: .search spans ${r.field.left}→${r.field.right} in a toolbar ${r.toolbar.left}→${r.toolbar.right} — the sm block pins it across both columns (grid-column 1 / span 2)`,
+          );
+        }
+        if (!(r.sort.top > r.field.bottom - 1) || !(r.create.top > r.field.bottom - 1)) {
+          throw new Error(
+            `${at}: .sort sits at top ${r.sort.top} and .create at ${r.create.top} over the search's bottom ${r.field.bottom} — the field owns row 1 and the pair the line beneath it`,
+          );
+        }
+        // `align-items: end` makes the bottoms the row witness, not the tops (T-79/T-80).
+        if (Math.abs(r.sort.bottom - r.create.bottom) > 2) {
+          throw new Error(
+            `${at}: .sort ends at ${r.sort.bottom} and .create at ${r.create.bottom} — the sm block puts them on one row under the search, bottom-aligned`,
+          );
+        }
+        if (!(r.sort.left < r.create.left)) {
+          throw new Error(`${at}: .sort starts at ${r.sort.left} and .create at ${r.create.left} — the sort takes column 1, the button column 2`);
+        }
+        // The `<a class="btn">` is what the block widens; `.create` is the grid item it sits in.
+        if (r.btnMinWidth !== "120px") {
+          throw new Error(`${at}: .create .btn computes min-width ${JSON.stringify(r.btnMinWidth)}, not the 120px the sm block gives it`);
+        }
+        // `width: auto` on a **block-level** flex container is the fill, not the content (T-81's
+        // find): the button keeps whatever column it is in — 283px here — exactly as the base
+        // `width: 100%` did, so the 120px floor has nothing to bind against at this width. Record the
+        // pair rather than assert a 120px box that a right page does not draw; the floor is proved
+        // where it can bind, on the `lg` auto track below.
+        if (Math.abs(r.btn.width - r.create.width) > 1) {
+          throw new Error(
+            `${at}: .create .btn measures ${r.btn.width} in a ${r.create.width} column — the sm block widens the button's floor, not its box, so width auto still fills the column`,
+          );
+        }
+        if (r.btn.width < 119) {
+          throw new Error(`${at}: .create .btn measures ${r.btn.width}, under the 120px floor the sm block gives it`);
+        }
+        return;
+      }
+
+      if (width === 900) {
+        // `lg 900`: three tracks with the sort in a **fixed** 200px middle column, all three children
+        // on one line. `align-items: end` still rules here (no later block resets it), so the shared
+        // edge is the bottom.
+        if (r.display.indexOf("grid") < 0) {
+          throw new Error(`${at}: .toolbar computes ${JSON.stringify(r.display)}, not the grid the lg block rewrites`);
+        }
+        if (r.tracks.length !== 3) {
+          throw new Error(`${at}: .toolbar resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the three the lg block declares (fluid | 200px | auto)`);
+        }
+        if (Math.abs(parseFloat(r.tracks[1]) - 200) > 1) {
+          throw new Error(`${at}: the middle track resolves to ${JSON.stringify(r.tracks[1])}, not the fixed 200px sort column the lg block declares (tracks ${JSON.stringify(r.tracks)})`);
+        }
+        if (!(r.field.left < r.sort.left) || !(r.sort.left < r.create.left)) {
+          throw new Error(
+            `${at}: search ${r.field.left}→${r.field.right}, sort ${r.sort.left}→${r.sort.right}, create ${r.create.left}→${r.create.right} — the lg block puts all three on one line, search first`,
+          );
+        }
+        if (Math.abs(r.field.bottom - r.sort.bottom) > 2 || Math.abs(r.sort.bottom - r.create.bottom) > 2) {
+          throw new Error(
+            `${at}: the three children end at ${JSON.stringify([r.field.bottom, r.sort.bottom, r.create.bottom])} — one line under align-items: end shares a bottom`,
+          );
+        }
+        // The `auto` third track is sized by the button's own floor, so this is the one width where
+        // the sm block's 120px `min-width` actually binds (at 640 the 1fr column dwarfs it).
+        if (Math.abs(r.btn.width - 120) > 1) {
+          throw new Error(
+            `${at}: .create .btn measures ${r.btn.width} in the auto column ${JSON.stringify(r.tracks[2])} — the lg block leaves it content-sized, and the sm block's 120px floor is the content`,
+          );
+        }
+        return;
+      }
+
+      // 360: the base block — a `flex-direction: column` stack, no grid at all (a flex container's
+      // `gridTemplateColumns` computes to the string `none`, T-73), and the button back at 100%.
+      if (r.display !== "flex") {
+        throw new Error(`${at}: .toolbar computes ${JSON.stringify(r.display)}, not the flex column the base block declares — a sm or lg grid is leaking below 640`);
+      }
+      if (r.tracks.length !== 0) {
+        throw new Error(`${at}: .toolbar resolves ${JSON.stringify(r.tracks)} on a box that is not a grid — the display and the track list have to agree`);
+      }
+      if (!(r.field.top < r.sort.top) || !(r.sort.top < r.create.top)) {
+        throw new Error(
+          `${at}: search tops at ${r.field.top}, sort at ${r.sort.top}, create at ${r.create.top} — below 640 the three children stack in DOM order`,
+        );
+      }
+      if (Math.abs(r.btn.width - r.create.width) > 1) {
+        throw new Error(`${at}: .create .btn measures ${r.btn.width} in a ${r.create.width} column — the base block stretches it to width: 100%`);
+      }
+      if (r.btnMinWidth === "120px") {
+        throw new Error(`${at}: .create .btn still computes min-width 120px below the breakpoint — that is the sm block's, and it has to clear`);
+      }
+    };
+
+    await go(persona.path);
+    await waitFor(
+      `document.querySelector(".toolbar > .create .btn") !== null && document.querySelectorAll(".skel-card").length === 0`,
+      `${persona.path}: the toolbar to draw at the session's own width`,
+      12000,
+    );
+    const barRestore = await js("return window.innerWidth;");
+    const barLines = [];
+    let barSeen = "";
+    try {
+      // Width-major, one override per width: `go()` remounts the page, the `Emulation` override is
+      // browser-level, and the toolbar re-lays-out in place, so each reading asserts `innerWidth`
+      // rather than assuming the override took (the session's own tab is ~500px).
+      for (const width of [640, 900, 360]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        const bar = await readBar();
+        assertBar(bar, width);
+        barLines.push(
+          `${width}px: .toolbar ${JSON.stringify(bar.display)} gap ${bar.gap} → ${JSON.stringify(bar.tracks)} (${bar.tracks.length} track(s), ${bar.personas} persona card(s)) · search ${bar.field.left}→${bar.field.right} in ${bar.toolbar.left}→${bar.toolbar.right} top ${bar.field.top} bottom ${bar.field.bottom} · sort ${bar.sort.left}→${bar.sort.right} top ${bar.sort.top} bottom ${bar.sort.bottom} · create ${bar.create.left}→${bar.create.right} top ${bar.create.top} bottom ${bar.create.bottom} · .btn ${bar.btn.left}→${bar.btn.right} width ${bar.btnWidth} min-width ${bar.btnMinWidth}`,
+        );
+      }
+      barSeen = barLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const barAfter = await js("return window.innerWidth;");
+    if (barAfter !== barRestore) {
+      throw new Error(`the persona toolbar's overrides cleared to ${barAfter}px, but the session runs at ${barRestore}px — a leaked override would mis-measure every later row`);
+    }
+
+    return `${lorebook.path}: a fresh mount reads ${JSON.stringify(lorebookFull.search)} with ${lorebookFull.count} card(s) of ${JSON.stringify(lorebookFull.grid)} and Newest selected · typing ${JSON.stringify(lorebookSearch.word)} committed ${JSON.stringify(lorebookSearch.narrowed.search)} with ${lorebookSearch.count} of ${lorebookFull.count} card(s) and **kept the caret** (activeElement ${lorebookSearch.narrowed.active}), and a mount from that URL preloads the field and draws the same rows · ${lorebookTag} · ?sort=ratio reads ${JSON.stringify(lorebookSort.sortLabel)} at ${JSON.stringify(lorebookSort.search)} · ${preset.path} reads ${JSON.stringify(presetFull.search)} with ${presetFull.count} card(s), typing ${JSON.stringify(presetSearch.word)} committed ${JSON.stringify(presetSearch.narrowed.search)} with ${presetSearch.count} and kept the caret, ${presetTag}, and ?sort=ratio reads ${JSON.stringify(presetSort.sortLabel)} · ${persona.path} reads ${JSON.stringify(personaFull.search)} with ${personaFull.personas} persona card(s), typing ${JSON.stringify(personaSearch.word)} committed ${JSON.stringify(personaSearch.narrowed.search)} with ${personaSearch.count} and kept the caret, ?q=zzqx-nothing-matches reads ${JSON.stringify(personaNone.noResults)} **with its word break** and no Retry, and ?sort=name reads ${JSON.stringify(personaSort.sortLabel)} with ${JSON.stringify(rowsOf(persona, personaSort))} · the persona toolbar at ${barSeen}`;
   }),
 );
 

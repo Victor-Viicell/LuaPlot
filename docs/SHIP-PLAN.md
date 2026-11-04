@@ -634,12 +634,26 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       Found: the three catalog copies (`/preset/catalog`, `/lorebook/catalog`, `/persona`) still
       write their own query with no row reading them — filed as **T-68**.
 
-- [ ] **T-81 `/persona`'s `sm 640` toolbar had never been rendered.** `persona-collection.tsrx` keeps a
+- [x] **T-81 `/persona`'s `sm 640` toolbar had never been rendered.** `persona-collection.tsrx` keeps a
       `@media (min-width: 640px)` block that rewrites `.toolbar` from a flex column into
       `minmax(0, 1fr) minmax(0, 1fr)` with `.search` spanning both columns (`grid-column: 1 / span 2`)
       and sort + Create auto-placed on the line beneath, and widens `.create .btn` from the base
       `width: 100%` to `width: auto; min-width: 120px` — and row 51 mounts that page only at the
       session's own ~500px, below the breakpoint. Brief: `docs/NEXT.md` (T-81).
+      Landed: row 51 extended (no new row, 55 stays) reading the bar at 640 / 900 / 360; measured
+      640 `["283px","283px"]`, 900 `["378px","200px","120px"]`, 360 flex. Red proof: deleting the sm
+      block's `.search { grid-column: 1 / span 2 }` red-lit row 51 alone at *".search spans 24→307 in
+      a toolbar 24→606"*.
+
+- [ ] **T-82 `/onboarding`'s `sm 640` form measure and action row have never been rendered.** The
+      page's `@media (min-width: 640px)` block sets `.setup { max-width: 520px }` (*"A form is not a
+      poster"*), turns `.actions` from a stack into a row (`flex-direction: row; align-items: center;
+      gap: 16px`), gives `.actions .btn { width: auto; min-width: 200px }` and lets `.actions .note`
+      take `flex: 1 1 auto; max-width: 30ch`. Row 44 mounts `/onboarding` only at the session's ~500px,
+      so none of it has ever run — **and `.actions .btn` targets the `Button` primitive's own element,
+      which `DESIGN.md` says a scoped page `<style>` cannot reach** (`.toolbar .field`, `.prefs
+      .toggle`, `.pager .btn` all matched nothing), so the ticket may be a *dead rule* plus the
+      page-owned-wrapper fix the design already prescribes. Brief: `docs/NEXT.md` (T-82).
 
 - [x] **T-80 `/post/thread`'s `sm 640` controls had never been rendered.** `post-thread.tsrx` stacks
       **two** media blocks over `.controls`: `sm` turns the base two-track stack into

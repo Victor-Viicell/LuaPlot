@@ -3,6 +3,43 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-81: `/persona`'s `sm 640` and `lg 900` toolbars are rendered in both directions
+
+- **Changed:** `scripts/smoke.mjs` only — **row 51 extended, no new row** (`EXPECTED_ROWS` stays
+  **55**). The T-68 journey's new **§D** runs after its last press (`sortPass`), mounts `/persona`
+  once, then takes `640×740`, `900×740` and `360×740` in that ladder, one `readBar()` per width into
+  `assertBar(r, width)`. 640 asserts the `sm` block: a `grid`, **exactly two** tracks, both fluid and
+  **equal within 1px** (a `minmax(0, 1fr)` pair, so neither is sized against a constant), `.search`
+  spanning **both** of `.toolbar`'s edges, `.sort` and `.create` below the field (`top >
+  search.bottom − 1`) sharing row 2 by their **bottoms** (`align-items: end`), `sort.left <
+  create.left`, `.create .btn`'s `min-width: 120px`, and the button filling its column. 900 asserts
+  the `lg` rewrite: **three** tracks with the middle one `200 ± 1`, all three children on one line
+  (`search.left < sort.left < create.left`) sharing a bottom, and `.create .btn` at exactly
+  **120px** — the `auto` track is the one place the sm block's floor binds. 360 asserts the base:
+  `display: flex` (not a grid, so `tracks` is `[]`, T-73), the three children stacked in DOM order,
+  and `.create .btn` at the column's full width with `min-width` no longer `120px`. One `finally`
+  clears the override and `innerWidth` is asserted back. Measured at 640 `["283px","283px"]` gap
+  `16px`, search `24→606` (the whole bar), sort `24→307`, create `323→606`, both bottoms `283.58`,
+  `.btn` `283px` / `min-width 120px`; at 900 `["378px","200px","120px"]`, search `122→500`, sort
+  `516→716`, create `732→852`, three bottoms `205.98`, `.btn` `120px`; at 360 `flex`, `[]`, search
+  `16→324` top `127.59`, sort top `209.19`, create top `290.78`, `.btn` `308px` / `min-width 0px`.
+- **Verified:** red first — deleting `.search { grid-column: 1 / span 2 }` from
+  `persona-collection.tsrx`'s `sm` block put **row 51 alone** red (54 PASS / 1 FAIL) reading
+  *"/persona at 640px: .search spans 24→307 in a toolbar 24→606 — the sm block pins it across both
+  columns (grid-column 1 / span 2)"*: the page, the width and both edges, as the accept line asked.
+  Bytes restored (`cp` + `cmp` identical; `git status` shows only `scripts/smoke.mjs`), `check.sh`
+  **GREEN** (all ten sections), `./scripts/smoke.sh` **55/55**, `publish.sh` → `LIVE` (asset
+  `index-DPoxP2Sr.js`, unchanged: no built source moved), `curl` **200**, `./scripts/smoke.sh --live`
+  **55/55**.
+- **Not verified / next:** the ticket's own sketch of `.create .btn` was wrong — **`width: auto` on a
+  block-level flex container is the fill, not the content**, so at 640 the button measures the whole
+  283px column and the 120px floor cannot bind there; the assertion records the fill plus the floor
+  and proves the floor at 900, where the `auto` track sizes to it. `getComputedStyle().width` is
+  always a used length, so no row can assert the keyword `auto` at all. `.sort`'s 1fr column is
+  fluid here (283px), unlike `/bookmarks`' fixed 220px column — the two `sm` toolbars look alike and
+  are not. No press, no store row, no preference, no schema/adapter/JEV change, no new dependency.
+  `/onboarding`'s `sm` block is the next copy of this class — filed as **T-82**.
+
 ## 2026-11-03 — T-80: `/post/thread`'s `sm 640` controls are rendered in both directions
 
 - **Changed:** `scripts/smoke.mjs` only — **row 39 extended** (no new row; `EXPECTED_ROWS` stays
