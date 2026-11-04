@@ -657,13 +657,17 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       **Landed:** the rule *was* dead (pruned from the compiled CSS); the page now wraps `Button` in a
       page-owned `.primary`, row 44 reads the ladder at 640/900/360.
 
-- [ ] **T-83 `/authentification`'s `sm 640` 420 measure has never been rendered.** The entry screen's
+- [x] **T-83 `/authentification`'s `sm 640` 420 measure has never been rendered.** The entry screen's
       `@media (min-width: 640px)` block caps `.providers`, `.nsfw` and `.status` at `max-width: 420px`
       (*"A 420 measure for the controls, not three buttons stretched across 640"*) and steps `.screen`'s
       `min-height` from `100dvh - 228px` to `100dvh - 240px`. Row 1 is the only row that mounts
       `/authentification`, and it does so at the walk's own ~500px, below the breakpoint — so neither
       declaration has ever run, on the app's other entry screen. Extend row 1's width phase between its
       push proof and its provider press. Brief: `docs/NEXT.md` (T-83).
+      **Landed:** row 1 extended (no new row, 55 stays) reading 640 / 900 / 360; the caps are **live** —
+      420 in an outlet content box of 582 at 640 and 730 at 900, `none` at 360 where all three fill 318.
+      Red proofs: deleting the rule red-lit row 1 at *".providers measures 582 in an outlet whose content
+      box is 582 (630 box)"*; dropping only `.status` from the list red-lit it at *".status measures 582"*.
 
 - [x] **T-80 `/post/thread`'s `sm 640` controls had never been rendered.** `post-thread.tsrx` stacks
       **two** media blocks over `.controls`: `sm` turns the base two-track stack into

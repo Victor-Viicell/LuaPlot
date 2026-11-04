@@ -3,6 +3,38 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-83: `/authentification`'s `sm 640` 420 measure and its `.screen` step are rendered in both directions
+
+- **Changed:** row 1 of `scripts/smoke.mjs` (**extended, no new row** — `EXPECTED_ROWS` stays **55**)
+  + `docs/DESIGN.md` → *Auth*. No page change: the `sm` block was already right, it had simply never
+  been rendered. The ladder sits between the row's push proof (`expectNoReload(mark, "home's Sign in")`)
+  and its `Continue with Google` press, so the press still happens at the session's own ~500px and its
+  `cancelled` outcome is unchanged. It presses and types **nothing**, takes `640×740`, `900×740`,
+  `360×740` in that order — one `readGate()` per width into `assertGate(r, width)` — clears every
+  override in one `finally`, asserts `innerWidth` came back, then re-asserts the path and the button
+  face. Measured: **640** `.providers` `24→444` **420** `max-width 420px`, `.status` 420, `.nsfw` 420
+  inside an outlet **content** box of **582** (630 box); **900** the same 420 inside **730** (794 box);
+  **360** `max-width none`, all three **318** = the outlet's content box. The three share a left edge
+  and read providers → status → NSFW top to bottom; the three provider controls are one column inside
+  the capped box (tops increasing, lefts equal). `.screen`'s `min-height` reads **512px** at 360 and
+  **500px** at 640 — a **12px** step, compared not pinned (900 reads 608, evidence only).
+- **Verified:** red first. Deleting `.providers, .nsfw, .status { max-width: 420px }` from the `sm`
+  block put row 1 red at *"/authentification at 640px: .providers measures 582 in an outlet whose
+  content box is 582 (630 box) — the sm block caps it at 420"*; dropping **only** `.status` from the
+  selector list put it red at *".status measures 582 …"*, so the acceptance can tell which member of
+  the list bound. Bytes restored (`cp` + `cmp` identical), `check.sh` **GREEN**, `./scripts/smoke.sh`
+  **55/55** local, `publish.sh` → `LIVE` (`assets/index-ByZk6X8Z.js`), `curl` **200**, `./scripts/
+  smoke.sh --live` **55/55**.
+- **Not verified / next:** the red run also reds **35** later rows, because row 1 signs out at its top
+  and only signs back in at its end — a throw inside it leaves every session-dependent row stranded.
+  That is the row's shape, not a second bug; read the first failing row. The outlet's content box is
+  **page-dependent**: `/authentification` reads 582/318 where `/onboarding` in the same walk reads
+  572/308 (the onboarding form scrolls, the entry screen does not, and the scroller's bar comes out of
+  the column) — so a row must read it, never pin T-82's pair. Next: **T-84** — `/character/catalog`'s
+  `sm 640` toolbar (the `220px minmax(0, 1fr)` grid, `.prefs` as a row, and the `640–899` span), the
+  last of the four toolbars T-79/T-80/T-81 have not walked. No new dependency, no schema/adapter/JEV
+  change, no store write.
+
 ## 2026-11-03 — T-82: `/onboarding`'s `sm 640` form measure and action row are rendered in both directions
 
 - **Changed:** `src/pages/onboarding.tsrx` + row 44 of `scripts/smoke.mjs` (**extended, no new row** —

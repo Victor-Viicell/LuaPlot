@@ -828,6 +828,194 @@ results.push(
     await expectPath("/authentification", "home's Sign in");
     await waitText("Continue with Google", 8000);
     const kept = await expectNoReload(mark, "home's Sign in");
+
+    /* T-83 — the entry screen's own `sm 640` block, which no row has ever rendered. Row 1 is the
+     * only row that mounts `/authentification` and it does so at the session's own ~500px, so
+     * `.providers, .nsfw, .status { max-width: 420px }` and the `.screen` `min-height` step
+     * (`100dvh - 228px` → `- 240px`) had never run on the app's other entry screen.
+     *
+     * The ladder presses and types **nothing** — it sits between the push proof and the provider
+     * press, so the press still happens at the session's own width and its `cancelled` outcome is
+     * unchanged — and every override comes off in one `finally` that asserts `innerWidth` came
+     * back (T-78's leak).
+     *
+     * Trap: nothing here touches `.providers .btn`. The buttons are the `Button` primitive and a
+     * scoped rule on a primitive's element is pruned at compile time (T-82), so the box under test
+     * is `.providers` — a page-owned element — and the column check reads its children's geometry,
+     * not a declared rule. `.status` is read through `role="status"` beside its own box, because
+     * the copy changes with the state and the role does not.
+     */
+    const readGate = () =>
+      js(`
+        const box = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width), height: round(r.height) };
+        };
+        const screen = document.querySelector('.screen');
+        const ss = screen ? getComputedStyle(screen) : null;
+        const outlet = screen ? screen.parentElement : null;
+        const os = outlet ? getComputedStyle(outlet) : null;
+        const pad = os ? parseFloat(os.paddingLeft) + parseFloat(os.paddingRight) : 0;
+        const outletContent = outlet ? Math.round((outlet.getBoundingClientRect().width - pad) * 100) / 100 : null;
+        const providers = document.querySelector('.gate .providers');
+        const ps = providers ? getComputedStyle(providers) : null;
+        const status = document.querySelector('.gate .status');
+        const sts = status ? getComputedStyle(status) : null;
+        const nsfw = document.querySelector('.gate .nsfw');
+        const ns = nsfw ? getComputedStyle(nsfw) : null;
+        const rows = providers ? [...providers.children].map(box) : [];
+        return {
+          path: location.pathname,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          screen: box(screen),
+          screenMinHeight: ss ? ss.minHeight : '',
+          outlet: box(outlet),
+          outletContent: outletContent,
+          providers: box(providers),
+          providersMaxWidth: ps ? ps.maxWidth : '',
+          providersDirection: ps ? ps.flexDirection : '',
+          providersGap: ps ? ps.gap : '',
+          status: box(status),
+          statusMaxWidth: sts ? sts.maxWidth : '',
+          statusRole: !!document.querySelector('.gate .status [role="status"]'),
+          nsfw: box(nsfw),
+          nsfwMaxWidth: ns ? ns.maxWidth : '',
+          rows: rows,
+        };
+      `);
+
+    /** One width of the entry screen: the three capped boxes, their shared left edge, the order. */
+    const assertGate = (r, width) => {
+      const at = `/authentification at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!String(r.path).endsWith("/authentification")) {
+        throw new Error(`${at}: the entry screen was measured on ${JSON.stringify(r.path)}, not /authentification`);
+      }
+      if (!r.screen || !r.outlet || !r.providers || !r.status || !r.nsfw) {
+        throw new Error(
+          `${at}: the entry screen is incomplete — screen ${JSON.stringify(r.screen)}, outlet ${JSON.stringify(r.outlet)}, providers ${JSON.stringify(r.providers)}, status ${JSON.stringify(r.status)}, nsfw ${JSON.stringify(r.nsfw)}`,
+        );
+      }
+      if (!r.statusRole) {
+        throw new Error(`${at}: the status line carries no role=status inside .status — the row reads the box and the role together, because the copy changes with the state`);
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the entry screen scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+      // Three providers, stacked: the children's own geometry is the column proof (the box's
+      // `flex-direction` says what the block asks for, the tops say what the browser did).
+      if (r.rows.length !== 3) {
+        throw new Error(`${at}: .providers draws ${r.rows.length} control(s), not the spec's three providers`);
+      }
+      if (r.providersDirection !== "column") {
+        throw new Error(`${at}: .providers computes flex-direction ${JSON.stringify(r.providersDirection)}, not the column the base block declares`);
+      }
+      for (let i = 1; i < r.rows.length; i++) {
+        if (!(r.rows[i].top > r.rows[i - 1].top)) {
+          throw new Error(`${at}: provider control ${i} tops at ${r.rows[i].top} and control ${i - 1} at ${r.rows[i - 1].top} — the three providers stack`);
+        }
+        if (Math.abs(r.rows[i].left - r.rows[0].left) > 1) {
+          throw new Error(`${at}: provider control ${i} starts at ${r.rows[i].left} and the first at ${r.rows[0].left} — a column shares its left edge`);
+        }
+        if (r.rows[i].right > r.providers.right + 1) {
+          throw new Error(`${at}: provider control ${i} ends at ${r.rows[i].right} past the .providers box's ${r.providers.right} — the buttons fill the measure, they do not overflow it`);
+        }
+      }
+
+      if (width === 640 || width === 900) {
+        // The cap is only a cap while the outlet is wider: read both numbers and print both.
+        if (!(r.outletContent > 421)) {
+          throw new Error(`${at}: the outlet's content box is ${r.outletContent} — a 420 cap on a box that narrow measures nothing (the ladder needs a wider column)`);
+        }
+        const capped = [
+          ["providers", r.providers, r.providersMaxWidth],
+          ["status", r.status, r.statusMaxWidth],
+          ["nsfw", r.nsfw, r.nsfwMaxWidth],
+        ];
+        for (const [name, measured, maxWidth] of capped) {
+          if (Math.abs(measured.width - 420) > 1) {
+            throw new Error(`${at}: .${name} measures ${measured.width} in an outlet whose content box is ${r.outletContent} (${r.outlet.width} box) — the sm block caps it at 420`);
+          }
+          if (maxWidth !== "420px") {
+            throw new Error(`${at}: .${name} measures ${measured.width} and computes max-width ${JSON.stringify(maxWidth)}, not the 420px the sm block declares`);
+          }
+        }
+        // The DESIGN comment's own words — "the two left edges agree" — so the measure is one column.
+        if (Math.abs(r.providers.left - r.nsfw.left) > 1) {
+          throw new Error(`${at}: .providers starts at ${r.providers.left} and .nsfw at ${r.nsfw.left} — the capped boxes share a left edge`);
+        }
+        if (Math.abs(r.providers.left - r.status.left) > 1) {
+          throw new Error(`${at}: .providers starts at ${r.providers.left} and .status at ${r.status.left} — the status line sits in the same measure`);
+        }
+        // Order, never tops: `.screen` centres its column, so a width change moves every box vertically.
+        if (!(r.providers.bottom <= r.status.top + 1)) {
+          throw new Error(`${at}: .providers ends at ${r.providers.bottom} and the status line starts at ${r.status.top} — the providers sit above it at every width`);
+        }
+        if (!(r.status.bottom <= r.nsfw.top + 1)) {
+          throw new Error(`${at}: the status line ends at ${r.status.bottom} and the NSFW row starts at ${r.nsfw.top} — the single signed-out control is the last of the three`);
+        }
+        return;
+      }
+
+      // 360: the base block — no cap at all, all three fill the outlet's content box.
+      for (const [name, measured, maxWidth] of [
+        ["providers", r.providers, r.providersMaxWidth],
+        ["status", r.status, r.statusMaxWidth],
+        ["nsfw", r.nsfw, r.nsfwMaxWidth],
+      ]) {
+        if (Math.abs(measured.width - r.outletContent) > 1) {
+          throw new Error(`${at}: .${name} measures ${measured.width} in an outlet content box of ${r.outletContent} — below 640 the boxes fill the column (the 420 cap is the sm block's)`);
+        }
+        if (maxWidth !== "none") {
+          throw new Error(`${at}: .${name} still computes max-width ${JSON.stringify(maxWidth)} below the breakpoint — the sm cap has to clear`);
+        }
+      }
+    };
+
+    const gateRestore = await js("return window.innerWidth;");
+    const gateMinHeight = {};
+    const gateLines = [];
+    let gateSeen = "";
+    try {
+      for (const width of [640, 900, 360]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        const gate = await readGate();
+        assertGate(gate, width);
+        gateMinHeight[width] = parseFloat(gate.screenMinHeight);
+        gateLines.push(
+          `${width}px: .providers ${gate.providers.left}→${gate.providers.right} ${gate.providers.width} max-width ${gate.providersMaxWidth} · .status ${gate.status.width} max-width ${gate.statusMaxWidth} · .nsfw ${gate.nsfw.width} max-width ${gate.nsfwMaxWidth} · outlet ${gate.outletContent} content / ${gate.outlet.width} box · .screen min-height ${gate.screenMinHeight}`,
+        );
+      }
+      // The sm block subtracts 12 more from the same chrome sum. Compared, never pinned: the walk's
+      // own window height is not the design's, so the *step* is the fact, not the two lengths.
+      const step = gateMinHeight[360] - gateMinHeight[640];
+      if (!(Number.isFinite(gateMinHeight[360]) && Number.isFinite(gateMinHeight[640]))) {
+        throw new Error(`/authentification's .screen min-height reads ${JSON.stringify([gateMinHeight[360], gateMinHeight[640]])} at 360/640 — both have to resolve to a px length`);
+      }
+      if (Math.abs(step - 12) > 0.5) {
+        throw new Error(
+          `/authentification: .screen's min-height steps ${step}px from 360 (${gateMinHeight[360]}px) to 640 (${gateMinHeight[640]}px), not the sm block's 12 — the block is 100dvh - 228px then - 240px`,
+        );
+      }
+      gateSeen = gateLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const gateAfter = await js("return window.innerWidth;");
+    if (gateAfter !== gateRestore) {
+      throw new Error(`the entry screen's overrides cleared to ${gateAfter}px, but the session runs at ${gateRestore}px — a leaked override would mis-measure every later row`);
+    }
+    // No `go()` ran inside the ladder: the page is still the entry screen and the same document.
+    await expectPath("/authentification", "the entry screen after its width ladder");
+    await waitText("Continue with Google", 8000);
+
     // The provider button is a **stub** (`lib/auth.ts`: no session write until T-30), so the honest
     // assertion is the outcome it really produces — `cancelled`, nobody signed in. This row used to
     // pass because home's entry control is an `<a>` with no `follow()`, so pressing it hard-reloaded
@@ -842,7 +1030,7 @@ results.push(
     await waitText("signed in as You", 8000);
     const label = await badge();
     if (!label.startsWith("Alerts")) throw new Error("the tab bar lost its Alerts destination");
-    return `the provider button answers cancelled and signs nobody in; the menu's switch signs in as You; the control pushed (${kept})`;
+    return `the provider button answers cancelled and signs nobody in; the menu's switch signs in as You; the control pushed (${kept}); the sm 640 measure ${gateSeen}`;
   }),
 );
 

@@ -264,6 +264,15 @@ sanctioned sub-44 target, because a token chip is a label with a corner, not a s
   `sm` the group is capped at **420px** so 640 never renders a 592px-wide button. The rules above and
   below keep spanning the whole column (a rule wider than the measure is home's look). Never a row
   of three: `Continue with Google` at 14px mono does not fit three-up in a 560 column.
+  **Measured (T-83, walk row 1):** at 640 `.providers`, `.status` and `.nsfw` each compute
+  `max-width: 420px` and measure **420** inside an outlet content box of **582**; at 900 the same
+  420 inside **730**; at 360 they compute `none` and fill the outlet's **318**. The three share a
+  left edge and read providers → status → NSFW top to bottom. The cap is on the three page-owned
+  boxes, never on a `.btn` (a scoped rule on a primitive's element is pruned — see *Primitives*).
+  The outlet's content box is **page-dependent** (582/318 here, 572/308 on `/onboarding`, same run):
+  a taller page scrolls, and the scroller's 10px bar comes out of the column. Read it, never pin it.
+  `.screen`'s `min-height` steps 12px between 360 (`100dvh - 228px`) and 640 (`- 240px`), then to
+  `- 132px` at 900 — the same chrome sum as home, so the two entry screens centre on one line.
 - **Provider names are text.** No brand marks exist and there is one 20px stroke icon set, so the
   labels are `Continue with Google` / `GitHub` / `Discord` — the product name never appears in them.
 - **One status row, height reserved.** `.status` is a 20px flex row when idle (empty, transparent
