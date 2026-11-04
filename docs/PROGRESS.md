@@ -3,6 +3,47 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-04 — T-87: `/session/[id]`'s `sm 640` block — one live step, three dead declarations
+
+- **Changed:** `session-detail.tsrx` lost **three rules that matched no element on the page** —
+  `.title { font-size: 26px }`, `.composer-actions` (two rules at `sm`) and the `lg` restatement of
+  `.composer-actions > * { min-width: 160px }`. `.title` is a second dead name the T-86 brief did not
+  know about: this page has **no title block at all** (the bar's `.who-name` is its only heading,
+  `session-detail.tsrx` line 457 says so), so the walk reads `.title 0 / .composer-actions 0 node(s)`
+  at every width. They were **compiled and inert** (unlike T-82's pruned `.btn`): the rebuilt
+  `dist/assets/session-detail-*.css` now has **zero** occurrences of either name, and the `sm` block
+  is down to `.turn-text`, `.menu-actions` and `.copy-actions`. Row 33 of `scripts/smoke.mjs` (`the
+  session's copies are the snapshot: closed, stated, and restorable` — **extended, no new row**,
+  `EXPECTED_ROWS` stays **55**) grew a read-only ladder at the very end, after its **Restore copy**
+  press: `640×740`, `900×740`, `360×740`, one `readStage()` per width into `assertTranscript(r, width)`,
+  then the settings sheet opened **once per width** for `.menu-actions` (`sheetMenuAt` — danger row,
+  read, *Cancel*, close, close-in-`finally`), every override cleared in one `finally`, `innerWidth`
+  re-read, then the bare mount re-read for the `.turn` count (the session URL has no query, so the URL
+  proves nothing). Measured: **640** `.turn-text` **15px** (400, 588px wide), sheet `.menu-actions`
+  **row / flex-end** (598px), `.copy-actions` justify `flex-start`; **900** the same, the pair is
+  **478px**; **360** `.turn-text` **14px**, `.menu-actions` **column-reverse / normal**, `.copy-actions`
+  `normal`; 6 turns at every width, scrollWidth 630/640, 890/900, 350/360.
+- **Verified:** red first, in the block's two remaining rules. `.turn-text { font-size: 15px }` → `14px`
+  put **row 33 alone** red (54 ok / 1 fail) at *\"/session/[id] at 640px: the first .turn-text computes
+  font-size 14px (weight 400, 588px wide, \"You are standing 1.4 metres inside the doorway. \"), not 15px
+  — the sm block's .turn-text is the only rule that steps the transcript\"*; bytes restored (`cmp`), then
+  deleting the `sm` `.menu-actions` rule alone red-lit it at *\"/session/[id] settings sheet at 640px:
+  .menu-actions computes flex-direction \"column-reverse\" (598px wide), not the sm block's row — the
+  confirmation's two answers are still stacked on a sheet that is a desktop dialog\"*. Bytes restored
+  (`cmp`), `check.sh` **GREEN**, `./scripts/smoke.sh` **55/55** local, `publish.sh` → `LIVE`
+  (`index-bhRI89H_.js`), `curl` **200**, `./scripts/smoke.sh --live` **55/55** with the same numbers.
+  The sheet's own two presses write nothing: the danger **row** sets `confirmDelete`, *Cancel* clears
+  it, and the confirm's *Delete session* is never pressed — so the row still touches no store.
+- **Not verified / next:** `docs/DESIGN.md` needed no change (same type step as every other page; the
+  sheet pair's `column-reverse → row` was already the *phone stacks, desktop pairs* rule). No APK — T-35
+  still blocked. **Correction to the T-86 brief's trap (a):** `.copy-actions`' `sm` rule is *not*
+  vacuous — with no base declaration Chromium computes `normal` at 360 and `flex-start` from 640, so
+  the rule does change the computed value while changing no layout; the row prints it and gates
+  nothing, which is still the right call. Next: **T-88** — `home.tsrx`'s `sm 640` block (`.screen`
+  `min-height` 228 → 240, `.entry` `column` → `row`/`space-between`/`gap 24`, `.entry .btn`
+  `width: 100%` → `auto` + `justify-content: center → flex-start`), the app's first screen and the
+  first entry to have it.
+
 ## 2026-11-04 — T-86: `/notifications`' `sm 640` row block is rendered at 640, 900 and 360
 
 - **Changed:** row 23 of `scripts/smoke.mjs` (`read a notification (the badge drops)` — **extended,

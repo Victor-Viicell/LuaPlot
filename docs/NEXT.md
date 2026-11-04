@@ -1,5 +1,83 @@
 # Baton — what the next session does
 
+**T-87 landed — and the brief it inherited was wrong in one place, which is the lesson to carry.** The
+T-86 baton said `/session/[id]`'s `sm 640` block held **two** live steps (`.title` 24 → 26 and
+`.turn-text` 14 → 15) and one dead declaration. It held **one** live text step and **three** dead
+rules: `.title` names nothing either — this page has **no title block** (the bar's `.who-name` is its
+only heading, and the file's own header comment says *"no page title block"*). So the block is now
+`.turn-text`, `.menu-actions`, `.copy-actions`, the copies row renders the two live ones at 640 / 900 /
+360, and the rebuilt CSS has zero occurrences of `composer-actions` or `.title`. **Compare every
+selector a block declares against the page's own markup before believing a brief's count of live
+versus dead** — T-86 found one dead name by grepping, T-87 found a second by grepping one line further.
+
+**Second fact, new:** `.copy-actions`' `sm` rule is **not** vacuous. With no base declaration Chromium
+computes `normal` at 360 and `flex-start` from 640 — it changes the computed value while changing no
+layout. The row prints it and gates nothing (a gate on a no-op styling is a gate on nothing a reader
+sees), but the T-86 brief's trap (a) — *"reads `flex-start` at every width"* — is wrong as written.
+
+**Row count is 55** (`EXPECTED_ROWS`), local **55/55** and `--live` **55/55** after T-87. The running
+total of this family: T-83, T-84, T-85, T-86 were four tickets in a row where every declaration was
+live and only the row was missing; **T-87 is the first where a block had dead rules to delete.**
+
+## T-88 — `home.tsrx`'s `sm 640` block: the app's first screen has never been rendered above 500px
+
+**Why it is next.** `/` is the route the walk lands on more than any other, always at the browser's own
+~500px, below the breakpoint — so `home.tsrx`'s `@media (min-width: 640px)` block has never been
+rendered by any row. It is also the screen whose whole argument is a *first screen*: the base
+`.screen` is `min-height: calc(100dvh - 228px)` with a `column` stack, and the block is what turns the
+entry row into a row. Four declarations plus the `md`/`lg` restatements:
+
+- `.screen { min-height: calc(100dvh - 240px) }` at `sm` (base `calc(100dvh - 228px)`).
+- `.entry { flex-direction: row; align-items: center; justify-content: space-between; gap: 24px }`
+  (base: `column`, `align-items: stretch`, `gap: 16px`, no `justify-content`).
+- `.entry .btn { width: auto; justify-content: flex-start }` (base: `width: 100%`,
+  `justify-content: center`).
+- `md 900`: `.screen { min-height: calc(100dvh - 132px) }` — its only declaration.
+- `lg 1200`: `.screen { max-width: 560px; min-height: calc(100dvh - 144px); margin: 0 auto }` and
+  `.mast { gap: 16px }`.
+
+**Approach.** Read the walk first: `/` is mounted by row 1 (it signs out, then signs back in) and by
+several other rows. Row 1 **already owns a T-83 ladder** inside itself and it signs out mid-row, so
+either extend row 1 where the page is *drawn* (not after the sign-in) or extend a row that lands on `/`
+with the session intact — decide by reading the rows, and quote the journey **name** in the report (the
+numeric row labels in these notes have drifted before). Then one read-only ladder at the end of that
+row: `640×740`, `900×740`, `360×740`, one `readHome()` per width into `assertHome(r, width)`, every
+override cleared in one `finally`, `innerWidth` re-read, then a re-read of the bare mount.
+
+At **640** assert `.entry`'s `flex-direction` **row**, its `justify-content` **space-between**, its
+`gap` **24px**, the anchor's `justify-content` **flex-start**, `.screen`'s `min-height` **500px**
+(`100dvh` follows the override's 740); at **900** the same three `.entry` facts and `.screen`
+**608px** (`740 − 132`); at **360** `.entry` **column**, `gap` **16px**, the anchor's `justify-content`
+**center**, `.screen` **512px** (`740 − 228`). At **1200** — only if the budget allows — `.screen`
+measures **560px** wide and centred.
+
+**Traps.**
+(a) **`.entry .btn` is a hand-written `<a class="btn btn-primary">` the page writes itself** (T-82), so
+the rule *does* bind — this is the page that proved "not every `.x .btn` in a page's block is dead".
+(b) **`width: auto` is not observable as a used value** (T-81), and here it is the *interesting* half:
+in a `row` the anchor is a flex item, so `auto` is content-sized where `100%` was the whole 572 — read
+`getBoundingClientRect().width` of the anchor **and** `.entry`'s content box and assert the anchor is
+substantially narrower, plus its `justify-content` `flex-start`. Do not assert a number for the fill.
+(c) **`align-items: center` makes the tops the wrong witness for "beside"** (T-79/T-80): `.reading` and
+the anchor are different heights, so assert `|centre − centre| ≤ 2`, not `|top − top|`.
+(d) **`min-height` with `dvh`** resolves against the emulated viewport (740 here), so `100dvh − 240` is
+`500px` — but the screen's own content may be taller, which is why the fact to read is
+`getComputedStyle(.screen).minHeight`, never the box height.
+(e) The row that runs this may be row 1, **and row 1's failure cascades** (T-83: 36 red rows followed
+one throw). Read the **first** failing row, not the count.
+(f) `document.documentElement.scrollWidth > innerWidth` at each width (T-72: equality is false on a
+right page because of `scrollbar-gutter: stable`).
+
+**Accept.** Red first, in the block's separate rules: `.entry { gap: 24px }` → `16px` must red the row
+at 640 naming `.entry` and the measured gap; then, bytes restored, `.screen`'s `min-height: calc(100dvh
+- 240px)` → `calc(100dvh - 228px)` must red it naming `.screen` and `512px`. Bytes restored (`cmp`),
+`check.sh` GREEN, **55/55** local and **55/55** `--live`, `publish.sh` prints `LIVE`, `curl` 200.
+
+**Brief:** this section. When it lands, replace it with the next ticket's and keep T-87's section below
+as the record.
+
+## T-86 (the tick before — landed; record)
+
 **T-86 landed.** Row 23 (`read a notification (the badge drops)`) was **extended, not duplicated** —
 `EXPECTED_ROWS` stays **55** — and `/notifications`' `sm 640` block is now rendered at **640, 900 and
 360**, read at the **end** of the row: after its `Mark read` press, after the `go("/notifications")`
@@ -31,7 +109,14 @@ step the other list pages carry. **Fourth ticket in a row** (T-83, T-84, T-85, T
 declarations were live and only the row was missing. Expect live declarations and no page change until
 a rule measures dead — and the first *dead* one is already in sight: see T-87.
 
-## T-87 — `/session/[id]`'s `sm 640` block: two live steps and one declaration that names nothing
+## T-87 — `/session/[id]`'s `sm 640` block (landed; the brief below is the record, and its count was wrong)
+
+*Read this as the ticket that was executed, not as a description of the tree.* Its headline — two live
+steps and one dead declaration — was off by two: `.title` names nothing on this page either, so the
+block lost `.title`, `.composer-actions` (both `sm` rules) and the `lg` restatement of its `> *`, and
+only `.turn-text` and `.menu-actions` were ever live. The row numbers it quotes are also stale by one
+(the walk's journey **name** is the stable handle). Everything else it says about *how* to walk the
+block — the sheet press, the two text facts, the traps — is what landed.
 
 **Why it is next.** `session-detail.tsrx`'s `@media (min-width: 640px)` block is the transcript's own
 step, and no row has ever run it: the pages that mount a session do so at the walk's own ~500px. It
@@ -213,13 +298,18 @@ conclude. Read the walk before trusting a brief's claim about which row does wha
   `finally` and asserts `innerWidth` came back, so anything after it may assume no override is in
   play — but it leaves the reader on `/persona` at that page's own `?sort=name`-less mount with
   **two** persona cards (row 41 deleted the third).
-- **T-80 through T-86 are landed; T-87 is the ticket: `/session/[id]`'s `sm 640` block.** It holds the
-  family's **first dead declaration**: `.composer-actions` (two rules at `sm`, one restatement at `lg`)
-  names a class **no element carries** — the composer is one `.say` field and one `.send` button — and
-  unlike T-82's pruned `.btn` rule it *is* compiled into `dist`, so the bundle cannot tell you either.
-  The two live steps are `.title` 24 → 26px and `.turn-text` 14 → 15px; `.menu-actions`'
-  `column-reverse` → `row` lives inside the settings sheet, so it costs a press. `/notifications`' block
-  (T-86) is now walked — `.row` `padding-left` 16, `gap` 12, `.sentence` 15px, `.title` 28px and the
+- **T-80 through T-87 are landed; T-88 is the ticket: `home.tsrx`'s `sm 640` block** — the app's first
+  screen, mounted by nearly every row at the walk's ~500px, so `.screen`'s `min-height` step, `.entry`'s
+  `column → row` and the entry anchor's `width: 100% → auto` / `justify-content: center → flex-start`
+  have never rendered. T-87 is the family's first ticket with **dead rules to delete**, and it found
+  **two** dead names where the brief predicted one: `.composer-actions` (two `sm` rules and the `lg`
+  restatement, no element anywhere) *and* `.title` (the page has no title block). Both were compiled
+  into `dist` and inert, so the proof is the rebuilt CSS plus unchanged numbers — a walk cannot show a
+  deletion. `.turn-text` 14 → 15px and the sheet's `.menu-actions` `column-reverse → row / flex-end`
+  are now walked at 640 / 900 / 360, and `.copy-actions`' `sm` rule turns out to change the *computed*
+  value (`normal` → `flex-start`) while changing no layout: printed, never gated.
+  `/notifications`' block
+  (T-86) is walked too — `.row` `padding-left` 16, `gap` 12, `.sentence` 15px, `.title` 28px and the
   `md` 8px toolbar, with 360 back at 12 / 10 / 14 / 24 / 4 — the fourth ticket in a row where **every**
   declaration was live and only the row was missing (T-83, T-84, T-85, T-86).
   Failure-bank
@@ -233,8 +323,9 @@ conclude. Read the walk before trusting a brief's claim about which row does wha
   other files*: T-75/T-76/T-77 closed base, `lg` **and** `sm` for the three detail pages, T-78 closed
   `user-profile`'s `sm` head, T-79 closed `/bookmarks`' toolbar, T-81 closed `/persona`'s, T-82 and
   T-83 closed the two entry screens, T-84 closed `/character/catalog`'s, T-85 closed `/moderation`'s and
-  T-86 closed `/notifications`' — so the same argument now points at the **other** pages whose `sm 640`
-  block no row has ever rendered: `/session/[id]` is T-87, and 28 page files still carry one — plus
+  T-86 closed `/notifications`' and T-87 closed `/session/[id]`'s — so the same argument now points at
+  the **other** pages whose `sm 640` block no row has ever rendered: `/` is T-88, and 28 page files
+  still carry one — plus
   whatever the gate or the walk finds next. The rest of
   the plan waits on Supabase
   (T-29…T-32), the Android toolchain (T-35/T-36/T-39) or an owner decision (T-33B's deep link
@@ -420,6 +511,25 @@ grim -g "967,38 941x1030" /tmp/shot.png     # geometry from `at` + `size`, not x
   Encoding that as an argument keeps one reader and one set of messages.
 
 ## Found while working (carried forward — keep this list growing)
+
+- **A page's `sm` block can hold *more than one* dead selector, and the brief names only the one it
+  grepped for (T-87).** T-86 found `.composer-actions` on `session-detail` and stopped; the same block
+  also declared `.title { font-size: 26px }`, and the page has **no title block at all** (its own header
+  comment says *"no page title block"*). One `grep -o '\.[a-z-]*' <file> | sort -u` against the markup
+  would have found both. **When a ticket deletes a dead selector, enumerate every selector in the block
+  and check each against the page's markup** — a brief's live/dead split is a hypothesis like its example
+  strings and its row numbers.
+- **A "restates the default" rule can still change the computed value (T-87).** `.copy-actions`' `sm`
+  rule sets `justify-content: flex-start` with no base declaration, so Chromium computes `normal` at 360
+  and `flex-start` from 640 — the T-86 trap that said it "reads `flex-start` at every width" was wrong.
+  The distinction to keep: **computably different but visually identical is evidence, not a gate** —
+  assert what a reader can see (`.row`'s padding, the `.turn-text` size, a flex direction) and print the
+  rest.
+- **A `finally` that closes a modal is part of the assertion, not tidiness (T-87).** The session's
+  `.menu-actions` only exists inside a `Sheet` portal *and* inside its `confirmDelete` arm, so the row
+  opened it three times (once per width) and had to close it in a `finally` — a throw with the sheet open
+  would leave a portal over every later row, and the sign-out row is next. Same shape as a leaked
+  `Emulation` override: restore it where the failure can see it.
 
 - **A page's `sm` block can hold a rule that matches nothing, and `dist` cannot tell you (T-86 → T-87).**
   `session-detail.tsrx` declares `.composer-actions` (two rules at `sm`, one restatement at `lg`) and

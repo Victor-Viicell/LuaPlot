@@ -717,6 +717,35 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       stepped (padding 16px, gap 12px) but the sentence's own rule did not"*. No page change: every
       declaration was live (fourth ticket in a row of that shape).
 
+- [x] **T-87 `/session/[id]`'s `sm 640` block: one live step and three dead declarations.**
+      `session-detail.tsrx`'s `sm` block declared five things and **three of them named nothing**: `.title`
+      (the page has no title block — the bar's `.who-name` is its only heading) and `.composer-actions`
+      twice (the composer is one `.say` field and one `.send` button; no spec describes an action row),
+      plus the `lg` restatement of `.composer-actions > *`. Unlike T-82's pruned `.btn` rule they were
+      **compiled and inert** — `dist/assets/session-detail-*.css` carried them — so no walk could prove a
+      deletion. What was live: `.turn-text` 14 → **15px** and the settings sheet's `.menu-actions`
+      `column-reverse` → **row / flex-end** (`.copy-actions`' `sm` rule restates the flex default and stays
+      as evidence only). Brief: `docs/NEXT.md` (T-87).
+      **Landed:** the three dead rules deleted (the rebuilt CSS has zero occurrences of either name, and
+      the `sm` block is now `.turn-text`, `.menu-actions`, `.copy-actions`), and the copies row extended —
+      no new row, 55 stays — with a read-only ladder at the very end, after its **Restore copy** press:
+      `640×740` / `900×740` / `360×740`, one `readStage()` into `assertTranscript(r, width)`, the settings
+      sheet opened once per width for `.menu-actions` (danger row → read → *Cancel* → close, the close in a
+      `finally`), one `finally` clearing every override, `innerWidth` re-read, then the bare mount re-read
+      for the `.turn` count. Measured 640: `.turn-text` **15px**, sheet pair **row / flex-end** (598px);
+      900: the same (478px); 360: **14px** and **column-reverse / normal**. Red proofs, the block's two
+      remaining rules one at a time: `.turn-text` 15 → 14px red-lit row 33 alone at *"the first .turn-text
+      computes font-size 14px … not 15px"*; deleting the `sm` `.menu-actions` rule alone red-lit it at
+      *".menu-actions computes flex-direction column-reverse … not the sm block's row"*.
+
+- [ ] **T-88 `home.tsrx`'s `sm 640` block has never been rendered.** `/` is the app's first screen and the
+      one route nearly every row lands on, always at the walk's ~500px: below the breakpoint. The block
+      steps `.screen`'s `min-height` `calc(100dvh - 228px)` → `calc(100dvh - 240px)`, turns `.entry` from a
+      `column` stack into `row` / `align-items: center` / `justify-content: space-between` / `gap: 24px`,
+      and gives `.entry .btn` `width: auto` + `justify-content: flex-start` (base: `100%` and `center`);
+      `md 900` then sets `min-height: calc(100dvh - 132px)` and `lg 1200` caps `.screen` at
+      `max-width: 560px` with `calc(100dvh - 144px)` and `margin: 0 auto`. Brief: `docs/NEXT.md` (T-88).
+
 - [x] **T-83 `/authentification`'s `sm 640` 420 measure has never been rendered.** The entry screen's
       `@media (min-width: 640px)` block caps `.providers`, `.nsfw` and `.status` at `max-width: 420px`
       (*"A 420 measure for the controls, not three buttons stretched across 640"*) and steps `.screen`'s

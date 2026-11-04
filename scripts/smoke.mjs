@@ -2686,7 +2686,174 @@ results.push(
 
     if (restored.summary !== "3 copies") throw new Error(`the header still reads ${JSON.stringify(restored.summary)}`);
 
-    return `closed: ${JSON.stringify(closed.summary)} · ${dealt} · unlinked offers ${lorebook.links} links / ${lorebook.actions.length} controls · restored → ${JSON.stringify(restored.summary)}`;
+    /* ------------------------------------------------------------------------------------------
+     * T-87 — `session-detail`'s transcript has a `sm 640` block of its own, and no row had ever
+     * rendered it: this row's `go()` lands at the walk's ~500px, below the breakpoint.
+     *
+     * The block declared **three** rules that matched no element on the page — `.title` (there is no
+     * title block; the bar's `.who-name` is the only heading) and `.composer-actions` twice (the
+     * composer is one `.say` field and one `.send` button) — plus the `lg` restatement of its
+     * `> *` width. T-87 deleted them: they were compiled into the bundle and inert, so no walk can
+     * show a deletion and the proof is the rebuilt CSS plus these unchanged numbers. What remains
+     * is what a reader sees: the transcript steps **14 → 15px** and the settings sheet's action
+     * pair turns from a `column-reverse` stack into a right-aligned row.
+     *
+     * It runs **last**, after the Restore copy press, because that press is a write: everything here
+     * reads type and layout only. The sheet costs two presses per width and neither writes — the
+     * danger row sets `confirmDelete`, *Cancel* clears it, and the confirm's own *Delete session*
+     * is never pressed.
+     * ------------------------------------------------------------------------------------------ */
+    const readStage = () =>
+      js(`
+        const round = (n) => Math.round(n * 100) / 100;
+        const first = document.querySelector(".turns .turn .turn-text");
+        const actions = document.querySelector(".copy-actions");
+        const box = first ? first.getBoundingClientRect() : null;
+        return {
+          path: location.pathname,
+          search: location.search,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          turns: document.querySelectorAll(".turns .turn").length,
+          turnText: first ? (first.textContent || "").trim().slice(0, 48) : "",
+          turnFont: first ? getComputedStyle(first).fontSize : "",
+          turnWeight: first ? getComputedStyle(first).fontWeight : "",
+          turnWidth: box ? round(box.width) : 0,
+          titleNodes: document.querySelectorAll(".title").length,
+          composerActions: document.querySelectorAll(".composer-actions").length,
+          copyJustify: actions ? getComputedStyle(actions).justifyContent : "",
+        };
+      `);
+
+    /** The settings sheet's action pair: `column-reverse` on a phone, a right-aligned row at `sm`. */
+    const readMenuActions = () =>
+      js(`
+        const menu = document.querySelector(".menu-actions");
+        if (!menu) return null;
+        const style = getComputedStyle(menu);
+        const box = menu.getBoundingClientRect();
+        return { flex: style.flexDirection, justify: style.justifyContent, width: Math.round(box.width * 100) / 100 };
+      `);
+
+    /**
+     * Open the sheet, reveal its action pair (the `confirmDelete` arm), read it and put the sheet
+     * away. The close is in a `finally` because a throw with the sheet open would leave a portal
+     * over every later row — the sign-out row is next.
+     */
+    const sheetMenuAt = async (width) => {
+      try {
+        await clickSelector('.bar [aria-label="Session settings"]');
+        await waitFor(`!!document.querySelector(".sheet .sheet-body")`, `the settings sheet at ${width}px`, 6000);
+        // The state-only press: the danger *row* arms the confirmation; it writes nothing.
+        await clickSelector(".sheet .menu .menu-row.is-danger");
+        await waitFor(`!!document.querySelector(".menu-actions")`, `the delete confirmation's action pair at ${width}px`, 4000);
+        const menu = await readMenuActions();
+
+        // *Cancel* is the first button of the pair and the only one this row may press.
+        const cancelled = await js(`
+          const button = [...document.querySelectorAll(".menu-actions button")].find((b) => (b.textContent || "").trim() === "Cancel");
+          if (!button) return "";
+          button.click();
+          return (button.textContent || "").trim();
+        `);
+        if (cancelled !== "Cancel") throw new Error(`at ${width}px the delete confirmation offered no "Cancel" (pressed ${JSON.stringify(cancelled)})`);
+        await waitFor(`document.querySelector(".menu-actions") === null && !!document.querySelector(".sheet .menu")`, `the confirmation to close at ${width}px`, 4000);
+        return menu;
+      } finally {
+        const still = await js(`
+          const sheet = document.querySelector(".sheet");
+          if (!sheet) return false;
+          const close = sheet.querySelector(".sheet-close");
+          if (close) close.click();
+          return true;
+        `);
+        if (still) await waitFor(`document.querySelector(".sheet") === null`, `the settings sheet to close at ${width}px`, 6000);
+      }
+    };
+
+    /** The sm block's one live text rule, plus the frame around it. */
+    const assertTranscript = (r, width) => {
+      const at = `/session/[id] at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!r.path.includes("/session/")) {
+        throw new Error(`${at}: the transcript was measured on ${JSON.stringify(r.path)} — a ladder that navigates proves another page's facts`);
+      }
+      if (!r.turnFont) {
+        throw new Error(`${at}: the transcript drew no .turns .turn .turn-text (${r.turns} turn(s)) — the sm block's only live text rule has no element to land on`);
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the transcript scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+      const want = width === 360 ? "14px" : "15px";
+      if (r.turnFont !== want) {
+        throw new Error(
+          `${at}: the first .turn-text computes font-size ${r.turnFont} (weight ${r.turnWeight}, ${r.turnWidth}px wide, ${JSON.stringify(r.turnText)}), not ${want} — ${width === 360 ? "the base is the law below 640" : "the sm block's .turn-text is the only rule that steps the transcript"}`,
+        );
+      }
+    };
+
+    /**
+     * `.menu-actions` is the one **layout** fact of the block: `column-reverse` on a phone, `row`
+     * justified `flex-end` from 640. Without the block the small screen's full-width pair stays a
+     * stack on a desktop sheet.
+     */
+    const assertMenuActions = (menu, width) => {
+      const at = `/session/[id] settings sheet at ${width}px`;
+      if (!menu) {
+        throw new Error(`${at}: the delete confirmation drew no .menu-actions — the block's layout rule has no element`);
+      }
+      if (width === 360) {
+        if (menu.flex !== "column-reverse") {
+          throw new Error(`${at}: .menu-actions computes flex-direction ${JSON.stringify(menu.flex)}, not the base column-reverse — the sm block must not leak below 640`);
+        }
+        return;
+      }
+      if (menu.flex !== "row") {
+        throw new Error(
+          `${at}: .menu-actions computes flex-direction ${JSON.stringify(menu.flex)} (${menu.width}px wide), not the sm block's row — the confirmation's two answers are still stacked on a sheet that is a desktop dialog`,
+        );
+      }
+      if (menu.justify !== "flex-end") {
+        throw new Error(`${at}: .menu-actions computes justify-content ${JSON.stringify(menu.justify)}, not flex-end — the pair is a row but not a right-aligned one`);
+      }
+    };
+
+    const stageRestore = await js("return window.innerWidth;");
+    const stageBefore = await readStage();
+    const stageLines = [];
+    let stageSeen = "";
+    try {
+      for (const width of [640, 900, 360]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        await waitFor(`!!document.querySelector(".turns .turn .turn-text")`, `the transcript's first turn at ${width}px`, 10000);
+        const r = await readStage();
+        assertTranscript(r, width);
+        const menu = await sheetMenuAt(width);
+        assertMenuActions(menu, width);
+        stageLines.push(
+          `${width}px: .turn-text ${r.turnFont} ${r.turnWeight} ${JSON.stringify(r.turnText)} · sheet .menu-actions ${JSON.stringify(menu.flex)} / ${JSON.stringify(menu.justify)} (${menu.width}px) · .copy-actions justify ${r.copyJustify} · .title ${r.titleNodes} / .composer-actions ${r.composerActions} node(s) · ${r.turns} turn(s), scrollWidth ${r.scrollWidth}/${r.innerWidth}`,
+        );
+      }
+      stageSeen = stageLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const stageAfter = await js("return window.innerWidth;");
+    if (stageAfter !== stageRestore) {
+      throw new Error(`the transcript's overrides cleared to ${stageAfter}px, but the session runs at ${stageRestore}px — a leaked override would mis-measure every later row`);
+    }
+    const stageBack = await readStage();
+    if (!stageBack.path.includes("/session/") || stageBack.path !== stageBefore.path || stageBack.turns !== stageBefore.turns) {
+      throw new Error(
+        `the width ladder left ${JSON.stringify(stageBack.path)} with ${stageBack.turns} turn(s), not the ${stageBefore.turns} the mount drew at ${JSON.stringify(stageBefore.path)} — a ladder that navigated proves another page's facts (the session URL carries no query, so the URL alone cannot say it stayed put)`,
+      );
+    }
+
+    return `closed: ${JSON.stringify(closed.summary)} · ${dealt} · unlinked offers ${lorebook.links} links / ${lorebook.actions.length} controls · restored → ${JSON.stringify(restored.summary)} · the sm 640 block rendered — ${stageSeen}`;
   }),
 );
 

@@ -1011,23 +1011,17 @@ export function SessionDetail() @{
         padding: 16px 0;
       }
 
+      /* T-87 — this block declared three rules that matched **no element on this page**: `.title`
+         (the page has no title block at all: the bar's `.who-name` is the only heading, see the
+         comment at the top of this file) and `.composer-actions` twice (the composer is one `.say`
+         field and one `.send` button, with no action row — `src/specs/pages/session.md` and
+         `docs/DESIGN.md` describe none). They were compiled into the bundle and inert, unlike
+         T-82's pruned `.btn` rule, so no walk could prove them and they are gone. What is left is
+         what a reader can see: the transcript steps 14 → 15px and the sheet's action pair turns
+         from a stack into a right-aligned row. */
       @media (min-width: 640px) {
-        .title {
-          font-size: 26px;
-        }
-
         .turn-text {
           font-size: 15px;
-        }
-
-        .composer-actions {
-          flex-direction: row;
-          justify-content: space-between;
-        }
-
-        .composer-actions > * {
-          flex: 0 0 auto;
-          min-width: 140px;
         }
 
         .menu-actions {
@@ -1066,10 +1060,6 @@ export function SessionDetail() @{
           grid-row: 1;
           position: sticky;
           top: 88px;
-        }
-
-        .composer-actions > * {
-          min-width: 160px;
         }
       }
 
