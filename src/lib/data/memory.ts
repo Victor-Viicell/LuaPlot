@@ -2245,7 +2245,7 @@ export const memoryRepo: Repo = {
    * each with **the item when it still resolves** and `null` when it is gone.
    *
    * - **Search reuses the type's own matcher.** A saved character is matched on name, tagline and
-   *   description exactly as `/character/catalog` matches it; a saved post on its body, like the
+   *   description exactly as `/discover/characters` matches it; a saved post on its body, like the
    *   thread. A fourth matcher invented here would drift from the catalog it mirrors.
    * - **Visibility is the catalogue's rule**: a row that is not public (removed by moderation) is a
    *   dead card, not a hidden one — the bookmark outlives it.

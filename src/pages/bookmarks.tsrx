@@ -38,7 +38,7 @@ import { toast } from "../lib/toast.ts";
  *   That is the one thing this page exists to guarantee, so removal goes through
  *   `repo.removeBookmark` (key-only), never `toggleBookmark`, which refuses a missing row.
  * - **URL state**: `?type=&q=&sort=` committed through `commitQuery()` — `navigate()` would remount
- *   the page and drop the rows it just fetched **and** the caret (the rule `character-catalog`
+ *   the page and drop the rows it just fetched **and** the caret (the rule `discover-characters`
  *   records in DESIGN, T-66).
  *   The NSFW pair is deliberately **not** here: it belongs to the account.
  * - **Six states**, all drawn: loading, empty (*Nothing saved here yet.*), no results, a tab entirely

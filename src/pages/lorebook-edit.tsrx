@@ -81,7 +81,7 @@ export function LorebookEdit() @{
       return;
     }
 
-    navigate("/lorebook/catalog");
+    navigate("/discover/lorebooks");
   }
 
   load();
@@ -99,20 +99,20 @@ export function LorebookEdit() @{
     } @else if (phase.value === "missing") {
       <EmptyState
         message="This lorebook doesn't exist."
-        actionLabel="Back to catalog"
-        to="/lorebook/catalog"
+        actionLabel="Back to discover"
+        to="/discover/lorebooks"
       />
     } @else if (phase.value === "forbidden") {
       <EmptyState
         message="This lorebook isn't yours to edit."
-        actionLabel="Back to catalog"
-        to="/lorebook/catalog"
+        actionLabel="Back to discover"
+        to="/discover/lorebooks"
       />
     } @else if (phase.value === "error") {
       <EmptyState
         message="This lorebook couldn't be loaded. Try again from the catalog."
-        actionLabel="Back to catalog"
-        to="/lorebook/catalog"
+        actionLabel="Back to discover"
+        to="/discover/lorebooks"
       />
     } @else {
       <>

@@ -75,7 +75,7 @@ export type ListOptions = {
   /** Matched against the title/name and the tagline, case-insensitive. Debounced by the page. */
   query?: string;
   /**
-   * Tags the row must carry at least one of (`character/catalog.md`): the filter is a multi-select
+   * Tags the row must carry at least one of (`character/discover.md`): the filter is a multi-select
    * of the tags in use, and an empty list means `All`. Any-of rather than all-of, because two tags
    * on a card are often alternatives in a reader's mind, and an all-of filter empties a small
    * catalog on the second click.
@@ -579,7 +579,7 @@ export type Repo = {
    * One `/bookmarks` tab (`pages/bookmarks.md` → *Data*): the viewer's saved rows of one kind, each
    * carrying **the item when it still resolves and `null` when it is gone** (*a bookmark outlives
    * the item*). `query` reuses the type's own matcher — a saved character is matched the way the
-   * character catalog matches it, a saved post on its body — and `sort` is the save order:
+   * character Discover matches it, a saved post on its body — and `sort` is the save order:
    * `newest` (newest saved first, the spec's default), `oldest`, or `name` (title A–Z).
    */
   listBookmarks(kind: BookmarkKind, options?: ListOptions): Promise<Listing<BookmarkRow>>;

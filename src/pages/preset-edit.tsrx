@@ -83,7 +83,7 @@ export function PresetEdit() @{
       return;
     }
 
-    navigate("/preset/catalog");
+    navigate("/discover/presets");
   }
 
   load();
@@ -101,20 +101,20 @@ export function PresetEdit() @{
     } @else if (phase.value === "missing") {
       <EmptyState
         message="This preset doesn't exist."
-        actionLabel="Back to catalog"
-        to="/preset/catalog"
+        actionLabel="Back to discover"
+        to="/discover/presets"
       />
     } @else if (phase.value === "forbidden") {
       <EmptyState
         message="This preset isn't yours to edit."
-        actionLabel="Back to catalog"
-        to="/preset/catalog"
+        actionLabel="Back to discover"
+        to="/discover/presets"
       />
     } @else if (phase.value === "error") {
       <EmptyState
         message="This preset couldn't be loaded. Try again from the catalog."
-        actionLabel="Back to catalog"
-        to="/preset/catalog"
+        actionLabel="Back to discover"
+        to="/discover/presets"
       />
     } @else {
       <>

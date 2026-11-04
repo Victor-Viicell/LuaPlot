@@ -1,17 +1,30 @@
 import { effect, track, type Component } from "ripple";
-import { currentRoute, follow, getMountedKey, href, navigate, onRouteChange, setMountedKey, type RouteState } from "./router.ts";
+import {
+  currentRoute,
+  follow,
+  getMountedKey,
+  href,
+  navigate,
+  onRouteChange,
+  setMountedKey,
+  type RouteState,
+} from "./router.ts";
 import {
   IconBack,
   IconBell,
-  IconCatalog,
-  IconHome,
+  IconDiscover,
   IconMore,
   IconThread,
   IconUser,
 } from "./components/Icons.tsrx";
 import { ToastHost } from "./components/Toast.tsrx";
 import { badgeCount } from "./lib/format.ts";
-import { currentUser, onSession, signIn, signOut } from "./lib/state/session.ts";
+import {
+  currentUser,
+  onSession,
+  signIn,
+  signOut,
+} from "./lib/state/session.ts";
 import { nsfwPreference, onPrefs } from "./lib/state/prefs.ts";
 import { onInbox, refreshInbox, unreadCount } from "./lib/state/inbox.ts";
 import { installKeyboardInset } from "./lib/viewport.ts";
@@ -24,21 +37,31 @@ import type { AccountPreferences, User } from "./lib/data/types.ts";
 
 type Status = "loading" | "ready" | "missing" | "error";
 
-type Destination = { to: string; label: string; icon: Component; prefix: string };
+type Destination = {
+  to: string;
+  label: string;
+  icon: Component;
+  prefix: string;
+};
 
 /**
- * The five destinations. Profile is the only one that depends on who is signed in: it points at
- * the handle the session reports (T-04), and falls back to `/` when signed out — the redirect
- * matrix that would send a guest to `/authentification` is T-30's, not the shell's.
+ * The four destinations. Discover is the home page, so there is no separate Home tab. Profile is
+ * the only one that depends on who is signed in: it points at the handle the session reports (T-04),
+ * and falls back to `/authentification` when signed out — the one way in now that the landing page
+ * is gone.
  */
 function tabsFor(user: User | null): Destination[] {
   return [
-    { to: "/", label: "Home", icon: IconHome, prefix: "/" },
+    { to: "/", label: "Discover", icon: IconDiscover, prefix: "/" },
     { to: "/post/thread", label: "Thread", icon: IconThread, prefix: "/post" },
-    { to: "/character/catalog", label: "Catalog", icon: IconCatalog, prefix: "/character" },
-    { to: "/notifications", label: "Alerts", icon: IconBell, prefix: "/notifications" },
     {
-      to: user ? `/user/${user.handle}` : "/",
+      to: "/notifications",
+      label: "Alerts",
+      icon: IconBell,
+      prefix: "/notifications",
+    },
+    {
+      to: user ? `/user/${user.handle}` : "/authentification",
       label: "Profile",
       icon: IconUser,
       prefix: "/user",
@@ -48,6 +71,7 @@ function tabsFor(user: User | null): Destination[] {
 
 const MENU: { to: string; label: string }[] = [
   { to: "/bookmarks", label: "Bookmarks" },
+  { to: "/subscription", label: "Subscription" },
   { to: "/moderation", label: "Moderation" },
   { to: "/terms", label: "Terms of use" },
 ];
@@ -60,7 +84,8 @@ function prefsLine(user: User | null, prefs: AccountPreferences): string {
 }
 
 function isActive(path: string, prefix: string): boolean {
-  if (prefix === "/") return path === "/";
+  // Discover is the home page: `/` and every `/discover/*` surface belong to the same tab.
+  if (prefix === "/") return path === "/" || path.startsWith("/discover");
   return path === prefix || path.startsWith(`${prefix}/`);
 }
 
@@ -165,7 +190,8 @@ export function App() @{
       return;
     }
 
-    document.title = def.path === "/" ? "LuaPlot" : `${def.title} — LuaPlot`;
+    document.title =
+      def.path === "/" ? "Discover — LuaPlot" : `${def.title} — LuaPlot`;
     status.value = "loading";
     def.page().then(
       (module) => {
@@ -721,20 +747,30 @@ export function App() @{
 
     <div class={immersive.value ? "shell is-immersive" : "shell"}>
       <aside class="rail">
-        <a class="mark" href={href("/")} onClick={follow("/")}>LuaPlot</a>
+        <a class="mark" href={href("/")} onClick={follow("/")}>
+          LuaPlot
+        </a>
         <nav class="rail-nav" aria-label="Sections">
           @for (const tab of tabs.value; key tab.label) {
             <a
-              class={isActive(route.value.path, tab.prefix) ? "rail-item is-active" : "rail-item"}
+              class={
+                isActive(route.value.path, tab.prefix)
+                  ? "rail-item is-active"
+                  : "rail-item"
+              }
               href={href(tab.to)}
-              aria-current={isActive(route.value.path, tab.prefix) ? "page" : undefined}
+              aria-current={
+                isActive(route.value.path, tab.prefix) ? "page" : undefined
+              }
               aria-label={alertsLabel(tab, unread.value)}
               onClick={follow(tab.to)}
             >
               <{tab.icon} />
               <span class="rail-label">{tab.label}</span>
               @if (tab.prefix === "/notifications" && badge.value) {
-                <span class="badge" aria-hidden="true">{badge.value}</span>
+                <span class="badge" aria-hidden="true">
+                  {badge.value}
+                </span>
               }
             </a>
           }
@@ -743,11 +779,18 @@ export function App() @{
 
       <div class="frame">
         <header class="topbar">
-          <button class="ghost" type="button" aria-label="Back" onClick={goBack}>
+          <button
+            class="ghost"
+            type="button"
+            aria-label="Back"
+            onClick={goBack}
+          >
             <IconBack />
           </button>
           <div class="titles">
-            <span class="bar-title">{route.value.route ? route.value.route.title : "Not found"}</span>
+            <span class="bar-title">
+              {route.value.route ? route.value.route.title : "Not found"}
+            </span>
             <span class="crumb">{route.value.path}</span>
           </div>
           <button
@@ -766,24 +809,42 @@ export function App() @{
             <div class="scrim" onClick={() => (menuOpen.value = false)}></div>
             <div class="menu" role="menu">
               @for (const item of MENU; key item.to) {
-                <a class="menu-item" role="menuitem" href={href(item.to)} onClick={follow(item.to)}>
+                <a
+                  class="menu-item"
+                  role="menuitem"
+                  href={href(item.to)}
+                  onClick={follow(item.to)}
+                >
                   {item.label}
                 </a>
               }
               <div class="menu-sep" role="separator"></div>
               <p class="menu-label">Preview only · not a product control</p>
-              <button class="menu-item menu-btn" type="button" role="menuitem" onClick={toggleSession}>
+              <button
+                class="menu-item menu-btn"
+                type="button"
+                role="menuitem"
+                onClick={toggleSession}
+              >
                 {self.value ? "Sign out" : "Sign in as @you"}
               </button>
               <p class="menu-note">{prefsLine(self.value, prefs.value)}</p>
-              <a class="menu-link" href={href("/dev/state")} onClick={follow("/dev/state")}>
+              <a
+                class="menu-link"
+                href={href("/dev/state")}
+                onClick={follow("/dev/state")}
+              >
                 /dev/state
               </a>
             </div>
           </>
         }
 
-        <main class="content" ref={scroller} aria-busy={status.value === "loading" ? "true" : undefined}>
+        <main
+          class="content"
+          ref={scroller}
+          aria-busy={status.value === "loading" ? "true" : undefined}
+        >
           <div class="outlet">
             @switch (status.value) {
               @case "loading": {
@@ -797,14 +858,27 @@ export function App() @{
                 <section class="fallback">
                   <h1>Not found</h1>
                   <p>This page doesn't exist.</p>
-                  <a class="fallback-action" href={href("/")} onClick={follow("/")}>Go home</a>
+                  <a
+                    class="fallback-action"
+                    href={href("/")}
+                    onClick={follow("/")}
+                  >
+                    Go home
+                  </a>
                 </section>
               }
               @case "error": {
                 <section class="fallback">
                   <h1>Couldn't load this page</h1>
-                  <p>The page module didn't arrive. Check the connection and try again.</p>
-                  <button class="fallback-action" type="button" onClick={() => (attempt.value += 1)}>
+                  <p>
+                    The page module didn't arrive. Check the connection and try
+                    again.
+                  </p>
+                  <button
+                    class="fallback-action"
+                    type="button"
+                    onClick={() => (attempt.value += 1)}
+                  >
                     Retry
                   </button>
                 </section>
@@ -821,16 +895,22 @@ export function App() @{
         <nav class="tabbar" aria-label="Primary">
           @for (const tab of tabs.value; key tab.label) {
             <a
-              class={isActive(route.value.path, tab.prefix) ? "tab is-active" : "tab"}
+              class={
+                isActive(route.value.path, tab.prefix) ? "tab is-active" : "tab"
+              }
               href={href(tab.to)}
-              aria-current={isActive(route.value.path, tab.prefix) ? "page" : undefined}
+              aria-current={
+                isActive(route.value.path, tab.prefix) ? "page" : undefined
+              }
               aria-label={alertsLabel(tab, unread.value)}
               onClick={follow(tab.to)}
             >
               <{tab.icon} />
               <span class="tab-label">{tab.label}</span>
               @if (tab.prefix === "/notifications" && badge.value) {
-                <span class="badge" aria-hidden="true">{badge.value}</span>
+                <span class="badge" aria-hidden="true">
+                  {badge.value}
+                </span>
               }
             </a>
           }

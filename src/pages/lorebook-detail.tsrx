@@ -881,14 +881,14 @@ export function LorebookDetail() @{
       } @else if (missing.value) {
         <EmptyState
           message="This lorebook doesn't exist."
-          actionLabel="Back to the catalog"
-          to="/lorebook/catalog"
+          actionLabel="Back to discover"
+          to="/discover/lorebooks"
         />
       } @else if (unavailable.value) {
         <EmptyState
           message="This lorebook isn't available."
-          actionLabel="Back to the catalog"
-          to="/lorebook/catalog"
+          actionLabel="Back to discover"
+          to="/discover/lorebooks"
         />
       } @else {
         <>

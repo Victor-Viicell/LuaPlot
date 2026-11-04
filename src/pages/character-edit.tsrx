@@ -81,7 +81,7 @@ export function CharacterEdit() @{
       return;
     }
 
-    navigate("/character/catalog");
+    navigate("/discover/characters");
   }
 
   load();
@@ -99,20 +99,20 @@ export function CharacterEdit() @{
     } @else if (phase.value === "missing") {
       <EmptyState
         message="This character doesn't exist."
-        actionLabel="Back to catalog"
-        to="/character/catalog"
+        actionLabel="Back to discover"
+        to="/discover/characters"
       />
     } @else if (phase.value === "forbidden") {
       <EmptyState
         message="This character isn't yours to edit."
-        actionLabel="Back to catalog"
-        to="/character/catalog"
+        actionLabel="Back to discover"
+        to="/discover/characters"
       />
     } @else if (phase.value === "error") {
       <EmptyState
         message="This character couldn't be loaded. Try again from the catalog."
-        actionLabel="Back to catalog"
-        to="/character/catalog"
+        actionLabel="Back to discover"
+        to="/discover/characters"
       />
     } @else {
       <>

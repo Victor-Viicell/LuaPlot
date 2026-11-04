@@ -5,7 +5,7 @@ import { isHandle } from "./lib/schema.ts";
  * The route table plus the only navigation seam in the app.
  *
  * Rules (from `src/specs/luaplot-pages.md`):
- * - fixed segments win over params, params are UUID-shaped so `catalog` can never collide with an id;
+ * - fixed segments win over params, params are UUID-shaped so `discover` can never collide with an id;
  * - the query string is untouched here — pages read it with `useQuery()`;
  * - `base` comes from `import.meta.env.BASE_URL` so `/LuaPlot/` on Pages and `/` under Tauri both work;
  * - no router dependency: ~120 lines of match + navigate.
@@ -30,7 +30,12 @@ export type RouteDef = {
 
 export const ROUTES: RouteDef[] = [
   // Entry
-  { path: "/", title: "LuaPlot", access: "public", page: () => import("./pages/home.tsrx") },
+  {
+    path: "/",
+    title: "Discover",
+    access: "public",
+    page: () => import("./pages/discover-characters.tsrx"),
+  },
   {
     path: "/authentification",
     title: "Sign in",
@@ -57,6 +62,12 @@ export const ROUTES: RouteDef[] = [
     access: "signed-in",
     page: () => import("./pages/bookmarks.tsrx"),
   },
+  {
+    path: "/subscription",
+    title: "Subscription",
+    access: "signed-in",
+    page: () => import("./pages/subscription.tsrx"),
+  },
 
   // People
   {
@@ -72,13 +83,27 @@ export const ROUTES: RouteDef[] = [
     page: () => import("./pages/user-edit.tsrx"),
   },
 
-  // Characters
+  // Discover — the three browse surfaces, characters first and also the home page.
   {
-    path: "/character/catalog",
-    title: "Characters",
+    path: "/discover/characters",
+    title: "Discover",
     access: "public",
-    page: () => import("./pages/character-catalog.tsrx"),
+    page: () => import("./pages/discover-characters.tsrx"),
   },
+  {
+    path: "/discover/lorebooks",
+    title: "Lorebooks",
+    access: "public",
+    page: () => import("./pages/discover-lorebooks.tsrx"),
+  },
+  {
+    path: "/discover/presets",
+    title: "Presets",
+    access: "public",
+    page: () => import("./pages/discover-presets.tsrx"),
+  },
+
+  // Characters
   {
     path: "/character/create",
     title: "New character",
@@ -100,12 +125,6 @@ export const ROUTES: RouteDef[] = [
 
   // Lorebooks
   {
-    path: "/lorebook/catalog",
-    title: "Lorebooks",
-    access: "public",
-    page: () => import("./pages/lorebook-catalog.tsrx"),
-  },
-  {
     path: "/lorebook/create",
     title: "New lorebook",
     access: "signed-in",
@@ -125,12 +144,6 @@ export const ROUTES: RouteDef[] = [
   },
 
   // Presets
-  {
-    path: "/preset/catalog",
-    title: "Presets",
-    access: "public",
-    page: () => import("./pages/preset-catalog.tsrx"),
-  },
   {
     path: "/preset/create",
     title: "New preset",
@@ -434,7 +447,7 @@ export function navigate(path: string, options: { replace?: boolean } = {}): voi
  * **The mounted key is the whole point.** Without it the shell still believed it was showing the
  * pre-query location, so any later navigation to that same route was a no-op: press the Catalog tab
  * on a narrowed catalog and the URL cleared while the grid kept the filter — the one shape
- * `character/catalog.md` → *URL* forbids (a narrowed view can be shared, bookmarked).
+ * `character/discover.md` → *URL* forbids (a narrowed view can be shared, bookmarked).
  *
  * `search` is a bare query string (`q=sea`, leading `?` allowed), applied to the route the router
  * has already matched — a page cannot commit a query onto a path it is not on.

@@ -337,7 +337,7 @@ export function SessionDetail() @{
       return;
     }
 
-    navigate(sourceId.value === "" ? "/character/catalog" : `/character/${sourceId.value}`);
+    navigate(sourceId.value === "" ? "/discover/characters" : `/character/${sourceId.value}`);
   }
 
   // ---- Persona ---------------------------------------------------------------------------------
@@ -1102,8 +1102,8 @@ export function SessionDetail() @{
       } @else if (missing.value) {
         <EmptyState
           message="This session doesn't exist."
-          actionLabel="Back to the catalog"
-          to="/character/catalog"
+          actionLabel="Back to discover"
+          to="/discover/characters"
         />
       } @else {
         <>

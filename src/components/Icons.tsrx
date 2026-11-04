@@ -24,7 +24,7 @@ export function IconThread() {
   );
 }
 
-export function IconCatalog() {
+export function IconDiscover() {
   return (
     <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
       <rect x="4" y="4" width="7" height="7" rx="1" />
@@ -145,7 +145,11 @@ export function IconFlag() {
 /** The caret a `<select>` cannot draw for itself. */
 export function IconChevron({ class: className }: { class?: string }) {
   return (
-    <svg class={className ? `ico ${className}` : "ico"} viewBox="0 0 24 24" aria-hidden="true">
+    <svg
+      class={className ? `ico ${className}` : "ico"}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
       <path d="M6 9.5 12 15l6-5.5" />
     </svg>
   );

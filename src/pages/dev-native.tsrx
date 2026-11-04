@@ -357,7 +357,7 @@ export function DevNative() @{
                         shareText({
                           title: "LuaPlot",
                           text: "A character worth reading.",
-                          url: `${location.origin}${href("/character/catalog")}`,
+                          url: `${location.origin}${href("/discover/characters")}`,
                         }),
                       )}
                   >

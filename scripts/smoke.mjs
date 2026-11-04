@@ -385,14 +385,14 @@ const settingValue = (term) =>
  *
  * Three facts, because the sentence alone would let the other two rot: an `EmptyState` with no
  * action strands the reader, and a refusal that still mounted the form is a worse defect than a
- * wrong sentence. `catalogPath` is matched as a **suffix** — preview serves `/character/catalog`,
- * Pages serves `/LuaPlot/character/catalog`, and T-41 lost three rows to an `^`-anchored test.
+ * wrong sentence. `catalogPath` is matched as a **suffix** — preview serves `/discover/characters`,
+ * Pages serves `/LuaPlot/discover/characters`, and T-41 lost three rows to an `^`-anchored test.
  */
 async function refusal(message, catalogPath) {
   await waitText(message, 8000);
   const read = await js(`
     const form = document.querySelector("form");
-    const a = [...document.querySelectorAll("a")].find((e) => (e.innerText || "").trim() === "Back to catalog");
+    const a = [...document.querySelectorAll("a")].find((e) => (e.innerText || "").trim() === "Back to discover");
     const href = a ? a.getAttribute("href") || "" : "";
     return {
       form: form !== null,
@@ -401,7 +401,7 @@ async function refusal(message, catalogPath) {
   `);
   const where = await url();
   if (read.form) throw new Error(`the refusal at ${where} still mounted a <form>`);
-  if (!read.resolved) throw new Error(`the refusal at ${where} prints no "Back to catalog" road out`);
+  if (!read.resolved) throw new Error(`the refusal at ${where} prints no "Back to discover" road out`);
   const base = new URL(BASE).pathname;
   if (!read.resolved.startsWith(base)) {
     throw new Error(`the road out ${read.resolved} leaves the served base ${base} (from ${where})`);
@@ -797,7 +797,7 @@ console.log(`smoke: ${BASE} @ 360x740`);
 
 // Open the build once. Everything after this is in-app: a reload re-seeds the memory adapter.
 await send("Page.navigate", { url: BASE });
-await waitText("LuaPlot", 15000);
+await waitText("Discover", 15000);
 await sleep(600);
 
 const badge = () =>
@@ -808,26 +808,24 @@ let unreadBefore = "";
 const results = [];
 
 results.push(
-  await journey("sign in from /", async () => {
-    await waitText("signed in as", 8000);
+  await journey("sign in from the Discover tab", async () => {
+    await waitText("Discover", 8000);
     await click("More");
     await click("Sign out");
-    await waitText("signed out");
-    // T-45 — two facts, because the press used to pass this row by *re-booting*: the control is
-    // still a real anchor (an `href` a middle-click, a crawler and a no-JS visit can follow) and
-    // pressing it is a **push**, not a document load.
+    await waitText("Discover", 8000);
+    // The landing page is gone, so the signed-out way in is the Profile tab — while there is no
+    // account it points at `/authentification`. The anchor stays real and the press is a push.
     const entry = await js(`
-      const el = document.querySelector(".entry a.btn");
-      return el ? { href: el.getAttribute("href") || "", text: (el.innerText || "").trim() } : null;
+      const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile");
+      return el ? { href: el.getAttribute("href") || "", text: (el.getAttribute("aria-label") || el.innerText || "").trim() } : null;
     `);
-    if (!entry) throw new Error("home's entry control is no longer an anchor");
-    if (!entry.text.startsWith("Sign in")) throw new Error(`home's entry control reads ${JSON.stringify(entry.text)}, expected "Sign in"`);
-    if (!entry.href.endsWith("/authentification")) throw new Error(`home's entry control points at ${entry.href}, not /authentification`);
-    const mark = await markDocument("home-sign-in");
-    await click("Sign in");
-    await expectPath("/authentification", "home's Sign in");
+    if (!entry) throw new Error("the signed-out Profile tab is missing");
+    if (!entry.href.endsWith("/authentification")) throw new Error(`the signed-out Profile tab points at ${entry.href}, not /authentification`);
+    const mark = await markDocument("profile-sign-in");
+    await click("Profile");
+    await expectPath("/authentification", "the signed-out Profile tab");
     await waitText("Continue with Google", 8000);
-    const kept = await expectNoReload(mark, "home's Sign in");
+    const kept = await expectNoReload(mark, "the signed-out Profile tab");
 
     /* T-83 — the entry screen's own `sm 640` block, which no row has ever rendered. Row 1 is the
      * only row that mounts `/authentification` and it does so at the session's own ~500px, so
@@ -1023,11 +1021,11 @@ results.push(
     await click("Continue with Google");
     await waitText("sign-in was cancelled", 8000);
     await go("/");
-    await waitText("signed out", 8000);
+    await waitText("Discover", 8000);
     // The one control that really does write the session in the preview: the menu's own switch.
     await click("More");
     await click("Sign in as @you");
-    await waitText("signed in as You", 8000);
+    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/you"); })()`, "the Profile tab to point at @you", 8000);
     const label = await badge();
     if (!label.startsWith("Alerts")) throw new Error("the tab bar lost its Alerts destination");
     return `the provider button answers cancelled and signs nobody in; the menu's switch signs in as You; the control pushed (${kept}); the sm 640 measure ${gateSeen}`;
@@ -1044,22 +1042,21 @@ results.push(
  * the path.
  */
 results.push(
-  await journey("profile from /", async () => {
+  await journey("profile from Discover", async () => {
     await go("/");
-    await waitText("signed in as You", 8000);
+    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/you"); })()`, "the signed-in Profile tab", 8000);
     const entry = await js(`
-      const el = document.querySelector(".entry a.btn");
-      return el ? { href: el.getAttribute("href") || "", text: (el.innerText || "").trim() } : null;
+      const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile");
+      return el ? { href: el.getAttribute("href") || "", text: (el.getAttribute("aria-label") || el.innerText || "").trim() } : null;
     `);
-    if (!entry) throw new Error("home's entry control is no longer an anchor");
-    if (!entry.text.startsWith("Open profile")) throw new Error(`the signed-in control reads ${JSON.stringify(entry.text)}, expected "Open profile"`);
-    if (!/\/user\/you$/.test(entry.href)) throw new Error(`the signed-in control points at ${entry.href}, not /user/you`);
-    const mark = await markDocument("home-open-profile");
-    await click("Open profile");
-    await expectPath("/user/you", "home's Open profile");
+    if (!entry) throw new Error("the signed-in Profile tab is missing");
+    if (!/\/user\/you$/.test(entry.href)) throw new Error(`the signed-in Profile tab points at ${entry.href}, not /user/you`);
+    const mark = await markDocument("discover-profile");
+    await click("Profile");
+    await expectPath("/user/you", "the Profile tab");
     await waitText("Edit profile", 8000);
-    const kept = await expectNoReload(mark, "home's Open profile");
-    return `Open profile pushes to @you's own profile with the owner actions visible; ${kept}`;
+    const kept = await expectNoReload(mark, "the Profile tab");
+    return `the Profile tab pushes to @you's own profile with the owner actions visible; ${kept}`;
   }),
 );
 
@@ -1342,15 +1339,15 @@ results.push(
  * come first.
  *
  * Every hop asserts three things through `refusal()`: the page's own sentence, that no `<form>`
- * mounted, and that the `Back to catalog` action resolves under the served base to *that type's*
+ * mounted, and that the `Back to discover` action resolves under the served base to *that type's*
  * catalog. A refusal with no road out is a dead end, and the copy alone would let it rot.
  */
 results.push(
   await journey("refuse another author's character (forbidden, then missing)", async () => {
     await go(OTHER_CHARACTER_EDIT);
-    const forbidden = await refusal("This character isn't yours to edit.", "/character/catalog");
+    const forbidden = await refusal("This character isn't yours to edit.", "/discover/characters");
     await go(NO_CHARACTER_EDIT);
-    const missing = await refusal("This character doesn't exist.", "/character/catalog");
+    const missing = await refusal("This character doesn't exist.", "/discover/characters");
     return `ada's row → ${forbidden} | a dead id in the same bucket → ${missing}`;
   }),
 );
@@ -1358,9 +1355,9 @@ results.push(
 results.push(
   await journey("refuse another author's lorebook (forbidden, then missing)", async () => {
     await go(OTHER_LOREBOOK_EDIT);
-    const forbidden = await refusal("This lorebook isn't yours to edit.", "/lorebook/catalog");
+    const forbidden = await refusal("This lorebook isn't yours to edit.", "/discover/lorebooks");
     await go(NO_LOREBOOK_EDIT);
-    const missing = await refusal("This lorebook doesn't exist.", "/lorebook/catalog");
+    const missing = await refusal("This lorebook doesn't exist.", "/discover/lorebooks");
     return `Ashmarket Gazetteer → ${forbidden} | a dead id in the same bucket → ${missing}`;
   }),
 );
@@ -1368,9 +1365,9 @@ results.push(
 results.push(
   await journey("refuse another author's preset (forbidden, then missing)", async () => {
     await go(OTHER_PRESET_EDIT);
-    const forbidden = await refusal("This preset isn't yours to edit.", "/preset/catalog");
+    const forbidden = await refusal("This preset isn't yours to edit.", "/discover/presets");
     await go(NO_PRESET_EDIT);
-    const missing = await refusal("This preset doesn't exist.", "/preset/catalog");
+    const missing = await refusal("This preset doesn't exist.", "/discover/presets");
     return `Long Table → ${forbidden} | a dead id in the same bucket → ${missing}`;
   }),
 );
@@ -1913,7 +1910,7 @@ results.push(
     const on = await storeCell("Show");
     if (on !== "on · blur") throw new Error(`the counts strip reads Show "${on}" after both toggles went on`);
 
-    await go("/character/catalog");
+    await go("/discover/characters");
     const coveredOn = await coveredCards();
     if (coveredOn < 1) throw new Error("the catalog drew no cover with Show + Blur on — the listing is not reading the store");
 
@@ -1923,7 +1920,7 @@ results.push(
     await setToggle("Blur NSFW content", seedBlur);
     const restored = `${await storeCell("Show")}/${await storeCell("Blur")}`;
 
-    await go("/character/catalog");
+    await go("/discover/characters");
     const coveredBack = await coveredCards();
     const expectedBack = seedShow && seedBlur ? coveredOn : 0;
     if (coveredBack !== expectedBack) {
@@ -1976,7 +1973,7 @@ results.push(
     const basePath = new URL(BASE).pathname;
     const cardPath = first.path.startsWith(basePath) ? first.path.slice(basePath.length - 1) : first.path;
 
-    await go("/character/catalog");
+    await go("/discover/characters");
     await waitFor(`document.querySelectorAll(".card").length > 0`, "the catalog grid", 10000);
     const cardRatio = await waitFor(
       `(() => {
@@ -2071,7 +2068,7 @@ results.push(
 
 results.push(
   await journey("measure the card's touch targets at 360×740 (44px bands, no new scroll)", async () => {
-    await go("/character/catalog");
+    await go("/discover/characters");
     await waitFor(`document.querySelectorAll(".card a.card-author").length > 0`, "a catalog card's author link", 10000);
     const restore = await js(`return window.innerWidth;`);
     const seen = [];
@@ -2098,7 +2095,7 @@ results.push(
           viewport: window.innerWidth,
         };
       `);
-      if (!first) throw new Error("/character/catalog drew no card with an author link");
+      if (!first) throw new Error("/discover/characters drew no card with an author link");
       if (first.viewport !== 360) throw new Error(`the override asked for 360 and the page measured ${first.viewport}`);
       if (first.author.h < 44) throw new Error(`the card's author link is ${first.author.h}px tall at 360, under the 44px floor`);
       if (first.author.w < 44) throw new Error(`the card's author link is only ${first.author.w}px wide at 360, under the 44px floor`);
@@ -2210,7 +2207,7 @@ const cssHex = (value) => {
 
 results.push(
   await journey("the accent's text tiers clear 4.5:1 in both flavours", async () => {
-    await go("/character/catalog");
+    await go("/discover/characters");
     await waitFor(`!!document.querySelector(".tabbar .tab.is-active .tab-label")`, "an active tab label", 8000);
     await waitFor(`!!document.querySelector(".card a.card-author")`, "a catalog card's author link", 8000);
 
@@ -2999,7 +2996,7 @@ results.push(
  * The router gets this from `TABLE`'s sort (fewer params first, then deeper) plus the id predicate
  * (`src/router.ts` → `/^[0-9a-f-]{36}$/i`). No gate can see it: `spec-routes.mjs` proves each
  * route's page module resolves, never **which** route the table picks for a path. A sort that loses
- * its param count, or an id predicate widened to `\w+`, would make `/character/catalog` mount the
+ * its param count, or an id predicate widened to `\w+`, would make `/discover/characters` mount the
  * character *detail* page with `id="catalog"` — the app would read *not found* on a route the spec
  * guarantees, and every gate would stay green.
  *
@@ -3008,7 +3005,7 @@ results.push(
  * from the page files, all read as data:
  *   - the page's own root class (`.catalog`, `.create-page`, `.thread`, `.compose-page`; a detail
  *     page's root is `.detail`, so its **absence** is the other half of the assertion);
- *   - its `.kicker` sentence — the string each page writes for itself (`character catalog`,
+ *   - its `.kicker` sentence — the string each page writes for itself (`character Discover`,
  *     `new preset`, `thread`, …);
  *   - `document.title` = `<Title> — LuaPlot` (`App.tsrx`); and
  *   - on a create page, a mounted `<form>`. Polled rather than asserted on the first frame (T-40's
@@ -3030,11 +3027,11 @@ results.push(
  * `sign out` so `sign out` stays the walk's last row.
  * -------------------------------------------------------------------------------------------- */
 const FIXED_SEGMENTS = [
-  { path: "/character/catalog", root: ".catalog", kicker: "character catalog", title: "Characters" },
+  { path: "/discover/characters", root: ".catalog", kicker: "discover characters", title: "Discover" },
   { path: "/character/create", root: ".create-page", kicker: "new character", title: "New character", form: true },
-  { path: "/lorebook/catalog", root: ".catalog", kicker: "lorebook catalog", title: "Lorebooks" },
+  { path: "/discover/lorebooks", root: ".catalog", kicker: "discover lorebooks", title: "Lorebooks" },
   { path: "/lorebook/create", root: ".create-page", kicker: "new lorebook", title: "New lorebook", form: true },
-  { path: "/preset/catalog", root: ".catalog", kicker: "preset catalog", title: "Presets" },
+  { path: "/discover/presets", root: ".catalog", kicker: "discover presets", title: "Presets" },
   { path: "/preset/create", root: ".create-page", kicker: "new preset", title: "New preset", form: true },
   { path: "/persona/create", root: ".create-page", kicker: "new persona", title: "New persona", form: true },
   { path: "/post/thread", root: ".thread", kicker: "thread", title: "Thread" },
@@ -3111,7 +3108,7 @@ results.push(
  * reads anchors, row 30 measures a card's **links** and row 31 a token's **contrast**. A page that
  * printed a count itself would be invisible to every gate.
  *
- * So the row reads the engagement surface of **every** card on `/character/catalog` as data:
+ * So the row reads the engagement surface of **every** card on `/discover/characters` as data:
  * exactly one `.card-ratio`, its text a whole percent, **zero** `.count/.counts/.count-label/
  * .count-value/.comments` inside the card, and the ratio **not a control** — its tag is `SPAN` and
  * `closest("a, button, [role=button]")` is null, so a card's only interactive children are the two
@@ -3144,10 +3141,10 @@ const ENGAGEMENT_CHARACTER = CONTROL_CHARACTER;
 
 results.push(
   await journey("engagement is a ratio on a card and counts on the detail page", async () => {
-    await go("/character/catalog");
+    await go("/discover/characters");
     await waitFor(
       `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".card .card-ratio").length > 0`,
-      "the character catalog to leave its skeletons behind",
+      "the character Discover to leave its skeletons behind",
       8000,
     );
     // The card re-measures its tags on a ResizeObserver, so the footer is read once the grid settles.
@@ -3278,7 +3275,7 @@ results.push(
  * The two halves fail independently, so the row proves them separately and names which one moved:
  *
  *   - **Listing.** Both directions, so the absence is a *difference* and not a fact about a
- *     catalogue that never lists the row: with Show on, `/character/catalog` prints *Hollow Saint*
+ *     catalogue that never lists the row: with Show on, `/discover/characters` prints *Hollow Saint*
  *     (`CHARACTER(4)`, the only NSFW character that reaches page one); with Show off the same
  *     catalogue draws cards (20, not zero — an absence over an empty grid proves nothing) and none
  *     of them prints that title.
@@ -3311,10 +3308,10 @@ results.push(
 
     /** The catalogue read as data: how many cards, and the title each one prints. */
     const listing = async () => {
-      await go("/character/catalog");
+      await go("/discover/characters");
       await waitFor(
         `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".card").length > 0`,
-        "the character catalog to leave its skeletons behind",
+        "the character Discover to leave its skeletons behind",
         8000,
       );
       await sleep(150);
@@ -3539,15 +3536,15 @@ results.push(
     const seedBlur = (await toggleState("Blur NSFW content")) === "true";
 
     /**
-     * `/character/catalog` read as data: every card's title, the covered cards in DOM order, and
+     * `/discover/characters` read as data: every card's title, the covered cards in DOM order, and
      * each covered card's own containment. The reveal press and the restore both re-read through
      * this, so one definition answers "what is on the page" for the whole row.
      */
     const readCatalog = async () => {
-      await go("/character/catalog");
+      await go("/discover/characters");
       await waitFor(
         `document.querySelectorAll(".skel-card").length === 0 && document.querySelectorAll(".card").length > 0`,
-        "the character catalog to leave its skeletons behind",
+        "the character Discover to leave its skeletons behind",
         8000,
       );
       // The card re-measures its tags on a ResizeObserver; the footer is read once the grid settles.
@@ -3606,7 +3603,7 @@ results.push(
       const catalog = await readCatalog();
       if (catalog.covered.length === 0) {
         throw new Error(
-          `no .card.is-covered on /character/catalog with Show + Blur on — ${catalog.cards} card(s) drawn (${JSON.stringify(catalog.titles.slice(0, 4))}…); a cover rule read over zero covered cards proves nothing`,
+          `no .card.is-covered on /discover/characters with Show + Blur on — ${catalog.cards} card(s) drawn (${JSON.stringify(catalog.titles.slice(0, 4))}…); a cover rule read over zero covered cards proves nothing`,
         );
       }
       const broken = catalog.covered.filter(
@@ -4494,7 +4491,7 @@ results.push(
 
     // 5. **Voted is the adapter's state, so it survives a remount** (`detail.md` → States): leave
     //    the page entirely and come back through the router; `myVote` is re-read from `repo.myVote`.
-    await go("/character/catalog");
+    await go("/discover/characters");
     await waitFor(`document.querySelector(".catalog") !== null`, "the catalog on the way out", 8000);
     await go(VOTE_CHARACTER);
     const remounted = await open("the character again after a remount");
@@ -4524,7 +4521,7 @@ results.push(
       return "";
     });
 
-    return `seed Likes/Dislikes ${base.likes}/${base.dislikes} at ${VOTE_CHARACTER.slice(-12)} · Like → ${first.likes}/${first.dislikes} · Like again → ${repeated.likes}/${repeated.dislikes}, still ${settled.likes}/${settled.dislikes} after 300ms (a repeat is not a second vote) · Dislike → ${switched.likes}/${switched.dislikes} with one .vote pressed (the Like was replaced) · remount via /character/catalog → ${remounted.likes}/${remounted.dislikes}, Dislike still pressed · left on Like ${restored.likes}/${restored.dislikes} (the spec fixes the pair; a viewer who arrived with no vote cannot be returned to none)`;
+    return `seed Likes/Dislikes ${base.likes}/${base.dislikes} at ${VOTE_CHARACTER.slice(-12)} · Like → ${first.likes}/${first.dislikes} · Like again → ${repeated.likes}/${repeated.dislikes}, still ${settled.likes}/${settled.dislikes} after 300ms (a repeat is not a second vote) · Dislike → ${switched.likes}/${switched.dislikes} with one .vote pressed (the Like was replaced) · remount via /discover/characters → ${remounted.likes}/${remounted.dislikes}, Dislike still pressed · left on Like ${restored.likes}/${restored.dislikes} (the spec fixes the pair; a viewer who arrived with no vote cannot be returned to none)`;
   }),
 );
 
@@ -4811,7 +4808,7 @@ results.push(
  * page reading the same string and the row would pass on the bug it exists to catch.
  *
  * **Mutating and final.** It renames the character twice through `/character/<id>/edit`, which
- * writes the live row (the character catalog, its detail page and every later card now read the new
+ * writes the live row (the character Discover, its detail page and every later card now read the new
  * name), and it publishes one post. That is why it is the walk's last but one: nothing after it
  * reads a character except `sign out`.
  * ---------------------------------------------------------------------------------------------- */
@@ -5241,7 +5238,7 @@ results.push(
     await go(`/session/${sessionId}`);
     await waitText("This session doesn't exist.", 8000);
     const missing = await js(`
-      const road = [...document.querySelectorAll("a")].find((a) => /catalog/i.test((a.textContent || "")));
+      const road = [...document.querySelectorAll("a")].find((a) => (a.textContent || "").trim() === "Back to discover");
       return {
         path: location.pathname,
         text: document.body.innerText.replace(/\\s+/g, " ").trim(),
@@ -5255,8 +5252,8 @@ results.push(
     if (missing.turns !== 0) {
       throw new Error(`the deleted session's route still draws ${missing.turns} .turn-text — the transcript survived`);
     }
-    if (!/\/character\/catalog$/.test(missing.road)) {
-      throw new Error(`the Not found state's road out points at ${JSON.stringify(missing.road)}, not /character/catalog`);
+    if (!/\/discover\/characters$/.test(missing.road)) {
+      throw new Error(`the Not found state's road out points at ${JSON.stringify(missing.road)}, not /discover/characters`);
     }
 
     // 7. The cut did not leave with the session: same body, same lines, same count.
@@ -5346,11 +5343,8 @@ results.push(
 
     const readShell = () =>
       js(`
-        const link = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Open profile");
-        return {
-          sentence: (document.querySelector(".reading-value")?.textContent || "").trim(),
-          profile: link ? link.getAttribute("href") || "" : "",
-        };
+        const link = [...document.querySelectorAll("a")].find((a) => (a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile");
+        return { profile: link ? link.getAttribute("href") || "" : "" };
       `);
 
     // 1. The account this row borrows, read from the page it will be handed back to.
@@ -5436,13 +5430,10 @@ results.push(
     }
 
     await go("/");
-    await waitText("signed in as", 8000);
+    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/${ONBOARDING_HANDLE}"); })()`, "the Profile tab after the claim", 8000);
     const shell = await readShell();
-    if (shell.sentence !== `signed in as ${ONBOARDING_NAME}`) {
-      throw new Error(`/ reads ${JSON.stringify(shell.sentence)} after the claim, not ${JSON.stringify(`signed in as ${ONBOARDING_NAME}`)} — the account did not move`);
-    }
     if (!shell.profile.endsWith(`/user/${ONBOARDING_HANDLE}`)) {
-      throw new Error(`the shell's Open profile points at ${JSON.stringify(shell.profile)}, not /user/${ONBOARDING_HANDLE}`);
+      throw new Error(`the shell's Profile tab points at ${JSON.stringify(shell.profile)}, not /user/${ONBOARDING_HANDLE} — the account did not move`);
     }
 
     // 7. The resume, then the hand-back. A second visit must restore the saved pair, not a blank.
@@ -5672,13 +5663,13 @@ results.push(
         throw new Error(`the restore landed on ${JSON.stringify([back.name, back.handle, back.missing])}, not ${JSON.stringify([account.name, `@${accountHandle}`])}`);
       }
       await go("/");
-      await waitText("signed in as", 8000);
+      await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/${accountHandle}"); })()`, "the Profile tab after the restore", 8000);
       const home = await readShell();
-      if (home.sentence !== `signed in as ${account.name}` || !home.profile.endsWith(`/user/${accountHandle}`)) {
-        throw new Error(`/ reads ${JSON.stringify([home.sentence, home.profile])} after the restore, not ${JSON.stringify([`signed in as ${account.name}`, `/user/${accountHandle}`])}`);
+      if (!home.profile.endsWith(`/user/${accountHandle}`)) {
+        throw new Error(`the shell's Profile tab points at ${JSON.stringify(home.profile)} after the restore, not /user/${accountHandle}`);
       }
 
-      return `@${accountHandle} (${JSON.stringify(account.name)}) · a first visit opens blank with the rule as the handle's help line, and Finish enables on the pair only once the settle asked the adapter · "ab" → ${JSON.stringify(HANDLE_RULE_SENTENCE)} with Finish disabled · "Ada" → "Username taken" with Finish disabled · Finish → /user/${ONBOARDING_HANDLE} reads ${JSON.stringify([claimed.name, claimed.handle])}, / reads ${JSON.stringify(shell.sentence)} with Open profile at ${shell.profile} · a second visit restored ${JSON.stringify([resumed.handle, resumed.name])} → Finish back to /user/${accountHandle}, / reads ${JSON.stringify(home.sentence)} · the setup form at ${setupSeen}`;
+      return `@${accountHandle} (${JSON.stringify(account.name)}) · a first visit opens blank with the rule as the handle's help line, and Finish enables on the pair only once the settle asked the adapter · "ab" → ${JSON.stringify(HANDLE_RULE_SENTENCE)} with Finish disabled · "Ada" → "Username taken" with Finish disabled · Finish → /user/${ONBOARDING_HANDLE} reads ${JSON.stringify([claimed.name, claimed.handle])}, the Profile tab at ${shell.profile} · a second visit restored ${JSON.stringify([resumed.handle, resumed.name])} → Finish back to /user/${accountHandle}, the Profile tab at ${home.profile} · the setup form at ${setupSeen}`;
     } catch (error) {
       throw new Error(
         `${error.message} — the account was left as @${ONBOARDING_HANDLE} (${JSON.stringify(ONBOARDING_NAME)}); the walk's borrowed @${accountHandle} was not handed back`,
@@ -5760,11 +5751,8 @@ results.push(
 
     const readShell = () =>
       js(`
-        const link = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Open profile");
-        return {
-          sentence: (document.querySelector(".reading-value")?.textContent || "").trim(),
-          profile: link ? link.getAttribute("href") || "" : "",
-        };
+        const link = [...document.querySelectorAll("a")].find((a) => (a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile");
+        return { profile: link ? link.getAttribute("href") || "" : "" };
       `);
 
     const HEAD = 'input[name="username"], input[name="handle"]';
@@ -5849,12 +5837,12 @@ results.push(
       throw new Error(`the comment the account wrote reads ${JSON.stringify(signed)} after the rename, not @${EDIT_HANDLE} — a comment is signed by its author, and the account keeps its content`);
     }
 
-    // 5. The account itself moved: `/` names the same person at the new handle.
+    // 5. The account itself moved: the Profile tab names the same person at the new handle.
     await go("/");
-    await waitText("signed in as", 8000);
+    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/${EDIT_HANDLE}"); })()`, "the Profile tab after the rename", 8000);
     const shell = await readShell();
-    if (shell.sentence !== `signed in as ${before.name}` || !shell.profile.endsWith(`/user/${EDIT_HANDLE}`)) {
-      throw new Error(`/ reads ${JSON.stringify([shell.sentence, shell.profile])} after the rename, not ${JSON.stringify([`signed in as ${before.name}`, `/user/${EDIT_HANDLE}`])} — the session kept the old handle`);
+    if (!shell.profile.endsWith(`/user/${EDIT_HANDLE}`)) {
+      throw new Error(`the shell's Profile tab points at ${JSON.stringify(shell.profile)} after the rename, not /user/${EDIT_HANDLE} — the session kept the old handle`);
     }
 
     // 6. The way back, and the whole pair re-read: the walk hands the account over as row 44 does.
@@ -5874,13 +5862,13 @@ results.push(
         throw new Error(`the restore reads ${JSON.stringify([back.bio, back.figures, back.creations])}, not ${JSON.stringify([before.bio, before.figures, before.creations])} — the round trip lost a row`);
       }
       await go("/");
-      await waitText("signed in as", 8000);
+      await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/${accountHandle}"); })()`, "the Profile tab after the restore", 8000);
       const home = await readShell();
-      if (home.sentence !== `signed in as ${before.name}` || !home.profile.endsWith(`/user/${accountHandle}`)) {
-        throw new Error(`/ reads ${JSON.stringify([home.sentence, home.profile])} after the restore, not ${JSON.stringify([`signed in as ${before.name}`, `/user/${accountHandle}`])}`);
+      if (!home.profile.endsWith(`/user/${accountHandle}`)) {
+        throw new Error(`the shell's Profile tab points at ${JSON.stringify(home.profile)} after the restore, not /user/${accountHandle}`);
       }
 
-      return `@${accountHandle} → @${EDIT_HANDLE} → @${accountHandle} · the form prefilled ${JSON.stringify([prefilled.handle, prefilled.name, prefilled.bio])} with Save enabled · Save → /user/${EDIT_HANDLE} reads ${JSON.stringify([after.name, after.handle, after.figures, after.creations])} (same name, bio, figures and creations as before) · /user/${accountHandle} reads "This user doesn't exist." with no profile · the account's own comment reads ${JSON.stringify(signed)} · / reads ${JSON.stringify(shell.sentence)} with Open profile at ${shell.profile} · the way back restores ${JSON.stringify([back.handle, back.bio, back.creations])}`;
+      return `@${accountHandle} → @${EDIT_HANDLE} → @${accountHandle} · the form prefilled ${JSON.stringify([prefilled.handle, prefilled.name, prefilled.bio])} with Save enabled · Save → /user/${EDIT_HANDLE} reads ${JSON.stringify([after.name, after.handle, after.figures, after.creations])} (same name, bio, figures and creations as before) · /user/${accountHandle} reads "This user doesn't exist." with no profile · the account's own comment reads ${JSON.stringify(signed)} · the Profile tab at ${shell.profile} · the way back restores ${JSON.stringify([back.handle, back.bio, back.creations])}`;
     } catch (error) {
       throw new Error(
         `${error.message} — the account was left as @${EDIT_HANDLE}; the walk's borrowed @${accountHandle} was not handed back`,
@@ -5955,15 +5943,15 @@ results.push(
 
     const HEAD_FIELD = 'input[name="username"], input[name="handle"]';
 
-    // 1. The session's own handle, read from the shell (row 45 hands `@you` back, but never pin it).
+    // 1. The session's own handle, read from the shell's Profile tab (row 45 hands `@you` back, but never pin it).
     await go("/");
-    await waitText("signed in as", 8000);
+    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").includes("/user/"); })()`, "the signed-in Profile tab", 8000);
     const ownHref = await js(`
-      const link = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Open profile");
+      const link = [...document.querySelectorAll("a")].find((a) => (a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile");
       return link ? link.getAttribute("href") || "" : "";
     `);
     const ownHandle = ownHref.split("/").filter(Boolean).pop() || "";
-    if (!ownHandle) throw new Error(`/ draws no Open profile link (read ${JSON.stringify(ownHref)}) — the row cannot know whose account it is borrowing`);
+    if (!ownHandle) throw new Error(`/ draws no Profile tab (read ${JSON.stringify(ownHref)}) — the row cannot know whose account it is borrowing`);
 
     await go(`/user/${ownHandle}`);
     await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the account's profile header", 10000);
@@ -6330,15 +6318,15 @@ results.push(
       return { ...body, selected: head.selected };
     };
 
-    // 1. The session's own handle, read from the shell (row 45 hands `@you` back; never pin it).
+    // 1. The session's own handle, read from the shell's Profile tab (row 45 hands `@you` back; never pin it).
     await go("/");
-    await waitText("signed in as", 8000);
+    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").includes("/user/"); })()`, "the signed-in Profile tab", 8000);
     const ownHref = await js(`
-      const link = [...document.querySelectorAll("a")].find((a) => (a.innerText || "").trim() === "Open profile");
+      const link = [...document.querySelectorAll("a")].find((a) => (a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile");
       return link ? link.getAttribute("href") || "" : "";
     `);
     const ownHandle = ownHref.split("/").filter(Boolean).pop() || "";
-    if (!ownHandle) throw new Error(`/ draws no Open profile link (read ${JSON.stringify(ownHref)}) — the row cannot know whose profile it is walking`);
+    if (!ownHandle) throw new Error(`/ draws no Profile tab (read ${JSON.stringify(ownHref)}) — the row cannot know whose profile it is walking`);
 
     await go(`/user/${ownHandle}`);
     await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the account's profile header", 10000);
@@ -6482,7 +6470,7 @@ results.push(
 
 /* ------------------------------------------------------------------------------------------------
  * T-65 — the catalog's search, its tags and its sort are three **URL** facts
- * (`src/specs/pages/character/catalog.md` → URL), and the search is debounced (`CONTRACT.md` →
+ * (`src/specs/pages/discover/characters.md` → URL), and the search is debounced (`CONTRACT.md` →
  * Engineering law). Rows 30 and 36-38 read this grid, the card's footer and the NSFW pair; no row had
  * ever typed into the search, picked a tag, pressed the sort control or opened
  * `?q=…&tags=…&sort=ratio` by address — so a per-keystroke writer, a `q` that dies on reload, a chip
@@ -6509,7 +6497,7 @@ results.push(
  * earlier row mounted the page at the walk's own ~500px where none of them is live. It is a read,
  * taken **before** the first keystroke so the typing half's field and settle are untouched.
  * ---------------------------------------------------------------------------------------------- */
-const CATALOG_PATH = "/character/catalog";
+const CATALOG_PATH = "/discover/characters";
 
 results.push(
   await journey("the catalog's search, tags and sort are three URL facts, and the search settles", async () => {
@@ -6628,7 +6616,7 @@ results.push(
         throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
       }
       if (!r.path.endsWith(CATALOG_PATH)) {
-        throw new Error(`${at}: the toolbar was measured on ${JSON.stringify(r.path)}, not the character catalog`);
+        throw new Error(`${at}: the toolbar was measured on ${JSON.stringify(r.path)}, not the character Discover`);
       }
       if (r.display.indexOf("grid") < 0) {
         throw new Error(`${at}: .toolbar computes ${JSON.stringify(r.display)}, not the grid all three of its blocks declare`);
@@ -7066,7 +7054,7 @@ results.push(
     }
 
     // 3. The switcher's own tab, pressed on the catalog it is already on. This is the bug T-66
-    //    fixed: without a mounted key that follows the commit, `navigate(/character/catalog)` asks
+    //    fixed: without a mounted key that follows the commit, `navigate(/discover/characters)` asks
     //    for the key the shell already believed it had, nothing reloads, the URL drops the query and
     //    the grid keeps the filter.
     await click("Characters", { exact: true, scope: ".cat-switch a" });
@@ -7078,22 +7066,22 @@ results.push(
       throw new Error(`after the switcher's Characters tab the field still holds ${JSON.stringify(leftBySwitch.field)} — the URL cleared but the page did not remount, so the view and the address disagree`);
     }
 
-    // 4. The bottom bar's Catalog tab in a narrowed state — the second shape of the same press.
+    // 4. The bottom bar's Discover tab in a narrowed state — the second shape of the same press.
     await retype('input[name="q"]', word);
     const reNarrowed = await until(`the second settle to commit q=${JSON.stringify(word)}`, (s) => s.q === word && !s.busy && s.count === narrowed.count);
-    await click("Catalog", { exact: true, scope: ".tabbar a" });
+    await click("Discover", { exact: true, scope: ".tabbar a" });
     const leftByTab = await until(
-      "the bottom bar's Catalog tab to leave the narrowed view",
+      "the bottom bar's Discover tab to leave the narrowed view",
       (s) => s.search === "" && s.q === null && !s.busy && s.count === full.count,
     );
     if (leftByTab.field !== "") {
-      throw new Error(`after the Catalog tab the field still holds ${JSON.stringify(leftByTab.field)} on ${JSON.stringify(leftByTab.search)} — a page's silent query write left the router's mounted key behind`);
+      throw new Error(`after the Discover tab the field still holds ${JSON.stringify(leftByTab.field)} on ${JSON.stringify(leftByTab.search)} — a page's silent query write left the router's mounted key behind`);
     }
-    if (!leftByTab.crumb.endsWith(CATALOG_PATH)) {
-      throw new Error(`the shell's crumb reads ${JSON.stringify(leftByTab.crumb)} after the tab press, not ${CATALOG_PATH} — the tab landed somewhere else`);
+    if (leftByTab.crumb.trim() !== "/") {
+      throw new Error(`the shell's crumb reads ${JSON.stringify(leftByTab.crumb)} after the tab press, not "/" — the Discover tab landed somewhere else`);
     }
 
-    return `typing ${JSON.stringify(word)} committed ${JSON.stringify(narrowed.search)} with ${narrowed.count} of ${full.count} card(s) and **kept the caret in the field** (activeElement ${narrowed.active}) · the switcher's Characters tab cleared the query, the field and the grid (${leftBySwitch.count} card(s), ${JSON.stringify(leftBySwitch.search)}) · a second settle (${JSON.stringify(reNarrowed.search)}) then the bottom bar's Catalog tab did the same (${leftByTab.count} card(s), ${JSON.stringify(leftByTab.search)}, crumb ${JSON.stringify(leftByTab.crumb.trim())})`;
+    return `typing ${JSON.stringify(word)} committed ${JSON.stringify(narrowed.search)} with ${narrowed.count} of ${full.count} card(s) and **kept the caret in the field** (activeElement ${narrowed.active}) · the switcher's Characters tab cleared the query, the field and the grid (${leftBySwitch.count} card(s), ${JSON.stringify(leftBySwitch.search)}) · a second settle (${JSON.stringify(reNarrowed.search)}) then the bottom bar's Discover tab did the same (${leftByTab.count} card(s), ${JSON.stringify(leftByTab.search)}, crumb ${JSON.stringify(leftByTab.crumb.trim())})`;
   }),
 );
 
@@ -7500,8 +7488,8 @@ results.push(
  * live. It is a read: no press, no store row, and every override clears in one `finally`.
  */
 const TOOLBAR_PAGES = [
-  { path: "/lorebook/catalog", owner: "catalog", grid: "Lorebooks", emptyCatalog: "No lorebooks yet." },
-  { path: "/preset/catalog", owner: "catalog", grid: "Presets", emptyCatalog: "No presets yet." },
+  { path: "/discover/lorebooks", owner: "catalog", grid: "Lorebooks", emptyCatalog: "No lorebooks yet." },
+  { path: "/discover/presets", owner: "catalog", grid: "Presets", emptyCatalog: "No presets yet." },
   { path: "/persona", owner: "personas", grid: "Your personas", emptyCatalog: "" },
 ];
 
@@ -7745,14 +7733,14 @@ results.push(
       return sorted;
     };
 
-    // A. `/lorebook/catalog` — the full toolbar, and the page most like row 48's own catalogue.
+    // A. `/discover/lorebooks` — the full toolbar, and the page most like row 48's own catalogue.
     const lorebook = TOOLBAR_PAGES[0];
     const lorebookFull = await freshPage(lorebook);
     const lorebookSearch = await searchPass(lorebook, lorebookFull);
     const lorebookTag = await tagPass(lorebook, lorebookFull);
     const lorebookSort = await sortPass(lorebook, "ratio", "Top rated");
 
-    // B. `/preset/catalog` — the same three facts in one short pass. If the two toolbars differ, that
+    // B. `/discover/presets` — the same three facts in one short pass. If the two toolbars differ, that
     //    is the point of pressing both.
     const preset = TOOLBAR_PAGES[1];
     const presetFull = await freshPage(preset);
@@ -8803,14 +8791,14 @@ results.push(
 results.push(
   await journey("sign out", async () => {
     await go("/");
-    await waitText("signed in as", 8000);
+    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").includes("/user/"); })()`, "the signed-in Profile tab", 8000);
     await click("More", { exact: true });
     await click("Sign out", { exact: true });
-    await waitText("signed out", 8000);
+    await waitText("Discover", 8000);
     const profileTab = await js(`const el=[...document.querySelectorAll("a")].find((e)=>(e.getAttribute("aria-label")||e.innerText||"").trim()==="Profile"); return el ? el.getAttribute("href") : null;`);
-    const root = new URL(BASE).pathname;
-    if (profileTab !== root) throw new Error(`the Profile tab still points at ${profileTab}`);
-    return `home reads "signed out"; the Profile tab points at ${profileTab}`;
+    const auth = new URL(BASE).pathname + "authentification";
+    if (profileTab !== auth) throw new Error(`the Profile tab points at ${profileTab}, not ${auth}`);
+    return `Discover reads signed out; the Profile tab points at ${profileTab}`;
   }),
 );
 

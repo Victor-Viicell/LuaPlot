@@ -1337,6 +1337,20 @@ export const accountPreferencesPatchSchema = z.strictObject({
   blur: z.boolean().optional(),
 });
 
+/*
+ * The subscription (T-88). `pages/subscription.md` gives the page two tabs and one rule for which
+ * opens: Plan while the account is free, Billing once it is subscribed. The plan is a small enum
+ * because that is the whole surface the page needs — no price, no provider and no invoice shape is
+ * invented here.
+ */
+export const subscriptionPlanSchema = z.enum(["free", "pro"]);
+
+/** Where `lib/state/subscription.ts` keeps the plan, so a preview restart does not forget it. */
+export const SUBSCRIPTION_KEY = "luaplot.subscription";
+
+/** The stored value is the plan itself: an absent or stale key falls back to `free` in the store. */
+export const storedSubscriptionSchema = subscriptionPlanSchema;
+
 /**
  * The signed-in account as **this client** needs it: a handle to address, a display name to print,
  * the admin mark `/moderation` checks. Deliberately not the auth record — no email, no provider, no

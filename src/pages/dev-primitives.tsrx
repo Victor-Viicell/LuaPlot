@@ -9,8 +9,8 @@ import {
   IconBack,
   IconBell,
   IconBookmark,
-  IconCatalog,
   IconCheck,
+  IconDiscover,
   IconChevronDown,
   IconClose,
   IconFlag,
@@ -83,7 +83,7 @@ const TABS: TabItem[] = [
 const ICONS: { name: string; Icon: Component }[] = [
   { name: "Home", Icon: IconHome },
   { name: "Thread", Icon: IconThread },
-  { name: "Catalog", Icon: IconCatalog },
+  { name: "Discover", Icon: IconDiscover },
   { name: "Bell", Icon: IconBell },
   { name: "User", Icon: IconUser },
   { name: "Back", Icon: IconBack },
@@ -309,9 +309,10 @@ export function DevPrimitives() @{
         <p class="g-kicker">/dev/primitives</p>
         <h1 class="g-title">Primitives</h1>
         <p class="g-note">
-          Every primitive and every variant, on one stage. The theme switch writes
-          {" "}<code>data-theme</code>{" "}on the document; the stage width is the layout width, while the
-          sheet's dialog form follows the real viewport (900 up).
+          Every primitive and every variant, on one stage. The theme switch
+          writes <code>data-theme</code> on the document; the stage width is the
+          layout width, while the sheet's dialog form follows the real viewport
+          (900 up).
         </p>
       </header>
 
@@ -351,17 +352,23 @@ export function DevPrimitives() @{
           <section class="g-sec">
             <div class="g-sec-head">
               <h2 class="g-sec-title">Button</h2>
-              <p class="g-sec-note">44px floor, radius 2, one accent per screen</p>
+              <p class="g-sec-note">
+                44px floor, radius 2, one accent per screen
+              </p>
             </div>
             <div class="g-row-mid">
               <Button variant="primary">Start a session</Button>
               <Button variant="secondary">Save draft</Button>
               <Button variant="ghost">Cancel</Button>
               <Button variant="danger">Delete</Button>
-              <Button variant="secondary" disabled>Disabled</Button>
+              <Button variant="secondary" disabled>
+                Disabled
+              </Button>
             </div>
             <div class="g-col">
-              <Button variant="primary" block>Block primary</Button>
+              <Button variant="primary" block>
+                Block primary
+              </Button>
             </div>
           </section>
 
@@ -393,14 +400,22 @@ export function DevPrimitives() @{
                 placeholder="One line that sets the scene."
                 onInput={() => {}}
               />
-              <Field label="Handle" value="you" disabled help="Claimed at onboarding." onInput={() => {}} />
+              <Field
+                label="Handle"
+                value="you"
+                disabled
+                help="Claimed at onboarding."
+                onInput={() => {}}
+              />
             </div>
           </section>
 
           <section class="g-sec">
             <div class="g-sec-head">
               <h2 class="g-sec-title">Toggle</h2>
-              <p class="g-sec-note">Show / Blur — edits the account, not this view</p>
+              <p class="g-sec-note">
+                Show / Blur — edits the account, not this view
+              </p>
             </div>
             <div class="g-col">
               <Toggle
@@ -415,14 +430,22 @@ export function DevPrimitives() @{
                 pressed={blurNsfw}
                 onToggle={(next) => (blurNsfw.value = next)}
               />
-              <Toggle label="Disabled" pressed={true} disabled onToggle={() => {}} />
+              <Toggle
+                label="Disabled"
+                pressed={true}
+                disabled
+                onToggle={() => {}}
+              />
             </div>
           </section>
 
           <section class="g-sec">
             <div class="g-sec-head">
               <h2 class="g-sec-title">Card</h2>
-              <p class="g-sec-note">Real fixtures · header and footer crisp, middle covered until Reveal</p>
+              <p class="g-sec-note">
+                Real fixtures · header and footer crisp, middle covered until
+                Reveal
+              </p>
             </div>
             <div class="g-grid">
               <Card item={SFW} />
@@ -431,19 +454,23 @@ export function DevPrimitives() @{
               <Card item={LONG_TAGLINE} />
             </div>
             <p class="g-sec-note">
-              The second card is the fixture flagged NSFW, covered pre-reveal: the avatar and tagline
-              blur behind the scrim while the title, author and{" "}<code>ratio</code>{" "}stay at full
-              contrast. Press{" "}<strong>Reveal</strong>{" "}on it — that is the third state, and the same
-              component one click later, because reveal state is created inside the card and lasts
-              exactly this mount. The third and fourth cards hold the longest title and the longest
-              tagline in the set: the title ellipses on one line, the tagline clamps at two.
+              The second card is the fixture flagged NSFW, covered pre-reveal:
+              the avatar and tagline blur behind the scrim while the title,
+              author and <code>ratio</code> stay at full contrast. Press{" "}
+              <strong>Reveal</strong> on it — that is the third state, and the
+              same component one click later, because reveal state is created
+              inside the card and lasts exactly this mount. The third and fourth
+              cards hold the longest title and the longest tagline in the set:
+              the title ellipses on one line, the tagline clamps at two.
             </p>
           </section>
 
           <section class="g-sec">
             <div class="g-sec-head">
               <h2 class="g-sec-title">Tabs</h2>
-              <p class="g-sec-note">The page owns the query; Tabs only renders and calls back</p>
+              <p class="g-sec-note">
+                The page owns the query; Tabs only renders and calls back
+              </p>
             </div>
             <Tabs
               items={TABS}
@@ -464,14 +491,16 @@ export function DevPrimitives() @{
             <EmptyState
               message="Nothing here yet. Characters you create show up on this tab."
               actionLabel="Create a character"
-              to="/character/catalog"
+              to="/discover/characters"
             />
           </section>
 
           <section class="g-sec">
             <div class="g-sec-head">
               <h2 class="g-sec-title">Skeleton</h2>
-              <p class="g-sec-note">Matches the layout it stands in for — never a spinner</p>
+              <p class="g-sec-note">
+                Matches the layout it stands in for — never a spinner
+              </p>
             </div>
             <div class="g-grid">
               <Skeleton variant="lines" lines={4} />
@@ -498,7 +527,10 @@ export function DevPrimitives() @{
               <p class="g-sec-note">Portal to body · z 40/41 · toast 60</p>
             </div>
             <div class="g-row-mid">
-              <Button variant="secondary" onClick={() => (sheetOpen.value = true)}>
+              <Button
+                variant="secondary"
+                onClick={() => (sheetOpen.value = true)}
+              >
                 Open sheet
               </Button>
               <Button
@@ -531,9 +563,10 @@ export function DevPrimitives() @{
         <div class="g-sec-head">
           <h2 class="g-sec-title">Card grid</h2>
           <p class="g-sec-note">
-            Outside the stage on purpose: its columns follow the viewport (1-up at 360, 2-up sm,
-            3-up md, 4-up lg), so a 360px stage would only ever prove the phone case. Blur preference
-            on — the one flagged fixture in the first four is covered until its own Reveal.
+            Outside the stage on purpose: its columns follow the viewport (1-up
+            at 360, 2-up sm, 3-up md, 4-up lg), so a 360px stage would only ever
+            prove the phone case. Blur preference on — the one flagged fixture
+            in the first four is covered until its own Reveal.
           </p>
         </div>
         <CardGrid items={GRID_ITEMS} blurNsfw label="Characters" />
@@ -545,9 +578,16 @@ export function DevPrimitives() @{
         title="Report this character"
         onClose={() => (sheetOpen.value = false)}
       >
-        <p>Reasons come from the report component (T-12). Escape closes, Tab stays inside.</p>
+        <p>
+          Reasons come from the report component (T-12). Escape closes, Tab
+          stays inside.
+        </p>
         <div class="g-row-mid">
-          <Button variant="primary" block onClick={() => (sheetOpen.value = false)}>
+          <Button
+            variant="primary"
+            block
+            onClick={() => (sheetOpen.value = false)}
+          >
             Submit report
           </Button>
         </div>

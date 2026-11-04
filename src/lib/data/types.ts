@@ -73,6 +73,7 @@ import type {
   reportWriteSchema,
   sessionCopySchema,
   sessionSchema,
+  subscriptionPlanSchema,
   turnSchema,
   turnWriteSchema,
   userSchema,
@@ -209,6 +210,8 @@ export type ChatReply = z.infer<typeof chatReplySchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type User = z.infer<typeof userSchema>;
 export type AccountPreferences = z.infer<typeof accountPreferencesSchema>;
+/** The subscription page's plan: free opens on Plan, pro opens on Billing. */
+export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>;
 
 /** One author's public profile (`pages/user/profile.md`); the two figures are derived edges. */
 export type Profile = z.infer<typeof profileSchema>;

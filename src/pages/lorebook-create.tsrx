@@ -36,7 +36,7 @@ export function LorebookCreate() @{
       <LorebookForm
         lorebook={null}
         onSaved={(saved) => navigate(`/lorebook/${saved.id}`)}
-        onCancel={() => navigate("/lorebook/catalog")}
+        onCancel={() => navigate("/discover/lorebooks")}
       />
     }
 

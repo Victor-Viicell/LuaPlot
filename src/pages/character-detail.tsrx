@@ -1021,14 +1021,14 @@ export function CharacterDetail() @{
       } @else if (missing.value) {
         <EmptyState
           message="This character doesn't exist."
-          actionLabel="Back to the catalog"
-          to="/character/catalog"
+          actionLabel="Back to discover"
+          to="/discover/characters"
         />
       } @else if (unavailable.value) {
         <EmptyState
           message="This character isn't available."
-          actionLabel="Back to the catalog"
-          to="/character/catalog"
+          actionLabel="Back to discover"
+          to="/discover/characters"
         />
       } @else {
         <>

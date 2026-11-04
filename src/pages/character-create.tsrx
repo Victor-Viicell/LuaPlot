@@ -32,7 +32,7 @@ export function CharacterCreate() @{
       <CharacterForm
         character={null}
         onSaved={(saved) => navigate(`/character/${saved.id}`)}
-        onCancel={() => navigate("/character/catalog")}
+        onCancel={() => navigate("/discover/characters")}
       />
     }
 

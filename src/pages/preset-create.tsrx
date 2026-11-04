@@ -36,7 +36,7 @@ export function PresetCreate() @{
       <PresetForm
         preset={null}
         onSaved={(saved) => navigate(`/preset/${saved.id}`)}
-        onCancel={() => navigate("/preset/catalog")}
+        onCancel={() => navigate("/discover/presets")}
       />
     }
 

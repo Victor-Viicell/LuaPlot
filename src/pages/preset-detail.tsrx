@@ -872,14 +872,14 @@ export function PresetDetail() @{
       } @else if (missing.value) {
         <EmptyState
           message="This preset doesn't exist."
-          actionLabel="Back to the catalog"
-          to="/preset/catalog"
+          actionLabel="Back to discover"
+          to="/discover/presets"
         />
       } @else if (unavailable.value) {
         <EmptyState
           message="This preset isn't available."
-          actionLabel="Back to the catalog"
-          to="/preset/catalog"
+          actionLabel="Back to discover"
+          to="/discover/presets"
         />
       } @else {
         <>
