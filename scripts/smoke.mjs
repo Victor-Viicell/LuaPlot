@@ -6008,6 +6008,12 @@ results.push(
  *
  * Read-only: it types, presses a chip's own remove control, the sort select and one `+N` chip. No
  * store row and no preference is written.
+ *
+ * Since T-84 the row also reads **the toolbar at 640, 900 and 360** — two media blocks govern that
+ * bar (`220px minmax(0, 1fr)` with the sort pinned to column 1 and the switches rewritten into a row;
+ * then `640-899` lifting that row across both columns; then `md` putting them side by side), and every
+ * earlier row mounted the page at the walk's own ~500px where none of them is live. It is a read,
+ * taken **before** the first keystroke so the typing half's field and settle are untouched.
  * ---------------------------------------------------------------------------------------------- */
 const CATALOG_PATH = "/character/catalog";
 
@@ -6074,6 +6080,218 @@ results.push(
     }
     if (full.ratios.some((ratio) => !Number.isFinite(ratio) || ratio < 0)) {
       throw new Error(`a card's ratio reads ${JSON.stringify(full.ratios)} — the footer's percentage is what the ratio sort is measured by`);
+    }
+
+    // 1b. The toolbar at the three widths its own stylesheet draws it for (T-84). `character-catalog`'s
+    //     `sm 640` block turns the four stacked rows into `220px minmax(0, 1fr)`, pins the sort to
+    //     column 1 and rewrites the bordered `.prefs` column into a 32px row; the `640-899` block then
+    //     lifts that row across both columns, and `md 900` gives it column 2 beside the sort. Row 48's
+    //     own mount is the walk's ~500px, so not one declaration has ever been rendered. Nothing here
+    //     presses or types: it runs before the first keystroke, which is what lets the debounce half
+    //     below keep its field, its caret and its 250ms settle untouched.
+    const readToolbar = () =>
+      js(`
+        const box = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const round = (n) => Math.round(n * 100) / 100;
+          return { top: round(r.top), left: round(r.left), right: round(r.right), bottom: round(r.bottom), width: round(r.width), height: round(r.height) };
+        };
+        const bar = document.querySelector(".toolbar");
+        const bs = bar ? getComputedStyle(bar) : null;
+        const isGrid = !!bs && bs.display.indexOf("grid") >= 0;
+        const prefs = document.querySelector(".toolbar > .prefs");
+        const ps = prefs ? getComputedStyle(prefs) : null;
+        const head = document.querySelector(".head");
+        const pagerBox = document.querySelector(".pager-action");
+        return {
+          path: location.pathname,
+          search: location.search,
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          display: bs ? bs.display : "",
+          tracks: isGrid ? bs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
+          gap: bs ? bs.gap : "",
+          alignItems: bs ? bs.alignItems : "",
+          toolbar: box(bar),
+          field: box(document.querySelector(".toolbar > .search")),
+          tags: box(document.querySelector(".toolbar > .tags")),
+          sort: box(document.querySelector(".toolbar > .sort")),
+          prefs: box(prefs),
+          prefsFlex: ps ? ps.flexDirection : "",
+          prefsAlign: ps ? ps.alignItems : "",
+          prefsGap: ps ? ps.gap : "",
+          prefsBorderTop: ps ? ps.borderTopWidth : "",
+          headAlign: head ? getComputedStyle(head).alignItems : "",
+          pagerMinWidth: pagerBox ? getComputedStyle(pagerBox).minWidth : "",
+          cards: document.querySelectorAll(".card-cell .card").length,
+        };
+      `);
+
+    const assertToolbar = (r, width) => {
+      const at = `${CATALOG_PATH} at ${width}px`;
+      if (r.innerWidth !== width) {
+        throw new Error(`${at}: the override asked for ${width} and the page measured ${r.innerWidth} — the row refuses to measure a viewport it did not set`);
+      }
+      if (!r.path.endsWith(CATALOG_PATH)) {
+        throw new Error(`${at}: the toolbar was measured on ${JSON.stringify(r.path)}, not the character catalog`);
+      }
+      if (r.display.indexOf("grid") < 0) {
+        throw new Error(`${at}: .toolbar computes ${JSON.stringify(r.display)}, not the grid all three of its blocks declare`);
+      }
+      if (!r.toolbar || !r.field || !r.tags || !r.sort || !r.prefs) {
+        throw new Error(
+          `${at}: the toolbar is incomplete — toolbar ${JSON.stringify(r.toolbar)}, search ${JSON.stringify(r.field)}, tags ${JSON.stringify(r.tags)}, sort ${JSON.stringify(r.sort)}, prefs ${JSON.stringify(r.prefs)}`,
+        );
+      }
+      if (r.scrollWidth > r.innerWidth) {
+        throw new Error(`${at}: the catalog scrolls horizontally: scrollWidth ${r.scrollWidth} > innerWidth ${r.innerWidth}`);
+      }
+
+      if (width === 640) {
+        // The `sm` fact: a 220px fixed column and a fluid one. The count alone is not proof (a
+        // leftover placement creates an implicit track, T-77), so the fixed track is sized too.
+        if (r.tracks.length !== 2) {
+          throw new Error(
+            `${at}: .toolbar resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the two the sm block declares (220px | minmax(0, 1fr)) — the sort measures ${r.sort.width} wide`,
+          );
+        }
+        if (Math.abs(parseFloat(r.tracks[0]) - 220) > 1) {
+          throw new Error(
+            `${at}: the toolbar's first track resolves to ${JSON.stringify(r.tracks[0])}, not the 220px sort column the sm block declares (tracks ${JSON.stringify(r.tracks)}, sort ${r.sort.width} wide)`,
+          );
+        }
+        if (Math.abs(r.sort.left - r.toolbar.left) > 1 || Math.abs(r.sort.width - 220) > 1) {
+          throw new Error(
+            `${at}: .sort draws ${r.sort.left}→${r.sort.right} (${r.sort.width} wide) in a toolbar that starts at ${r.toolbar.left} — the sm block pins it to column 1, the 220px track`,
+          );
+        }
+        if (r.gap !== "12px 24px") {
+          throw new Error(`${at}: .toolbar computes gap ${JSON.stringify(r.gap)}, not the sm block's 12px 24px`);
+        }
+        if (r.prefsFlex !== "row" || r.prefsAlign !== "center" || r.prefsGap !== "32px" || r.prefsBorderTop !== "0px") {
+          throw new Error(
+            `${at}: .prefs reads flexDirection ${JSON.stringify(r.prefsFlex)}, alignItems ${JSON.stringify(r.prefsAlign)}, gap ${JSON.stringify(r.prefsGap)}, border-top ${JSON.stringify(r.prefsBorderTop)} — the sm block rewrites the bordered column into a 32px row`,
+          );
+        }
+        // `.prefs` spans both columns here because the `640-899` block wins: it starts at the
+        // toolbar's own left edge and crosses the fixed column. Its right edge is the area's only if
+        // nothing centres it, so "it spans" is the left edge plus the crossing (T-80's honest form).
+        if (Math.abs(r.prefs.left - r.toolbar.left) > 1) {
+          throw new Error(
+            `${at}: .prefs starts at ${r.prefs.left} in a toolbar starting at ${r.toolbar.left} (it measures ${r.prefs.width} of the ${r.toolbar.width} toolbar) — the 640-899 block lifts the pair across both columns (grid-column 1 / -1)`,
+          );
+        }
+        if (!(r.prefs.right > r.sort.right)) {
+          throw new Error(
+            `${at}: .prefs ends at ${r.prefs.right} inside the sort's ${r.sort.right} — the row spans past the fixed column, not only its own`,
+          );
+        }
+        if (r.headAlign !== "flex-end") {
+          throw new Error(`${at}: .head computes align-items ${JSON.stringify(r.headAlign)}, not the flex-end the sm block declares`);
+        }
+        // `.pager` draws only while the listing has a next page, so a min-width is read when the box
+        // exists and never asserted into being (T-78's guarded read).
+        if (r.pagerMinWidth !== "" && r.pagerMinWidth !== "200px") {
+          throw new Error(`${at}: the pager's action box computes min-width ${JSON.stringify(r.pagerMinWidth)}, not the 200px the sm block gives it`);
+        }
+        return;
+      }
+
+      if (width === 900) {
+        if (r.tracks.length !== 2) {
+          throw new Error(`${at}: .toolbar resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the two the md block keeps (220px | minmax(0, 1fr))`);
+        }
+        if (Math.abs(parseFloat(r.tracks[0]) - 220) > 1) {
+          throw new Error(`${at}: the toolbar's first track resolves to ${JSON.stringify(r.tracks[0])}, not 220px (tracks ${JSON.stringify(r.tracks)}, sort ${r.sort.width} wide)`);
+        }
+        if (Math.abs(r.sort.width - 220) > 1) {
+          throw new Error(`${at}: .sort measures ${r.sort.width} wide, not the 220px column it is pinned to (tracks ${JSON.stringify(r.tracks)})`);
+        }
+        // Column 2 is one column gap right of the fixed track, and it reaches the toolbar's right
+        // edge: this is the direction `640-899`'s span is meant to *not* happen in.
+        if (Math.abs(r.prefs.left - (r.sort.right + 24)) > 1) {
+          throw new Error(
+            `${at}: .prefs starts at ${r.prefs.left}, not ${r.sort.right} + 24 (the column gap) — at md the switches take column 2 beside the 220px sort, not a full-width row`,
+          );
+        }
+        if (Math.abs(r.prefs.right - r.toolbar.right) > 1) {
+          throw new Error(`${at}: .prefs ends at ${r.prefs.right} in a toolbar ending at ${r.toolbar.right} — the pair fills the fluid column`);
+        }
+        // `align-items: end` makes the BOTTOMS the row witness: `.sort` is a Select wrapper and the
+        // row is content-sized, so their tops differ by design (T-79/T-80).
+        if (Math.abs(r.prefs.bottom - r.sort.bottom) > 2) {
+          throw new Error(
+            `${at}: .sort ends at ${r.sort.bottom} and .prefs at ${r.prefs.bottom} — md puts them on one row (tops ${r.sort.top} / ${r.prefs.top}, align-items end), so the bottoms are the witness`,
+          );
+        }
+        if (r.pagerMinWidth !== "" && r.pagerMinWidth !== "200px") {
+          throw new Error(`${at}: the pager's action box computes min-width ${JSON.stringify(r.pagerMinWidth)}, not the 200px the sm block gives it`);
+        }
+        return;
+      }
+
+      // 360 — the base block: one track, all four children the toolbar's full width, and the switches
+      // back in the bordered column the sm block replaces.
+      if (r.tracks.length !== 1) {
+        throw new Error(
+          `${at}: .toolbar resolves ${r.tracks.length} track(s) ${JSON.stringify(r.tracks)}, not the one the base block leaves (no grid-template-columns) — the sm block is leaking below its breakpoint`,
+        );
+      }
+      if (Math.abs(r.sort.left - r.toolbar.left) > 1 || Math.abs(r.sort.right - r.toolbar.right) > 1) {
+        throw new Error(`${at}: .sort draws ${r.sort.left}→${r.sort.right} in a toolbar ${r.toolbar.left}→${r.toolbar.right} — below 640 the sort is a full-width row of its own`);
+      }
+      if (Math.abs(r.prefs.left - r.toolbar.left) > 1 || Math.abs(r.prefs.right - r.toolbar.right) > 1) {
+        throw new Error(`${at}: .prefs draws ${r.prefs.left}→${r.prefs.right} in a toolbar ${r.toolbar.left}→${r.toolbar.right} — below 640 the switches are a full-width row`);
+      }
+      if (r.prefsFlex !== "column" || r.prefsBorderTop !== "1px") {
+        throw new Error(
+          `${at}: .prefs reads flexDirection ${JSON.stringify(r.prefsFlex)} and border-top ${JSON.stringify(r.prefsBorderTop)} — below 640 it is the bordered column of two labels, not the sm row`,
+        );
+      }
+      if (!(r.sort.top > r.tags.bottom - 1) || !(r.prefs.top > r.sort.bottom - 1)) {
+        throw new Error(
+          `${at}: the rows read search ${r.field.top}→${r.field.bottom}, tags ${r.tags.top}→${r.tags.bottom}, sort ${r.sort.top}→${r.sort.bottom}, prefs ${r.prefs.top}→${r.prefs.bottom} — below 640 the four are stacked in DOM order`,
+        );
+      }
+      if (r.pagerMinWidth === "200px") {
+        throw new Error(`${at}: the pager's action box computes min-width 200px below its breakpoint — the sm block's floor is leaking into the phone`);
+      }
+    };
+
+    const barRestore = await js("return window.innerWidth;");
+    const barLines = [];
+    let barSeen = "";
+    try {
+      // One override per width, and the page does not remount on a width change, so every reading
+      // asserts `innerWidth` instead of assuming it held (T-77's width-major ladder).
+      for (const width of [640, 900, 360]) {
+        await send("Emulation.setDeviceMetricsOverride", { width, height: 740, deviceScaleFactor: 1, mobile: false });
+        await sleep(260);
+        await waitFor(`document.querySelector(".toolbar > .prefs") !== null`, `the catalog toolbar at ${width}px`, 10000);
+        const bar = await readToolbar();
+        assertToolbar(bar, width);
+        barLines.push(
+          `${width}px: .toolbar ${JSON.stringify(bar.display)} gap ${bar.gap} → ${JSON.stringify(bar.tracks)} (${bar.tracks.length} track(s), align ${bar.alignItems}) · search ${bar.field.top}→${bar.field.bottom} · tags ${bar.tags.top}→${bar.tags.bottom} · sort ${bar.sort.left}→${bar.sort.right} top ${bar.sort.top} bottom ${bar.sort.bottom} · prefs ${bar.prefs.left}→${bar.prefs.right} top ${bar.prefs.top} bottom ${bar.prefs.bottom} (${bar.prefsFlex}, align ${bar.prefsAlign}, gap ${bar.prefsGap}, border-top ${bar.prefsBorderTop}) · head align ${bar.headAlign}${bar.pagerMinWidth ? `, pager min-width ${bar.pagerMinWidth}` : ", no pager"}`,
+        );
+      }
+      barSeen = barLines.join(" · ");
+    } finally {
+      await send("Emulation.clearDeviceMetricsOverride");
+      await sleep(240);
+    }
+    const barAfter = await js("return window.innerWidth;");
+    if (barAfter !== barRestore) {
+      throw new Error(`the toolbar's overrides cleared to ${barAfter}px, but the session runs at ${barRestore}px — a leaked override would mis-measure every later row`);
+    }
+    // Nothing was pressed and nothing navigated, so the page is still the bare mount it was: the
+    // ladder is a measure, not a hop (a `go()` inside it would re-boot the page and the first
+    // keystroke's caret proof would silently measure another mount).
+    const afterLadder = await readCatalog();
+    if (afterLadder.search !== "" || afterLadder.count !== full.count) {
+      throw new Error(
+        `the width phase left ${JSON.stringify(afterLadder.search)} with ${afterLadder.count} card(s), not the bare ${full.count} the mount drew — a ladder that navigates proves another page's facts`,
+      );
     }
 
     /** The word to type: the longest in the first card's own title, so it is a real search term. */
@@ -6291,7 +6509,7 @@ results.push(
       throw new Error(`the override cleared to ${widthBack}px, but the session runs at ${restoreWidth}px`);
     }
 
-    return `a fresh mount reads ${JSON.stringify(full.search)} with ${full.count} card(s) and Newest selected · typing ${JSON.stringify(word)} a character at a time left the URL clean on all ${fast.length} in-window sample(s) and settled to ${JSON.stringify(typed.search)} with ${typed.count} card(s) · a mount from that URL preloads the field and draws the same ${restored.count} · ?q=zzqx-nothing-matches reads ${JSON.stringify(none.empty)} with 0 card(s), no Retry, a Clear filters control · ?sort=ratio reads ${JSON.stringify(rated.sortLabel)} at ${JSON.stringify(rated.search)} with ratios ${JSON.stringify(rated.ratios)} never rising, Newest drops the param (${JSON.stringify(backToNewest.search)}) and Back returns ${JSON.stringify(returnedSort.search)} · ?tags=${tagA} draws ${oneTag.count} card(s) all carrying it, its chip's remove control rewrites the URL to ${JSON.stringify(clearedTags.search)} · ?tags=${tagA},${tagB} draws ${onlyA} ${tagA}-only and ${onlyB} ${tagB}-only card(s) — either, not both — and removing ${tagB} leaves ${JSON.stringify(oneLeft.search)} · at 360 ${folded}`;
+    return `a fresh mount reads ${JSON.stringify(full.search)} with ${full.count} card(s) and Newest selected · typing ${JSON.stringify(word)} a character at a time left the URL clean on all ${fast.length} in-window sample(s) and settled to ${JSON.stringify(typed.search)} with ${typed.count} card(s) · a mount from that URL preloads the field and draws the same ${restored.count} · ?q=zzqx-nothing-matches reads ${JSON.stringify(none.empty)} with 0 card(s), no Retry, a Clear filters control · ?sort=ratio reads ${JSON.stringify(rated.sortLabel)} at ${JSON.stringify(rated.search)} with ratios ${JSON.stringify(rated.ratios)} never rising, Newest drops the param (${JSON.stringify(backToNewest.search)}) and Back returns ${JSON.stringify(returnedSort.search)} · ?tags=${tagA} draws ${oneTag.count} card(s) all carrying it, its chip's remove control rewrites the URL to ${JSON.stringify(clearedTags.search)} · ?tags=${tagA},${tagB} draws ${onlyA} ${tagA}-only and ${onlyB} ${tagB}-only card(s) — either, not both — and removing ${tagB} leaves ${JSON.stringify(oneLeft.search)} · at 360 ${folded} · the toolbar at ${barSeen}`;
   }),
 );
 

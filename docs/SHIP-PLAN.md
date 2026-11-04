@@ -657,6 +657,26 @@ Design law: `docs/DESIGN.md`. Stack law: `docs/ARCHITECTURE.md`. Rules: `docs/CO
       **Landed:** the rule *was* dead (pruned from the compiled CSS); the page now wraps `Button` in a
       page-owned `.primary`, row 44 reads the ladder at 640/900/360.
 
+- [x] **T-84 `/character/catalog`'s `sm 640` toolbar has never been rendered.** `character-catalog.tsrx`
+      keeps **two** media blocks over `.toolbar`: at `640` the grid becomes `220px minmax(0, 1fr)` with
+      `align-items: end` and `gap: 12px 24px`, `.sort` pinned to `grid-column: 1`, `.prefs` rewritten
+      from a bordered column into a **row** (`row` / `center` / `gap: 32px` / `border-top: 0`) pinned to
+      `grid-column: 2`, plus `.pager { align-items: center }`, `.pager-action { min-width: 200px }` and
+      `.head { align-items: flex-end }`; the `640–899` block then lifts `.prefs` to `grid-column: 1 /
+      -1`. Row 48 mounts the page at the walk's own ~500px, so not one declaration had ever run.
+      Brief: `docs/NEXT.md` (T-84).
+      **Landed:** row 48 extended (no new row, 55 stays) with a read-only ladder at the **top** of the
+      row — 640 / 900 / 360, one `readToolbar()` per width into `assertToolbar(r, width)`, every override
+      cleared in one `finally`, `innerWidth` re-read, and the bare mount re-read afterwards (no `go()`).
+      Measured 640: tracks `["220px","328px"]` gap `12px 24px` align `end`, sort `24→244` (220), prefs
+      `24→596` **row**/center/gap 32/border-top 0 (the 640–899 span), head `flex-end`; 900: tracks
+      `["220px","486px"]`, sort `117→337`, prefs `361→847` = `sort.right + 24` and the toolbar's right,
+      bottoms `438.78`/`438.78` (align-items end makes the bottoms the witness); 360: one `308px` track,
+      sort and prefs both `16→324`, prefs **column** with `border-top: 1px`, pager min-width `auto`.
+      Red proofs: `220px minmax(0, 1fr)` → `minmax(0, 1fr)` red-lit row 48 at *"1 track(s) ["572px"] …
+      the sort measures 572 wide"*; replacing the range block's `.prefs { grid-column: 1 / -1 }` red-lit
+      it at *".prefs starts at 268 in a toolbar starting at 24 (it measures 328 of the 572 toolbar)"*.
+
 - [x] **T-83 `/authentification`'s `sm 640` 420 measure has never been rendered.** The entry screen's
       `@media (min-width: 640px)` block caps `.providers`, `.nsfw` and `.status` at `max-width: 420px`
       (*"A 420 measure for the controls, not three buttons stretched across 640"*) and steps `.screen`'s

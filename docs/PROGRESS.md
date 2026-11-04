@@ -3,6 +3,39 @@
 Append-only. Newest first. Every entry: ticket, what changed, what was verified and how, what
 could not be verified.
 
+## 2026-11-03 — T-84: `/character/catalog`'s `sm 640` toolbar is rendered at 640, 900 and 360
+
+- **Changed:** row 48 of `scripts/smoke.mjs` (**extended, no new row** — `EXPECTED_ROWS` stays **55**)
+  — no page change: both media blocks were already right, they had simply never been rendered. The
+  width phase sits at the **top** of the row, right after the fresh-mount assertion and **before** the
+  first keystroke, so the debounce half keeps its field, its caret and its 250ms settle untouched and
+  the row's existing 360 tag-fold override stays last. It presses and types **nothing**, takes
+  `640×740`, `900×740`, `360×740` in that order (one `readToolbar()` per width into
+  `assertToolbar(r, width)`), clears every override in one `finally`, asserts `innerWidth` came back,
+  then re-reads the bare mount (search `""`, the same card count) as the evidence that no `go()` ran
+  inside it. Measured: **640** tracks `["220px","328px"]` gap `12px 24px` align `end`, sort `24→244`
+  (220 wide) at the toolbar's left, `.prefs` `24→596` **row** / `center` / gap `32px` / `border-top
+  0px` (the `640–899` span) crossing the fixed column, `.head` `align-items flex-end`, pager min-width
+  `200px`; **900** tracks `["220px","486px"]`, sort `117→337`, `.prefs` `361→847` = `sort.right + 24`
+  (the column gap) and the toolbar's right edge, bottoms `438.78`/`438.78`; **360** one `308px` track
+  (the outlet's 308 content box), sort and `.prefs` both `16→324`, `.prefs` **column** with
+  `border-top: 1px`, pager min-width `auto`, the four rows stacked in DOM order.
+- **Verified:** red first. `grid-template-columns: 220px minmax(0, 1fr)` → `minmax(0, 1fr)` in the
+  `sm` block put **row 48 alone** red (54 ok / 1 fail) at *"/character/catalog at 640px: .toolbar
+  resolves 1 track(s) ["572px"], not the two the sm block declares (220px | minmax(0, 1fr)) — the
+  sort measures 572 wide"*; replacing the `640–899` block's `.prefs { grid-column: 1 / -1 }` put it
+  red again, alone, at *".prefs starts at 268 in a toolbar starting at 24 (it measures 328 of the 572
+  toolbar)"* — 268 is exactly `24 + 220 + 24`, the squeezed column the block exists to undo. Bytes
+  restored (`cp` + `cmp` identical), `check.sh` **GREEN**, `./scripts/smoke.sh` **55/55** local,
+  `publish.sh` → `LIVE` (`assets/index-ByZk6X8Z.js`), `curl` **200**, `./scripts/smoke.sh --live`
+  **55/55**.
+- **Not verified / next:** `docs/DESIGN.md` already carried both rules (*"A select keeps a fixed
+  220px column…"*, *"Between 640 and 899 the pair therefore takes its own full-width row"*), so no doc
+  changed — the row is what was missing, not the decision. The evidence is a walk fact, not a device
+  one: no APK was rendered (T-35 still blocked). Next: **T-85** — `/moderation`'s `sm 640` queue block
+  (44px → 56px numeral column, 20 → 26px weight, `14px 0` → `16px 0` row padding), which row 20 mounts
+  only at the walk's ~500px. No new dependency, no schema/adapter/JEV change, no store write.
+
 ## 2026-11-03 — T-83: `/authentification`'s `sm 640` 420 measure and its `.screen` step are rendered in both directions
 
 - **Changed:** row 1 of `scripts/smoke.mjs` (**extended, no new row** — `EXPECTED_ROWS` stays **55**)
