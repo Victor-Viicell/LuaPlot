@@ -1,8 +1,14 @@
-import { track } from "ripple";
+import { track, type Component } from "ripple";
 import { Button } from "../components/Button.tsrx";
 import { Card } from "../components/Card.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
 import { Field } from "../components/Field.tsrx";
+import {
+  IconBook,
+  IconThread,
+  IconUser,
+  IconWand,
+} from "../components/Icons.tsrx";
 import { PostCard } from "../components/PostCard.tsrx";
 import { Select } from "../components/Select.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
@@ -53,11 +59,11 @@ import { toast } from "../lib/toast.ts";
 type SortChoice = "recent" | "oldest" | "name";
 type Phase = "loading" | "ready" | "error";
 
-const TABS: { value: BookmarkKind; label: string }[] = [
-  { value: "character", label: "Characters" },
-  { value: "lorebook", label: "Lorebooks" },
-  { value: "preset", label: "Presets" },
-  { value: "post", label: "Posts" },
+const TABS: { value: BookmarkKind; label: string; icon: Component }[] = [
+  { value: "character", label: "Characters", icon: IconUser },
+  { value: "lorebook", label: "Lorebooks", icon: IconBook },
+  { value: "preset", label: "Presets", icon: IconWand },
+  { value: "post", label: "Posts", icon: IconThread },
 ];
 
 /** Newest saved first is the spec's default, so it is the first option and the fallback. */
@@ -87,7 +93,11 @@ type Cell = { key: string; kind: BookmarkKind; id: string } & (
 );
 
 function cellOf(row: BookmarkRow, epoch = 0): Cell {
-  const base = { key: `${row.kind}:${row.id}#${epoch}`, kind: row.kind, id: row.id };
+  const base = {
+    key: `${row.kind}:${row.id}#${epoch}`,
+    kind: row.kind,
+    id: row.id,
+  };
 
   if (row.kind === "post") {
     return row.item
@@ -101,11 +111,16 @@ function cellOf(row: BookmarkRow, epoch = 0): Cell {
 }
 
 /** The page's own reading of its URL, taken once at mount. */
-function readQuery(): { type: BookmarkKind | null; q: string; sort: SortChoice } {
+function readQuery(): {
+  type: BookmarkKind | null;
+  q: string;
+  sort: SortChoice;
+} {
   const params = useQuery();
 
   const rawType = params.get("type");
-  const parsedType = rawType === null ? null : bookmarkKindSchema.safeParse(rawType);
+  const parsedType =
+    rawType === null ? null : bookmarkKindSchema.safeParse(rawType);
   const rawSort = params.get("sort");
 
   return {
@@ -124,7 +139,12 @@ function adapterSort(sort: SortChoice): SortOrder {
 }
 
 /** Write the tab state into the URL through `commitQuery()` (T-66) — the router owns the mounted key. */
-function writeQuery(type: BookmarkKind, q: string, sort: SortChoice, mode: "push" | "replace"): void {
+function writeQuery(
+  type: BookmarkKind,
+  q: string,
+  sort: SortChoice,
+  mode: "push" | "replace",
+): void {
   const params = new URLSearchParams();
   params.set("type", type);
   if (q) params.set("q", q);
@@ -140,7 +160,12 @@ export function Bookmarks() @{
 
   const phase = track<Phase>("loading");
   const failure = track("");
-  const counts = track<BookmarkCounts>({ character: 0, lorebook: 0, preset: 0, post: 0 });
+  const counts = track<BookmarkCounts>({
+    character: 0,
+    lorebook: 0,
+    preset: 0,
+    post: 0,
+  });
   const items = track<BookmarkRow[]>([]);
   const hasMore = track(false);
   const nextPage = track(1);
@@ -171,7 +196,9 @@ export function Bookmarks() @{
   const cells = track(() => items.value.map((row) => cellOf(row, epoch.value)));
   /** Show off removes a flagged row; Blur keeps it and covers it (`Card`/`PostCard` own that). */
   const visible = track(() =>
-    show.value ? cells.value : cells.value.filter((cell) => cell.mode === "gone" || !cell.nsfw),
+    show.value
+      ? cells.value
+      : cells.value.filter((cell) => cell.mode === "gone" || !cell.nsfw),
   );
 
   let seq = 0;
@@ -183,7 +210,10 @@ export function Bookmarks() @{
     for (const cell of rows) {
       if (cell.mode !== "post") continue;
       const attachment = cell.post.attachment;
-      if (attachment?.kind === "character" && !people.value[attachment.characterId]) {
+      if (
+        attachment?.kind === "character" &&
+        !people.value[attachment.characterId]
+      ) {
         wanted.add(attachment.characterId);
       }
     }
@@ -221,31 +251,40 @@ export function Bookmarks() @{
       appending.value = true;
     }
 
-    repo.listBookmarks(tab.value, { query: applied.value, sort: adapterSort(sort.value), page }).then(
-      (listing) => {
-        if (mine !== seq) return;
+    repo
+      .listBookmarks(tab.value, {
+        query: applied.value,
+        sort: adapterSort(sort.value),
+        page,
+      })
+      .then(
+        (listing) => {
+          if (mine !== seq) return;
 
-        items.value = mode === "append" ? [...items.value, ...listing.items] : listing.items;
-        hasMore.value = listing.hasMore;
-        nextPage.value = page + 1;
-        appending.value = false;
-        phase.value = "ready";
+          items.value =
+            mode === "append"
+              ? [...items.value, ...listing.items]
+              : listing.items;
+          hasMore.value = listing.hasMore;
+          nextPage.value = page + 1;
+          appending.value = false;
+          phase.value = "ready";
 
-        resolvePeople(cells.value);
-      },
-      () => {
-        if (mine !== seq) return;
-        appending.value = false;
+          resolvePeople(cells.value);
+        },
+        () => {
+          if (mine !== seq) return;
+          appending.value = false;
 
-        if (mode === "append") {
-          appendFailure.value = "The next page didn't load.";
-          return;
-        }
+          if (mode === "append") {
+            appendFailure.value = "The next page didn't load.";
+            return;
+          }
 
-        phase.value = "error";
-        failure.value = "Your bookmarks couldn't be loaded.";
-      },
-    );
+          phase.value = "error";
+          failure.value = "Your bookmarks couldn't be loaded.";
+        },
+      );
   }
 
   /**
@@ -352,7 +391,9 @@ export function Bookmarks() @{
     if (busy.value) return;
     busy.value = true;
 
-    const removed = await repo.removeBookmark(cell.kind, cell.id).catch(() => false);
+    const removed = await repo
+      .removeBookmark(cell.kind, cell.id)
+      .catch(() => false);
     busy.value = false;
 
     if (!removed) {
@@ -360,10 +401,16 @@ export function Bookmarks() @{
       return;
     }
 
-    items.value = items.value.filter((row) => !(row.kind === cell.kind && row.id === cell.id));
-    counts.value = { ...counts.value, [cell.kind]: Math.max(0, counts.value[cell.kind] - 1) };
+    items.value = items.value.filter(
+      (row) => !(row.kind === cell.kind && row.id === cell.id),
+    );
+    counts.value = {
+      ...counts.value,
+      [cell.kind]: Math.max(0, counts.value[cell.kind] - 1),
+    };
 
-    if (items.value.length === 0 && hasMore.value) load(nextPage.value, "append");
+    if (items.value.length === 0 && hasMore.value)
+      load(nextPage.value, "append");
   }
 
   if (signedIn) boot();
@@ -483,7 +530,6 @@ export function Bookmarks() @{
           font-size: 28px;
         }
 
-
         /* Two rows: the search across, then the sort in its fixed column with the count beside it.
            The sort used to inherit `grid-column: 1 / -1` from the base rule and spanned the row on
            its own, which is why the desktop toolbar read as three ragged lines. */
@@ -557,7 +603,13 @@ export function Bookmarks() @{
         />
       } @else {
         <>
-          <Tabs items={TABS} value={tab} counts={counts} label="Saved types" onChange={chooseTab} />
+          <Tabs
+            items={TABS}
+            value={tab}
+            counts={counts}
+            label="Saved types"
+            onChange={chooseTab}
+          />
 
           <div class="toolbar">
             <div class="search">
@@ -587,12 +639,16 @@ export function Bookmarks() @{
           </div>
 
           @if (phase.value === "loading") {
-            <ul class="card-grid" aria-busy="true" aria-label="Loading bookmarks">
+            <ul
+              class="card-grid"
+              aria-busy="true"
+              aria-label="Loading bookmarks"
+            >
               @for (const cell of [0, 1, 2, 3]; key cell) {
                 <li class="card-cell">
                   <div class="skel-card">
                     <Skeleton variant="block" height={18} />
-                    <Skeleton variant="block" height={56} />
+                    <Skeleton variant="block" height={64} />
                     <Skeleton variant="block" height={14} />
                   </div>
                 </li>
@@ -601,7 +657,9 @@ export function Bookmarks() @{
           } @else if (phase.value === "error") {
             <div class="alert" role="alert">
               <p class="alert-text">{failure.value}</p>
-              <Button variant="secondary" onClick={boot}>Retry</Button>
+              <Button variant="secondary" onClick={boot}>
+                Retry
+              </Button>
             </div>
           } @else if (visible.value.length === 0 && applied.value) {
             <EmptyState
@@ -609,7 +667,10 @@ export function Bookmarks() @{
               actionLabel="Clear search"
               onAction={clearSearch}
             />
-          } @else if (visible.value.length === 0 && counts.value[tab.value] > 0) {
+          } @else if (
+            visible.value.length === 0 &&
+            counts.value[tab.value] > 0
+          ) {
             <EmptyState
               message="Everything saved here is hidden by your NSFW preference."
               actionLabel="Account settings"
@@ -630,13 +691,17 @@ export function Bookmarks() @{
                           </div>
                           <div class="card-middle">
                             <p class="card-missing-note">
-                              Deleted by its author or removed by moderation. The item is gone; the
-                              bookmark is not.
+                              Deleted by its author or removed by moderation.
+                              The item is gone; the bookmark is not.
                             </p>
                           </div>
                         </article>
                       } @else if (cell.mode === "post") {
-                        <PostCard post={cell.post} people={people} blur={blur} />
+                        <PostCard
+                          post={cell.post}
+                          people={people}
+                          blur={blur}
+                        />
                       } @else {
                         <Card item={cell.item} nsfw={cell.nsfw} blur={blur} />
                       }
@@ -659,11 +724,18 @@ export function Bookmarks() @{
                 @if (appendFailure.value) {
                   <div class="alert" role="alert">
                     <p class="alert-text">{appendFailure.value}</p>
-                    <Button variant="secondary" onClick={loadMore}>Retry</Button>
+                    <Button variant="secondary" onClick={loadMore}>
+                      Retry
+                    </Button>
                   </div>
                 } @else if (hasMore.value) {
                   <div>
-                    <Button variant="secondary" block disabled={appending} onClick={loadMore}>
+                    <Button
+                      variant="secondary"
+                      block
+                      disabled={appending}
+                      onClick={loadMore}
+                    >
                       {appending.value ? "Loading…" : "Load more"}
                     </Button>
                   </div>

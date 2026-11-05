@@ -25,6 +25,14 @@ export type RouteDef = {
    * T-01 renders every route so the smoke test can walk the tree.
    */
   access: Access;
+  /**
+   * How wide the page's content column may grow on a desktop.
+   *
+   * `reading` (the default) is one A4 page wide (794px) — the app's document measure. `wide`
+   * hands the page the whole content area, for a browse surface that gains columns from it
+   * (`/discover/*`). The shell reads this; a page never sets its own width.
+   */
+  layout?: "reading" | "wide";
   page: () => Promise<PageModule>;
 };
 
@@ -34,6 +42,7 @@ export const ROUTES: RouteDef[] = [
     path: "/",
     title: "Discover",
     access: "public",
+    layout: "wide",
     page: () => import("./pages/discover-characters.tsrx"),
   },
   {
@@ -88,18 +97,21 @@ export const ROUTES: RouteDef[] = [
     path: "/discover/characters",
     title: "Discover",
     access: "public",
+    layout: "wide",
     page: () => import("./pages/discover-characters.tsrx"),
   },
   {
     path: "/discover/lorebooks",
     title: "Lorebooks",
     access: "public",
+    layout: "wide",
     page: () => import("./pages/discover-lorebooks.tsrx"),
   },
   {
     path: "/discover/presets",
     title: "Presets",
     access: "public",
+    layout: "wide",
     page: () => import("./pages/discover-presets.tsrx"),
   },
 

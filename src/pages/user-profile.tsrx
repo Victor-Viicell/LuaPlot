@@ -1,8 +1,15 @@
-import { track } from "ripple";
-import { Avatar } from "../components/Avatar.tsrx";
+import { track, type Component } from "ripple";
+import { AvatarButton } from "../components/AvatarButton.tsrx";
 import { Button } from "../components/Button.tsrx";
 import { CardGrid } from "../components/CardGrid.tsrx";
 import { EmptyState } from "../components/EmptyState.tsrx";
+import { Excerpt } from "../components/Excerpt.tsrx";
+import {
+  IconPen,
+  IconThread,
+  IconUserCheck,
+  IconUsers,
+} from "../components/Icons.tsrx";
 import { PostCard } from "../components/PostCard.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
 import { PersonaSheet } from "../components/PersonaSheet.tsrx";
@@ -18,7 +25,11 @@ import type {
   ProfileCreationType,
   ProfileTab,
 } from "../lib/data/types.ts";
-import { handleSchema, profileCreationTypeSchema, profileTabSchema } from "../lib/schema.ts";
+import {
+  handleSchema,
+  profileCreationTypeSchema,
+  profileTabSchema,
+} from "../lib/schema.ts";
 import { currentUser } from "../lib/state/session.ts";
 import { nsfwPreference, onPrefs } from "../lib/state/prefs.ts";
 import { toast } from "../lib/toast.ts";
@@ -43,11 +54,11 @@ import { toast } from "../lib/toast.ts";
  * - **No personas**: a persona is personal and is never listed here.
  */
 
-const TABS: { value: ProfileTab; label: string }[] = [
-  { value: "creations", label: "Creations" },
-  { value: "posts", label: "Posts" },
-  { value: "followers", label: "Followers" },
-  { value: "following", label: "Following" },
+const TABS: { value: ProfileTab; label: string; icon: Component }[] = [
+  { value: "creations", label: "Creations", icon: IconPen },
+  { value: "posts", label: "Posts", icon: IconThread },
+  { value: "followers", label: "Followers", icon: IconUsers },
+  { value: "following", label: "Following", icon: IconUserCheck },
 ];
 
 /** The creations tab's filter row — a control over one listing, never a fifth tab. */
@@ -64,7 +75,8 @@ function readQuery(): { tab: ProfileTab; type: ProfileCreationType } {
   const rawTab = params.get("tab");
   const rawType = params.get("type");
   const tab = rawTab === null ? null : profileTabSchema.safeParse(rawTab);
-  const type = rawType === null ? null : profileCreationTypeSchema.safeParse(rawType);
+  const type =
+    rawType === null ? null : profileCreationTypeSchema.safeParse(rawType);
 
   // Parsed, not trusted: an unknown value falls back to the spec's default rather than a new state.
   return {
@@ -77,7 +89,11 @@ function readQuery(): { tab: ProfileTab; type: ProfileCreationType } {
  * Write tab/type into the URL through `commitQuery()` (T-66) — the router applies the query to the
  * route it already matched (`/user/<handle>`), so the page never spells its own path.
  */
-function writeQuery(tab: ProfileTab, type: ProfileCreationType, mode: "push" | "replace"): void {
+function writeQuery(
+  tab: ProfileTab,
+  type: ProfileCreationType,
+  mode: "push" | "replace",
+): void {
   const params = new URLSearchParams();
   params.set("tab", tab);
   if (tab === "creations" && type !== "all") params.set("type", type);
@@ -142,7 +158,9 @@ export function UserProfile() @{
    */
   const epoch = track(0);
   const own = track(() => myHandle !== "" && myHandle === handle);
-  const initials = track(() => row.value?.avatar.initials ?? handle.slice(0, 2).toUpperCase());
+  const initials = track(
+    () => row.value?.avatar.initials ?? handle.slice(0, 2).toUpperCase(),
+  );
 
   /** One flat chain in the template: is the selected tab empty, and what does it say? */
   const sectionEmpty = track(() =>
@@ -169,7 +187,10 @@ export function UserProfile() @{
     const wanted = new Set<string>();
     for (const post of rows) {
       const attachment = post.attachment;
-      if (attachment?.kind === "character" && !attachments.value[attachment.characterId]) {
+      if (
+        attachment?.kind === "character" &&
+        !attachments.value[attachment.characterId]
+      ) {
         wanted.add(attachment.characterId);
       }
     }
@@ -229,7 +250,8 @@ export function UserProfile() @{
     repo.profileCreations(handle, { type: type.value, page }).then(
       (listing) => {
         if (mine !== seq) return;
-        if (mode === "append") creations.value = [...creations.value, ...listing.items];
+        if (mode === "append")
+          creations.value = [...creations.value, ...listing.items];
         else creations.value = listing.items;
         settle(page, listing);
       },
@@ -247,7 +269,10 @@ export function UserProfile() @{
     repo.profilePosts(handle, { page }).then(
       (listing) => {
         if (mine !== seq) return;
-        posts.value = mode === "append" ? [...posts.value, ...listing.items] : listing.items;
+        posts.value =
+          mode === "append"
+            ? [...posts.value, ...listing.items]
+            : listing.items;
         settle(page, listing);
         resolveAttachments(listing.items);
       },
@@ -270,7 +295,10 @@ export function UserProfile() @{
     call(handle, { page }).then(
       (listing) => {
         if (mine !== seq) return;
-        people.value = mode === "append" ? [...people.value, ...listing.items] : listing.items;
+        people.value =
+          mode === "append"
+            ? [...people.value, ...listing.items]
+            : listing.items;
         settle(page, listing);
       },
       () => {
@@ -357,7 +385,11 @@ export function UserProfile() @{
 
     followBusy.value = false;
     if (!answer) {
-      toast(following.value ? "Couldn't unfollow this account." : "Couldn't follow this account.");
+      toast(
+        following.value
+          ? "Couldn't unfollow this account."
+          : "Couldn't follow this account.",
+      );
       return;
     }
 
@@ -377,19 +409,26 @@ export function UserProfile() @{
         gap: 18px;
       }
 
+      /* The head borrows the catalogue card's anatomy on phones: the square image on the left,
+         the name/handle/bio on the right, then the actions and the figures as full-width rows read
+         end to end. `minmax(0, 1fr) minmax(0, 1fr)` is `.card-top`'s own split, so the avatar is
+         half the head exactly as a card image is half the card. */
       .profile-head {
         display: grid;
-        grid-template-columns: 56px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         grid-template-areas:
           "avatar who"
-          "action action";
-        gap: 14px;
+          "action action"
+          "figures figures";
+        align-items: start;
+        gap: 12px;
         padding-bottom: 18px;
         border-bottom: 1px solid var(--color-border);
       }
 
       .head-avatar {
         grid-area: avatar;
+        min-width: 0;
       }
 
       .who {
@@ -429,9 +468,11 @@ export function UserProfile() @{
 
       /* Plain figures, never links: the followers and following tabs are the only way in. */
       .figures {
+        grid-area: figures;
         display: flex;
+        justify-content: center;
         gap: 16px;
-        margin: 6px 0 0;
+        margin: 0;
         color: var(--color-text-subtle);
         font-size: 13px;
         line-height: 1.4;
@@ -447,30 +488,66 @@ export function UserProfile() @{
         grid-area: action;
         display: flex;
         flex-wrap: wrap;
+        justify-content: space-between;
         gap: 10px;
+      }
+
+      .owner-actions {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      /* Justified is not enough: the two actions also take their half of the row, so the pair reads
+         as the card's full-width row instead of two small boxes with a hole between them. */
+      .owner-actions > .btn {
+        flex: 1 1 0;
+      }
+
+      .head-action > .btn {
+        flex: 1 1 0;
       }
 
       .head-action > * {
         min-width: 140px;
       }
 
-      /* The type row: a filter over one listing, drawn as chips rather than a second tab strip. */
+      /* The type row: a filter over one listing, drawn as chips rather than a second tab strip.
+         12px and 2px radius put it in the same language as the tag chips, and compact enough that
+         the four labels stay on one line at 360 (they total about 210px of text). It never wraps
+         into a 3 + 1 orphan; if a label ever outgrows the row it scrolls, like the tab strips. */
       .type-row {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        gap: 6px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+
+      .type-row::-webkit-scrollbar {
+        display: none;
       }
 
       .type-chip {
+        flex: none;
         min-height: 44px;
-        padding: 0 14px;
-        border: 1px solid var(--color-border);
-        border-radius: 999px;
+        padding: 0 10px;
+        border: 1px solid var(--color-border-strong);
+        border-radius: 2px;
         background-color: var(--color-bg-elevated);
         color: var(--color-text-muted);
         font: inherit;
-        font-size: 13px;
+        font-size: 12px;
         cursor: pointer;
+        transition:
+          border-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
+          color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      .type-chip:hover {
+        color: var(--color-text);
       }
 
       .type-chip.is-on {
@@ -572,11 +649,29 @@ export function UserProfile() @{
       }
 
       @media (min-width: 640px) {
+        /* The avatar keeps the phone's size (the two are ~160px either side of the breakpoint),
+           and it is the tallest block, so the square reaches the content's bottom — the head's
+           usual 18px padding below it is the gap before the separation rule. */
         .profile-head {
-          grid-template-columns: 72px minmax(0, 1fr) auto;
-          grid-template-areas: "avatar who action";
+          grid-template-columns: 160px minmax(0, 1fr) auto;
+          grid-template-areas:
+            "avatar who action"
+            "avatar figures action";
           align-items: start;
-          gap: 18px;
+          gap: 6px 18px;
+        }
+
+        .owner-actions {
+          flex-direction: column;
+          width: auto;
+        }
+
+        .owner-actions > .btn {
+          flex: 0 0 auto;
+        }
+
+        .figures {
+          justify-content: flex-start;
         }
 
         .name {
@@ -584,7 +679,13 @@ export function UserProfile() @{
         }
 
         .head-action {
-          justify-content: flex-end;
+          flex-direction: column;
+          align-items: stretch;
+          justify-content: flex-start;
+        }
+
+        .head-action > .btn {
+          flex: 0 0 auto;
         }
 
         .pager {
@@ -593,6 +694,10 @@ export function UserProfile() @{
 
         .pager > div {
           min-width: 200px;
+        }
+
+        .type-row {
+          justify-content: flex-start;
         }
       }
 
@@ -615,138 +720,195 @@ export function UserProfile() @{
       }
     </style>
 
-  <div class="profile">
+    <div class="profile">
+      @if (phase.value === "loading") {
+        <div class="slab" aria-busy="true" aria-label="Loading profile">
+          <Skeleton variant="block" height={22} />
+          <Skeleton variant="block" height={14} />
+          <Skeleton variant="block" height={56} />
+        </div>
+      } @else if (phase.value === "missing") {
+        <EmptyState message="This user doesn't exist." />
+      } @else if (phase.value === "error") {
+        <div class="alert" role="alert">
+          <p class="alert-text">{failure.value}</p>
+          <Button variant="secondary" onClick={boot}>
+            Retry
+          </Button>
+        </div>
+      } @else {
+        <>
+          <header class="profile-head">
+            <div class="head-avatar">
+              <AvatarButton
+                initials={initials.value}
+                label={row.value?.displayName ?? handle}
+              />
+            </div>
 
-    @if (phase.value === "loading") {
-      <div class="slab" aria-busy="true" aria-label="Loading profile">
-        <Skeleton variant="block" height={22} />
-        <Skeleton variant="block" height={14} />
-        <Skeleton variant="block" height={56} />
-      </div>
-    } @else if (phase.value === "missing") {
-      <EmptyState message="This user doesn't exist." />
-    } @else if (phase.value === "error") {
-      <div class="alert" role="alert">
-        <p class="alert-text">{failure.value}</p>
-        <Button variant="secondary" onClick={boot}>Retry</Button>
-      </div>
-    } @else {
-      <>
-        <header class="profile-head">
-          <div class="head-avatar">
-            <Avatar
-              initials={initials.value}
-              label={`${row.value?.displayName ?? handle} avatar`}
-              size={56}
-            />
-          </div>
+            <div class="who">
+              <h1 class="name">{row.value?.displayName}</h1>
+              <p class="handle">{`@${handle}`}</p>
+              @if (row.value && row.value.bio) {
+                <Excerpt
+                  class="bio"
+                  text={row.value.bio}
+                  title={row.value.displayName}
+                />
+              }
+            </div>
 
-          <div class="who">
-            <h1 class="name">{row.value?.displayName}</h1>
-            <p class="handle">{`@${handle}`}</p>
-            @if (row.value && row.value.bio) {
-              <p class="bio">{row.value.bio}</p>
-            }
-            <p class="figures">
-              <span class="figure"><strong>{row.value?.followers ?? 0}</strong>{" "}followers</span>
-              <span class="figure"><strong>{row.value?.following ?? 0}</strong>{" "}following</span>
-            </p>
-          </div>
-
-          <div class="head-action">
-            @if (own.value) {
-              <div class="owner-actions">
-                <button class="btn btn-secondary" type="button" onClick={() => (personasOpen.value = true)}>
-                  Personas
-                </button>
-                <a class="btn btn-secondary" href={href(`/user/${handle}/edit`)} onClick={follow(`/user/${handle}/edit`)}>Edit profile</a>
-              </div>
-            } @else if (myHandle === "") {
-              <a class="btn btn-primary" href={href("/authentification")} onClick={follow("/authentification")}>Sign in to follow</a>
-            } @else {
-              <Button
-                variant={following.value ? "secondary" : "primary"}
-                disabled={followBusy}
-                onClick={toggleFollow}
-              >
-                {following.value ? "Unfollow" : "Follow"}
-              </Button>
-            }
-          </div>
-        </header>
-
-        <Tabs items={TABS} value={tab} onChange={chooseTab} label="Profile sections" />
-
-        @if (tab.value === "creations") {
-          <div class="type-row" role="group" aria-label="Filter creations by type">
-            @for (const option of TYPES; key option.value) {
-              <button
-                type="button"
-                class={type.value === option.value ? "type-chip is-on" : "type-chip"}
-                aria-pressed={type.value === option.value ? "true" : "false"}
-                onClick={() => chooseType(option.value)}
-              >
-                {option.label}
-              </button>
-            }
-          </div>
-        }
-
-        @if (listPhase.value === "loading") {
-          <div class="slab" aria-busy="true" aria-label="Loading this section">
-            <Skeleton variant="block" height={18} />
-            <Skeleton variant="block" height={56} />
-          </div>
-        } @else if (listPhase.value === "error") {
-          <div class="alert" role="alert">
-            <p class="alert-text">{failure.value}</p>
-            <Button variant="secondary" onClick={boot}>Retry</Button>
-          </div>
-        } @else if (sectionEmpty.value) {
-          <EmptyState message={sectionEmptyCopy.value} />
-        } @else if (tab.value === "creations") {
-          <CardGrid items={visibleCreations} blurNsfw={blur} revealEpoch={epoch} label="Creations" />
-        } @else if (tab.value === "posts") {
-          <ul class="feed" aria-label="Posts">
-            @for (const post of posts.value; key post.id) {
-              <li>
-                <PostCard post={post} people={attachments} blur={blur} />
-              </li>
-            }
-          </ul>
-        } @else {
-          <ul class="card-grid" aria-label={tab.value}>
-            @for (const person of people.value; key person.handle) {
-              <li class="card-cell">
-                <UserCard person={person} />
-              </li>
-            }
-          </ul>
-        }
-
-        @if (listPhase.value === "ready") {
-          <div class="pager">
-            @if (appendFailure.value) {
-              <div class="alert" role="alert">
-                <p class="alert-text">{appendFailure.value}</p>
-                <Button variant="secondary" onClick={loadMore}>Retry</Button>
-              </div>
-            } @else if (hasMore.value) {
-              <div>
-                <Button variant="secondary" block disabled={appending} onClick={loadMore}>
-                  {appending.value ? "Loading…" : "Load more"}
+            <div class="head-action">
+              @if (own.value) {
+                <div class="owner-actions">
+                  <button
+                    class="btn btn-secondary"
+                    type="button"
+                    onClick={() => (personasOpen.value = true)}
+                  >
+                    Personas
+                  </button>
+                  <a
+                    class="btn btn-secondary"
+                    href={href(`/user/${handle}/edit`)}
+                    onClick={follow(`/user/${handle}/edit`)}
+                  >
+                    Edit profile
+                  </a>
+                </div>
+              } @else if (myHandle === "") {
+                <a
+                  class="btn btn-primary"
+                  href={href("/authentification")}
+                  onClick={follow("/authentification")}
+                >
+                  Sign in to follow
+                </a>
+              } @else {
+                <Button
+                  variant={following.value ? "secondary" : "primary"}
+                  block
+                  disabled={followBusy}
+                  onClick={toggleFollow}
+                >
+                  {following.value ? "Unfollow" : "Follow"}
                 </Button>
-              </div>
-            }
-          </div>
-        }
-      </>
-    }
+              }
+            </div>
 
-    @if (personasOpen.value) {
-      <PersonaSheet onClose={() => (personasOpen.value = false)} />
-    }
-  </div>
+            <p class="figures">
+              <span class="figure">
+                <strong>{row.value?.followers ?? 0}</strong>{" "}followers
+              </span>
+              <span class="figure">
+                <strong>{row.value?.following ?? 0}</strong>{" "}following
+              </span>
+            </p>
+          </header>
+
+          <Tabs
+            items={TABS}
+            value={tab}
+            onChange={chooseTab}
+            label="Profile sections"
+          />
+
+          @if (tab.value === "creations") {
+            <div
+              class="type-row"
+              role="group"
+              aria-label="Filter creations by type"
+            >
+              @for (const option of TYPES; key option.value) {
+                <button
+                  type="button"
+                  class={
+                    type.value === option.value
+                      ? "type-chip is-on"
+                      : "type-chip"
+                  }
+                  aria-pressed={type.value === option.value ? "true" : "false"}
+                  onClick={() => chooseType(option.value)}
+                >
+                  {option.label}
+                </button>
+              }
+            </div>
+          }
+
+          @if (listPhase.value === "loading") {
+            <div
+              class="slab"
+              aria-busy="true"
+              aria-label="Loading this section"
+            >
+              <Skeleton variant="block" height={18} />
+              <Skeleton variant="block" height={56} />
+            </div>
+          } @else if (listPhase.value === "error") {
+            <div class="alert" role="alert">
+              <p class="alert-text">{failure.value}</p>
+              <Button variant="secondary" onClick={boot}>
+                Retry
+              </Button>
+            </div>
+          } @else if (sectionEmpty.value) {
+            <EmptyState message={sectionEmptyCopy.value} />
+          } @else if (tab.value === "creations") {
+            <CardGrid
+              items={visibleCreations}
+              blurNsfw={blur}
+              revealEpoch={epoch}
+              label="Creations"
+            />
+          } @else if (tab.value === "posts") {
+            <ul class="feed" aria-label="Posts">
+              @for (const post of posts.value; key post.id) {
+                <li>
+                  <PostCard post={post} people={attachments} blur={blur} />
+                </li>
+              }
+            </ul>
+          } @else {
+            <ul class="card-grid" aria-label={tab.value}>
+              @for (const person of people.value; key person.handle) {
+                <li class="card-cell">
+                  <UserCard person={person} />
+                </li>
+              }
+            </ul>
+          }
+
+          @if (listPhase.value === "ready") {
+            <div class="pager">
+              @if (appendFailure.value) {
+                <div class="alert" role="alert">
+                  <p class="alert-text">{appendFailure.value}</p>
+                  <Button variant="secondary" onClick={loadMore}>
+                    Retry
+                  </Button>
+                </div>
+              } @else if (hasMore.value) {
+                <div>
+                  <Button
+                    variant="secondary"
+                    block
+                    disabled={appending}
+                    onClick={loadMore}
+                  >
+                    {appending.value ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              }
+            </div>
+          }
+        </>
+      }
+
+      @if (personasOpen.value) {
+        <PersonaSheet onClose={() => (personasOpen.value = false)} />
+      }
+    </div>
   </>
 }
 

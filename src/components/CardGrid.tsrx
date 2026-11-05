@@ -5,10 +5,11 @@ import { read } from "../lib/reactive.ts";
 import { Card } from "./Card.tsrx";
 
 /**
- * The listing grid every catalogue reuses: 1-up at 360, 2-up at `sm` (640), 3-up at `md` (900),
- * 4-up at `lg` (1200). A **gutter grid** (12/16/20px gaps) with the cards' own 1px border and 6px
- * radius — not the 1px-gap count-strip gesture, which needs square corners and would fight the
- * card radius (`docs/DESIGN.md` → Cards, decided in T-08).
+ * The listing grid every catalogue reuses: 1-up at 360, 2-up at `sm` (640), 3-up at `md` (900) in
+ * the reading column, and **at most 4-up** on a `wide` route (`lg`, 1200). A **gutter grid**
+ * (12/16/20px gaps) with the cards' own 1px border and 6px radius — not the 1px-gap count-strip
+ * gesture, which needs square corners and would fight the card radius (`docs/DESIGN.md` → Cards,
+ * decided in T-08).
  *
  * The grid is the listing's chrome, so it owns the two listing-level decisions and the card owns
  * none of them: `blurNsfw` is the account's Blur preference (the caller reads the store) and is
@@ -53,7 +54,10 @@ export function CardGrid({
 }) @{
   /** Rows carry their own key: the item's identity **and** the fetch it arrived in. */
   const cells = track(() =>
-    read(items).map((item) => ({ key: `${item.id}#${read(revealEpoch)}`, item })),
+    read(items).map((item) => ({
+      key: `${item.id}#${read(revealEpoch)}`,
+      item,
+    })),
   );
 
   @if (read(items).length === 0) {

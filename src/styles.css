@@ -668,10 +668,8 @@ a.card-title:hover {
     overflow: hidden;
 }
 
-/* The middle is a column of two rows (owner's call): the thumbnail beside the tagline, then the tag
-   row across the **full card width** — it no longer shares the text column, so the tags stop being
-   squeezed and the tagline gets the width back. Both rows stay inside the veil, because the cover
-   has to blur the tags too. */
+/* The middle is a column of two rows: the image beside the tagline, then the tag row across the
+   **full card width**. Both rows stay inside the veil, because the cover has to blur the tags too. */
 .card-veil {
     display: flex;
     flex: 1;
@@ -681,16 +679,14 @@ a.card-title:hover {
     transition: filter 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* The image owns half the row and the tagline the other half: a card is read as
+   name → image + tagline → tags → author + score, never as a full-bleed poster. */
 .card-top {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 12px;
-    align-items: flex-start;
+    align-items: start;
     min-width: 0;
-}
-
-/* Only the tagline column takes the free space; the row holding the tags keeps its height. */
-.card-top .card-body {
-    flex: 1 1 auto;
 }
 
 .card.is-covered .card-veil {
@@ -712,11 +708,11 @@ a.card-title:hover {
     padding: 0 12px;
 }
 
-/* The card thumbnail is a third of the card's width and square (T-09, on the owner's call): the
-   middle is avatar + text, so the text column keeps the other two thirds. The initials scale with
-   it, which is why this is a stylesheet rule and not a `size` prop. */
+/* The card image is half the top row and square (T-09, on the owner's call); the tagline column
+   takes the other half. The initials scale with the box, which is why this is a stylesheet rule
+   and not a `size` prop. */
 .card-veil .avatar.is-fluid {
-    width: 33%;
+    width: 100%;
     height: auto;
     aspect-ratio: 1 / 1;
     font-size: 22px;
@@ -726,6 +722,16 @@ a.card-title:hover {
     .card-veil .avatar.is-fluid {
         font-size: 18px;
     }
+}
+
+/* The profile head gives the same box to the account's monogram: half of its top row on a phone,
+   the 160px column from `sm` up, square in both. The column belongs to the page; the avatar only
+   has to fill it, which is why this lives beside the card's rule rather than in a `size` prop. */
+.profile-head .avatar.is-fluid {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    font-size: 22px;
 }
 
 /* The cover on an item page is the same primitive, **full width of its column and square** (1:1),
@@ -750,6 +756,23 @@ a.card-title:hover {
     text-indent: 0.06em;
 }
 
+/* The avatar as a control: the box is the same square the card and head give it, so the button is
+   a reset that fills its column and the span keeps the drawing. */
+.avatar-button {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: zoom-in;
+}
+
+.avatar-button:hover .avatar {
+    border-color: var(--color-accent);
+}
+
 .card-body {
     display: flex;
     flex-direction: column;
@@ -758,16 +781,39 @@ a.card-title:hover {
 }
 
 .card-tagline {
-    display: -webkit-box;
-    overflow: hidden;
     margin: 0;
     color: var(--color-text-muted);
     font-size: 13px;
     line-height: 1.6;
+}
+
+/* A clamped piece of copy: the listing keeps one height whatever the length, and the whole text
+   opens in a `Sheet` on press (components/Excerpt.tsrx). The clamp is three lines; the element is
+   a button, so the UA chrome is reset here and the caller's class carries the typography. */
+.excerpt {
+    display: -webkit-box;
     -webkit-box-orient: vertical;
-    /* Three lines: with the tag row out of this column the card has room, and a tagline cut at two
-       lines was the tightest thing on the card. */
     -webkit-line-clamp: 3;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.excerpt:hover {
+    color: var(--color-text);
+}
+
+.excerpt-full {
+    margin: 0;
+    color: var(--color-text);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 /* One line, always (owner's call): tags never wrap a card. The row clips, the chips that do not fit
@@ -1351,12 +1397,44 @@ a.post-time:hover {
 }
 
 @media (min-width: 1200px) {
-    /* Three, not four: the outlet is one A4 page wide (794px), so a fourth column would draw 163px
-       cards with a 54px thumbnail — the grid stops growing with the viewport because the column
-       does. */
+    /* Three, not four: the outlet is one A4 page wide (794px). A fourth column would leave the
+       artwork under its 200px floor, so the reading column stops at three. */
     .card-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 20px;
+    }
+}
+
+/* A `layout: "wide"` route (the three Discover surfaces) has no A4 cap, so the grid uses the room
+   for more cards — but **never more than four columns**. Past four, each extra column only squeezes
+   the image and the tagline into unreadable slivers. */
+.outlet.is-wide .card-grid {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 640px) {
+    .outlet.is-wide .card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 900px) {
+    .outlet.is-wide .card-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .outlet.is-wide .card-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+/* A profile's cards stop at **two columns** (owner's call): the page is a reading column, and a
+   follower or creation is a person/item to read, not a catalogue tile to scan in fours. */
+@media (min-width: 640px) {
+    .profile .card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -1743,6 +1821,80 @@ a.post-time:hover {
     }
 }
 
+/* Avatar viewer — the same ladder as the sheet (scrim 40, panel 41, toast 60), because it is the
+   same kind of surface: a dialog over the page. The stage owns the pointer gestures; the panel is
+   the surface that receives them and the one the Escape key is bound to. */
+.avatar-viewer-scrim {
+    position: fixed;
+    z-index: 40;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background-color: rgb(0 0 0 / 0.55);
+    animation: sheet-scrim-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.avatar-viewer {
+    position: relative;
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    max-width: 100%;
+    max-height: 100%;
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+}
+
+.avatar-viewer:active {
+    cursor: grabbing;
+}
+
+.avatar-viewer-stage {
+    width: min(76vw, 64vh);
+    aspect-ratio: 1 / 1;
+    transform-origin: center;
+    will-change: transform;
+}
+
+.avatar-viewer-stage .avatar {
+    pointer-events: none;
+}
+
+.avatar-viewer-hint {
+    margin: 0;
+    padding: 4px 8px;
+    border-radius: 2px;
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.avatar-viewer-close {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top));
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 2px;
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.avatar-viewer-close:hover {
+    background-color: var(--color-surface);
+}
+
 /* Toast — bottom, above the tab bar; no shadow, it is not a sheet. */
 .toasts {
     position: fixed;
@@ -1820,8 +1972,11 @@ a.post-time:hover {
 /* Tabs — underline strip. The caller owns the value (the query string at page level). */
 /* The catalog switcher: three real links between the three catalogs, wearing the tab strip's
    geometry so the app has one underline language. `aria-current` is the active mark, not a class. */
+/* Both strips are compact on phones: a tab is its icon, the selected one opens to reveal its label.
+   From `sm` up every label stays visible and the strip reads left to right. */
 .cat-switch {
     display: flex;
+    justify-content: space-between;
     gap: 4px;
     overflow-x: auto;
     border-bottom: 1px solid var(--color-border);
@@ -1862,10 +2017,13 @@ a.post-time:hover {
     height: 2px;
     background-color: var(--color-accent);
     content: "";
+    transform-origin: center;
+    animation: tab-tick-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .tabs {
     display: flex;
+    justify-content: space-between;
     gap: 4px;
     overflow-x: auto;
     border-bottom: 1px solid var(--color-border);
@@ -1878,7 +2036,9 @@ a.post-time:hover {
 
 .tab-pill {
     position: relative;
+    display: inline-flex;
     flex: none;
+    align-items: center;
     min-height: 44px;
     padding: 0 12px;
     border: 0;
@@ -1906,6 +2066,94 @@ a.post-time:hover {
     height: 2px;
     background-color: var(--color-accent);
     content: "";
+    transform-origin: center;
+    animation: tab-tick-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The icon is the whole compact tab; the label opens beside it. The label is a one-track grid:
+   `0fr` has no width, `1fr` grows to the text's own width, and **fr tracks interpolate**, so the
+   reveal lands exactly on the label instead of overshooting a guessed `max-width`. */
+.cat-icon,
+.tab-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+}
+
+.cat-label,
+.tab-label {
+    display: inline-grid;
+    grid-template-columns: 0fr;
+    padding-left: 0;
+    opacity: 0;
+    transition:
+        grid-template-columns 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        padding-left 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        opacity 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cat-label-text,
+.tab-label-text {
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+/* `DiscoverSwitch` is a set of real links, so its strip **remounts** on every route change: the
+   newly selected label has no transition to run against an old style. The keyframes give it the
+   same open on mount, so the switch animates across navigations too. */
+@keyframes tab-label-open {
+    from {
+        grid-template-columns: 0fr;
+        padding-left: 0;
+        opacity: 0;
+    }
+    to {
+        grid-template-columns: 1fr;
+        padding-left: 6px;
+        opacity: 1;
+    }
+}
+
+/* The active mark arrives instead of teleporting. A remount has no previous tick to slide from,
+   so the 2px bar settles in place — the same motion `Tabs` gets when the selection moves. */
+@keyframes tab-tick-in {
+    from {
+        opacity: 0;
+        transform: scaleX(0.6);
+    }
+    to {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+}
+
+.cat-tab[aria-current="page"] .cat-label,
+.tab-pill[aria-selected="true"] .tab-label {
+    grid-template-columns: 1fr;
+    padding-left: 6px;
+    opacity: 1;
+    animation: tab-label-open 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (min-width: 640px) {
+    .cat-switch,
+    .tabs {
+        justify-content: flex-start;
+    }
+
+    .cat-label,
+    .tab-label {
+        grid-template-columns: 1fr;
+        padding-left: 6px;
+        opacity: 1;
+    }
+
+    /* Same specificity as the selected rule, so the desktop strip never grows on mount: every
+       label is simply there. */
+    .cat-tab[aria-current="page"] .cat-label,
+    .tab-pill[aria-selected="true"] .tab-label {
+        animation: none;
+    }
 }
 
 /* The tab's saved count. Tabular figures so two tabs' numbers keep the same width, and muted so the
@@ -1986,8 +2234,16 @@ a.post-time:hover {
     .field-input,
     .toggle-track,
     .toggle-knob,
-    .tab-pill {
+    .tab-pill,
+    .cat-label,
+    .tab-label {
         transition: none;
+        animation: none;
+    }
+
+    .cat-tab::after,
+    .tab-pill::after {
+        animation: none;
     }
 }
 

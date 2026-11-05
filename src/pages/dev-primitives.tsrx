@@ -8,6 +8,7 @@ import { Field } from "../components/Field.tsrx";
 import {
   IconBack,
   IconBell,
+  IconBook,
   IconBookmark,
   IconCheck,
   IconDiscover,
@@ -16,10 +17,14 @@ import {
   IconFlag,
   IconHome,
   IconMore,
+  IconPen,
   IconPlus,
   IconSearch,
   IconThread,
   IconUser,
+  IconUserCheck,
+  IconUsers,
+  IconWand,
 } from "../components/Icons.tsrx";
 import { Sheet } from "../components/Sheet.tsrx";
 import { Skeleton } from "../components/Skeleton.tsrx";
@@ -74,10 +79,10 @@ const LONG_TAGLINE: Character = {
 const GRID_ITEMS = CHARACTERS.slice(0, 4);
 
 const TABS: TabItem[] = [
-  { value: "creations", label: "Creations" },
-  { value: "posts", label: "Posts" },
-  { value: "followers", label: "Followers" },
-  { value: "following", label: "Following" },
+  { value: "creations", label: "Creations", icon: IconPen },
+  { value: "posts", label: "Posts", icon: IconThread },
+  { value: "followers", label: "Followers", icon: IconUsers },
+  { value: "following", label: "Following", icon: IconUserCheck },
 ];
 
 const ICONS: { name: string; Icon: Component }[] = [
@@ -95,6 +100,11 @@ const ICONS: { name: string; Icon: Component }[] = [
   { name: "Bookmark", Icon: IconBookmark },
   { name: "ChevronDown", Icon: IconChevronDown },
   { name: "Flag", Icon: IconFlag },
+  { name: "Book", Icon: IconBook },
+  { name: "Wand", Icon: IconWand },
+  { name: "Pen", Icon: IconPen },
+  { name: "Users", Icon: IconUsers },
+  { name: "UserCheck", Icon: IconUserCheck },
 ];
 
 export function DevPrimitives() @{

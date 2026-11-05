@@ -9,7 +9,7 @@
  *
  * Two rules the walk exists to enforce:
  *
- * 1. **Every step asserts on the DOM** — the sentence a page prints, the badge in the tab bar,
+ * 1. **Every step asserts on the DOM** — the sentence a page prints, the badge in the header,
  *    the card leaving the grid. A journey that only passes because the memory adapter said so is
  *    not a journey: the adapter is what the pages are supposed to prove.
  * 2. **A hard reload re-seeds the memory adapter**, so the walk never reloads between the steps of
@@ -703,6 +703,7 @@ async function measureAt(width) {
     const rail = document.querySelector(".rail");
     const outlet = document.querySelector(".outlet");
     const tabbar = document.querySelector(".tabbar");
+    const topbar = document.querySelector(".topbar");
     return {
       viewport: window.innerWidth,
       scroll: document.documentElement.scrollWidth,
@@ -712,24 +713,25 @@ async function measureAt(width) {
       rail: rail ? Math.round(rail.getBoundingClientRect().width) : -1,
       outlet: outlet ? Math.round(outlet.getBoundingClientRect().width) : -1,
       tabbar: tabbar ? getComputedStyle(tabbar).display : "",
+      topbar: topbar ? Math.round(topbar.getBoundingClientRect().height) : -1,
     };
   `);
 }
 
 /**
- * The ladder the stylesheet actually fixes: 1/2/3/3 card columns, one Field column then two, no
- * bottom bar at `md`, a rail that widens at `lg`.
+ * The ladder the stylesheet actually fixes: 1/2/3/3 card columns, one Field column then two, and
+ * **one header at every width** — the sidebar and the bottom tab bar were removed, so no step draws
+ * either. The header is the only chrome the shell adds.
  *
- * **The grid stops at three, on purpose** (`styles.css`, `.card-grid` @1200): the outlet is one A4
- * page wide (794px), so a fourth column would draw 163px cards with a 54px thumbnail. `DESIGN.md`
- * still claimed "1 / 2 / 3 / 4" until T-44 measured it and found three; the row asserts the
- * stylesheet's decision, and the docs line was corrected in the same commit.
+ * **The grid stops at three, on purpose** (`styles.css`, `.card-grid` @1200): this gallery is a
+ * reading route (794px), so a fourth column would draw 163px cards with a 54px thumbnail. The
+ * `layout: "wide"` Discover routes opt into `auto-fit` and are measured separately.
  */
 const BREAKPOINTS = [
-  { width: 360, grid: 1, fields: 1, rail: 0 },
-  { width: 640, grid: 2, fields: 2, rail: 0 },
-  { width: 900, grid: 3, fields: 2, rail: 1 },
-  { width: 1200, grid: 3, fields: 2, rail: 1 },
+  { width: 360, grid: 1, fields: 1 },
+  { width: 640, grid: 2, fields: 2 },
+  { width: 900, grid: 3, fields: 2 },
+  { width: 1200, grid: 3, fields: 2 },
 ];
 
 const rows = [];
@@ -797,11 +799,48 @@ console.log(`smoke: ${BASE} @ 360x740`);
 
 // Open the build once. Everything after this is in-app: a reload re-seeds the memory adapter.
 await send("Page.navigate", { url: BASE });
-await waitText("Discover", 15000);
+await waitFor(`!!document.querySelector(".catalog")`, "the Discover catalog", 15000);
 await sleep(600);
 
 const badge = () =>
-  js(`const el = [...document.querySelectorAll("a")].find((e) => /^Alerts/.test((e.getAttribute("aria-label") || e.innerText || "").trim())); return el ? el.getAttribute("aria-label") || el.innerText.trim() : "";`);
+  js(`const el = document.querySelector(".bar-actions .badge"); return el ? (el.innerText || "").trim() : "";`);
+
+/** Open the header's options menu — it is not rendered until the trigger is pressed. */
+async function openMenu() {
+  if (await js(`return !!document.querySelector(".menu")`)) return;
+  await click("Menu", { scope: ".bar-actions button" });
+  await waitFor(`!!document.querySelector(".menu")`, "the options menu", 8000);
+}
+
+/** Close it again, so its scrim cannot swallow the next press. */
+async function closeMenu() {
+  if (!(await js(`return !!document.querySelector(".menu")`))) return;
+  await click("Menu", { scope: ".bar-actions button" });
+  await waitFor(`!document.querySelector(".menu")`, "the options menu to close", 8000);
+}
+
+/** The Profile destination's href; it lives in the options menu now. */
+async function profileHref() {
+  await openMenu();
+  const href = await js(`
+    const link = [...document.querySelectorAll(".menu a[role=menuitem]")].find((a) => ((a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile"));
+    return link ? link.getAttribute("href") || "" : "";
+  `);
+  await closeMenu();
+  return href;
+}
+
+/** Poll the Profile destination until `ok(href)`; a session change may land a tick later. */
+async function waitProfileHref(ok, label, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  let href = "";
+  while (Date.now() < deadline) {
+    href = await profileHref();
+    if (href && ok(href)) return href;
+    await sleep(120);
+  }
+  throw new Error(`timed out waiting for ${label} (last Profile href: ${JSON.stringify(href)})`);
+}
 
 let unreadBefore = "";
 
@@ -809,21 +848,20 @@ const results = [];
 
 results.push(
   await journey("sign in from the Discover tab", async () => {
-    await waitText("Discover", 8000);
-    await click("More");
+    await waitFor(`!!document.querySelector(".catalog")`, "the Discover catalog", 8000);
+    await openMenu();
     await click("Sign out");
-    await waitText("Discover", 8000);
-    // The landing page is gone, so the signed-out way in is the Profile tab — while there is no
-    // account it points at `/authentification`. The anchor stays real and the press is a push.
-    const entry = await js(`
-      const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile");
-      return el ? { href: el.getAttribute("href") || "", text: (el.getAttribute("aria-label") || el.innerText || "").trim() } : null;
-    `);
-    if (!entry) throw new Error("the signed-out Profile tab is missing");
-    if (!entry.href.endsWith("/authentification")) throw new Error(`the signed-out Profile tab points at ${entry.href}, not /authentification`);
+    await waitFor(`!!document.querySelector(".catalog")`, "the Discover catalog", 8000);
+    // The landing page is gone, so the signed-out way in is the Profile destination — while there is
+    // no account it points at `/authentification`. The anchor stays real and the press is a push.
+    const entryHref = await waitProfileHref((href) => href.endsWith("/authentification"), "the signed-out Profile destination");
+    const entry = { href: entryHref, text: "Profile" };
+    if (!entry) throw new Error("the signed-out Profile destination is missing");
+    if (!entry.href.endsWith("/authentification")) throw new Error(`the signed-out Profile destination points at ${entry.href}, not /authentification`);
     const mark = await markDocument("profile-sign-in");
-    await click("Profile");
-    await expectPath("/authentification", "the signed-out Profile tab");
+    await openMenu();
+    await click("Profile", { scope: ".menu a" });
+    await expectPath("/authentification", "the signed-out Profile destination");
     await waitText("Continue with Google", 8000);
     const kept = await expectNoReload(mark, "the signed-out Profile tab");
 
@@ -1021,13 +1059,13 @@ results.push(
     await click("Continue with Google");
     await waitText("sign-in was cancelled", 8000);
     await go("/");
-    await waitText("Discover", 8000);
+    await waitFor(`!!document.querySelector(".catalog")`, "the Discover catalog", 8000);
     // The one control that really does write the session in the preview: the menu's own switch.
-    await click("More");
+    await openMenu();
     await click("Sign in as @you");
-    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/you"); })()`, "the Profile tab to point at @you", 8000);
+    await waitProfileHref((href) => href.endsWith("/user/you"), "the Profile destination to point at @you");
     const label = await badge();
-    if (!label.startsWith("Alerts")) throw new Error("the tab bar lost its Alerts destination");
+    if (!label) throw new Error("the shell lost its unread badge");
     return `the provider button answers cancelled and signs nobody in; the menu's switch signs in as You; the control pushed (${kept}); the sm 640 measure ${gateSeen}`;
   }),
 );
@@ -1044,19 +1082,14 @@ results.push(
 results.push(
   await journey("profile from Discover", async () => {
     await go("/");
-    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/you"); })()`, "the signed-in Profile tab", 8000);
-    const entry = await js(`
-      const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile");
-      return el ? { href: el.getAttribute("href") || "", text: (el.getAttribute("aria-label") || el.innerText || "").trim() } : null;
-    `);
-    if (!entry) throw new Error("the signed-in Profile tab is missing");
-    if (!/\/user\/you$/.test(entry.href)) throw new Error(`the signed-in Profile tab points at ${entry.href}, not /user/you`);
+    await waitProfileHref((href) => href.endsWith("/user/you"), "the signed-in Profile destination");
     const mark = await markDocument("discover-profile");
-    await click("Profile");
-    await expectPath("/user/you", "the Profile tab");
+    await openMenu();
+    await click("Profile", { scope: ".menu a" });
+    await expectPath("/user/you", "the Profile destination");
     await waitText("Edit profile", 8000);
-    const kept = await expectNoReload(mark, "the Profile tab");
-    return `the Profile tab pushes to @you's own profile with the owner actions visible; ${kept}`;
+    const kept = await expectNoReload(mark, "the Profile destination");
+    return `the Profile destination pushes to @you's own profile with the owner actions visible; ${kept}`;
   }),
 );
 
@@ -1094,7 +1127,8 @@ results.push(
 
 results.push(
   await journey("publish a post from /post/create", async () => {
-    await click("Thread");
+    await openMenu();
+    await click("Thread", { scope: ".menu a" });
     await waitUrl("/post/thread");
     await waitText("SORT", 8000);
     await click("Create");
@@ -1586,7 +1620,7 @@ results.push(
 results.push(
   await journey("conclude a case as removed (the item panel follows)", async () => {
     await go("/moderation/4e90047a-0000-4000-8000-000000000002?admin=1");
-    await waitText("Case");
+    await waitFor(`!!document.querySelector(".case")`, "the case page", 8000);
     await waitText("Removed");
     // T-40: the panel is evidence, so it has to read what the item *is*. Before the conclusion the
     // post is visible; reading that first is what makes the after-read a fact and not a guess.
@@ -1609,7 +1643,8 @@ results.push(
 
 results.push(
   await journey("read a notification (the badge drops)", async () => {
-    await click("Alerts");
+    await openMenu();
+    await click("Alerts", { scope: ".menu a" });
     await waitUrl("/notifications");
     await waitFor(`document.querySelectorAll(".row.is-unread").length > 0`, "an unread row", 8000);
     const before = await js(`return document.querySelectorAll(".row.is-unread").length;`);
@@ -1774,7 +1809,7 @@ results.push(
       throw new Error(`the inbox measured 0 rows after the ladder — an empty list satisfies every count above, so the reading proves nothing`);
     }
 
-    return `${before} unread rows → ${before - 1}; the tab bar went "${unreadBefore}" → "${after}"; the sm step rendered — ${inboxSeen}`;
+    return `${before} unread rows → ${before - 1}; the header badge went "${unreadBefore}" → "${after}"; the sm step rendered — ${inboxSeen}`;
   }),
 );
 
@@ -2041,19 +2076,19 @@ results.push(
         if (m.fields !== step.fields) {
           throw new Error(`at ${step.width}px the Field gallery has ${m.fields} columns, not ${step.fields}`);
         }
-        if (step.rail === 0 ? m.rail !== 0 : m.rail <= 0) {
-          throw new Error(`at ${step.width}px the shell's rail measures ${m.rail}px (expected ${step.rail === 0 ? "hidden" : "visible"})`);
+        if (m.rail !== -1) {
+          throw new Error(`at ${step.width}px the shell still draws a sidebar ${m.rail}px wide — it was removed in favour of the header menu`);
         }
-        if (step.rail === 0 && m.tabbar === "none") {
-          throw new Error(`at ${step.width}px the bottom tab bar is already gone: that is the md layout at a phone width`);
+        if (m.tabbar !== "") {
+          throw new Error(`at ${step.width}px the shell still draws a bottom tab bar (${m.tabbar}) — it was removed in favour of the header menu`);
         }
-        if (step.rail === 1 && m.tabbar !== "none") {
-          throw new Error(`at ${step.width}px the bottom tab bar survives beside the rail: the rail layout is a stretched phone`);
+        if (m.topbar <= 0) {
+          throw new Error(`at ${step.width}px the shell draws no header (${m.topbar}px) — the brand and the options menu are the only navigation`);
         }
         if (step.width === 1200 && m.outlet >= m.viewport - 200) {
           throw new Error(`at 1200px the reading column is ${m.outlet}px wide in a ${m.viewport}px viewport — the 360 layout, stretched`);
         }
-        seen.push(`${step.width}:${m.grid}col/field${m.fields}/rail${m.rail}/btn${m.minButton}/outlet${m.outlet}`);
+        seen.push(`${step.width}:${m.grid}col/field${m.fields}/btn${m.minButton}/outlet${m.outlet}/topbar${m.topbar}`);
       }
     } finally {
       // A leaked override is the trap: every later row would run at 1200 and read as a layout bug.
@@ -2208,7 +2243,7 @@ const cssHex = (value) => {
 results.push(
   await journey("the accent's text tiers clear 4.5:1 in both flavours", async () => {
     await go("/discover/characters");
-    await waitFor(`!!document.querySelector(".tabbar .tab.is-active .tab-label")`, "an active tab label", 8000);
+    await waitFor(`!!document.querySelector(".bar-btn.is-active")`, "the active Discover control", 8000);
     await waitFor(`!!document.querySelector(".card a.card-author")`, "a catalog card's author link", 8000);
 
     // A pinned attribute makes `prefers-color-scheme` inert (`:root:not([data-theme])`), and the light
@@ -2244,14 +2279,14 @@ results.push(
     const probe = await node('a[data-walk-probe="bare-link"]');
 
     const read = () => js(`
-      const label = document.querySelector(".tabbar .tab.is-active .tab-label");
-      const tab = label.closest(".tab");
+      const active = document.querySelector(".bar-btn.is-active");
+      const nav = document.querySelector(".topbar");
       const link = document.querySelector(".card a.card-author");
       const card = link.closest(".card");
       const bare = document.querySelector('a[data-walk-probe="bare-link"]');
-      // A token pair with no element left on it: T-37C removed the rail's surface fill, and
-      // --color-surface is the app's worst backplate — the hover tier exists for it. Resolve it
-      // through a throwaway element so the value is the one the browser computed, not a hex here.
+      // A token pair with no element left on it: --color-surface is the app's worst backplate — the
+      // hover tier exists for it. Resolve it through a throwaway element so the value is the one the
+      // browser computed, not a hex here.
       const swatch = document.createElement("div");
       swatch.style.backgroundColor = "var(--color-surface)";
       card.appendChild(swatch);
@@ -2259,10 +2294,10 @@ results.push(
       swatch.remove();
       const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
       return {
-        text: label.innerText.trim(),
-        label: cs(label).color,
-        plate: cs(tab.closest(".tabbar")).backgroundColor,
-        mark: cs(tab, "::before").backgroundColor,
+        text: (active.getAttribute("aria-label") || "").trim(),
+        label: cs(active).color,
+        plate: cs(nav).backgroundColor,
+        mark: cs(document.querySelector(".brand .ico")).color,
         author: cs(link).color,
         cardBg: cs(card).backgroundColor,
         bare: cs(bare).color,
@@ -2324,7 +2359,7 @@ results.push(
           throw new Error(`the ${want.scheme} emulation asserts color-scheme ${rest.scheme}`);
         }
         for (const [key, what] of [
-          ["tab", `the active tab label "${rest.text}"`],
+          ["tab", `the active header action "${rest.text}"`],
           ["authorHover", "a hovered card author"],
           ["link", "a bare link on a card"],
           ["linkHover", "a hovered bare link on a card"],
@@ -2341,7 +2376,7 @@ results.push(
         // The text tiers must not be the mark. On the dark flavours they are the same value by
         // design (the mark already reads as text); on light both hovers and the link must sit darker.
         if (want.scheme === "light" && rest.mark === rest.label) {
-          throw new Error(`${want.flavour}: the tab tick and the label are the same colour (${rest.mark}) — the text tier did not diverge from the mark`);
+          throw new Error(`${want.flavour}: the brand mark and the active label are the same colour (${rest.mark}) — the text tier did not diverge from the mark`);
         }
         if (want.scheme === "light" && rest.bare === rest.mark) {
           throw new Error(`${want.flavour}: a bare link paints the mark (${rest.bare}) — the base rule skipped the text tier`);
@@ -2350,44 +2385,36 @@ results.push(
           throw new Error(`${want.flavour}: a hovered link is the same colour as a resting one (${rest.bare}) — the hover tier is not attached`);
         }
 
-        // The `md` rail, in the same flavour: its own 84px column, the label on the rail's plate.
-        await send("Emulation.setDeviceMetricsOverride", { width: 900, height: 740, deviceScaleFactor: 1, mobile: false });
-        await sleep(260);
-        const rail = await js(`
-          const row = document.querySelector(".rail-item.is-active");
-          if (!row) return null;
-          const label = row.querySelector(".rail-label");
-          const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
-          return {
-            viewport: window.innerWidth,
-            text: label ? label.innerText.trim() : "",
-            label: label ? cs(label).color : null,
-            rowBg: cs(row).backgroundColor,
-            plate: cs(row.closest(".rail")).backgroundColor,
-            bar: cs(row, "::before").backgroundColor,
-          };
+        // The options menu, in the same flavour: a row label on the elevated plate. It is opened
+        // and closed with the trigger's own click, so no pointer state is left behind.
+        await js(`document.querySelector(".bar-actions button[aria-haspopup=menu]").click(); return true;`);
+        await sleep(180);
+        const menu = await js(`
+          const item = document.querySelector(".menu-item .menu-text");
+          const box = document.querySelector(".menu");
+          const icon = item && item.closest(".menu-item").querySelector(".menu-icon");
+          const cs = (el) => getComputedStyle(el);
+          return item && box ? {
+            text: item.innerText.trim(),
+            label: cs(item).color,
+            plate: cs(box).backgroundColor,
+            icon: icon ? cs(icon).color : null,
+          } : null;
         `);
-        await send("Emulation.clearDeviceMetricsOverride");
-        await sleep(260);
-        if (!rail || !rail.label) throw new Error(`at 900px ${want.flavour} draws no active rail label`);
-        if (rail.viewport !== 900) throw new Error(`the override asked for 900px and the rail measured ${rail.viewport}px`);
-        if (rail.rowBg !== "rgba(0, 0, 0, 0)") {
-          throw new Error(`the md rail's active row paints ${rail.rowBg} behind its label — the fill is back, and on light no accent text clears AA on it`);
-        }
-        if (rail.bar === "rgba(0, 0, 0, 0)") {
-          throw new Error(`the md rail's active row draws no bar (${rail.bar}) — it has no indicator left`);
-        }
-        const railRatio = await js(`${CONTRAST_FN}
-          return contrast(${JSON.stringify(rail.label)}, ${JSON.stringify(rail.plate)});
+        await js(`document.querySelector(".bar-actions button[aria-haspopup=menu]").click(); return true;`);
+        await sleep(140);
+        if (!menu || !menu.label) throw new Error(`at 900px ${want.flavour} draws no menu row label`);
+        const menuRatio = await js(`${CONTRAST_FN}
+          return contrast(${JSON.stringify(menu.label)}, ${JSON.stringify(menu.plate)});
         `);
-        if (!(railRatio >= 4.5)) {
-          throw new Error(`${want.flavour}'s active rail label "${rail.text}" measures ${railRatio.toFixed(2)}:1 (${rail.label} on ${rail.plate}), under AA 4.5`);
+        if (!(menuRatio >= 4.5)) {
+          throw new Error(`${want.flavour}'s menu row "${menu.text}" measures ${menuRatio.toFixed(2)}:1 (${menu.label} on ${menu.plate}), under AA 4.5`);
         }
 
         seen.push(
-          `${want.flavour} ${rest.base} "${rest.text}" tab ${ratios.tab.toFixed(2)}:1 (label ${cssHex(rest.label)}, tick ${cssHex(rest.mark)}), ` +
+          `${want.flavour} ${rest.base} "${rest.text}" header action ${ratios.tab.toFixed(2)}:1 (label ${cssHex(rest.label)}, mark ${cssHex(rest.mark)}), ` +
             `@author hover ${ratios.authorHover.toFixed(2)}:1, bare link ${ratios.link.toFixed(2)}:1 / hover ${ratios.linkHover.toFixed(2)}:1 (${cssHex(bareHover)}${want.scheme === "light" ? `, ${ratios.linkHoverSurface.toFixed(2)}:1 on surface` : ""}), ` +
-            `rail "${rail.text}" ${railRatio.toFixed(2)}:1 on ${cssHex(rail.plate)} (bar ${cssHex(rail.bar)}, no fill)`,
+            `menu "${menu.text}" ${menuRatio.toFixed(2)}:1 on ${cssHex(menu.plate)}`,
         );
       }
     } finally {
@@ -5341,11 +5368,7 @@ results.push(
         };
       `);
 
-    const readShell = () =>
-      js(`
-        const link = [...document.querySelectorAll("a")].find((a) => (a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile");
-        return { profile: link ? link.getAttribute("href") || "" : "" };
-      `);
+    const readShell = async () => ({ profile: await profileHref() });
 
     // 1. The account this row borrows, read from the page it will be handed back to.
     await go("/user/you");
@@ -5430,7 +5453,7 @@ results.push(
     }
 
     await go("/");
-    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/${ONBOARDING_HANDLE}"); })()`, "the Profile tab after the claim", 8000);
+    await waitProfileHref((href) => href.endsWith(`/user/${ONBOARDING_HANDLE}`), "the Profile destination after the claim");
     const shell = await readShell();
     if (!shell.profile.endsWith(`/user/${ONBOARDING_HANDLE}`)) {
       throw new Error(`the shell's Profile tab points at ${JSON.stringify(shell.profile)}, not /user/${ONBOARDING_HANDLE} — the account did not move`);
@@ -5663,10 +5686,10 @@ results.push(
         throw new Error(`the restore landed on ${JSON.stringify([back.name, back.handle, back.missing])}, not ${JSON.stringify([account.name, `@${accountHandle}`])}`);
       }
       await go("/");
-      await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/${accountHandle}"); })()`, "the Profile tab after the restore", 8000);
+      await waitProfileHref((href) => href.endsWith(`/user/${accountHandle}`), "the Profile destination after the restore");
       const home = await readShell();
       if (!home.profile.endsWith(`/user/${accountHandle}`)) {
-        throw new Error(`the shell's Profile tab points at ${JSON.stringify(home.profile)} after the restore, not /user/${accountHandle}`);
+        throw new Error(`the shell's Profile destination points at ${JSON.stringify(home.profile)} after the restore, not /user/${accountHandle}`);
       }
 
       return `@${accountHandle} (${JSON.stringify(account.name)}) · a first visit opens blank with the rule as the handle's help line, and Finish enables on the pair only once the settle asked the adapter · "ab" → ${JSON.stringify(HANDLE_RULE_SENTENCE)} with Finish disabled · "Ada" → "Username taken" with Finish disabled · Finish → /user/${ONBOARDING_HANDLE} reads ${JSON.stringify([claimed.name, claimed.handle])}, the Profile tab at ${shell.profile} · a second visit restored ${JSON.stringify([resumed.handle, resumed.name])} → Finish back to /user/${accountHandle}, the Profile tab at ${home.profile} · the setup form at ${setupSeen}`;
@@ -5749,11 +5772,7 @@ results.push(
       throw new Error(`${label} — read ${JSON.stringify(last)}`);
     };
 
-    const readShell = () =>
-      js(`
-        const link = [...document.querySelectorAll("a")].find((a) => (a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile");
-        return { profile: link ? link.getAttribute("href") || "" : "" };
-      `);
+    const readShell = async () => ({ profile: await profileHref() });
 
     const HEAD = 'input[name="username"], input[name="handle"]';
 
@@ -5837,12 +5856,12 @@ results.push(
       throw new Error(`the comment the account wrote reads ${JSON.stringify(signed)} after the rename, not @${EDIT_HANDLE} — a comment is signed by its author, and the account keeps its content`);
     }
 
-    // 5. The account itself moved: the Profile tab names the same person at the new handle.
+    // 5. The account itself moved: the Profile destination names the same person at the new handle.
     await go("/");
-    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/${EDIT_HANDLE}"); })()`, "the Profile tab after the rename", 8000);
+    await waitProfileHref((href) => href.endsWith(`/user/${EDIT_HANDLE}`), "the Profile destination after the rename");
     const shell = await readShell();
     if (!shell.profile.endsWith(`/user/${EDIT_HANDLE}`)) {
-      throw new Error(`the shell's Profile tab points at ${JSON.stringify(shell.profile)} after the rename, not /user/${EDIT_HANDLE} — the session kept the old handle`);
+      throw new Error(`the shell's Profile destination points at ${JSON.stringify(shell.profile)} after the rename, not /user/${EDIT_HANDLE} — the session kept the old handle`);
     }
 
     // 6. The way back, and the whole pair re-read: the walk hands the account over as row 44 does.
@@ -5862,10 +5881,10 @@ results.push(
         throw new Error(`the restore reads ${JSON.stringify([back.bio, back.figures, back.creations])}, not ${JSON.stringify([before.bio, before.figures, before.creations])} — the round trip lost a row`);
       }
       await go("/");
-      await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").endsWith("/user/${accountHandle}"); })()`, "the Profile tab after the restore", 8000);
+      await waitProfileHref((href) => href.endsWith(`/user/${accountHandle}`), "the Profile destination after the restore");
       const home = await readShell();
       if (!home.profile.endsWith(`/user/${accountHandle}`)) {
-        throw new Error(`the shell's Profile tab points at ${JSON.stringify(home.profile)} after the restore, not /user/${accountHandle}`);
+        throw new Error(`the shell's Profile destination points at ${JSON.stringify(home.profile)} after the restore, not /user/${accountHandle}`);
       }
 
       return `@${accountHandle} → @${EDIT_HANDLE} → @${accountHandle} · the form prefilled ${JSON.stringify([prefilled.handle, prefilled.name, prefilled.bio])} with Save enabled · Save → /user/${EDIT_HANDLE} reads ${JSON.stringify([after.name, after.handle, after.figures, after.creations])} (same name, bio, figures and creations as before) · /user/${accountHandle} reads "This user doesn't exist." with no profile · the account's own comment reads ${JSON.stringify(signed)} · the Profile tab at ${shell.profile} · the way back restores ${JSON.stringify([back.handle, back.bio, back.creations])}`;
@@ -5945,13 +5964,9 @@ results.push(
 
     // 1. The session's own handle, read from the shell's Profile tab (row 45 hands `@you` back, but never pin it).
     await go("/");
-    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").includes("/user/"); })()`, "the signed-in Profile tab", 8000);
-    const ownHref = await js(`
-      const link = [...document.querySelectorAll("a")].find((a) => (a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile");
-      return link ? link.getAttribute("href") || "" : "";
-    `);
+    const ownHref = await waitProfileHref((href) => href.includes("/user/"), "the signed-in Profile destination");
     const ownHandle = ownHref.split("/").filter(Boolean).pop() || "";
-    if (!ownHandle) throw new Error(`/ draws no Profile tab (read ${JSON.stringify(ownHref)}) — the row cannot know whose account it is borrowing`);
+    if (!ownHandle) throw new Error(`/ draws no Profile destination (read ${JSON.stringify(ownHref)}) — the row cannot know whose account it is borrowing`);
 
     await go(`/user/${ownHandle}`);
     await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the account's profile header", 10000);
@@ -6073,10 +6088,12 @@ results.push(
     }
 
     // 5. The head at the two widths its own stylesheet draws it for (T-78). `user-profile.tsrx`'s
-    //    `sm 640` block turns `.profile-head` from **two** tracks with the action on a second row
-    //    into **three** on one row and raises `.name` 22 → 26px. Rows 45–47 all mount this page at
-    //    the session's own ~500px — below the breakpoint — so the block was a declaration nothing
-    //    could go red on. Both widths are read, because one direction cannot show a breakpoint.
+    //    base block is the catalogue card's anatomy — two equal halves (square avatar | name,
+    //    handle, bio), then the actions and the figures as full-width rows — and the `sm 640` block
+    //    turns it back into the compact 160px | fluid | auto row and raises `.name` 22 → 26px. Rows
+    //    45–47 all mount this page at the session's own ~500px — below the breakpoint — so the block
+    //    was a declaration nothing could go red on. Both widths are read, because one direction
+    //    cannot show a breakpoint.
     const readHeadAt = () =>
       js(`
         const rect = (el) => {
@@ -6099,8 +6116,10 @@ results.push(
           headTracks: isGrid ? hs.gridTemplateColumns.split(" ").filter((t) => t.trim() !== "") : [],
           headGap: hs ? hs.gap : "",
           avatar: rect(document.querySelector(".profile-head .head-avatar")),
+          avatarImage: rect(document.querySelector(".profile-head .head-avatar .avatar")),
           who: rect(document.querySelector(".profile-head .who")),
           action: rect(document.querySelector(".profile-head .head-action")),
+          figures: rect(document.querySelector(".profile-head .figures")),
           name: (nameEl ? nameEl.textContent || "" : "").trim(),
           nameFont: nameEl ? getComputedStyle(nameEl).fontSize : "",
           pagerAlign: pager ? getComputedStyle(pager).alignItems : "",
@@ -6119,9 +6138,9 @@ results.push(
       if (r.headDisplay.indexOf("grid") < 0) {
         throw new Error(`${at}: .profile-head computes ${JSON.stringify(r.headDisplay)}, not the grid both of its blocks declare`);
       }
-      if (!r.avatar || !r.who || !r.action) {
+      if (!r.avatar || !r.avatarImage || !r.who || !r.action || !r.figures) {
         throw new Error(
-          `${at}: the head is incomplete — avatar ${JSON.stringify(r.avatar)}, who ${JSON.stringify(r.who)}, action ${JSON.stringify(r.action)}`,
+          `${at}: the head is incomplete — avatar ${JSON.stringify(r.avatar)}, image ${JSON.stringify(r.avatarImage)}, who ${JSON.stringify(r.who)}, action ${JSON.stringify(r.action)}, figures ${JSON.stringify(r.figures)}`,
         );
       }
       if (r.name === "") throw new Error(`${at}: the head draws no h1.name, so what measured is a skeleton`);
@@ -6135,13 +6154,13 @@ results.push(
         // The whole `sm` fact: three tracks, and the action on the **same row** as the avatar.
         if (r.headTracks.length !== 3) {
           throw new Error(
-            `${at}: .profile-head resolves ${r.headTracks.length} track(s) ${JSON.stringify(r.headTracks)}, not the three the sm block declares (72px | fluid | auto)`,
+            `${at}: .profile-head resolves ${r.headTracks.length} track(s) ${JSON.stringify(r.headTracks)}, not the three the sm block declares (160px | fluid | auto)`,
           );
         }
         // The count alone is not proof: a leftover placement can create an implicit third track, so
         // the track the block declares is sized too (T-77's lesson).
-        if (Math.abs(parseFloat(r.headTracks[0]) - 72) > 1) {
-          throw new Error(`${at}: the head's first track resolves to ${JSON.stringify(r.headTracks[0])}, not the 72px avatar column the sm block declares (tracks ${JSON.stringify(r.headTracks)})`);
+        if (Math.abs(parseFloat(r.headTracks[0]) - 160) > 1) {
+          throw new Error(`${at}: the head's first track resolves to ${JSON.stringify(r.headTracks[0])}, not the 160px avatar column the sm block declares (tracks ${JSON.stringify(r.headTracks)})`);
         }
         if (Math.abs(r.avatar.top - r.who.top) > 2) {
           throw new Error(`${at}: the avatar sits at top ${r.avatar.top} and .who at ${r.who.top} — the sm block puts them on one row`);
@@ -6165,18 +6184,37 @@ results.push(
         return;
       }
 
-      // The opposite, in the same words: the base block is still the phone's.
+      // The opposite, in the same words: the base block is the phone's card anatomy.
       if (r.headTracks.length !== 2) {
         throw new Error(
-          `${at}: .profile-head resolves ${r.headTracks.length} track(s) ${JSON.stringify(r.headTracks)}, not the two the base block declares (56px | fluid) — the sm block is leaking below its breakpoint`,
+          `${at}: .profile-head resolves ${r.headTracks.length} track(s) ${JSON.stringify(r.headTracks)}, not the two equal halves the base block declares (1fr | 1fr) — the sm block is leaking below its breakpoint`,
         );
       }
-      if (Math.abs(parseFloat(r.headTracks[0]) - 56) > 1) {
-        throw new Error(`${at}: the head's first track resolves to ${JSON.stringify(r.headTracks[0])}, not the 56px base column (tracks ${JSON.stringify(r.headTracks)})`);
+      const [first, second] = r.headTracks.map((track) => parseFloat(track));
+      if (!(Math.abs(first - second) <= 1)) {
+        throw new Error(
+          `${at}: the head's tracks are ${JSON.stringify(r.headTracks)}, not the two equal halves the base block declares (1fr | 1fr) — the avatar and the text are not sharing the row`,
+        );
+      }
+      const imageHeight = r.avatarImage.bottom - r.avatarImage.top;
+      if (!(Math.abs(r.avatarImage.width - imageHeight) <= 1)) {
+        throw new Error(
+          `${at}: the head avatar is ${r.avatarImage.width}×${imageHeight} — the base block gives it the card image's square box`,
+        );
+      }
+      if (!(Math.abs(r.avatarImage.width - r.avatar.width) <= 1)) {
+        throw new Error(
+          `${at}: the head avatar is ${r.avatarImage.width} wide inside a ${r.avatar.width} column — the image must fill its half of the row`,
+        );
       }
       if (!(r.action.top > r.avatar.top + 1)) {
         throw new Error(
           `${at}: .head-action sits at top ${r.action.top} with the avatar at ${r.avatar.top} — below 640 the action belongs on its own second row, spanning both columns`,
+        );
+      }
+      if (!(r.figures.top > r.action.bottom - 0.5)) {
+        throw new Error(
+          `${at}: .figures sits at top ${r.figures.top} with the action ending at ${r.action.bottom} — below 640 the figures belong on their own third row`,
         );
       }
       if (r.nameFont !== "22px") {
@@ -6320,13 +6358,9 @@ results.push(
 
     // 1. The session's own handle, read from the shell's Profile tab (row 45 hands `@you` back; never pin it).
     await go("/");
-    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").includes("/user/"); })()`, "the signed-in Profile tab", 8000);
-    const ownHref = await js(`
-      const link = [...document.querySelectorAll("a")].find((a) => (a.getAttribute("aria-label") || a.innerText || "").trim() === "Profile");
-      return link ? link.getAttribute("href") || "" : "";
-    `);
+    const ownHref = await waitProfileHref((href) => href.includes("/user/"), "the signed-in Profile destination");
     const ownHandle = ownHref.split("/").filter(Boolean).pop() || "";
-    if (!ownHandle) throw new Error(`/ draws no Profile tab (read ${JSON.stringify(ownHref)}) — the row cannot know whose profile it is walking`);
+    if (!ownHandle) throw new Error(`/ draws no Profile destination (read ${JSON.stringify(ownHref)}) — the row cannot know whose profile it is walking`);
 
     await go(`/user/${ownHandle}`);
     await waitFor(`document.querySelector(".profile-head h1.name") !== null`, "the account's profile header", 10000);
@@ -7011,7 +7045,7 @@ results.push(
           focused: !!field && active === field,
           active: active ? active.tagName + "." + (active.className || "") : "none",
           busy: document.querySelector(".catalog [aria-busy='true']") !== null,
-          crumb: (document.querySelector(".crumb") || {}).textContent || "",
+          path: location.pathname,
         };
       `);
 
@@ -7066,22 +7100,22 @@ results.push(
       throw new Error(`after the switcher's Characters tab the field still holds ${JSON.stringify(leftBySwitch.field)} — the URL cleared but the page did not remount, so the view and the address disagree`);
     }
 
-    // 4. The bottom bar's Discover tab in a narrowed state — the second shape of the same press.
+    // 4. The header's Discover control in a narrowed state — the second shape of the same press.
     await retype('input[name="q"]', word);
     const reNarrowed = await until(`the second settle to commit q=${JSON.stringify(word)}`, (s) => s.q === word && !s.busy && s.count === narrowed.count);
-    await click("Discover", { exact: true, scope: ".tabbar a" });
+    await click("Discover", { exact: true, scope: ".bar-actions a" });
     const leftByTab = await until(
-      "the bottom bar's Discover tab to leave the narrowed view",
+      "the header's Discover control to leave the narrowed view",
       (s) => s.search === "" && s.q === null && !s.busy && s.count === full.count,
     );
     if (leftByTab.field !== "") {
-      throw new Error(`after the Discover tab the field still holds ${JSON.stringify(leftByTab.field)} on ${JSON.stringify(leftByTab.search)} — a page's silent query write left the router's mounted key behind`);
+      throw new Error(`after the Discover control the field still holds ${JSON.stringify(leftByTab.field)} on ${JSON.stringify(leftByTab.search)} — a page's silent query write left the router's mounted key behind`);
     }
-    if (leftByTab.crumb.trim() !== "/") {
-      throw new Error(`the shell's crumb reads ${JSON.stringify(leftByTab.crumb)} after the tab press, not "/" — the Discover tab landed somewhere else`);
+    if (!leftByTab.path.endsWith("/discover/characters")) {
+      throw new Error(`the header's Discover control landed on ${JSON.stringify(leftByTab.path)}, not /discover/characters`);
     }
 
-    return `typing ${JSON.stringify(word)} committed ${JSON.stringify(narrowed.search)} with ${narrowed.count} of ${full.count} card(s) and **kept the caret in the field** (activeElement ${narrowed.active}) · the switcher's Characters tab cleared the query, the field and the grid (${leftBySwitch.count} card(s), ${JSON.stringify(leftBySwitch.search)}) · a second settle (${JSON.stringify(reNarrowed.search)}) then the bottom bar's Discover tab did the same (${leftByTab.count} card(s), ${JSON.stringify(leftByTab.search)}, crumb ${JSON.stringify(leftByTab.crumb.trim())})`;
+    return `typing ${JSON.stringify(word)} committed ${JSON.stringify(narrowed.search)} with ${narrowed.count} of ${full.count} card(s) and **kept the caret in the field** (activeElement ${narrowed.active}) · the switcher's Characters tab cleared the query, the field and the grid (${leftBySwitch.count} card(s), ${JSON.stringify(leftBySwitch.search)}) · a second settle (${JSON.stringify(reNarrowed.search)}) then the header's Discover control did the same (${leftByTab.count} card(s), ${JSON.stringify(leftByTab.search)}, path ${JSON.stringify(leftByTab.path)})`;
   }),
 );
 
@@ -7128,6 +7162,8 @@ results.push(
         const params = new URLSearchParams(location.search);
         const text = (el) => (el ? String(el.textContent || "").trim() : "");
         const labelOf = (el) => {
+          const label = el.querySelector(".tab-label");
+          if (label) return String(label.textContent || "").trim();
           const first = el.childNodes[0];
           return String(first && first.nodeType === 3 ? first.textContent : el.textContent || "").trim();
         };
@@ -8150,8 +8186,8 @@ results.push(
  * stretched phone*: a 200px sticky rail beside a prose column, `lg` only. Nothing has looked at
  * `/terms` above 900px, so a rail that overflows the outlet, a prose column that grows past its
  * measure, or a `display: none` that never turns on is green in `check.sh`, in every other row and
- * on the live walk. Ladder row 30 measures `/dev/primitives`' `.rail` — the **shell's** rail, a
- * different decision behind a different selector.
+ * on the live walk. Ladder row 30 measures `/dev/primitives`' shell chrome — the header, not the
+ * page's own `.contents` rail, which is a different decision behind a different selector.
  *
  * Read-only: `/terms` reads no store, writes no preference, presses nothing and commits no query.
  *
@@ -8791,14 +8827,14 @@ results.push(
 results.push(
   await journey("sign out", async () => {
     await go("/");
-    await waitFor(`(() => { const el = [...document.querySelectorAll("a")].find((e) => (e.getAttribute("aria-label") || e.innerText || "").trim() === "Profile"); return !!el && (el.getAttribute("href") || "").includes("/user/"); })()`, "the signed-in Profile tab", 8000);
-    await click("More", { exact: true });
+    await waitProfileHref((href) => href.includes("/user/"), "the signed-in Profile destination");
+    await openMenu();
     await click("Sign out", { exact: true });
-    await waitText("Discover", 8000);
-    const profileTab = await js(`const el=[...document.querySelectorAll("a")].find((e)=>(e.getAttribute("aria-label")||e.innerText||"").trim()==="Profile"); return el ? el.getAttribute("href") : null;`);
+    await waitFor(`!!document.querySelector(".catalog")`, "the Discover catalog", 8000);
+    const profileTab = await profileHref();
     const auth = new URL(BASE).pathname + "authentification";
-    if (profileTab !== auth) throw new Error(`the Profile tab points at ${profileTab}, not ${auth}`);
-    return `Discover reads signed out; the Profile tab points at ${profileTab}`;
+    if (profileTab !== auth) throw new Error(`the Profile destination points at ${profileTab}, not ${auth}`);
+    return `Discover reads signed out; the Profile destination points at ${profileTab}`;
   }),
 );
 

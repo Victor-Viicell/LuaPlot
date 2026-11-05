@@ -12,8 +12,13 @@ import {
 import {
   IconBack,
   IconBell,
-  IconDiscover,
-  IconMore,
+  IconBookmark,
+  IconCompass,
+  IconDoc,
+  IconFlag,
+  IconMark,
+  IconMenu,
+  IconSpark,
   IconThread,
   IconUser,
 } from "./components/Icons.tsrx";
@@ -31,8 +36,9 @@ import { installKeyboardInset } from "./lib/viewport.ts";
 import type { AccountPreferences, User } from "./lib/data/types.ts";
 
 /**
- * The shell: mobile top bar + bottom tab bar, a rail from `md`, a fixed sidebar from `lg`.
- * Every destination is a real spec route; the outlet loads the page lazily from `router.ts`.
+ * The shell: one top bar, no sidebar and no bottom tab bar. The brand sits on the left, Discover
+ * and the options menu on the right. Every destination is a real spec route; the outlet loads the
+ * page lazily from `router.ts`.
  */
 
 type Status = "loading" | "ready" | "missing" | "error";
@@ -45,20 +51,24 @@ type Destination = {
 };
 
 /**
- * The four destinations. Discover is the home page, so there is no separate Home tab. Profile is
- * the only one that depends on who is signed in: it points at the handle the session reports (T-04),
- * and falls back to `/authentification` when signed out — the one way in now that the landing page
- * is gone.
+ * The options menu. Discover is deliberately absent: it has its own button in the top bar. Profile
+ * is the only entry that depends on who is signed in — it points at the handle the session reports
+ * (T-04), and falls back to `/authentification` when signed out.
  */
-function tabsFor(user: User | null): Destination[] {
+function optionsFor(user: User | null): Destination[] {
   return [
-    { to: "/", label: "Discover", icon: IconDiscover, prefix: "/" },
-    { to: "/post/thread", label: "Thread", icon: IconThread, prefix: "/post" },
     {
       to: "/notifications",
       label: "Alerts",
       icon: IconBell,
       prefix: "/notifications",
+    },
+    { to: "/post/thread", label: "Thread", icon: IconThread, prefix: "/post" },
+    {
+      to: "/bookmarks",
+      label: "Bookmarks",
+      icon: IconBookmark,
+      prefix: "/bookmarks",
     },
     {
       to: user ? `/user/${user.handle}` : "/authentification",
@@ -66,15 +76,21 @@ function tabsFor(user: User | null): Destination[] {
       icon: IconUser,
       prefix: "/user",
     },
+    {
+      to: "/subscription",
+      label: "Subscription",
+      icon: IconSpark,
+      prefix: "/subscription",
+    },
+    {
+      to: "/moderation",
+      label: "Moderation",
+      icon: IconFlag,
+      prefix: "/moderation",
+    },
+    { to: "/terms", label: "Terms of use", icon: IconDoc, prefix: "/terms" },
   ];
 }
-
-const MENU: { to: string; label: string }[] = [
-  { to: "/bookmarks", label: "Bookmarks" },
-  { to: "/subscription", label: "Subscription" },
-  { to: "/moderation", label: "Moderation" },
-  { to: "/terms", label: "Terms of use" },
-];
 
 /** One honest sentence for the dev readout: what the listings would do right now. */
 function prefsLine(user: User | null, prefs: AccountPreferences): string {
@@ -84,8 +100,6 @@ function prefsLine(user: User | null, prefs: AccountPreferences): string {
 }
 
 function isActive(path: string, prefix: string): boolean {
-  // Discover is the home page: `/` and every `/discover/*` surface belong to the same tab.
-  if (prefix === "/") return path === "/" || path.startsWith("/discover");
   return path === prefix || path.startsWith(`${prefix}/`);
 }
 
@@ -106,14 +120,32 @@ export function App() @{
     route.value = next;
   });
 
-  const Page = track<Component | null>(null);
+  /**
+   * The mounted page, paired with the route key that mounts it. The key matters because several
+   * routes share one component (`/discover/characters?q=…`, `/user/<handle>?tab=…`): setting the
+   * same component again would keep the old instance, and pages read the URL **once per mount**.
+   * The `key` on the rendered component turns a same-module navigation into a real remount.
+   */
+  const page = track<{ key: string; View: Component } | null>(null);
   const status = track<Status>("loading");
   /**
-   * A session draws its own chrome (`session/detail.md` → *Layout*): the shell hides its bar, its
-   * tabs and its rail, and the page owns the viewport. One predicate, so the rule is the route and
-   * not a class a page has to remember to add.
+   * The route whose page is **on screen**, which is not always the route in the URL: a navigation
+   * keeps the mounted page until the next module resolves, so the shell never blanks the outlet for
+   * a chunk it does not have yet. The chrome (`immersive`, `wide`) follows this, not the target.
    */
-  const immersive = track(() => /^\/session\//.test(route.value.path));
+  const shown = track<RouteState>(currentRoute());
+  /**
+   * A session draws its own chrome (`session/detail.md` → *Layout*): the shell hides the header and
+   * the page owns the viewport. One predicate, so the rule is the route and not a class a page has
+   * to remember to add.
+   */
+  const immersive = track(() => /^\/session\//.test(shown.value.path));
+  /**
+   * The route's own width choice (`router.ts` → `RouteDef.layout`). `reading` is the A4 column;
+   * `wide` hands the page the whole content area. Only the outlet changes — the shell's chrome is
+   * the same at every width.
+   */
+  const wide = track(() => shown.value.route?.layout === "wide");
 
   const menuOpen = track(false);
   const attempt = track(0);
@@ -132,8 +164,12 @@ export function App() @{
     prefs.value = next;
   });
 
-  /** Profile points at the signed-in handle; every other tab is fixed. */
-  const tabs = track(() => tabsFor(self.value));
+  /** Profile points at the signed-in handle; the rest are fixed. */
+  const options = track(() => optionsFor(self.value));
+  /** Discover owns `/` and every `/discover/*` surface. */
+  const discoverActive = track(
+    () => route.value.path === "/" || route.value.path.startsWith("/discover"),
+  );
 
   /**
    * The inbox badge (`pages/notifications.md` → *Badge*): the store's unread **row** count, mirrored
@@ -184,7 +220,8 @@ export function App() @{
 
     const def = current.route;
     if (!def) {
-      Page.value = null;
+      shown.value = current;
+      page.value = null;
       status.value = "missing";
       document.title = "Not found — LuaPlot";
       return;
@@ -196,12 +233,14 @@ export function App() @{
     def.page().then(
       (module) => {
         if (mine !== seq) return;
-        Page.value = module.default;
+        shown.value = current;
+        page.value = { key, View: module.default };
         status.value = "ready";
       },
       () => {
         if (mine !== seq) return;
-        Page.value = null;
+        shown.value = current;
+        page.value = null;
         status.value = "error";
       },
     );
@@ -213,9 +252,9 @@ export function App() @{
   }
 
   /**
-   * The dev session switch. Labelled as an affordance, in the overflow menu so a reviewer can
-   * flip it in two taps: `signOut()` exists to make the signed-out states pages must render
-   * reachable, and it is not a product control (`docs/NEXT.md` → T-04, T-30 owns the real one).
+   * The dev session switch. Labelled as an affordance, in the options menu so a reviewer can flip
+   * it in two taps: `signOut()` exists to make the signed-out states pages must render reachable,
+   * and it is not a product control (`docs/NEXT.md` → T-04, T-30 owns the real one).
    */
   function toggleSession() {
     if (self.value) signOut();
@@ -223,13 +262,16 @@ export function App() @{
     menuOpen.value = false;
   }
 
+  /** The trigger's accessible name carries the unread count, because the badge is decorative. */
+  function optionsLabel(): string {
+    return unread.value > 0 ? `Menu, ${unread.value} unread` : "Menu";
+  }
+
   <>
     <style>
-      /* A session is a conversation, not a page in a shell: no top bar, no tab bar, no rail. The
-         page draws its own header and composer and owns the whole viewport. */
-      .shell.is-immersive .topbar,
-      .shell.is-immersive .tabbar,
-      .shell.is-immersive .rail {
+      /* A session is a conversation, not a page in a shell: no top bar. The page draws its own
+         header and composer and owns the whole viewport. */
+      .shell.is-immersive .topbar {
         display: none;
       }
 
@@ -260,22 +302,62 @@ export function App() @{
         min-height: 0;
       }
 
-      .rail {
-        display: none;
-      }
-
       .topbar {
         display: flex;
         flex: none;
         align-items: center;
-        gap: 2px;
+        gap: 4px;
         height: calc(56px + env(safe-area-inset-top));
-        padding: env(safe-area-inset-top) 8px 0;
+        padding: env(safe-area-inset-top) 12px 0 8px;
         border-bottom: 1px solid var(--color-border);
         background-color: var(--color-bg);
       }
 
-      .ghost {
+      /* The brand is the way home: the logo is the mark, the name is the wordmark. */
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 44px;
+        min-width: 0;
+        margin-right: auto;
+        padding: 0 4px;
+        border-radius: 2px;
+        color: var(--color-text);
+        text-decoration: none;
+      }
+
+      .brand:hover {
+        color: var(--color-accent-text);
+      }
+
+      .brand .ico {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        /* The logo is a mark: paint the stroke, never `color`, which is the text tier's job. */
+        stroke: var(--color-accent);
+      }
+
+      .brand-name {
+        overflow: hidden;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .bar-actions {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .bar-btn {
+        position: relative;
         display: inline-flex;
         flex: none;
         align-items: center;
@@ -287,48 +369,25 @@ export function App() @{
         border-radius: 2px;
         background: transparent;
         color: var(--color-text-muted);
+        text-decoration: none;
         cursor: pointer;
         transition:
           color 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
           background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
       }
 
-      .ghost:hover {
+      .bar-btn:hover {
         color: var(--color-text);
         background-color: var(--color-surface);
       }
 
-      .ghost:active {
+      .bar-btn:active {
         background-color: var(--color-surface-hover);
       }
 
-      .titles {
-        display: flex;
-        flex: 1;
-        align-items: baseline;
-        gap: 10px;
-        min-width: 0;
-        padding-left: 2px;
-      }
-
-      .bar-title {
-        overflow: hidden;
-        color: var(--color-text);
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: -0.005em;
-        line-height: 1.2;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .crumb {
-        display: none;
-        overflow: hidden;
-        color: var(--color-text-subtle);
-        font-size: 12px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+      /* The icon is a mark; a bar control has no text of its own. */
+      .bar-btn.is-active {
+        color: var(--color-accent-text);
       }
 
       .content {
@@ -337,7 +396,7 @@ export function App() @{
         overflow-x: hidden;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        padding-bottom: calc(60px + env(safe-area-inset-bottom));
+        padding-bottom: env(safe-area-inset-bottom);
       }
 
       /* The reading column is one A4 page wide on a desktop (210mm ≈ 794px at 96dpi, the width a
@@ -348,77 +407,32 @@ export function App() @{
         padding: 20px 16px 32px;
       }
 
-      .tabbar {
-        display: grid;
-        flex: none;
-        grid-template-columns: repeat(5, 1fr);
-        height: calc(60px + env(safe-area-inset-bottom));
-        padding-bottom: env(safe-area-inset-bottom);
-        border-top: 1px solid var(--color-border);
-        background-color: var(--color-bg-elevated);
-      }
-
-      .tab {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        min-height: 44px;
-        color: var(--color-text-subtle);
-        text-decoration: none;
-        transition: color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
-      }
-
-      .tab:hover {
-        color: var(--color-text-muted);
-      }
-
-      /* T-37B: the *label* is text and takes the text tier; the 20×2 tick below stays
-         `--color-accent` — a mark may use the mark. */
-      .tab.is-active {
-        color: var(--color-accent-text);
-      }
-
-      .tab.is-active::before {
-        position: absolute;
-        top: -1px;
-        left: 50%;
-        width: 20px;
-        height: 2px;
-        background-color: var(--color-accent);
-        content: "";
-        transform: translateX(-50%);
-      }
-
-      .tab-label {
-        font-size: 12px;
-        letter-spacing: 0.02em;
-        line-height: 1;
+      /* A browse surface that asks for `layout: "wide"` takes the whole content area. The
+         reading column stays the default for every other route. */
+      .outlet.is-wide {
+        max-width: none;
       }
 
       /*
-        The inbox badge (T-22): unread *rows*, `9+` above nine, nothing at zero. A status chip, so
-        it is the one sanctioned pill in the chrome; accent fill with contrast text, 18px tall, and
-        it sits at the icon's upper-right shoulder because the icon is the thing it annotates.
-        It never animates and never toasts — it changes only when a row is read.
+        The inbox badge: unread *rows*, `9+` above nine, nothing at zero. It floats on the
+        icon it annotates (the menu trigger, or the Alerts row's bell) and is decorative — the
+        control's `aria-label` carries the count. It never animates and never toasts.
       */
       .badge {
         position: absolute;
-        top: 6px;
-        left: 50%;
-        min-width: 18px;
-        height: 18px;
-        margin-left: 8px;
-        padding: 0 5px;
+        top: -5px;
+        right: -6px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border: 2px solid var(--color-bg);
         border-radius: 999px;
         background-color: var(--color-accent);
         color: var(--color-accent-contrast);
-        font-size: 12px;
+        font-size: 10px;
         font-variant-numeric: tabular-nums;
         font-weight: 600;
-        line-height: 18px;
+        line-height: 12px;
         text-align: center;
         pointer-events: none;
       }
@@ -432,10 +446,12 @@ export function App() @{
 
       .menu {
         position: fixed;
-        top: calc(52px + env(safe-area-inset-top));
+        top: calc(56px + env(safe-area-inset-top));
         right: 10px;
         z-index: 9;
-        min-width: 220px;
+        min-width: 240px;
+        max-height: calc(100dvh - 72px - env(safe-area-inset-top));
+        overflow-y: auto;
         padding: 6px;
         border: 1px solid var(--color-border);
         border-radius: 6px;
@@ -447,8 +463,9 @@ export function App() @{
       .menu-item {
         display: flex;
         align-items: center;
+        gap: 10px;
         height: 44px;
-        padding: 0 12px;
+        padding: 0 10px;
         border-radius: 2px;
         color: var(--color-text);
         font-size: 14px;
@@ -457,6 +474,38 @@ export function App() @{
 
       .menu-item:hover {
         background-color: var(--color-surface);
+      }
+
+      /* The active row is a text-tier label plus its icon; no accent backplate. */
+      .menu-item.is-active,
+      .menu-item.is-active .menu-icon {
+        color: var(--color-accent-text);
+      }
+
+      .menu-icon {
+        position: relative;
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        color: var(--color-text-muted);
+      }
+
+      .menu-text {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* Floating on the bell, matching the trigger's badge over the menu button. */
+      .menu-icon .badge {
+        top: -6px;
+        right: -9px;
+        border-color: var(--color-bg-elevated);
       }
 
       .menu-sep {
@@ -591,86 +640,6 @@ export function App() @{
       }
 
       @media (min-width: 900px) {
-        .rail {
-          display: flex;
-          flex: none;
-          flex-direction: column;
-          gap: 20px;
-          width: 84px;
-          padding: 16px 6px calc(16px + env(safe-area-inset-bottom));
-          border-right: 1px solid var(--color-border);
-          background-color: var(--color-bg-elevated);
-        }
-
-        .mark {
-          padding: 6px 0 14px;
-          border-bottom: 1px solid var(--color-border);
-          color: var(--color-text);
-          font-size: 13px;
-          font-weight: 600;
-          letter-spacing: 0.01em;
-          text-align: center;
-          text-decoration: none;
-        }
-
-        .rail-nav {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .rail-item {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 5px;
-          position: relative;
-          padding: 10px 4px;
-          border-radius: 2px;
-          color: var(--color-text-subtle);
-          text-decoration: none;
-          transition:
-            color 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
-            background-color 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        /* T-37C: the rail stopped **filling**. Even the text tier measures 3.81:1 on Latte's
-           `--color-surface` (the mark was 3.51), and a light-filled row cannot carry accent text at
-           4.5 with this palette — so the `md` active state is now the 2px accent bar `lg` already
-           drew, and the label sits on the rail's own `--color-bg-elevated` (4.83:1). DESIGN.md →
-           *Layout law* carries the rule: a rail's indicators are marks, never backplates.
-           Hover is a label change, not a fill: `--color-text-subtle` and `--color-text-muted` are
-           the same value in every flavour (styles.css), so a hover that pointed at the muted tier
-           would now be invisible — it steps to the full text colour (6.55:1 on Latte's rail). */
-        .rail-item:hover {
-          color: var(--color-text);
-        }
-
-        /* T-37B: the label is text (text tier); the ::before bar is a mark and keeps the accent. */
-        .rail-item.is-active {
-          color: var(--color-accent-text);
-        }
-
-        .rail-item.is-active::before {
-          position: absolute;
-          top: 8px;
-          bottom: 8px;
-          left: 0;
-          width: 2px;
-          background-color: var(--color-accent);
-          content: "";
-        }
-
-        .rail-label {
-          font-size: 12px;
-          letter-spacing: 0.01em;
-          line-height: 1;
-        }
-
-        .tabbar {
-          display: none;
-        }
-
         .content {
           padding-bottom: 0;
         }
@@ -678,60 +647,15 @@ export function App() @{
         .outlet {
           padding: 28px 32px 48px;
         }
+
+        .menu {
+          right: 16px;
+        }
       }
 
       @media (min-width: 1200px) {
-        .rail {
-          gap: 24px;
-          width: 240px;
-          padding: 24px 16px;
-        }
-
-        .rail-nav {
-          gap: 2px;
-        }
-
-        .rail-item {
-          position: relative;
-          flex-direction: row;
-          gap: 12px;
-          height: 44px;
-          padding: 0 12px;
-        }
-
-        /* The bar's geometry only: position, left edge and width are the `md` rule's (T-37C), and a
-           44px row carries the 2px mark a little tighter to its own height. */
-        .rail-item.is-active::before {
-          top: 10px;
-          bottom: 10px;
-        }
-
-        .rail-label {
-          font-size: 13px;
-        }
-
-        /* A 240px row has room: the badge leaves the icon's shoulder for the row's own right edge. */
-        .rail-item .badge {
-          top: 50%;
-          right: 12px;
-          left: auto;
-          margin-left: 0;
-          transform: translateY(-50%);
-        }
-
-        .mark {
-          padding: 0 8px 16px;
-          font-size: 15px;
-          text-align: left;
-        }
-
-        .crumb {
-          display: inline;
-        }
-
-        /* The A4 cap is the page's width at every breakpoint (owner's call): the old 1120px here
-           overrode it and every desktop page was laid out 940 wide by accident, which is what made
-           the toolbars and switch rows read as compressed. */
+        /* A4 is the default content width (owner's call); a route may opt into the full
+           content area with `layout: "wide"` (`.outlet.is-wide`). */
         .outlet {
           padding: 32px 40px 56px;
         }
@@ -746,76 +670,85 @@ export function App() @{
     </style>
 
     <div class={immersive.value ? "shell is-immersive" : "shell"}>
-      <aside class="rail">
-        <a class="mark" href={href("/")} onClick={follow("/")}>
-          LuaPlot
-        </a>
-        <nav class="rail-nav" aria-label="Sections">
-          @for (const tab of tabs.value; key tab.label) {
-            <a
-              class={
-                isActive(route.value.path, tab.prefix)
-                  ? "rail-item is-active"
-                  : "rail-item"
-              }
-              href={href(tab.to)}
-              aria-current={
-                isActive(route.value.path, tab.prefix) ? "page" : undefined
-              }
-              aria-label={alertsLabel(tab, unread.value)}
-              onClick={follow(tab.to)}
-            >
-              <{tab.icon} />
-              <span class="rail-label">{tab.label}</span>
-              @if (tab.prefix === "/notifications" && badge.value) {
-                <span class="badge" aria-hidden="true">
-                  {badge.value}
-                </span>
-              }
-            </a>
-          }
-        </nav>
-      </aside>
-
       <div class="frame">
         <header class="topbar">
           <button
-            class="ghost"
+            class="bar-btn"
             type="button"
             aria-label="Back"
             onClick={goBack}
           >
             <IconBack />
           </button>
-          <div class="titles">
-            <span class="bar-title">
-              {route.value.route ? route.value.route.title : "Not found"}
-            </span>
-            <span class="crumb">{route.value.path}</span>
-          </div>
-          <button
-            class="ghost"
-            type="button"
-            aria-label="More"
-            aria-expanded={menuOpen.value ? "true" : "false"}
-            onClick={() => (menuOpen.value = !menuOpen.value)}
+          <a
+            class="brand"
+            href={href("/")}
+            onClick={follow("/")}
+            aria-label="LuaPlot — Discover"
           >
-            <IconMore />
-          </button>
+            <IconMark />
+            <span class="brand-name">LuaPlot</span>
+          </a>
+          <div class="bar-actions">
+            <a
+              class={discoverActive.value ? "bar-btn is-active" : "bar-btn"}
+              href={href("/discover/characters")}
+              onClick={follow("/discover/characters")}
+              aria-label="Discover"
+              aria-current={discoverActive.value ? "page" : undefined}
+            >
+              <IconCompass />
+            </a>
+            <button
+              class="bar-btn"
+              type="button"
+              aria-label={optionsLabel()}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen.value ? "true" : "false"}
+              onClick={() => (menuOpen.value = !menuOpen.value)}
+            >
+              <IconMenu />
+              @if (badge.value) {
+                <span class="badge" aria-hidden="true">
+                  {badge.value}
+                </span>
+              }
+            </button>
+          </div>
         </header>
 
         @if (menuOpen.value) {
           <>
             <div class="scrim" onClick={() => (menuOpen.value = false)}></div>
-            <div class="menu" role="menu">
-              @for (const item of MENU; key item.to) {
+            <div class="menu" role="menu" aria-label="Options">
+              <p class="menu-label">Places</p>
+              @for (const option of options.value; key option.label) {
                 <a
-                  class="menu-item"
+                  class={
+                    isActive(route.value.path, option.prefix)
+                      ? "menu-item is-active"
+                      : "menu-item"
+                  }
                   role="menuitem"
-                  href={href(item.to)}
-                  onClick={follow(item.to)}
+                  href={href(option.to)}
+                  aria-label={alertsLabel(option, unread.value)}
+                  aria-current={
+                    isActive(route.value.path, option.prefix)
+                      ? "page"
+                      : undefined
+                  }
+                  onClick={(event) => {
+                    menuOpen.value = false;
+                    follow(option.to)(event);
+                  }}
                 >
-                  {item.label}
+                  <span class="menu-icon" aria-hidden="true">
+                    <{option.icon} />
+                    @if (option.prefix === "/notifications" && badge.value) {
+                      <span class="badge">{badge.value}</span>
+                    }
+                  </span>
+                  <span class="menu-text">{option.label}</span>
                 </a>
               }
               <div class="menu-sep" role="separator"></div>
@@ -826,13 +759,21 @@ export function App() @{
                 role="menuitem"
                 onClick={toggleSession}
               >
-                {self.value ? "Sign out" : "Sign in as @you"}
+                <span class="menu-icon" aria-hidden="true">
+                  <IconUser />
+                </span>
+                <span class="menu-text">
+                  {self.value ? "Sign out" : "Sign in as @you"}
+                </span>
               </button>
               <p class="menu-note">{prefsLine(self.value, prefs.value)}</p>
               <a
                 class="menu-link"
                 href={href("/dev/state")}
-                onClick={follow("/dev/state")}
+                onClick={(event) => {
+                  menuOpen.value = false;
+                  follow("/dev/state")(event);
+                }}
               >
                 /dev/state
               </a>
@@ -845,15 +786,8 @@ export function App() @{
           ref={scroller}
           aria-busy={status.value === "loading" ? "true" : undefined}
         >
-          <div class="outlet">
+          <div class={wide.value ? "outlet is-wide" : "outlet"}>
             @switch (status.value) {
-              @case "loading": {
-                <div class="skel">
-                  <div class="skel-bar is-title" style={{ width: "46%" }}></div>
-                  <div class="skel-bar" style={{ width: "82%" }}></div>
-                  <div class="skel-bar" style={{ width: "64%" }}></div>
-                </div>
-              }
               @case "missing": {
                 <section class="fallback">
                   <h1>Not found</h1>
@@ -884,37 +818,25 @@ export function App() @{
                 </section>
               }
               @default: {
-                @if (Page.value) {
-                  <{Page.value} />
+                @if (page.value) {
+                  <{page.value.View} key={page.value.key} />
+                } @else {
+                  /* Only the first boot has no page to keep: the shell's own placeholder is the
+                     one surface it can draw before a page module exists. Data loading is the
+                     page's job, and it shapes its skeleton like the answer (law 11). */
+                  <div class="skel">
+                    <div
+                      class="skel-bar is-title"
+                      style={{ width: "46%" }}
+                    ></div>
+                    <div class="skel-bar" style={{ width: "82%" }}></div>
+                    <div class="skel-bar" style={{ width: "64%" }}></div>
+                  </div>
                 }
               }
             }
           </div>
         </main>
-
-        <nav class="tabbar" aria-label="Primary">
-          @for (const tab of tabs.value; key tab.label) {
-            <a
-              class={
-                isActive(route.value.path, tab.prefix) ? "tab is-active" : "tab"
-              }
-              href={href(tab.to)}
-              aria-current={
-                isActive(route.value.path, tab.prefix) ? "page" : undefined
-              }
-              aria-label={alertsLabel(tab, unread.value)}
-              onClick={follow(tab.to)}
-            >
-              <{tab.icon} />
-              <span class="tab-label">{tab.label}</span>
-              @if (tab.prefix === "/notifications" && badge.value) {
-                <span class="badge" aria-hidden="true">
-                  {badge.value}
-                </span>
-              }
-            </a>
-          }
-        </nav>
       </div>
     </div>
 

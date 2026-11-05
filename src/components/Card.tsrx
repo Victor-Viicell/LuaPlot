@@ -3,14 +3,15 @@ import { ratioOf, type AuthoredItem } from "../lib/data/types.ts";
 import { percent } from "../lib/format.ts";
 import { read } from "../lib/reactive.ts";
 import { follow, href } from "../router.ts";
-import { Avatar } from "./Avatar.tsrx";
+import { AvatarButton } from "./AvatarButton.tsrx";
 import { Button } from "./Button.tsrx";
+import { Excerpt } from "./Excerpt.tsrx";
 
 /**
  * Catalogue card — one authored item (character, lorebook or preset), drawn in three parts.
  *
  * Header (title link) and footer (author beside the derived ratio) stay crisp at all times; only
- * the middle — avatar, tagline, tags — is what the NSFW cover blurs. That split is load-bearing:
+ * the middle — image, tagline, tags — is what the NSFW cover blurs. That split is load-bearing:
  * `specs/systems/nsfw.md` says *the numbers are never hidden*.
  *
  * The card takes the **entity** and reads the fields the schema already owns (`name`, `tagline`,
@@ -24,8 +25,11 @@ import { Button } from "./Button.tsrx";
  * so this state cannot be passed in — it would freeze.
  *
  * No comment count and no vote counts on a card: engagement on a listing is the ratio, and counts
- * live on the detail page (`luaplot-pages.md`). The tags row is absent, not empty, while the
- * taxonomy is undecided.
+ * live on the detail page (`luaplot-pages.md`). The tags row is absent, not empty, when a row has
+ * no tags — every kind that reaches a discover listing carries them in the fixture set.
+ *
+ * The image and the tagline are also doors: the image opens its viewer (zoom/pan), and a clipped
+ * tagline opens in full — a listing row keeps one height whether the copy is one line or ten.
  */
 export function Card({
   item,
@@ -112,7 +116,10 @@ export function Card({
     const chip = event.currentTarget as HTMLElement;
     const box = chip.getBoundingClientRect();
     const width = 200;
-    menuX.value = Math.max(8, Math.min(box.left, window.innerWidth - width - 8));
+    menuX.value = Math.max(
+      8,
+      Math.min(box.left, window.innerWidth - width - 8),
+    );
     menuY.value = box.bottom + 6;
     menuOpen.value = true;
     document.addEventListener("keydown", onKeyDown);
@@ -130,60 +137,66 @@ export function Card({
     }}
   >
     <div class="card-head">
-      <a class="card-title" href={href(path)} onClick={onOpen}>{item.name}</a>
+      <a class="card-title" href={href(path)} onClick={onOpen}>
+        {item.name}
+      </a>
     </div>
 
     <div class="card-middle">
       <div class="card-veil" aria-hidden={covered.value ? "true" : "false"}>
         <div class="card-top">
-          <Avatar initials={item.avatar.initials} size="fluid" />
+          <AvatarButton initials={item.avatar.initials} label={item.name} />
           <div class="card-body">
             @if (item.tagline) {
-              <p class="card-tagline">{item.tagline}</p>
+              <Excerpt
+                class="card-tagline"
+                text={item.tagline}
+                title={item.name}
+              />
             }
           </div>
         </div>
         <div class="card-body">
           @if (item.tags.length > 0) {
             <>
-            <ul
-              class="card-tags"
-              ref={(element) => {
-                row = element;
-                queueMicrotask(measure);
-              }}
-            >
-              @for (const tag of item.tags.slice(0, fits.value); key tag) {
-                <li class="card-tag">{tag}</li>
-              }
-              @if (hidden.value.length > 0) {
-                <li>
-                  <button
-                    class="card-tag is-more"
-                    type="button"
-                    aria-haspopup="menu"
-                    aria-expanded={menuOpen.value ? "true" : "false"}
-                    aria-label={`${hidden.value.length} more tags`}
-                    onClick={openMenu}
-                  >
-                    {`+${hidden.value.length}`}
-                  </button>
-                </li>
-              }
-            </ul>
+              <ul
+                class="card-tags"
+                ref={(element) => {
+                  row = element;
+                  queueMicrotask(measure);
+                }}
+              >
+                @for (const tag of item.tags.slice(0, fits.value); key tag) {
+                  <li class="card-tag">{tag}</li>
+                }
+                @if (hidden.value.length > 0) {
+                  <li>
+                    <button
+                      class="card-tag is-more"
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={menuOpen.value ? "true" : "false"}
+                      aria-label={`${hidden.value.length} more tags`}
+                      onClick={openMenu}
+                    >
+                      {`+${hidden.value.length}`}
+                    </button>
+                  </li>
+                }
+              </ul>
 
-            <ul
-              class="card-tags is-measure"
-              aria-hidden="true"
-              ref={(element) => {
-                mirror = element;
-                queueMicrotask(measure);
-              }}
-            >
-              @for (const tag of item.tags; key tag) {
-                <li class="card-tag">{tag}</li>
-              }
-            </ul>
+              <ul
+                class="card-tags is-measure"
+                aria-hidden="true"
+                ref={(element) => {
+                  mirror = element;
+                  queueMicrotask(measure);
+                }}
+              >
+                @for (const tag of item.tags; key tag) {
+                  <li class="card-tag">{tag}</li>
+                }
+              </ul>
             </>
           }
         </div>
@@ -191,31 +204,37 @@ export function Card({
 
       @if (covered.value) {
         <div class="card-cover">
-          <Button variant="ghost" onClick={() => (revealed.value = true)}>Reveal</Button>
+          <Button variant="ghost" onClick={() => (revealed.value = true)}>
+            Reveal
+          </Button>
         </div>
       }
     </div>
 
     @if (menuOpen.value) {
       <>
-      <div class="card-menu-scrim" onClick={closeMenu}></div>
-      <div
-        class="card-menu"
-        role="menu"
-        aria-label="All tags"
-        style={{ top: `${menuY.value}px`, left: `${menuX.value}px` }}
-      >
-        <ul class="card-menu-tags">
-          @for (const tag of hidden.value; key tag) {
-            <li class="card-tag">{tag}</li>
-          }
-        </ul>
-      </div>
+        <div class="card-menu-scrim" onClick={closeMenu}></div>
+        <div
+          class="card-menu"
+          role="menu"
+          aria-label="All tags"
+          style={{ top: `${menuY.value}px`, left: `${menuX.value}px` }}
+        >
+          <ul class="card-menu-tags">
+            @for (const tag of hidden.value; key tag) {
+              <li class="card-tag">{tag}</li>
+            }
+          </ul>
+        </div>
       </>
     }
 
     <div class="card-foot">
-      <a class="card-author" href={href(`/user/${item.author}`)} onClick={follow(`/user/${item.author}`)}>{`@${item.author}`}</a>
+      <a
+        class="card-author"
+        href={href(`/user/${item.author}`)}
+        onClick={follow(`/user/${item.author}`)}
+      >{`@${item.author}`}</a>
       <span class="card-ratio">{percent(ratioOf(item))}</span>
     </div>
   </article>

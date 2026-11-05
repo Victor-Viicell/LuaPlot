@@ -1,11 +1,16 @@
-import type { Derived } from "ripple";
+import type { Component, Derived } from "ripple";
 import { read } from "../lib/reactive.ts";
 
 /**
- * Tabs: the underline strip for profile and bookmark tabs.
+ * Tabs: the underline strip for profile, bookmarks and subscription tabs.
  * It renders and calls back; it never writes the query string — the page owns
  * that (spec: tab state lives in the query string, so the page decides how it
  * is written and restored).
+ *
+ * **Every tab carries an icon.** On a phone the strip is compact — each tab is its icon, and only
+ * the selected one opens to reveal its label (and it closes again when the choice moves) — so four
+ * sections fit a 360px header without a sideways scroll. From `sm` up every label stays visible and
+ * the strip is left-aligned.
  *
  * **Counts are the adapter's** (`/bookmarks` → *Layout*: *each carrying its saved count*). They are
  * handed in live — a saved row being removed has to move the number without remounting the strip —
@@ -14,7 +19,7 @@ import { read } from "../lib/reactive.ts";
  * preference, which is what makes a tab read `3` while the grid draws `1`.
  */
 
-export type TabItem = { value: string; label: string };
+export type TabItem = { value: string; label: string; icon: Component };
 
 export function Tabs({
   items,
@@ -41,7 +46,12 @@ export function Tabs({
           aria-selected={read(value) === item.value ? "true" : "false"}
           onClick={() => onChange(item.value)}
         >
-          {item.label}
+          <span class="tab-icon" aria-hidden="true">
+            <{item.icon} />
+          </span>
+          <span class="tab-label">
+            <span class="tab-label-text">{item.label}</span>
+          </span>
           @if (counts !== undefined) {
             <span class="tab-count">{read(counts)[item.value] ?? 0}</span>
           }
