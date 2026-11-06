@@ -1,5 +1,11 @@
 # LuaPlot — Design & Implementation Guide
 
+> **How this repo is run (owner's call, 2026-11-05).** Development is directed by the owner; nothing is
+> built autonomously. **This file is the design source of truth**, and the only one — the old
+> `src/specs/` tree and `docs/` were deleted in the Discover restructure and are **not** to be restored.
+> Where an older comment in the code cites `src/specs/…`, read it as history, not as a document that
+> exists. The gate's route section was retired with the tree (`scripts/check.sh` says so by name).
+
 This is the canonical guide for **every component and page** in this repository. Read it before
 creating or changing a `.tsrx` file, and keep it current when you establish a new precedent.
 

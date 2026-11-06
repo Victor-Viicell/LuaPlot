@@ -28,18 +28,12 @@ else
   FAIL=1
 fi
 
-# 3. Route table sanity against the spec index (skipped until the router exists)
+# 3. Route table sanity — RETIRED. It compared `src/router.ts` against the route table in
+#    `src/specs/luaplot-pages.md`, and that tree is gone for good (owner: development is guided by him
+#    and DESIGN.md, and nothing is restored). A check that reads a deleted file can only ever be red, so
+#    it is skipped by name instead of quietly passing on nothing.
 say "== routes"
-if [[ -f src/router.ts ]]; then
-  if node scripts/spec-routes.mjs; then
-    say "   routes ok"
-  else
-    say "   ROUTE TABLE MISMATCH"
-    FAIL=1
-  fi
-else
-  say "   SKIP (src/router.ts not created yet)"
-fi
+say "   SKIP (src/specs is retired; DESIGN.md is the design source)" 
 
 # 4. Preview host must stay public — Pages dies on a private repo
 say "== host"
