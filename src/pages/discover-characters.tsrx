@@ -243,6 +243,12 @@ export function CharacterCatalog() @{
     fetchPage(1, "replace");
   }
 
+  /** A tag on a card is another way into the filter; a tag already chosen is a no-op. */
+  function filterByTag(tag: string): void {
+    if (tags.value.includes(tag)) return;
+    chooseTags([...tags.value, tag]);
+  }
+
   function loadMore(): void {
     if (appending.value || !hasMore.value) return;
     fetchPage(nextPage.value, "append");
@@ -535,6 +541,7 @@ export function CharacterCatalog() @{
             revealEpoch={epoch}
             label="Characters"
             onOpen={openItem}
+            onTagClick={filterByTag}
           />
 
           <div class="pager">

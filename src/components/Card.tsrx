@@ -36,6 +36,7 @@ export function Card({
   nsfw = false,
   blur = false,
   onOpen,
+  onTagClick,
 }: {
   item: AuthoredItem;
   /** The item's own NSFW flag. */
@@ -48,6 +49,11 @@ export function Card({
    */
   blur?: boolean | Derived<boolean>;
   onOpen?: (event: MouseEvent) => void;
+  /**
+   * A tag is a door into the listing's filter when the host offers one. The card reports the tag and
+   * closes its `+N` menu; it never edits the query itself.
+   */
+  onTagClick?: (tag: string) => void;
 }) @{
   const revealed = track(false);
   const covered = track(() => read(nsfw) && read(blur) && !revealed.value);
@@ -72,6 +78,12 @@ export function Card({
   let mirror: HTMLUListElement | undefined;
   let row: HTMLUListElement | undefined;
   let observer: ResizeObserver | undefined;
+
+  /** Pick a tag from the card (or its `+N` menu) and hand it to the listing. */
+  function pickTag(tag: string): void {
+    closeMenu();
+    onTagClick?.(tag);
+  }
 
   /** Escape closes the list; the scrim closes it on an outside tap. */
   function onKeyDown(event: KeyboardEvent): void {
@@ -167,7 +179,19 @@ export function Card({
                 }}
               >
                 @for (const tag of item.tags.slice(0, fits.value); key tag) {
-                  <li class="card-tag">{tag}</li>
+                  <li class="card-tag">
+                    @if (onTagClick) {
+                      <button
+                        class="card-tag-action"
+                        type="button"
+                        onClick={() => pickTag(tag)}
+                      >
+                        {tag}
+                      </button>
+                    } @else {
+                      <span>{tag}</span>
+                    }
+                  </li>
                 }
                 @if (hidden.value.length > 0) {
                   <li>
@@ -222,7 +246,19 @@ export function Card({
         >
           <ul class="card-menu-tags">
             @for (const tag of hidden.value; key tag) {
-              <li class="card-tag">{tag}</li>
+              <li class="card-tag">
+                @if (onTagClick) {
+                  <button
+                    class="card-tag-action"
+                    type="button"
+                    onClick={() => pickTag(tag)}
+                  >
+                    {tag}
+                  </button>
+                } @else {
+                  <span>{tag}</span>
+                }
+              </li>
             }
           </ul>
         </div>

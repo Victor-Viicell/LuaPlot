@@ -52,7 +52,9 @@ export function TagPicker({
   const available = (): string[] => {
     const needle = text.value.trim().toLowerCase();
     return read(options).filter(
-      (tag) => !chosen().includes(tag) && (needle === "" || tag.toLowerCase().includes(needle)),
+      (tag) =>
+        !chosen().includes(tag) &&
+        (needle === "" || tag.toLowerCase().includes(needle)),
     );
   };
 
@@ -61,11 +63,38 @@ export function TagPicker({
     onChange([...chosen(), tag]);
     text.value = "";
     active.value = -1;
-    open.value = true;
+    openMenu();
   }
 
   function remove(tag: string): void {
     onChange(chosen().filter((entry) => entry !== tag));
+  }
+
+  /**
+   * The menu is a popup, so it listens to the document while it is open: a press or a focus that
+   * lands outside the field closes it at once. A blur alone is not enough — the reader can tab or
+   * click straight into another control, and waiting on `document.activeElement` left the list
+   * hanging open beside it.
+   */
+  function onOutside(event: Event): void {
+    if (!root || !root.contains(event.target as Node)) closeMenu();
+  }
+
+  function openMenu(): void {
+    open.value = true;
+    document.addEventListener("pointerdown", onOutside, true);
+    document.addEventListener("focusin", onOutside, true);
+  }
+
+  function closeMenu(): void {
+    open.value = false;
+    active.value = -1;
+    document.removeEventListener("pointerdown", onOutside, true);
+    document.removeEventListener("focusin", onOutside, true);
+    if (blurTimer) {
+      clearTimeout(blurTimer);
+      blurTimer = undefined;
+    }
   }
 
   function onKeyDown(event: KeyboardEvent): void {
@@ -74,7 +103,7 @@ export function TagPicker({
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (!open.value) {
-        open.value = true;
+        openMenu();
         return;
       }
       if (list.length === 0) return;
@@ -92,8 +121,7 @@ export function TagPicker({
     }
 
     if (event.key === "Escape") {
-      open.value = false;
-      active.value = -1;
+      closeMenu();
       return;
     }
 
@@ -108,21 +136,27 @@ export function TagPicker({
     event.preventDefault();
   }
 
+  /** Blur is the fallback for focus that leaves the page without a `focusin` (e.g. the window). */
   function closeIfOutside(): void {
     if (blurTimer) clearTimeout(blurTimer);
     blurTimer = setTimeout(() => {
-      if (!root || !root.contains(document.activeElement)) open.value = false;
+      if (!root || !root.contains(document.activeElement)) closeMenu();
     }, 120);
   }
 
-  <div class="tagpicker" ref={(element) => {
+  <div
+    class="tagpicker"
+    ref={(element) => {
       root = element;
-    }}>
-    <label class="tagpicker-label" for={id}>{label}</label>
+    }}
+  >
+    <label class="tagpicker-label" for={id}>
+      {label}
+    </label>
 
     <div
       class={open.value ? "tagpicker-field is-open" : "tagpicker-field"}
-      onClick={() => (open.value = true)}
+      onClick={() => openMenu()}
     >
       @for (const tag of read(selected); key tag) {
         <span class="tag-chip">
@@ -147,15 +181,17 @@ export function TagPicker({
         aria-autocomplete="list"
         aria-expanded={open.value ? "true" : "false"}
         aria-controls={menuId}
-        aria-activedescendant={active.value >= 0 ? `${menuId}-${active.value}` : undefined}
+        aria-activedescendant={
+          active.value >= 0 ? `${menuId}-${active.value}` : undefined
+        }
         value={text.value}
         placeholder={read(selected).length === 0 ? placeholder : ""}
         onInput={(event) => {
           text.value = event.currentTarget.value;
           active.value = -1;
-          open.value = true;
+          openMenu();
         }}
-        onFocus={() => (open.value = true)}
+        onFocus={() => openMenu()}
         onBlur={closeIfOutside}
         onKeyDown={onKeyDown}
       />
@@ -163,11 +199,23 @@ export function TagPicker({
 
     @if (open.value) {
       @if (available().length > 0) {
-        <ul class="tagpicker-menu" id={menuId} role="listbox" aria-label={label}>
-          @for (const entry of available().map((tag, index) => ({ tag, index })); key entry.tag) {
+        <ul
+          class="tagpicker-menu"
+          id={menuId}
+          role="listbox"
+          aria-label={label}
+        >
+          @for (
+            const entry of available().map((tag, index) => ({ tag, index }));
+            key entry.tag
+          ) {
             <li
               id={`${menuId}-${entry.index}`}
-              class={entry.index === active.value ? "tagpicker-option is-active" : "tagpicker-option"}
+              class={
+                entry.index === active.value
+                  ? "tagpicker-option is-active"
+                  : "tagpicker-option"
+              }
               role="option"
               aria-selected={entry.index === active.value ? "true" : "false"}
               onMouseDown={keepFocus}
@@ -179,7 +227,9 @@ export function TagPicker({
         </ul>
       } @else {
         <p class="tagpicker-empty">
-          {text.value.trim() ? `No tag matches “${text.value.trim()}”.` : "No other tags yet."}
+          {text.value.trim()
+            ? `No tag matches “${text.value.trim()}”.`
+            : "No other tags yet."}
         </p>
       }
     }

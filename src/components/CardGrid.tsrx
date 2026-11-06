@@ -32,6 +32,7 @@ export function CardGrid({
   blurNsfw = false,
   revealEpoch = 0,
   onOpen,
+  onTagClick,
   label,
   children,
 }: {
@@ -47,6 +48,8 @@ export function CardGrid({
    */
   revealEpoch?: Derived<number> | number;
   onOpen?: (event: MouseEvent, item: AuthoredItem) => void;
+  /** A listing that filters by tag hands this down so a card's tags can feed the filter. */
+  onTagClick?: (tag: string) => void;
   /** Accessible name for the list, e.g. `Characters`. */
   label?: string;
   /** The listing's empty state, rendered inside the grid when there is nothing to draw. */
@@ -71,6 +74,7 @@ export function CardGrid({
             nsfw={cell.item.nsfw}
             blur={blurNsfw}
             onOpen={onOpen ? (event) => onOpen(event, cell.item) : undefined}
+            onTagClick={onTagClick}
           />
         </li>
       }

@@ -237,6 +237,12 @@ export function LorebookCatalog() @{
     fetchPage(1, "replace");
   }
 
+  /** A tag on a card is another way into the filter; a tag already chosen is a no-op. */
+  function filterByTag(tag: string): void {
+    if (tags.value.includes(tag)) return;
+    chooseTags([...tags.value, tag]);
+  }
+
   function loadMore(): void {
     if (appending.value || !hasMore.value) return;
     fetchPage(nextPage.value, "append");
@@ -460,7 +466,7 @@ export function LorebookCatalog() @{
             type="search"
             name="q"
             value={draft}
-            placeholder="Name, description"
+            placeholder="Name, tagline, description"
             onInput={onSearchInput}
           />
         </div>
@@ -529,6 +535,7 @@ export function LorebookCatalog() @{
             revealEpoch={epoch}
             label="Lorebooks"
             onOpen={openItem}
+            onTagClick={filterByTag}
           />
 
           <div class="pager">
