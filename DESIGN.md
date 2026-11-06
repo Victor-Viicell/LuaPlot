@@ -178,7 +178,7 @@ Rules:
 | --- | --- | --- |
 | `Button` | All actions. `primary` once per screen, `secondary` default, `ghost` in rows, `danger` destructive only. | Substitute an `<a>` for an action, or add a second focus ring. |
 | `Field` | Labelled text input / textarea, help and error lines. | Float the label, or keep a local copy of the value. |
-| `Select` | A named choice from a growing list. | Use a segmented row that cannot grow. |
+| `Select` | A named choice from a growing list, opened as a **floating list of our own** — 44px trigger with `data-value` and the chosen label, then a fixed, viewport-clamped panel (flipped above when there is no room) that cannot be clipped by a card or the scrolling outlet. Keyboard: Up/Down/Home/End, Enter/Space, Escape, Tab. Outside press closes through the scrim. | Use a segmented row that cannot grow, or a native `<select>` — the OS popup ignores every token we have and looks nothing like the card menu beside it. |
 | `Toggle` | A two-state row (`aria-pressed`). | Use `role="switch"`; the press state is the contract. |
 | `Tabs` | Underline tab strip with an icon per tab and optional counts. On phones only the selected label opens; from `sm` up all labels show. | Let it write the query; the page owns `?tab=`. |
 | `TagPicker` | Multi-select tag filter with chips. | Invent a taxonomy; options come from the adapter. |
@@ -498,6 +498,26 @@ by the compiler. Use `:global(...)` only to react to something you do not own (a
   a reason and an outcome; an audit trail is flat, not a thread.
 
 ---
+
+## The dropdown is the app's, not the OS's
+
+`Select` was a native `<select>` until now, and on Android that opens a full-screen wheel while on a
+desktop it opens a grey popup sharing no token with the rest of the product — next to a card menu that
+is already ours. It is a real dropdown now:
+
+- **Trigger**: `<button role="combobox">`, 44px, the chosen label, the caret, `aria-expanded`,
+  `aria-activedescendant` while open, and **`data-value`** so a walk or a test reads the state without
+  opening anything.
+- **Panel**: `position: fixed`, one 44px row per option, width = the trigger's width, clamped into the
+  viewport and **flipped above** when the space beneath is short; scrolls past ~8 options.
+- **z-ladder**: scrim 19, panel 21 — above the card's `+N` menu (20), below a sheet (40). The scrim is
+  an outside-press catcher, not a dimmer: a dropdown is not a dialog.
+- **The keyboard is the reason to keep a native control, so it is the reason this one had to be built
+  properly**: Up/Down move the active row, Home/End jump, Enter/Space choose, Escape closes and returns
+  focus, Tab closes and moves on.
+- **The `value` prop must be the track, not `.value`** — every caller was passing a mount-time
+  snapshot, which is why the first build changed the listing but not the label. The frozen-prop trap,
+  in one sentence.
 
 ## 12. Verification gates
 

@@ -187,7 +187,7 @@ export function PersonaCollection() @{
           />
         </div>
         <div class="sort">
-          <Select label="Sort" name="sort" value={sort.value} options={SORT_OPTIONS} onChange={chooseSort} />
+          <Select label="Sort" name="sort" value={sort} options={SORT_OPTIONS} onChange={chooseSort} />
         </div>
         <div class="create">
           <a class="btn btn-primary" href={href("/persona/create")} onClick={follow("/persona/create")}>Create</a>

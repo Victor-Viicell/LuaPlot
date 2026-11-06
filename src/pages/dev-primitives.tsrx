@@ -320,7 +320,7 @@ export function DevPrimitives() @{
         <h1 class="g-title">Primitives</h1>
         <p class="g-note">
           Every primitive and every variant, on one stage. The theme switch
-          writes <code>data-theme</code> on the document; the stage width is the
+          writes{" "}<code>data-theme</code>{" "}on the document; the stage width is the
           layout width, while the sheet's dialog form follows the real viewport
           (900 up).
         </p>
@@ -466,8 +466,8 @@ export function DevPrimitives() @{
             <p class="g-sec-note">
               The second card is the fixture flagged NSFW, covered pre-reveal:
               the avatar and tagline blur behind the scrim while the title,
-              author and <code>ratio</code> stay at full contrast. Press{" "}
-              <strong>Reveal</strong> on it — that is the third state, and the
+              author and{" "}<code>ratio</code>{" "}stay at full contrast. Press{" "}
+              <strong>Reveal</strong>{" "}on it — that is the third state, and the
               same component one click later, because reveal state is created
               inside the card and lasts exactly this mount. The third and fourth
               cards hold the longest title and the longest tagline in the set:

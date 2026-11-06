@@ -485,7 +485,7 @@ export function CharacterCatalog() @{
           <Select
             label="Sort"
             name="sort"
-            value={sort.value}
+            value={sort}
             options={SORT_OPTIONS}
             onChange={chooseSort}
           />

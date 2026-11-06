@@ -355,15 +355,41 @@ async function retype(selector, value, nth = 0) {
  * ignored the choice fails here rather than on the page it was supposed to change.
  */
 async function choose(selector, value) {
-  const read = await js(`
-    const el = document.querySelector(${JSON.stringify(selector)});
-    if (!el) return null;
-    if (el.value !== ${JSON.stringify(value)}) {
-      el.value = ${JSON.stringify(value)};
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    return el.value;
-  `);
+  // Selects are a custom dropdown now (T-88): press the trigger, then the option. A native <select>
+  // that still exists anywhere keeps the old value+change path.
+  // `js()` wraps its template in a *non-async* arrow, so an async IIFE inside it returns undefined.
+  // This helper needs to click and wait, so it goes through `page()` directly.
+  const read = await page(`
+    (async () => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) return null;
+      if (el.tagName === "SELECT") {
+        if (el.value !== ${JSON.stringify(value)}) {
+          el.value = ${JSON.stringify(value)};
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        return el.value;
+      }
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      if (el.dataset.value !== ${JSON.stringify(value)}) {
+        el.click();
+        await sleep(90);
+        const option = document.querySelector(${JSON.stringify(".select-menu [data-value=" + JSON.stringify(value) + "]")});
+        if (!option) return "no-option";
+        option.click();
+        await sleep(120);
+      }
+      const deadline = Date.now() + 1200;
+      let now = "";
+      while (Date.now() < deadline) {
+        const again = document.querySelector(${JSON.stringify(selector)});
+        now = again ? again.dataset.value : "";
+        if (now === ${JSON.stringify(value)}) break;
+        await sleep(60);
+      }
+      return now === "" ? "gone" : now;
+    })()
+  `) ;
   if (read === null) throw new Error(`no ${selector} on ${await url()}`);
   if (read !== value) throw new Error(`${selector} reads ${JSON.stringify(read)} after choosing ${JSON.stringify(value)}`);
   await sleep(80);
@@ -1308,8 +1334,8 @@ results.push(
       6000,
     );
     // The preload nobody had read: the stored model, before anything is touched.
-    const before = await choose("select.select-input", "deepseek-chat");
-    await choose("select.select-input", "deepseek-reasoner");
+    const before = await choose(".select-input", "deepseek-chat");
+    await choose(".select-input", "deepseek-reasoner");
 
     await click("Save changes", { exact: true });
     await waitFor(`/\\/preset\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the preset's own page after saving", 8000);
@@ -3891,13 +3917,13 @@ results.push(
     /** One reading of all three: the address, the control, and the listing. */
     const state = () =>
       js(`
-        const el = document.querySelector("select.select-input");
+        const el = document.querySelector(".select-input");
         const cards = [...document.querySelectorAll(".card.post")];
         const note = document.querySelector(".pager-note");
         return {
           path: location.pathname,
           search: location.search,
-          value: el ? el.value : null,
+          value: el ? (el.dataset.value || el.value || "") : null,
           cards: cards.length,
           skeletons: document.querySelectorAll(".skel-card").length,
           marks: cards.filter((card) => card.__walkMark !== undefined).length,
@@ -3983,14 +4009,14 @@ results.push(
       throw new Error(`no post card could be stamped before the sort change (${describe(await state())})`);
     }
 
-    await choose("select.select-input", "discussed"); // T-41: a native select needs a real `change`
+    await choose(".select-input", "discussed"); // T-41: a native select needs a real `change`
     const discussed = await expectSort("?sort=discussed", "discussed", "choosing Most discussed");
     await expectRerender(newest, "choosing Most discussed");
 
     // 3. A second choice, so the Back below has a real entry to return to.
     const beforeLiked = await state();
     await stamp();
-    await choose("select.select-input", "liked");
+    await choose(".select-input", "liked");
     const liked = await expectSort("?sort=liked", "liked", "choosing Most liked");
     await expectRerender(beforeLiked, "choosing Most liked");
 
@@ -6541,7 +6567,7 @@ results.push(
         const params = new URLSearchParams(location.search);
         const text = (el) => (el ? (el.textContent || "").replace(/\\s+/g, " ").trim() : "");
         const cards = [...document.querySelectorAll(".card-cell .card")];
-        const select = document.querySelector('select[name="sort"]');
+        const select = document.querySelector('.select-input[data-name="sort"]');
         return {
           search: location.search,
           q: params.get("q"),
@@ -6558,8 +6584,8 @@ results.push(
           ),
           chips: [...document.querySelectorAll(".tagpicker .tag-chip-text")].map((el) => text(el)),
           field: (document.querySelector('input[name="q"]') || {}).value || "",
-          sortValue: select ? select.value : "",
-          sortLabel: select && select.selectedOptions[0] ? text(select.selectedOptions[0]) : "",
+          sortValue: select ? (select.dataset.value || select.value || "") : "",
+          sortLabel: select ? text(select.querySelector(".select-value") || select.selectedOptions?.[0] || select) : "",
           busy: document.querySelector(".catalog [aria-busy='true']") !== null,
           empty: text(document.querySelector(".empty-copy")),
           actions: [...document.querySelectorAll(".catalog button, .catalog a.btn")].map((el) => text(el)),
@@ -6891,7 +6917,7 @@ results.push(
       );
     }
 
-    await choose('select[name="sort"]', "ratio");
+    await choose('.select-input[data-name="sort"]', "ratio");
     const rated = await untilCatalog(
       "the ratio sort to reach the URL and reorder the grid",
       (s) => s.sortParam === "ratio" && !s.busy && s.count > 0 && descending(s.ratios),
@@ -6900,7 +6926,7 @@ results.push(
       throw new Error(`?sort=ratio leaves the control reading ${JSON.stringify(rated.sortLabel)}, not Top rated — the select is the state's, not its own`);
     }
 
-    await choose('select[name="sort"]', "newest");
+    await choose('.select-input[data-name="sort"]', "newest");
     const backToNewest = await untilCatalog(
       "Newest to drop the param and restore the order",
       (s) => s.sortParam === null && !s.busy && sameTitles(s.titles, newest.titles),
@@ -7170,7 +7196,7 @@ results.push(
         const tabs = [...document.querySelectorAll(${JSON.stringify(TAB_SCOPE)})];
         const cells = [...document.querySelectorAll(".card-cell")];
         const field = document.querySelector('input[name="q"]');
-        const select = document.querySelector('select[name="sort"]');
+        const select = document.querySelector('.select-input[data-name="sort"]');
         const grid = document.querySelector(".card-grid");
         const active = document.activeElement;
         return {
@@ -7192,8 +7218,8 @@ results.push(
           field: field ? field.value : "",
           focused: !!field && active === field,
           active: active ? active.tagName + "." + (active.className || "") : "none",
-          sortValue: select ? select.value : "",
-          sortLabel: select && select.selectedOptions[0] ? text(select.selectedOptions[0]) : "",
+          sortValue: select ? (select.dataset.value || select.value || "") : "",
+          sortLabel: select ? text(select.querySelector(".select-value") || select.selectedOptions?.[0] || select) : "",
           empty: text(document.querySelector(".empty-copy")),
         };
       `);
@@ -7284,7 +7310,7 @@ results.push(
     }
 
     // 4. The sort is a `push` and Title A–Z orders by title. It never changes how many rows match.
-    await choose('select[name="sort"]', "name");
+    await choose('.select-input[data-name="sort"]', "name");
     const byName = await until(
       "the Title A–Z sort to reach the URL and reorder the list",
       (s) => s.sort === "name" && settled(s) && s.count === mounted.count,
@@ -7343,7 +7369,7 @@ results.push(
     //    **searched** view with the field holding the word — the page reads `?q=` at mount.
     await retype('input[name="q"]', word);
     const again = await until(`the second settle to commit q=${JSON.stringify(word)}`, (s) => s.q === word && settled(s) && s.count === narrowed.count);
-    await choose('select[name="sort"]', "name");
+    await choose('.select-input[data-name="sort"]', "name");
     const sortedUnderSearch = await until(
       "the sort to reach the URL without dropping the search",
       (s) => s.sort === "name" && s.q === word && settled(s) && s.count === again.count,
@@ -7383,7 +7409,7 @@ results.push(
         const bs = bar ? getComputedStyle(bar) : null;
         const isGrid = !!bs && bs.display.indexOf("grid") >= 0;
         const metaEl = document.querySelector(".toolbar > .meta");
-        const select = document.querySelector('select[name="sort"]');
+        const select = document.querySelector('.select-input[data-name="sort"]');
         const pagerBox = document.querySelector(".pager > div");
         return {
           path: location.pathname,
@@ -7399,7 +7425,7 @@ results.push(
           meta: box(metaEl),
           metaAlign: metaEl ? getComputedStyle(metaEl).alignSelf : "",
           saved: metaEl ? String(metaEl.textContent || "").trim() : "",
-          sortValue: select ? select.value : "",
+          sortValue: select ? (select.dataset.value || select.value || "") : "",
           pagerMinWidth: pagerBox ? getComputedStyle(pagerBox).minWidth : "",
         };
       `);
@@ -7539,7 +7565,7 @@ results.push(
         const cards = [...document.querySelectorAll(".card-cell .card")];
         const personas = [...document.querySelectorAll(".persona-card")];
         const field = document.querySelector('input[name="q"]');
-        const select = document.querySelector('select[name="sort"]');
+        const select = document.querySelector('.select-input[data-name="sort"]');
         const grid = document.querySelector(".card-grid[aria-label]");
         const active = document.activeElement;
         return {
@@ -7558,8 +7584,8 @@ results.push(
           field: field ? field.value : "",
           focused: !!field && active === field,
           active: active ? active.tagName + "." + (active.className || "") : "none",
-          sortValue: select ? select.value : "",
-          sortLabel: select && select.selectedOptions[0] ? text(select.selectedOptions[0]) : "",
+          sortValue: select ? (select.dataset.value || select.value || "") : "",
+          sortLabel: select ? text(select.querySelector(".select-value") || select.selectedOptions?.[0] || select) : "",
           skeletons: document.querySelectorAll(".skel-card").length,
           noResults: text(document.querySelector(".no-results")),
           empty: text(document.querySelector(".empty-copy")),
@@ -7753,7 +7779,7 @@ results.push(
     //    `oldest` / `name` for the personas), and the control's **label** is the state's, not its own.
     const sortPass = async (page, value, label) => {
       await freshPage(page);
-      await choose('select[name="sort"]', value);
+      await choose('.select-input[data-name="sort"]', value);
       const sorted = await until(page.path, `?sort=${value} to reach the URL`, (s) => s.sort === value && s.skeletons === 0);
       if (sorted.sortLabel !== label) {
         throw new Error(`${page.path}: ?sort=${value} leaves the control reading ${JSON.stringify(sorted.sortLabel)}, not ${JSON.stringify(label)} — the select prints the state, it does not own it`);

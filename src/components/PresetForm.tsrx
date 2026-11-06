@@ -156,7 +156,7 @@ export function PresetForm({
 
     <section class="section is-settings">
       <p class="section-label">Generation settings</p>
-      <Select label="Model" name="model" value={model.value} options={modelOptions} onChange={(next) => (model.value = next)} />
+      <Select label="Model" name="model" value={model} options={modelOptions} onChange={(next) => (model.value = next)} />
     </section>
 
     <div class="foot">
