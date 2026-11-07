@@ -163,10 +163,19 @@ else if (paddedBody.data.body !== "a body with air around it") {
    filled from the name — all normalisation, so the form never does any of it. */
 const nameless = characterWriteSchema.safeParse({
   name: "   ",
-  inSessionName: "",
-  description: "",
-  nsfw: false,
   avatar: { initials: "" },
+  tagline: "",
+  inSessionName: "",
+  creatorNotes: "",
+  tags: "",
+  visibility: "public",
+  nsfw: false,
+  anonymous: false,
+  description: "",
+  firstMessage: "",
+  scenario: "",
+  exampleDialogs: "",
+  alternateGreetings: "",
   lorebookIds: [],
 });
 if (nameless.success) bad("characterWriteSchema accepted a name of spaces");
@@ -176,10 +185,19 @@ else if (nameless.error.issues[0]?.message !== CHARACTER_NAME_REQUIRED) {
 
 const authored = characterWriteSchema.safeParse({
   name: "  Sonic   the   Hedgehog ",
-  inSessionName: "   ",
-  description: "  fast  ",
-  nsfw: true,
   avatar: { initials: " so " },
+  tagline: "",
+  inSessionName: "   ",
+  creatorNotes: "",
+  tags: "",
+  visibility: "public",
+  nsfw: true,
+  anonymous: false,
+  description: "  fast  ",
+  firstMessage: "",
+  scenario: "",
+  exampleDialogs: "",
+  alternateGreetings: "",
   lorebookIds: [LOREBOOKS[0].id, LOREBOOKS[0].id, LOREBOOKS[1].id],
 });
 if (!authored.success) bad(`characterWriteSchema refused a real write (${authored.error.issues[0]?.message})`);
@@ -199,9 +217,19 @@ else {
 
 const derivedInitials = characterWriteSchema.safeParse({
   name: "Aurelia",
-  description: "",
-  nsfw: false,
   avatar: { initials: "" },
+  tagline: "",
+  inSessionName: "",
+  creatorNotes: "",
+  tags: "",
+  visibility: "public",
+  nsfw: false,
+  anonymous: false,
+  description: "",
+  firstMessage: "",
+  scenario: "",
+  exampleDialogs: "",
+  alternateGreetings: "",
   lorebookIds: [],
 });
 if (!derivedInitials.success) bad("characterWriteSchema refused a write with no initials");

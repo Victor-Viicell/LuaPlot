@@ -10,8 +10,10 @@ import {
   LOREBOOK_ALREADY_ATTACHED,
   LOREBOOK_ID_INVALID,
   LOREBOOK_NOT_ATTACHABLE,
+  VISIBILITY_OPTIONS,
   characterWriteSchema,
   lorebookIdSchema,
+  type Visibility,
 } from "../lib/schema.ts";
 
 /**
@@ -54,10 +56,24 @@ export function CharacterForm({
   const editing = character !== null;
 
   const name = track(character?.name ?? "");
-  const inSessionName = track(character?.inSessionName ?? "");
-  const description = track(character?.description ?? "");
   const initials = track(character?.avatar.initials ?? "");
+  const tagline = track(character?.tagline ?? "");
+  const inSessionName = track(character?.inSessionName ?? "");
+  const creatorNotes = track(character?.creatorNotes ?? "");
+  const tags = track((character?.tags ?? []).join(", "));
+  const visibility = track<Visibility>(
+    character?.visibility ??
+      (character?.isPublic === false ? "private" : "public"),
+  );
   const nsfw = track(character?.nsfw ?? false);
+  const anonymous = track(character?.anonymous ?? false);
+  const description = track(character?.description ?? "");
+  const firstMessage = track(character?.initialMessage ?? "");
+  const scenario = track(character?.scenario ?? "");
+  const exampleDialogs = track(character?.exampleDialogs ?? "");
+  const alternateGreetings = track(
+    (character?.alternateGreetings ?? []).join("\n"),
+  );
   const ids = track<string[]>([...(character?.lorebookIds ?? [])]);
 
   const idInput = track("");
@@ -114,7 +130,8 @@ export function CharacterForm({
       },
       () => {
         loading.value = false;
-        loadFailure.value = "The lorebook list could not be loaded. Add one by ID, or retry.";
+        loadFailure.value =
+          "The lorebook list could not be loaded. Add one by ID, or retry.";
       },
     );
   }
@@ -122,7 +139,8 @@ export function CharacterForm({
   async function addById(): Promise<void> {
     const parsed = lorebookIdSchema.safeParse(idInput.value);
     if (!parsed.success) {
-      attachError.value = parsed.error.issues[0]?.message ?? LOREBOOK_ID_INVALID;
+      attachError.value =
+        parsed.error.issues[0]?.message ?? LOREBOOK_ID_INVALID;
       return;
     }
 
@@ -163,14 +181,24 @@ export function CharacterForm({
 
     const parsed = characterWriteSchema.safeParse({
       name: name.value,
-      inSessionName: inSessionName.value,
-      description: description.value,
-      nsfw: nsfw.value,
       avatar: { initials: initials.value },
+      tagline: tagline.value,
+      inSessionName: inSessionName.value,
+      creatorNotes: creatorNotes.value,
+      tags: tags.value,
+      visibility: visibility.value,
+      nsfw: nsfw.value,
+      anonymous: anonymous.value,
+      description: description.value,
+      firstMessage: firstMessage.value,
+      scenario: scenario.value,
+      exampleDialogs: exampleDialogs.value,
+      alternateGreetings: alternateGreetings.value,
       lorebookIds: ids.value,
     });
     if (!parsed.success) {
-      formError.value = parsed.error.issues[0]?.message ?? "That character couldn't be saved.";
+      formError.value =
+        parsed.error.issues[0]?.message ?? "That character couldn't be saved.";
       return;
     }
 
@@ -202,130 +230,251 @@ export function CharacterForm({
     {/* The root element carries no scope class in Ripple 0.4.7, so a rule on `.character-form` is
         dropped and the form never becomes a grid (found in T-19). The layout lives on this child. */}
     <div class="layout">
-    <section class="section is-identity">
-      <p class="section-label">Identity</p>
-      <Field
-        label="Name"
-        value={name}
-        maxLength={80}
-        placeholder="Sonic the Hedgehog"
-        error={formError}
-        onInput={(value) => {
-          name.value = value;
-          formError.value = "";
-        }}
-      />
-      <Field
-        label="In-session name"
-        value={inSessionName}
-        maxLength={40}
-        placeholder="Sonic"
-        onInput={(value) => {
-          inSessionName.value = value;
-          formError.value = "";
-        }}
-      />
-    </section>
-
-    <section class="section is-definition">
-      <p class="section-label">Description / personality</p>
-      <Field
-        label="Definition"
-        multiline={true}
-        rows={8}
-        maxLength={4000}
-        value={description}
-        placeholder="Who they are, how they speak, what they want."
-        onInput={(value) => {
-          description.value = value;
-          formError.value = "";
-        }}
-      />
-    </section>
-
-    <section class="section is-media">
-      <p class="section-label">Image and visibility</p>
-      <div class="media-grid">
+      <section class="section is-identity">
+        <p class="section-label">Identity</p>
+        <Field
+          label="Name"
+          value={name}
+          maxLength={80}
+          placeholder="Sonic the Hedgehog"
+          error={formError}
+          onInput={(value) => {
+            name.value = value;
+            formError.value = "";
+          }}
+        />
         <Field
           label="Initials"
           value={initials}
           maxLength={4}
           placeholder="SO"
+          help="Stands in for an uploaded image."
           onInput={(value) => {
             initials.value = value;
             formError.value = "";
           }}
         />
-        <Toggle
-          label="NSFW"
-          pressed={nsfw}
-          onToggle={(next) => (nsfw.value = next)}
-        />
-      </div>
-    </section>
-
-    <section class="section is-attach">
-      <p class="section-label">Attached lorebooks</p>
-
-      <div class="attach-add">
         <Field
-          label="Lorebook ID"
-          value={idInput}
-          placeholder="Paste an ID"
-          error={attachError}
+          label="Tagline"
+          value={tagline}
+          maxLength={140}
+          placeholder="Runs first, apologises at speed."
           onInput={(value) => {
-            idInput.value = value;
-            attachError.value = "";
+            tagline.value = value;
+            formError.value = "";
           }}
         />
-        <Button variant="secondary" onClick={() => addById()}>Add by ID</Button>
-      </div>
+        <Field
+          label="In-session name"
+          value={inSessionName}
+          maxLength={40}
+          placeholder="Sonic"
+          help="Falls back to the name when left empty."
+          onInput={(value) => {
+            inSessionName.value = value;
+            formError.value = "";
+          }}
+        />
+      </section>
 
-      @if (loading.value) {
-        <div class="skel" aria-busy="true" aria-label="Loading your lorebooks">
-          <Skeleton lines={2} />
-          <Skeleton lines={2} />
+      <section class="section is-meta">
+        <p class="section-label">Publishing</p>
+        <Field
+          label="Creator notes"
+          multiline={true}
+          rows={4}
+          maxLength={4000}
+          value={creatorNotes}
+          placeholder="Notes for readers of the detail page. Never part of the prompt."
+          onInput={(value) => {
+            creatorNotes.value = value;
+            formError.value = "";
+          }}
+        />
+        <Field
+          label="Tags"
+          value={tags}
+          placeholder="sea, harbor, ritual"
+          help="Comma-separated."
+          onInput={(value) => {
+            tags.value = value;
+            formError.value = "";
+          }}
+        />
+        <Select
+          label="Visibility"
+          value={visibility}
+          options={[...VISIBILITY_OPTIONS]}
+          onChange={(next) => (visibility.value = next as Visibility)}
+        />
+        <div class="toggles">
+          <Toggle
+            label="NSFW"
+            pressed={nsfw}
+            onToggle={(next) => (nsfw.value = next)}
+          />
+          <Toggle
+            label="Publish anonymously"
+            pressed={anonymous}
+            onToggle={(next) => (anonymous.value = next)}
+          />
         </div>
-      } @else {
-        <>
-          @if (loadFailure.value) {
-            <p class="alert" role="alert">{loadFailure.value}</p>
-          } @else if (chooseOptions.value.length > 1) {
-            <Select label="Pick lorebook" value={""} options={chooseOptions.value} onChange={pick} />
-          }
+      </section>
 
-          @if (rows.value.length === 0) {
-            <p class="empty-note">No lorebooks attached. A character can be saved with none.</p>
-          } @else {
-            <ul class="attach-list">
-              @for (const row of rows.value; key row.id) {
-                <li class="attach-row">
-                  <span class="attach-text">
-                    <span class="attach-name">{row.available ? row.name : row.id}</span>
-                    @if (!row.available) {
-                      <span class="attach-unavailable">unavailable — the lorebook is gone or private</span>
-                    }
-                  </span>
-                  <Button variant="ghost" onClick={() => remove(row.id)} label="Remove">{`Remove`}</Button>
-                </li>
-              }
-            </ul>
-          }
-        </>
-      }
-    </section>
+      <section class="section is-definition">
+        <p class="section-label">Description and opening</p>
+        <Field
+          label="Description / personality"
+          multiline={true}
+          rows={8}
+          maxLength={4000}
+          value={description}
+          placeholder="Who they are, how they speak, what they want."
+          onInput={(value) => {
+            description.value = value;
+            formError.value = "";
+          }}
+        />
+        <Field
+          label="First message"
+          multiline={true}
+          rows={5}
+          maxLength={4000}
+          value={firstMessage}
+          placeholder="The character's opening line."
+          onInput={(value) => {
+            firstMessage.value = value;
+            formError.value = "";
+          }}
+        />
+        <Field
+          label="Scenario"
+          multiline={true}
+          rows={4}
+          maxLength={4000}
+          value={scenario}
+          placeholder="Where the scene starts and what is at stake."
+          onInput={(value) => {
+            scenario.value = value;
+            formError.value = "";
+          }}
+        />
+        <Field
+          label="Example dialogs"
+          multiline={true}
+          rows={6}
+          maxLength={8000}
+          value={exampleDialogs}
+          placeholder="How they answer, in their own voice."
+          onInput={(value) => {
+            exampleDialogs.value = value;
+            formError.value = "";
+          }}
+        />
+        <Field
+          label="Alternate greetings"
+          multiline={true}
+          rows={4}
+          maxLength={8000}
+          value={alternateGreetings}
+          placeholder="One greeting per line."
+          help="One opening per line; the first message stays the default."
+          onInput={(value) => {
+            alternateGreetings.value = value;
+            formError.value = "";
+          }}
+        />
+      </section>
 
-    <div class="foot">
-      @if (formError.value) {
-        <p class="alert" role="alert">{formError.value}</p>
-      }
-      <div class="buttons">
-        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
-        <Button variant="primary" type="submit" disabled={denySave}>
-          {saving.value ? "Saving…" : editing ? "Save changes" : "Save"}
-        </Button>
+      <section class="section is-attach">
+        <p class="section-label">Attached lorebooks</p>
+
+        <div class="attach-add">
+          <Field
+            label="Lorebook ID"
+            value={idInput}
+            placeholder="Paste an ID"
+            error={attachError}
+            onInput={(value) => {
+              idInput.value = value;
+              attachError.value = "";
+            }}
+          />
+          <Button variant="secondary" onClick={() => addById()}>
+            Add by ID
+          </Button>
+        </div>
+
+        @if (loading.value) {
+          <div
+            class="skel"
+            aria-busy="true"
+            aria-label="Loading your lorebooks"
+          >
+            <Skeleton lines={2} />
+            <Skeleton lines={2} />
+          </div>
+        } @else {
+          <>
+            @if (loadFailure.value) {
+              <p class="alert" role="alert">
+                {loadFailure.value}
+              </p>
+            } @else if (chooseOptions.value.length > 1) {
+              <Select
+                label="Pick lorebook"
+                value={""}
+                options={chooseOptions.value}
+                onChange={pick}
+              />
+            }
+
+            @if (rows.value.length === 0) {
+              <p class="empty-note">
+                No lorebooks attached. A character can be saved with none.
+              </p>
+            } @else {
+              <ul class="attach-list">
+                @for (const row of rows.value; key row.id) {
+                  <li class="attach-row">
+                    <span class="attach-text">
+                      <span class="attach-name">
+                        {row.available ? row.name : row.id}
+                      </span>
+                      @if (!row.available) {
+                        <span class="attach-unavailable">
+                          unavailable — the lorebook is gone or private
+                        </span>
+                      }
+                    </span>
+                    <Button
+                      variant="ghost"
+                      onClick={() => remove(row.id)}
+                      label="Remove"
+                    >{`Remove`}</Button>
+                  </li>
+                }
+              </ul>
+            }
+          </>
+        }
+      </section>
+
+      <div class="foot">
+        @if (formError.value) {
+          <p class="alert" role="alert">
+            {formError.value}
+          </p>
+        }
+        <div class="buttons">
+          <Button variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" disabled={denySave}>
+            {saving.value ? "Saving…" : editing ? "Save changes" : "Save"}
+          </Button>
+        </div>
       </div>
-    </div>
     </div>
 
     <style>
@@ -358,7 +507,8 @@ export function CharacterForm({
         line-height: 1.6;
       }
 
-      .media-grid {
+      .media-grid,
+      .toggles {
         display: flex;
         flex-direction: column;
         gap: 12px;
@@ -388,8 +538,8 @@ export function CharacterForm({
 
       .attach-row {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
+        flex-direction: column;
+        align-items: stretch;
         gap: 8px;
         min-height: 44px;
         padding: 6px 4px 6px 12px;
@@ -455,81 +605,6 @@ export function CharacterForm({
 
       .buttons > * {
         flex: 1 1 auto;
-      }
-
-      @media (min-width: 640px) {
-        .attach-add {
-          flex-direction: row;
-          align-items: flex-end;
-          gap: 12px;
-        }
-
-        .attach-add > :first-child {
-          flex: 1 1 auto;
-        }
-
-        .attach-add > :last-child {
-          align-self: auto;
-          flex: 0 0 auto;
-        }
-
-        .buttons {
-          flex-direction: row;
-          justify-content: flex-end;
-        }
-
-        .buttons > * {
-          flex: 0 0 auto;
-          min-width: 140px;
-        }
-      }
-
-      @media (min-width: 900px) {
-        /* Two columns: the definition reads down the left, identity and the image sit beside it.
-           A form that stayed one 328px column at 1440 would be a stretched phone. */
-        .layout {
-          grid-template-columns: minmax(0, 1fr) 360px;
-          column-gap: 40px;
-        }
-
-        .section.is-identity {
-          grid-column: 2;
-          grid-row: 1;
-        }
-
-        .section.is-media {
-          grid-column: 2;
-          grid-row: 2;
-        }
-
-        .section.is-definition {
-          grid-column: 1;
-          grid-row: 1 / span 2;
-        }
-
-        .section.is-attach {
-          grid-column: 1 / span 2;
-          padding-top: 16px;
-          border-top: 1px solid var(--color-border);
-        }
-
-        .media-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-          align-items: end;
-          gap: 16px;
-        }
-
-        .foot {
-          grid-column: 1 / span 2;
-          flex-direction: row;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .foot .alert {
-          order: -1;
-        }
       }
     </style>
   </form>

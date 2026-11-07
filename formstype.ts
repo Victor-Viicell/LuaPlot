@@ -1,9 +1,10 @@
 /**
- * Scratch file — the current shapes of the three authored entities, as plain interfaces, so the
- * form's final field table can be decided (and reordered) here.
+ * Scratch file — the current shapes of the authored entities, the personal ones (persona, session),
+ * and their form shapes, as plain interfaces, so the field tables can be decided (and reordered) here.
  *
  * Mirrors the **output** of `src/lib/schema.ts` (`characterSchema`, `lorebookSchema`,
- * `presetSchema` and their `*Write` form shapes). Nothing imports this file; it is a worksheet.
+ * `presetSchema`, `personaSchema`, `sessionSchema` and their `*Write` form shapes). Nothing imports
+ * this file; it is a worksheet.
  */
 
 /** `avatarSchema` — an uploaded image. No initials; when `url` is absent the card draws the `kind` icon. */
@@ -50,8 +51,6 @@ interface PresetSettings {
   postHistoryInstructions: string;
   /** The prompt the Impersonation feature uses to write the user's next response. */
   impersonationPrompt: string;
-  /** Whether lorebooks are used. */
-  useLorebooks: boolean;
 
   /* ------------------------------------------------------------------------------------------
    * Generation parameters
@@ -176,6 +175,75 @@ interface Persona {
 }
 
 /* ------------------------------------------------------------------------------------------------
+ * Session
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Per-chat switches that used to live on the preset. Both default to `true`. */
+interface SessionSettings {
+  /** Whether the session's lorebooks are used at all. Default: `true`. */
+  useLorebooks: boolean;
+  /** Whether the character's own preset is used instead of the session's. Default: `true`. */
+  useCharacterPreset: boolean;
+}
+
+/**
+ * A snapshot keeps the id of the source it was built from (`version`), whether the copy has since
+ * been edited, and whether the source is gone (`unlinked` — a removed source costs only the link,
+ * the chat keeps working).
+ */
+interface SessionCopyBase {
+  sourceId: string;
+  version: number;
+  edited: boolean;
+  unlinked: boolean;
+}
+
+/** The character as it stood when the session was built. */
+interface CharacterCopy extends SessionCopyBase {
+  kind: "character";
+  name: string;
+  inSessionName?: string;
+  description: string;
+  avatar: Avatar;
+}
+
+/** One lorebook as it stood when the session was built. */
+interface LorebookCopy extends SessionCopyBase {
+  kind: "lorebook";
+  name: string;
+  entries: LorebookEntry[];
+}
+
+/** The preset as it stood when the session was built. */
+interface PresetCopy extends SessionCopyBase {
+  kind: "preset";
+  name: string;
+  settings: PresetSettings;
+}
+
+/**
+ * `sessionSchema` — one chat the viewer has started, built from copies, not from the live items: at
+ * creation it snapshots the character, its lorebooks and the preset, so a later edit or deletion of
+ * any source never rewrites an existing chat. Only its owner reads or writes a session.
+ */
+interface Session {
+  id: string;
+  owner: string;
+  character: CharacterCopy;
+  lorebooks: LorebookCopy[];
+  preset: PresetCopy;
+  /** The session's own switches, defaulted to `true`. */
+  settings: SessionSettings;
+  /**
+   * The viewer persona speaking in this chat. A live reference, not a copy: it is swappable
+   * mid-session and switching it leaves no mark on the transcript.
+   */
+  personaId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/* ------------------------------------------------------------------------------------------------
  * Form writes — what the author fills; the adapter owns id, author, clock, verified, engagement.
  * ---------------------------------------------------------------------------------------------- */
 
@@ -254,4 +322,18 @@ interface PersonaWrite {
   avatar: Avatar;
   /** Every lorebook attached to this persona; any number may be attached. */
   lorebookIds: string[];
+}
+
+/**
+ * `sessionWriteSchema` — what starting a chat needs: which character, which lorebooks, and the
+ * preset the user set for it. These are references; the adapter then builds the session from copies
+ * of each source. `id`, `owner` and the clock are the adapter's.
+ */
+interface SessionWrite {
+  characterId: string;
+  lorebookIds: string[];
+  presetId: string;
+  /** Both switches default to `true` when omitted. */
+  settings?: Partial<SessionSettings>;
+  personaId?: string;
 }

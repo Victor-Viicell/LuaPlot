@@ -79,7 +79,7 @@ export const SESSIONS: Session[] = [
       unlinked: false,
       name: "Quiet Draft",
       description: "Short replies, low heat. For thinking out loud.",
-      settings: { model: "deepseek-chat" },
+      settings: { model: "deepseek-flash" },
     },
     personaId: PERSONA(1),
     turns: [
@@ -182,7 +182,7 @@ export const SESSIONS: Session[] = [
       unlinked: false,
       name: "Cold Open",
       description: "No preamble: the first line is already the scene.",
-      settings: { model: "deepseek-chat" },
+      settings: { model: "deepseek-flash" },
     },
     personaId: PERSONA(3),
     turns: [

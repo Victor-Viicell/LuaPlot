@@ -148,6 +148,16 @@ export const itemKindSchema = z.enum(["character", "lorebook", "preset"]);
 export const votableKindSchema = z.enum(["character", "lorebook", "preset", "post", "comment"]);
 export const voteDirectionSchema = z.enum(["like", "dislike"]);
 
+/** Public / Private / Unlisted — the authored row's reach (`formstype.ts` → `AuthoredBase`). */
+export const visibilitySchema = z.enum(["public", "private", "unlisted"]);
+export type Visibility = z.infer<typeof visibilitySchema>;
+
+export const VISIBILITY_OPTIONS: readonly { value: Visibility; label: string }[] = [
+  { value: "public", label: "Public" },
+  { value: "private", label: "Private" },
+  { value: "unlisted", label: "Unlisted" },
+];
+
 /* ------------------------------------------------------------------------------------------------
  * Authored content — character / lorebook / preset
  * ---------------------------------------------------------------------------------------------- */
@@ -168,7 +178,13 @@ const AUTHORED_SHAPE = {
   name: z.string().min(1),
   author: handleSchema,
   tagline: z.string(),
+  /** Shown on the detail page only; never part of the prompt. */
+  creatorNotes: z.string().optional(),
+  /** Public / Private / Unlisted. `isPublic` is kept for the rows seeded before it landed. */
+  visibility: visibilitySchema.optional(),
   nsfw: z.boolean(),
+  /** Publish under the author's handle vs. as “Anonymous”. */
+  anonymous: z.boolean().optional(),
   avatar: avatarSchema,
   isPublic: z.boolean(),
   verified: z.boolean(),
@@ -189,8 +205,14 @@ const authored = <const K extends z.infer<typeof itemKindSchema>, S extends z.Zo
  * can serve many characters and editing it changes what all of them read.*
  */
 export const characterSchema = authored("character", {
+  /** Individual person vs. narrator/world. Absent on rows seeded before it landed. */
+  characterType: z.enum(["character", "narrator"]).optional(),
   inSessionName: z.string().min(1).optional(),
   description: z.string(),
+  initialMessage: z.string().optional(),
+  scenario: z.string().optional(),
+  exampleDialogs: z.string().optional(),
+  alternateGreetings: z.array(z.string()).optional(),
   lorebookIds: z.array(z.uuid()),
 });
 
@@ -235,6 +257,29 @@ const initialsInputSchema = z
   .transform((raw) => raw.trim().toUpperCase())
   .pipe(z.string().max(4, "Four letters at most."));
 
+/** A comma-separated tag line, split on write — the authored forms' one tags control. */
+export function splitTags(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+}
+
+/** A one-per-line list (greetings, stop sequences), trimmed and emptied out. */
+export function splitLines(raw: string): string[] {
+  return raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/** Accepts the typed line or an already-split list, so a schema accepts its own output. */
+const stringListInput = (split: (raw: string) => string[]) =>
+  z
+    .union([z.string(), z.array(z.string())])
+    .transform((raw) => (Array.isArray(raw) ? raw : split(raw)))
+    .transform((words) => [...new Set(words.map((word) => word.trim()).filter((word) => word.length > 0))]);
+
 /** Empty initials are filled from the name — the transform both authored writes share (T-17). */
 function withInitials<T extends { name: string; avatar: { initials: string } }>(value: T): T {
   return {
@@ -251,6 +296,9 @@ export const characterWriteSchema = z
       .string()
       .transform(normaliseDisplayName)
       .pipe(z.string().min(1, CHARACTER_NAME_REQUIRED)),
+    avatar: z.strictObject({ initials: initialsInputSchema, url: z.url().optional() }),
+    /** Shown in search and on cards; never part of the prompt. */
+    tagline: z.string().transform((raw) => raw.trim()),
     inSessionName: z
       .string()
       .optional()
@@ -258,9 +306,17 @@ export const characterWriteSchema = z
         const value = normaliseDisplayName(raw ?? "");
         return value === "" ? undefined : value;
       }),
-    description: z.string().transform((raw) => raw.trim()),
+    creatorNotes: z.string().transform((raw) => raw.trim()),
+    tags: stringListInput(splitTags),
+    visibility: visibilitySchema,
     nsfw: z.boolean(),
-    avatar: z.strictObject({ initials: initialsInputSchema }),
+    anonymous: z.boolean(),
+    description: z.string().transform((raw) => raw.trim()),
+    /** Stored as `initialMessage`; the form calls it the first message. */
+    firstMessage: z.string().transform((raw) => raw.trim()),
+    scenario: z.string().transform((raw) => raw.trim()),
+    exampleDialogs: z.string().transform((raw) => raw.trim()),
+    alternateGreetings: stringListInput(splitLines),
     lorebookIds: z.array(z.uuid()).transform((ids) => [...new Set(ids)]),
   })
   .transform(withInitials);
@@ -273,7 +329,17 @@ export const characterWriteSchema = z
 export const lorebookEntrySchema = z.strictObject({
   id: z.string().min(1),
   keywords: z.array(z.string().min(1)),
+  /** Additional keys required to activate; ignored unless `selective` is true. */
+  secondaryKeywords: z.array(z.string()).optional(),
   content: z.string().min(1),
+  enabled: z.boolean().optional(),
+  insertionOrder: z.number().int().optional(),
+  caseSensitive: z.boolean().optional(),
+  priority: z.number().int().optional(),
+  selective: z.boolean().optional(),
+  selectiveLogic: z.enum(["AND", "NOT"]).optional(),
+  constant: z.boolean().optional(),
+  probability: z.number().int().min(0).max(100).optional(),
 });
 
 export const lorebookSchema = authored("lorebook", {
@@ -303,22 +369,33 @@ export function splitKeywords(raw: string): string[] {
     .filter((word) => word.length > 0);
 }
 
+const keywordListInput = (split: (raw: string) => string[]) =>
+  z
+    .union([z.string(), z.array(z.string())])
+    .transform((raw) => (Array.isArray(raw) ? raw : split(raw)))
+    // Trimmed and deduped in typed order: a keyword twice is one keyword.
+    .transform((words) => [...new Set(words.map((word) => word.trim()).filter((word) => word.length > 0))]);
+
 export const lorebookEntryWriteSchema = z.strictObject({
   /**
    * Accepts the typed line **or** an already-split list: the form hands strings, and the adapter
    * parses the write again, so the schema has to accept its own output or a second parse would
    * refuse a write the first one just normalised (T-18).
    */
-  keywords: z
-    .union([z.string(), z.array(z.string())])
-    .transform((raw) => (Array.isArray(raw) ? raw : splitKeywords(raw)))
-    // Trimmed and deduped in typed order: a keyword twice is one keyword.
-    .transform((words) => [...new Set(words.map((word) => word.trim()).filter((word) => word.length > 0))])
-    .pipe(z.array(z.string().min(1)).min(1, ENTRY_KEYWORD_REQUIRED)),
+  keywords: keywordListInput(splitKeywords).pipe(z.array(z.string().min(1)).min(1, ENTRY_KEYWORD_REQUIRED)),
+  secondaryKeywords: keywordListInput(splitKeywords),
   content: z
     .string()
     .transform((raw) => raw.trim())
     .pipe(z.string().min(1, ENTRY_CONTENT_REQUIRED)),
+  enabled: z.boolean(),
+  insertionOrder: z.number().int(),
+  caseSensitive: z.boolean(),
+  priority: z.number().int(),
+  selective: z.boolean(),
+  selectiveLogic: z.enum(["AND", "NOT"]),
+  constant: z.boolean(),
+  probability: z.number().int().min(0).max(100),
 });
 
 /**
@@ -326,9 +403,9 @@ export const lorebookEntryWriteSchema = z.strictObject({
  * `LorebookForm` **and** again by `repo.addLorebook` / `repo.updateLorebook` — the pattern
  * `characterWriteSchema` established in T-17.
  *
- * Deliberately no `tagline` (`luaplot-pages.md`: a lorebook has none, so the card's stays `""`) and
- * no tags (the taxonomy is undecided). `entries` may be empty: *No entries yet* is a state of the
- * form, not a validation error.
+ * A lorebook has no description of its own in the current field table: its entries are the
+ * content, and the card carries the tagline. `entries` may be empty: *No entries yet* is a state
+ * of the form, not a validation error.
  */
 export const lorebookWriteSchema = z
   .strictObject({
@@ -336,9 +413,13 @@ export const lorebookWriteSchema = z
       .string()
       .transform(normaliseDisplayName)
       .pipe(z.string().min(1, LOREBOOK_NAME_REQUIRED)),
-    description: z.string().transform((raw) => raw.trim()),
+    avatar: z.strictObject({ initials: initialsInputSchema, url: z.url().optional() }),
+    tagline: z.string().transform((raw) => raw.trim()),
+    creatorNotes: z.string().transform((raw) => raw.trim()),
+    visibility: visibilitySchema,
     nsfw: z.boolean(),
-    avatar: z.strictObject({ initials: initialsInputSchema }),
+    anonymous: z.boolean(),
+    tags: stringListInput(splitTags),
     entries: z.array(lorebookEntryWriteSchema),
   })
   .transform(withInitials);
@@ -349,8 +430,44 @@ export const lorebookWriteSchema = z
  * belongs to the app — it is never a field here. No version or compatibility marker: presets are
  * not versioned.
  */
+const reasoningEffortSchema = z.enum(["none", "low", "high", "max"]);
+
 export const presetSettingsSchema = z.strictObject({
+  /* Prompt structure. Optional on stored rows so the presets seeded before the field table
+     landed keep parsing; every form writes all three. */
+  preHistoryInstructions: z.string().optional(),
+  postHistoryInstructions: z.string().optional(),
+  impersonationPrompt: z.string().optional(),
+
+  /** One of `PRESET_MODELS`. */
   model: z.string().min(1),
+  /** When present it takes precedence over `reasoningEffort`. */
+  thinking: z.strictObject({ type: z.enum(["enabled", "disabled"]) }).optional(),
+  reasoningEffort: reasoningEffortSchema.optional(),
+  maxTokens: z.number().int().min(1).max(393216).optional(),
+  /** App-side only: the token budget for the prompt history. */
+  contextSize: z.number().int().positive().optional(),
+  stop: z.array(z.string()).max(16).optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  topP: z.number().gt(0).max(1).optional(),
+});
+
+/**
+ * The generation block as the preset form writes it. Every field the author sees is required here,
+ * so a new preset can never be stored with an invented or missing value.
+ */
+export const presetSettingsWriteSchema = z.strictObject({
+  preHistoryInstructions: z.string().transform((raw) => raw.trim()),
+  postHistoryInstructions: z.string().transform((raw) => raw.trim()),
+  impersonationPrompt: z.string().transform((raw) => raw.trim()),
+  model: z.string().min(1),
+  thinking: z.strictObject({ type: z.enum(["enabled", "disabled"]) }).optional(),
+  reasoningEffort: reasoningEffortSchema,
+  maxTokens: z.number().int().min(1).max(393216),
+  contextSize: z.number().int().positive(),
+  stop: stringListInput(splitLines).pipe(z.array(z.string()).max(16)),
+  temperature: z.number().min(0).max(2),
+  topP: z.number().gt(0).max(1),
 });
 
 /**
@@ -364,7 +481,14 @@ export const presetSettingsSchema = z.strictObject({
  * a migration of every stored preset. The control offers what exists; the row records what was
  * chosen.
  */
-export const PRESET_MODELS: readonly string[] = ["deepseek-chat", "deepseek-reasoner"];
+export const PRESET_MODELS: readonly string[] = ["deepseek-flash", "deepseek-v4-pro"];
+
+export const REASONING_EFFORTS: readonly { value: string; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "low", label: "Low" },
+  { value: "high", label: "High" },
+  { value: "max", label: "Max" },
+];
 
 export const presetSchema = authored("preset", {
   description: z.string(),
@@ -388,10 +512,11 @@ export const presetWriteSchema = z
       .string()
       .transform(normaliseDisplayName)
       .pipe(z.string().min(1, PRESET_NAME_REQUIRED)),
-    description: z.string().transform((raw) => raw.trim()),
+    tagline: z.string().transform((raw) => raw.trim()),
+    creatorNotes: z.string().transform((raw) => raw.trim()),
     nsfw: z.boolean(),
-    avatar: z.strictObject({ initials: initialsInputSchema }),
-    settings: presetSettingsSchema,
+    avatar: z.strictObject({ initials: initialsInputSchema, url: z.url().optional() }),
+    settings: presetSettingsWriteSchema,
   })
   .transform(withInitials);
 
@@ -413,10 +538,14 @@ export const personaSchema = z.strictObject({
   id: z.uuid(),
   owner: handleSchema,
   name: z.string().min(1),
+  /** “In-Chat Name” — falls back to `name` when empty. */
+  inSessionName: z.string().min(1).optional(),
   tagline: z.string(),
   description: z.string(),
   avatar: avatarSchema,
   isDefault: z.boolean(),
+  /** Every lorebook attached to this persona; any number may be attached. */
+  lorebookIds: z.array(z.uuid()).optional(),
   createdAt: isoSchema,
   updatedAt: isoSchema,
   verified: z.boolean(),
@@ -443,9 +572,17 @@ export const personaWriteSchema = z
       .string()
       .transform(normaliseDisplayName)
       .pipe(z.string().min(1, PERSONA_NAME_REQUIRED)),
+    inSessionName: z
+      .string()
+      .optional()
+      .transform((raw) => {
+        const value = normaliseDisplayName(raw ?? "");
+        return value === "" ? undefined : value;
+      }),
     tagline: z.string().transform((raw) => raw.trim()),
     description: z.string().transform((raw) => raw.trim()),
-    avatar: z.strictObject({ initials: initialsInputSchema }),
+    avatar: z.strictObject({ initials: initialsInputSchema, url: z.url().optional() }),
+    lorebookIds: z.array(z.uuid()).transform((ids) => [...new Set(ids)]),
   })
   .transform(withInitials);
 

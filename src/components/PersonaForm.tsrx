@@ -1,24 +1,26 @@
 import { track } from "ripple";
 import { Button } from "./Button.tsrx";
 import { Field } from "./Field.tsrx";
+import { Select } from "./Select.tsrx";
+import { Skeleton } from "./Skeleton.tsrx";
 import { resolveRepo } from "../lib/data/repo.ts";
-import type { Persona } from "../lib/data/types.ts";
+import type { Lorebook, Persona } from "../lib/data/types.ts";
 import { personaWriteSchema } from "../lib/schema.ts";
 
 /**
  * The persona form — one component, two hosts (`persona/create.md`, and `persona/edit.md`, which is
  * *the same form* preloaded). `persona: null` is create; a row is edit.
  *
- * It is `PresetForm` **minus the settings block and the NSFW toggle, plus a tagline field**, because
- * a persona is *a smaller, distinct model rather than a character with sharing removed*
- * (`persona/create.md` → *Data*). What the spec orders is the order here: *the name and tagline, then
- * the description and personality, then the avatar*.
+ * A persona is *a smaller, distinct model rather than a character with sharing removed*, so the form
+ * is the persona write and nothing else. The fields follow `formstype.ts` → `PersonaWrite`: name,
+ * in-chat name, tagline, description, avatar, then the attached lorebooks.
  *
  * Decisions recorded in `docs/DESIGN.md` → *Persona create and edit (T-20)*:
- * - **The tagline is a real field, never a `""` the adapter invents.** A persona has one (the
- *   collection card draws it), unlike a character, lorebook or preset whose forms leave it empty.
- * - **No NSFW toggle, no tags, no lorebook picker, no preset picker.** *Absent by design* lists
- *   exactly those, and the session settles the character's attachments and preset when it starts.
+ * - **The tagline is a real field, never a `""` the adapter invents.** A persona has one, and the
+ *   collection card draws it.
+ * - **No NSFW toggle, no tags, no preset picker.** *Absent by design* lists exactly those, and the
+ *   session settles the character's preset when it starts. Lorebooks are attached here because a
+ *   persona carries its own list.
  * - **The avatar is initials only**, filled from the name when left empty — the schema does that, the
  *   page never upper-cases a label itself.
  * - **Save is disabled while the write fails its schema**, not while a page-local rule says so: the
@@ -39,29 +41,75 @@ export function PersonaForm({
   const editing = persona !== null;
 
   const name = track(persona?.name ?? "");
+  const inSessionName = track(persona?.inSessionName ?? "");
   const tagline = track(persona?.tagline ?? "");
   const description = track(persona?.description ?? "");
   const initials = track(persona?.avatar.initials ?? "");
+  const ids = track<string[]>([...(persona?.lorebookIds ?? [])]);
 
+  const picker = track<Lorebook[]>([]);
+  const loading = track(true);
+  const loadFailure = track("");
   const formError = track("");
   const saving = track(false);
+
+  const chooseOptions = track(() => [
+    { value: "", label: "Choose a lorebook" },
+    ...picker.value
+      .filter((book) => !ids.value.includes(book.id))
+      .map((book) => ({ value: book.id, label: book.name })),
+  ]);
+
+  function load(): void {
+    repo.listAttachableLorebooks().then(
+      (books) => {
+        picker.value = books;
+        loading.value = false;
+      },
+      () => {
+        loading.value = false;
+        loadFailure.value = "The lorebook list could not be loaded.";
+      },
+    );
+  }
+
+  function attach(id: string): void {
+    if (id === "" || ids.value.includes(id)) return;
+    ids.value = [...ids.value, id];
+    formError.value = "";
+  }
+
+  function detach(id: string): void {
+    ids.value = ids.value.filter((row) => row !== id);
+  }
+
+  function lorebookName(id: string): string {
+    return picker.value.find((book) => book.id === id)?.name ?? id;
+  }
 
   /** The draft as the schema sees it; `denySave` and `save` read one rule. */
   const write = () => ({
     name: name.value,
+    inSessionName: inSessionName.value,
     tagline: tagline.value,
     description: description.value,
     avatar: { initials: initials.value },
+    lorebookIds: ids.value,
   });
 
-  const denySave = track(() => saving.value || !personaWriteSchema.safeParse(write()).success);
+  const denySave = track(
+    () => saving.value || !personaWriteSchema.safeParse(write()).success,
+  );
+
+  load();
 
   async function save(): Promise<void> {
     if (saving.value) return;
 
     const parsed = personaWriteSchema.safeParse(write());
     if (!parsed.success) {
-      formError.value = parsed.error.issues[0]?.message ?? "That persona couldn't be saved.";
+      formError.value =
+        parsed.error.issues[0]?.message ?? "That persona couldn't be saved.";
       return;
     }
 
@@ -105,6 +153,17 @@ export function PersonaForm({
           }}
         />
         <Field
+          label="In-chat name"
+          value={inSessionName}
+          maxLength={40}
+          placeholder="Nell"
+          help="Falls back to the name when left empty."
+          onInput={(value) => {
+            inSessionName.value = value;
+            formError.value = "";
+          }}
+        />
+        <Field
           label="Tagline"
           value={tagline}
           maxLength={140}
@@ -139,6 +198,7 @@ export function PersonaForm({
           value={initials}
           maxLength={4}
           placeholder="NL"
+          help="Stands in for an uploaded image."
           onInput={(value) => {
             initials.value = value;
             formError.value = "";
@@ -146,12 +206,60 @@ export function PersonaForm({
         />
       </section>
 
+      <section class="section is-attach">
+        <p class="section-label">Lorebooks</p>
+        @if (loading.value) {
+          <div
+            class="skel"
+            aria-busy="true"
+            aria-label="Loading your lorebooks"
+          >
+            <Skeleton lines={2} />
+          </div>
+        } @else {
+          <>
+            @if (loadFailure.value) {
+              <p class="alert" role="alert">
+                {loadFailure.value}
+              </p>
+            } @else if (chooseOptions.value.length > 1) {
+              <Select
+                label="Pick lorebook"
+                value={""}
+                options={chooseOptions.value}
+                onChange={attach}
+              />
+            }
+            @if (ids.value.length === 0) {
+              <p class="empty-note">
+                No lorebooks attached. A persona can be saved with none.
+              </p>
+            } @else {
+              <ul class="attach-list">
+                @for (const id of ids.value; key id) {
+                  <li class="attach-row">
+                    <span class="attach-name">{lorebookName(id)}</span>
+                    <Button variant="ghost" onClick={() => detach(id)}>
+                      {"Remove"}
+                    </Button>
+                  </li>
+                }
+              </ul>
+            }
+          </>
+        }
+      </section>
+
       <div class="foot">
         @if (formError.value) {
-          <p class="alert" role="alert">{formError.value}</p>
+          <p class="alert" role="alert">
+            {formError.value}
+          </p>
         }
         <div class="buttons">
-          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+          <Button variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
           <Button variant="primary" type="submit" disabled={denySave}>
             {saving.value ? "Saving…" : editing ? "Save changes" : "Save"}
           </Button>
@@ -189,6 +297,50 @@ export function PersonaForm({
         line-height: 1.6;
       }
 
+      .empty-note {
+        margin: 0;
+        padding: 8px 0;
+        color: var(--color-text-subtle);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .skel {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .attach-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        margin: 0;
+        padding: 0;
+        border: 1px solid var(--color-border);
+        border-radius: 2px;
+        list-style: none;
+      }
+
+      .attach-row {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        min-height: 44px;
+        padding: 6px 4px 6px 12px;
+        background-color: var(--color-bg-elevated);
+      }
+
+      .attach-name {
+        overflow: hidden;
+        color: var(--color-text);
+        font-size: 13px;
+        line-height: 1.4;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .foot {
         display: flex;
         flex-direction: column;
@@ -205,54 +357,6 @@ export function PersonaForm({
 
       .buttons > * {
         flex: 1 1 auto;
-      }
-
-      @media (min-width: 640px) {
-        .buttons {
-          flex-direction: row;
-          justify-content: flex-end;
-        }
-
-        .buttons > * {
-          flex: 0 0 auto;
-          min-width: 140px;
-        }
-      }
-
-      @media (min-width: 900px) {
-        /* The character/lorebook/preset frame: the picture and the identity in a 320px right column,
-           the definition down the left, and the foot across both. */
-        .layout {
-          grid-template-columns: minmax(0, 1fr) 320px;
-          align-items: start;
-          column-gap: 40px;
-        }
-
-        .section.is-definition {
-          grid-column: 1;
-          grid-row: 1;
-        }
-
-        .section.is-identity {
-          grid-column: 2;
-          grid-row: 1;
-        }
-
-        .section.is-media {
-          grid-column: 2;
-          grid-row: 2;
-        }
-
-        .foot {
-          grid-column: 1 / span 2;
-          flex-direction: row;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .foot .alert {
-          order: -1;
-        }
       }
     </style>
   </form>

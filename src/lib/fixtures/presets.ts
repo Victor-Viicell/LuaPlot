@@ -29,7 +29,7 @@ export const PRESETS: Preset[] = [
     commentCount: 0,
     createdAt: at(4, 10, 30),
     updatedAt: at(20, 10, 30),
-    settings: { model: "deepseek-chat" },
+    settings: { model: "deepseek-flash" },
   },
   {
     id: PRESET(2),
@@ -50,7 +50,7 @@ export const PRESETS: Preset[] = [
     commentCount: 0,
     createdAt: at(6, 8, 5),
     updatedAt: at(6, 8, 5),
-    settings: { model: "deepseek-reasoner" },
+    settings: { model: "deepseek-v4-pro" },
   },
   {
     id: PRESET(3),
@@ -71,7 +71,7 @@ export const PRESETS: Preset[] = [
     commentCount: 0,
     createdAt: at(7, 15, 45),
     updatedAt: at(24, 12, 10),
-    settings: { model: "deepseek-chat" },
+    settings: { model: "deepseek-flash" },
   },
   {
     id: PRESET(4),
@@ -92,7 +92,7 @@ export const PRESETS: Preset[] = [
     commentCount: 0,
     createdAt: at(9, 21, 0),
     updatedAt: at(9, 21, 0),
-    settings: { model: "deepseek-chat" },
+    settings: { model: "deepseek-flash" },
   },
   {
     id: PRESET(5),
@@ -113,6 +113,6 @@ export const PRESETS: Preset[] = [
     commentCount: 0,
     createdAt: at(14, 23, 15),
     updatedAt: at(28, 1, 0),
-    settings: { model: "deepseek-reasoner" },
+    settings: { model: "deepseek-v4-pro" },
   },
 ];

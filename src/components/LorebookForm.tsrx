@@ -1,10 +1,15 @@
 import { track } from "ripple";
 import { Button } from "./Button.tsrx";
 import { Field } from "./Field.tsrx";
+import { Select } from "./Select.tsrx";
 import { Toggle } from "./Toggle.tsrx";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Lorebook } from "../lib/data/types.ts";
-import { lorebookWriteSchema } from "../lib/schema.ts";
+import {
+  VISIBILITY_OPTIONS,
+  lorebookWriteSchema,
+  type Visibility,
+} from "../lib/schema.ts";
 
 /**
  * The lorebook form — one component, two hosts (`lorebook/create.md`, and `lorebook/edit.md`, which
@@ -23,13 +28,30 @@ import { lorebookWriteSchema } from "../lib/schema.ts";
  *   carries its own Up / Down / Remove on one 44px row, so reordering is two taps rather than a
  *   phone drag.
  *
- * What it deliberately does not do: it never splits, trims or numbers anything. Keywords and content
- * are normalised by the schema, and the entry ids are the adapter's (`numberEntries`), so the form
+ * The entry block follows `formstype.ts` → `LorebookEntryWrite`: keywords, secondary keywords,
+ * content, then the firing switches and counters (enabled, insertion order, case sensitivity,
+ * priority, selective logic, constant, probability).
+ *
+ * What it deliberately does not do: it never splits, trims or numbers anything. Keywords are
+ * normalised by the schema, and the entry ids are the adapter's (`numberEntries`), so the form
  * cannot invent a label that collides with another.
  */
 
 /** One block in the editor. `key` is the render key only — it never reaches the write. */
-type EntryBlock = { key: number; keywords: string; content: string };
+type EntryBlock = {
+  key: number;
+  keywords: string;
+  secondaryKeywords: string;
+  content: string;
+  enabled: boolean;
+  insertionOrder: number;
+  caseSensitive: boolean;
+  priority: number;
+  selective: boolean;
+  selectiveLogic: "AND" | "NOT";
+  constant: boolean;
+  probability: number;
+};
 
 let nextKey = 0;
 
@@ -46,15 +68,37 @@ export function LorebookForm({
   const editing = lorebook !== null;
 
   const name = track(lorebook?.name ?? "");
-  const description = track(lorebook?.description ?? "");
   const initials = track(lorebook?.avatar.initials ?? "");
+  const tagline = track(lorebook?.tagline ?? "");
+  const creatorNotes = track(lorebook?.creatorNotes ?? "");
+  const visibility = track<Visibility>(
+    lorebook?.visibility ??
+      (lorebook?.isPublic === false ? "private" : "public"),
+  );
   const nsfw = track(lorebook?.nsfw ?? false);
+  const anonymous = track(lorebook?.anonymous ?? false);
+  const tags = track((lorebook?.tags ?? []).join(", "));
 
   /** The preloaded blocks, built once: a `track(() => …)` initialiser would make the list read-only. */
-  const initialEntries: EntryBlock[] = (lorebook?.entries ?? []).map((entry) => {
-    nextKey += 1;
-    return { key: nextKey, keywords: entry.keywords.join(", "), content: entry.content };
-  });
+  const initialEntries: EntryBlock[] = (lorebook?.entries ?? []).map(
+    (entry) => {
+      nextKey += 1;
+      return {
+        key: nextKey,
+        keywords: entry.keywords.join(", "),
+        secondaryKeywords: (entry.secondaryKeywords ?? []).join(", "),
+        content: entry.content,
+        enabled: entry.enabled ?? true,
+        insertionOrder: entry.insertionOrder ?? 100,
+        caseSensitive: entry.caseSensitive ?? false,
+        priority: entry.priority ?? 10,
+        selective: entry.selective ?? false,
+        selectiveLogic: entry.selectiveLogic ?? "AND",
+        constant: entry.constant ?? false,
+        probability: entry.probability ?? 100,
+      };
+    },
+  );
   const entries = track<EntryBlock[]>(initialEntries);
 
   /** One message per block, keyed by the block's key — set from the schema's issue paths. */
@@ -67,7 +111,23 @@ export function LorebookForm({
 
   function addEntry(): void {
     nextKey += 1;
-    entries.value = [...entries.value, { key: nextKey, keywords: "", content: "" }];
+    entries.value = [
+      ...entries.value,
+      {
+        key: nextKey,
+        keywords: "",
+        secondaryKeywords: "",
+        content: "",
+        enabled: true,
+        insertionOrder: 100,
+        caseSensitive: false,
+        priority: 10,
+        selective: false,
+        selectiveLogic: "AND",
+        constant: false,
+        probability: 100,
+      },
+    ];
     formError.value = "";
   }
 
@@ -87,7 +147,11 @@ export function LorebookForm({
     entries.value = next;
   }
 
-  function patch(key: number, field: "keywords" | "content", value: string): void {
+  function patch<K extends keyof EntryBlock>(
+    key: number,
+    field: K,
+    value: EntryBlock[K],
+  ): void {
     entries.value = entries.value.map((row) =>
       row.key === key ? { ...row, [field]: value } : row,
     );
@@ -104,10 +168,26 @@ export function LorebookForm({
 
     const parsed = lorebookWriteSchema.safeParse({
       name: name.value,
-      description: description.value,
-      nsfw: nsfw.value,
       avatar: { initials: initials.value },
-      entries: entries.value.map((row) => ({ keywords: row.keywords, content: row.content })),
+      tagline: tagline.value,
+      creatorNotes: creatorNotes.value,
+      visibility: visibility.value,
+      nsfw: nsfw.value,
+      anonymous: anonymous.value,
+      tags: tags.value,
+      entries: entries.value.map((row) => ({
+        keywords: row.keywords,
+        secondaryKeywords: row.secondaryKeywords,
+        content: row.content,
+        enabled: row.enabled,
+        insertionOrder: row.insertionOrder,
+        caseSensitive: row.caseSensitive,
+        priority: row.priority,
+        selective: row.selective,
+        selectiveLogic: row.selectiveLogic,
+        constant: row.constant,
+        probability: row.probability,
+      })),
     });
 
     if (!parsed.success) {
@@ -125,7 +205,10 @@ export function LorebookForm({
         }
       }
       rowErrors.value = perRow;
-      formError.value = Object.keys(perRow).length > 0 ? "" : first || "That lorebook couldn't be saved.";
+      formError.value =
+        Object.keys(perRow).length > 0
+          ? ""
+          : first || "That lorebook couldn't be saved.";
       // A block's error message is a prop of `Field`, so the block has to re-render for the line to
       // appear: reassigning the list is what tells the `@for` its rows changed.
       entries.value = [...entries.value];
@@ -159,139 +242,282 @@ export function LorebookForm({
     {/* The root element carries no scope class in Ripple 0.4.7, so a rule on `.lorebook-form` is
         dropped and the form never becomes a grid (found in T-19). The layout lives on this child. */}
     <div class="layout">
-    <section class="section is-identity">
-      <p class="section-label">Identity</p>
-      <Field
-        label="Name"
-        value={name}
-        maxLength={80}
-        placeholder="The Hollow Court"
-        error={formError}
-        onInput={(value) => {
-          name.value = value;
-          formError.value = "";
-        }}
-      />
-    </section>
-
-    <section class="section is-definition">
-      <p class="section-label">Description</p>
-      <Field
-        label="What this lorebook holds"
-        multiline={true}
-        rows={5}
-        maxLength={4000}
-        value={description}
-        placeholder="The world it describes, and when it applies."
-        onInput={(value) => {
-          description.value = value;
-          formError.value = "";
-        }}
-      />
-    </section>
-
-    <section class="section is-media">
-      <p class="section-label">Image and visibility</p>
-      <div class="media-grid">
+      <section class="section is-identity">
+        <p class="section-label">Identity</p>
+        <Field
+          label="Name"
+          value={name}
+          maxLength={80}
+          placeholder="The Hollow Court"
+          error={formError}
+          onInput={(value) => {
+            name.value = value;
+            formError.value = "";
+          }}
+        />
         <Field
           label="Initials"
           value={initials}
           maxLength={4}
           placeholder="HC"
+          help="Stands in for an uploaded image."
           onInput={(value) => {
             initials.value = value;
             formError.value = "";
           }}
         />
-        <Toggle
-          label="NSFW"
-          pressed={nsfw}
-          onToggle={(next) => (nsfw.value = next)}
+        <Field
+          label="Tagline"
+          value={tagline}
+          maxLength={140}
+          placeholder="Records kept below the tideline, in salt and wax."
+          onInput={(value) => {
+            tagline.value = value;
+            formError.value = "";
+          }}
         />
-      </div>
-    </section>
+      </section>
 
-    <section class="section is-entries">
-      <div class="entries-head">
-        <p class="section-label">Entries</p>
-        <p class="entries-count">
-          {entryCount.value === 1 ? "1 entry" : `${entryCount.value} entries`}
-        </p>
-      </div>
+      <section class="section is-media">
+        <p class="section-label">Publishing</p>
+        <Field
+          label="Creator notes"
+          multiline={true}
+          rows={4}
+          maxLength={4000}
+          value={creatorNotes}
+          placeholder="Notes for readers of the detail page. Never part of the prompt."
+          onInput={(value) => {
+            creatorNotes.value = value;
+            formError.value = "";
+          }}
+        />
+        <Select
+          label="Visibility"
+          value={visibility}
+          options={[...VISIBILITY_OPTIONS]}
+          onChange={(next) => (visibility.value = next as Visibility)}
+        />
+        <div class="toggles">
+          <Toggle
+            label="NSFW"
+            pressed={nsfw}
+            onToggle={(next) => (nsfw.value = next)}
+          />
+          <Toggle
+            label="Publish anonymously"
+            pressed={anonymous}
+            onToggle={(next) => (anonymous.value = next)}
+          />
+        </div>
+        <Field
+          label="Tags"
+          value={tags}
+          placeholder="harbor, debt"
+          help="Comma-separated."
+          onInput={(value) => {
+            tags.value = value;
+            formError.value = "";
+          }}
+        />
+      </section>
 
-      @if (entries.value.length === 0) {
-        <p class="empty-note">No entries yet. A lorebook can be saved with none.</p>
-      } @else {
-        <ul class="entry-list">
-          @for (const row of entries.value; key row.key) {
-            <li class="entry">
-              <div class="entry-head">
-                <p class="entry-index">
-                  {`Entry ${entries.value.findIndex((each) => each.key === row.key) + 1}`}
-                </p>
-                <div class="entry-controls">
-                  <Button
-                    variant="ghost"
-                    label={`Move entry up`}
-                    disabled={entries.value.findIndex((each) => each.key === row.key) === 0}
-                    onClick={() => moveEntry(entries.value.findIndex((each) => each.key === row.key), -1)}
-                  >
-                    {`Up`}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    label={`Move entry down`}
-                    disabled={entries.value.findIndex((each) => each.key === row.key) === entries.value.length - 1}
-                    onClick={() => moveEntry(entries.value.findIndex((each) => each.key === row.key), 1)}
-                  >
-                    {`Down`}
-                  </Button>
-                  <Button variant="ghost" onClick={() => removeEntry(row.key)}>{`Remove`}</Button>
+      <section class="section is-entries">
+        <div class="entries-head">
+          <p class="section-label">Entries</p>
+          <p class="entries-count">
+            {entryCount.value === 1 ? "1 entry" : `${entryCount.value} entries`}
+          </p>
+        </div>
+
+        @if (entries.value.length === 0) {
+          <p class="empty-note">
+            No entries yet. A lorebook can be saved with none.
+          </p>
+        } @else {
+          <ul class="entry-list">
+            @for (const row of entries.value; key row.key) {
+              <li class="entry">
+                <div class="entry-head">
+                  <p class="entry-index">
+                    {`Entry ${entries.value.findIndex((each) => each.key === row.key) + 1}`}
+                  </p>
+                  <div class="entry-controls">
+                    <Button
+                      variant="ghost"
+                      label={`Move entry up`}
+                      disabled={
+                        entries.value.findIndex(
+                          (each) => each.key === row.key,
+                        ) === 0
+                      }
+                      onClick={() =>
+                        moveEntry(
+                          entries.value.findIndex(
+                            (each) => each.key === row.key,
+                          ),
+                          -1,
+                        )
+                      }
+                    >
+                      {`Up`}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      label={`Move entry down`}
+                      disabled={
+                        entries.value.findIndex(
+                          (each) => each.key === row.key,
+                        ) ===
+                        entries.value.length - 1
+                      }
+                      onClick={() =>
+                        moveEntry(
+                          entries.value.findIndex(
+                            (each) => each.key === row.key,
+                          ),
+                          1,
+                        )
+                      }
+                    >
+                      {`Down`}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => removeEntry(row.key)}
+                    >{`Remove`}</Button>
+                  </div>
                 </div>
-              </div>
 
-              <Field
-                label="Keywords"
-                value={row.keywords}
-                placeholder="king, court, throne"
-                error={rowErrors.value[row.key] ?? ""}
-                onInput={(value) => patch(row.key, "keywords", value)}
-              />
-              <Field
-                label="Content"
-                multiline={true}
-                rows={4}
-                value={row.content}
-                placeholder="What is injected into the session when an entry matches."
-                onInput={(value) => patch(row.key, "content", value)}
-              />
-              {/* The schema's sentence for this block. It is read here, in the template, so it
+                <Field
+                  label="Keywords"
+                  value={row.keywords}
+                  placeholder="king, court, throne"
+                  help="Comma-separated."
+                  error={rowErrors.value[row.key] ?? ""}
+                  onInput={(value) => patch(row.key, "keywords", value)}
+                />
+                <Field
+                  label="Secondary keywords"
+                  value={row.secondaryKeywords}
+                  placeholder="oath, crown"
+                  help="Comma-separated. Used when selective matching is on."
+                  onInput={(value) =>
+                    patch(row.key, "secondaryKeywords", value)
+                  }
+                />
+                <Field
+                  label="Content"
+                  multiline={true}
+                  rows={4}
+                  value={row.content}
+                  placeholder="What is injected into the session when an entry matches."
+                  onInput={(value) => patch(row.key, "content", value)}
+                />
+
+                <div class="entry-switches">
+                  <Toggle
+                    label="Enabled"
+                    pressed={row.enabled}
+                    onToggle={(next) => patch(row.key, "enabled", next)}
+                  />
+                  <Toggle
+                    label="Case sensitive"
+                    pressed={row.caseSensitive}
+                    onToggle={(next) => patch(row.key, "caseSensitive", next)}
+                  />
+                  <Toggle
+                    label="Selective"
+                    pressed={row.selective}
+                    onToggle={(next) => patch(row.key, "selective", next)}
+                  />
+                  <Toggle
+                    label="Constant"
+                    pressed={row.constant}
+                    onToggle={(next) => patch(row.key, "constant", next)}
+                  />
+                </div>
+
+                <div class="entry-grid">
+                  <Field
+                    label="Insertion order"
+                    type="text"
+                    value={String(row.insertionOrder)}
+                    onInput={(value) =>
+                      patch(row.key, "insertionOrder", Number(value) || 0)
+                    }
+                  />
+                  <Field
+                    label="Priority"
+                    type="text"
+                    value={String(row.priority)}
+                    onInput={(value) =>
+                      patch(row.key, "priority", Number(value) || 0)
+                    }
+                  />
+                  <Field
+                    label="Probability (%)"
+                    type="text"
+                    value={String(row.probability)}
+                    onInput={(value) =>
+                      patch(
+                        row.key,
+                        "probability",
+                        Math.max(0, Math.min(100, Number(value) || 0)),
+                      )
+                    }
+                  />
+                  <Select
+                    label="Selective logic"
+                    value={row.selectiveLogic}
+                    options={[
+                      { value: "AND", label: "AND" },
+                      { value: "NOT", label: "NOT" },
+                    ]}
+                    onChange={(next) =>
+                      patch(
+                        row.key,
+                        "selectiveLogic",
+                        next === "NOT" ? "NOT" : "AND",
+                      )
+                    }
+                  />
+                </div>
+                {/* The schema's sentence for this block. It is read here, in the template, so it
                   updates the moment `rowErrors` does — a `Field.error` prop would be evaluated once
                   and never refresh. */}
-              @if (rowErrors.value[row.key]) {
-                <p class="row-error" role="alert">{rowErrors.value[row.key]}</p>
-              }
-            </li>
-          }
-        </ul>
-      }
+                @if (rowErrors.value[row.key]) {
+                  <p class="row-error" role="alert">
+                    {rowErrors.value[row.key]}
+                  </p>
+                }
+              </li>
+            }
+          </ul>
+        }
 
-      <div class="add-row">
-        <Button variant="secondary" block onClick={addEntry}>Add entry</Button>
-      </div>
-    </section>
+        <div class="add-row">
+          <Button variant="secondary" block onClick={addEntry}>
+            Add entry
+          </Button>
+        </div>
+      </section>
 
-    <div class="foot">
-      @if (formError.value) {
-        <p class="alert" role="alert">{formError.value}</p>
-      }
-      <div class="buttons">
-        <Button variant="secondary" onClick={onCancel}>Cancel</Button>
-        <Button variant="primary" type="submit" disabled={denySave}>
-          {saving.value ? "Saving…" : editing ? "Save changes" : "Save"}
-        </Button>
+      <div class="foot">
+        @if (formError.value) {
+          <p class="alert" role="alert">
+            {formError.value}
+          </p>
+        }
+        <div class="buttons">
+          <Button variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" disabled={denySave}>
+            {saving.value ? "Saving…" : editing ? "Save changes" : "Save"}
+          </Button>
+        </div>
       </div>
-    </div>
     </div>
 
     <style>
@@ -326,9 +552,9 @@ export function LorebookForm({
 
       .entries-head {
         display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
       }
 
       .entries-count {
@@ -338,7 +564,15 @@ export function LorebookForm({
         line-height: 1.4;
       }
 
-      .media-grid {
+      .media-grid,
+      .toggles {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .entry-switches,
+      .entry-grid {
         display: flex;
         flex-direction: column;
         gap: 12px;
@@ -364,9 +598,8 @@ export function LorebookForm({
 
       .entry-head {
         display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
+        flex-direction: column;
+        align-items: stretch;
         gap: 8px;
       }
 
@@ -379,9 +612,9 @@ export function LorebookForm({
         text-transform: uppercase;
       }
 
-      /* Three 44px controls on one row at 360: 132px of 328 leaves the label breathing room. */
       .entry-controls {
         display: flex;
+        flex-direction: column;
         gap: 2px;
       }
 
@@ -427,69 +660,6 @@ export function LorebookForm({
 
       .buttons > * {
         flex: 1 1 auto;
-      }
-
-      @media (min-width: 640px) {
-        .buttons {
-          flex-direction: row;
-          justify-content: flex-end;
-        }
-
-        .buttons > * {
-          flex: 0 0 auto;
-          min-width: 140px;
-        }
-
-        .media-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-          align-items: end;
-          gap: 16px;
-        }
-
-        .add-row {
-          display: flex;
-        }
-      }
-
-      @media (min-width: 900px) {
-        /* The entries are the form, so they take the wide column; identity and media sit beside. */
-        .layout {
-          grid-template-columns: minmax(0, 1fr) 320px;
-          column-gap: 40px;
-        }
-
-        .section.is-identity {
-          grid-column: 2;
-          grid-row: 1;
-        }
-
-        .section.is-media {
-          grid-column: 2;
-          grid-row: 2;
-        }
-
-        .section.is-definition {
-          grid-column: 1;
-          grid-row: 1 / span 2;
-        }
-
-        .section.is-entries {
-          grid-column: 1 / span 2;
-          padding-top: 16px;
-          border-top: 1px solid var(--color-border);
-        }
-
-        .foot {
-          grid-column: 1 / span 2;
-          flex-direction: row;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .foot .alert {
-          order: -1;
-        }
       }
     </style>
   </form>
