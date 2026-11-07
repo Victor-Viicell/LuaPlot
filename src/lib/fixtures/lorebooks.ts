@@ -33,24 +33,28 @@ export const LOREBOOKS: Lorebook[] = [
     entries: [
       {
         id: "sa-1",
+        title: "The strongroom",
         keywords: ["archive", "strongroom", "below"],
         content:
           "The Salt Archive occupies a basalt strongroom six fathoms down, entered through a hatch that only opens on a falling tide. Nothing inside is dry. Panels are read by touch, then copied onto wax before the reading is spoken aloud.",
       },
       {
         id: "sa-2",
+        title: "Tide-readers and licences",
         keywords: ["tide-reader", "Aurelia", "reader"],
         content:
           "A tide-reader is licensed, not born. The licence is a brass token stamped with the year of the last drowning; the archive keeps the register of every token ever issued, and a reader who loses hers is not replaced.",
       },
       {
         id: "sa-3",
+        title: "The borrowed-name ledger",
         keywords: ["ledger", "borrowed name", "mother"],
         content:
           "The borrowed-name ledger records everyone who ever sailed under a name that was not theirs. One line is entered in an unfamiliar hand and left unsigned — the page has been cut and re-sewn twice.",
       },
       {
         id: "sa-4",
+        title: "What a citation costs",
         keywords: ["fine", "penalty", "law"],
         content:
           "Reading a panel without a token costs a season's salvage. Quoting one aloud costs the reader's name, which the archive then holds in escrow until the debt is repaid in full.",

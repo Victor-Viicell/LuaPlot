@@ -328,6 +328,12 @@ export const characterWriteSchema = z
  */
 export const lorebookEntrySchema = z.strictObject({
   id: z.string().min(1),
+  /**
+   * The entry's **name** — the one line the editor lists it by (owner's call: the entries list shows
+   * names only, and the full entry opens in a dialog). Optional on stored rows so the entries seeded
+   * before the field landed keep parsing; the editor always writes one.
+   */
+  title: z.string().optional(),
   keywords: z.array(z.string().min(1)),
   /** Additional keys required to activate; ignored unless `selective` is true. */
   secondaryKeywords: z.array(z.string()).optional(),
@@ -377,6 +383,8 @@ const keywordListInput = (split: (raw: string) => string[]) =>
     .transform((words) => [...new Set(words.map((word) => word.trim()).filter((word) => word.length > 0))]);
 
 export const lorebookEntryWriteSchema = z.strictObject({
+  /** The line the editor lists this entry by; empty falls back to its first keyword. */
+  title: z.string().transform((raw) => raw.trim()),
   /**
    * Accepts the typed line **or** an already-split list: the form hands strings, and the adapter
    * parses the write again, so the schema has to accept its own output or a second parse would

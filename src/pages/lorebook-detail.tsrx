@@ -43,7 +43,7 @@ type Phase = "loading" | "ready" | "error";
 type ReasonRow = { key: string; parts: string; reasons: string; details: string };
 
 /** One entry as the page draws it: its position, its keywords, its body. */
-type EntryRow = { key: string; keywords: string[]; content: string };
+type EntryRow = { key: string; title: string; keywords: string[]; content: string };
 
 export function LorebookDetail() @{
   const repo = resolveRepo();
@@ -188,6 +188,7 @@ export function LorebookDetail() @{
         // The author's order is the reading order; the adapter stored it that way.
         entries.value = item.entries.map((entry) => ({
           key: entry.id,
+          title: entry.title ?? "",
           keywords: entry.keywords,
           content: entry.content,
         }));
@@ -655,6 +656,16 @@ export function LorebookDetail() @{
         line-height: 1.6;
       }
 
+      /* The entry's name, when the author gave one: the list in the editor is names, so the reading
+         page states the same name above the content. */
+      .entry-title {
+        margin: 0 0 6px;
+        color: var(--color-text);
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+
       .entry-text {
         margin: 0;
         color: var(--color-text);
@@ -994,6 +1005,9 @@ export function LorebookDetail() @{
                       <ul class="entries">
                         @for (const row of entries.value; key row.key) {
                           <li class="entry">
+                            @if (row.title !== "") {
+                              <p class="entry-title">{row.title}</p>
+                            }
                             <ul class="keywords" aria-label="Keywords">
                               @for (const word of row.keywords; key word) {
                                 <li class="keyword">{word}</li>

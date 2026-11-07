@@ -2,12 +2,16 @@ import { track } from "ripple";
 import { Button } from "./Button.tsrx";
 import { Field } from "./Field.tsrx";
 import { Select } from "./Select.tsrx";
+import { Sheet } from "./Sheet.tsrx";
 import { Toggle } from "./Toggle.tsrx";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Lorebook } from "../lib/data/types.ts";
 import {
+  ENTRY_CONTENT_REQUIRED,
+  ENTRY_KEYWORD_REQUIRED,
   VISIBILITY_OPTIONS,
   lorebookWriteSchema,
+  splitKeywords,
   type Visibility,
 } from "../lib/schema.ts";
 
@@ -40,6 +44,8 @@ import {
 /** One block in the editor. `key` is the render key only — it never reaches the write. */
 type EntryBlock = {
   key: number;
+  /** The name the list shows; empty falls back to the first keyword. */
+  title: string;
   keywords: string;
   secondaryKeywords: string;
   content: string;
@@ -85,6 +91,7 @@ export function LorebookForm({
       nextKey += 1;
       return {
         key: nextKey,
+        title: entry.title ?? "",
         keywords: entry.keywords.join(", "),
         secondaryKeywords: (entry.secondaryKeywords ?? []).join(", "),
         content: entry.content,
@@ -109,12 +116,106 @@ export function LorebookForm({
   const denySave = track(() => saving.value || name.value.trim().length === 0);
   const entryCount = track(() => entries.value.length);
 
+  /**
+   * The entry editor is a **dialog**, not an inline block (owner's call): the list shows names only,
+   * so a lorebook with thirty entries is a list of thirty lines rather than thirty open forms. The
+   * open entry is copied into these drafts, edited there, and written back on Save — Cancel throws
+   * the copy away, which an inline block could never do.
+   */
+  const editingKey = track<number | "">("");
+  const draftTitle = track("");
+  const draftKeywords = track("");
+  const draftSecondary = track("");
+  const draftContent = track("");
+  const draftEnabled = track(true);
+  const draftCaseSensitive = track(false);
+  const draftSelective = track(false);
+  const draftConstant = track(false);
+  const draftLogic = track<"AND" | "NOT">("AND");
+  const draftOrder = track("100");
+  const draftPriority = track("10");
+  const draftProbability = track("100");
+  const draftError = track("");
+
+  /** What the list calls an entry: its name, else its first keyword, else a placeholder. */
+  function nameOf(row: EntryBlock): string {
+    const title = row.title.trim();
+    if (title !== "") return title;
+    const first = row.keywords.split(",")[0]?.trim() ?? "";
+    return first !== "" ? first : "Untitled entry";
+  }
+
+  function openEntry(key: number): void {
+    const row = entries.value.find((each) => each.key === key);
+    if (!row) return;
+    draftTitle.value = row.title;
+    draftKeywords.value = row.keywords;
+    draftSecondary.value = row.secondaryKeywords;
+    draftContent.value = row.content;
+    draftEnabled.value = row.enabled;
+    draftCaseSensitive.value = row.caseSensitive;
+    draftSelective.value = row.selective;
+    draftConstant.value = row.constant;
+    draftLogic.value = row.selectiveLogic;
+    draftOrder.value = String(row.insertionOrder);
+    draftPriority.value = String(row.priority);
+    draftProbability.value = String(row.probability);
+    draftError.value = rowErrors.value[key] ?? "";
+    editingKey.value = key;
+  }
+
+  function closeEntry(): void {
+    editingKey.value = "";
+    draftError.value = "";
+  }
+
+  /** Write the draft back. Keywords and content are the two things an entry cannot do without. */
+  function saveEntry(): void {
+    const key = editingKey.value;
+    if (key === "") return;
+
+    if (splitKeywords(draftKeywords.value).length === 0) {
+      draftError.value = ENTRY_KEYWORD_REQUIRED;
+      return;
+    }
+    if (draftContent.value.trim() === "") {
+      draftError.value = ENTRY_CONTENT_REQUIRED;
+      return;
+    }
+
+    entries.value = entries.value.map((row) =>
+      row.key === key
+        ? {
+            ...row,
+            title: draftTitle.value,
+            keywords: draftKeywords.value,
+            secondaryKeywords: draftSecondary.value,
+            content: draftContent.value,
+            enabled: draftEnabled.value,
+            caseSensitive: draftCaseSensitive.value,
+            selective: draftSelective.value,
+            constant: draftConstant.value,
+            selectiveLogic: draftLogic.value,
+            insertionOrder: Number(draftOrder.value) || 0,
+            priority: Number(draftPriority.value) || 0,
+            probability: Math.max(0, Math.min(100, Number(draftProbability.value) || 0)),
+          }
+        : row,
+    );
+
+    const next = { ...rowErrors.value };
+    delete next[key];
+    rowErrors.value = next;
+    closeEntry();
+  }
+
   function addEntry(): void {
     nextKey += 1;
     entries.value = [
       ...entries.value,
       {
         key: nextKey,
+        title: "",
         keywords: "",
         secondaryKeywords: "",
         content: "",
@@ -129,6 +230,9 @@ export function LorebookForm({
       },
     ];
     formError.value = "";
+    // A new entry is empty: open it straight away so the author names it and writes it instead of
+    // hunting for the row that just appeared at the bottom of the list.
+    openEntry(nextKey);
   }
 
   function removeEntry(key: number): void {
@@ -147,22 +251,6 @@ export function LorebookForm({
     entries.value = next;
   }
 
-  function patch<K extends keyof EntryBlock>(
-    key: number,
-    field: K,
-    value: EntryBlock[K],
-  ): void {
-    entries.value = entries.value.map((row) =>
-      row.key === key ? { ...row, [field]: value } : row,
-    );
-    if (rowErrors.value[key]) {
-      const next = { ...rowErrors.value };
-      delete next[key];
-      rowErrors.value = next;
-    }
-    formError.value = "";
-  }
-
   async function save(): Promise<void> {
     if (saving.value) return;
 
@@ -176,6 +264,7 @@ export function LorebookForm({
       anonymous: anonymous.value,
       tags: tags.value,
       entries: entries.value.map((row) => ({
+        title: row.title,
         keywords: row.keywords,
         secondaryKeywords: row.secondaryKeywords,
         content: row.content,
@@ -205,13 +294,15 @@ export function LorebookForm({
         }
       }
       rowErrors.value = perRow;
+      const badKeys = Object.keys(perRow).map(Number);
+      // An entry's message lives in its dialog now, so a closed dialog would swallow the refusal and
+      // the form would look dead. Say it on the form *and* open the first offending entry.
       formError.value =
-        Object.keys(perRow).length > 0
-          ? ""
+        badKeys.length > 0
+          ? "One entry needs attention — it is open for you."
           : first || "That lorebook couldn't be saved.";
-      // A block's error message is a prop of `Field`, so the block has to re-render for the line to
-      // appear: reassigning the list is what tells the `@for` its rows changed.
       entries.value = [...entries.value];
+      if (badKeys.length > 0 && editingKey.value !== badKeys[0]) openEntry(badKeys[0]);
       return;
     }
 
@@ -338,159 +429,40 @@ export function LorebookForm({
           <ul class="entry-list">
             @for (const row of entries.value; key row.key) {
               <li class="entry">
-                <div class="entry-head">
-                  <p class="entry-index">
-                    {`Entry ${entries.value.findIndex((each) => each.key === row.key) + 1}`}
-                  </p>
-                  <div class="entry-controls">
-                    <Button
-                      variant="ghost"
-                      label={`Move entry up`}
-                      disabled={
-                        entries.value.findIndex(
-                          (each) => each.key === row.key,
-                        ) === 0
-                      }
-                      onClick={() =>
-                        moveEntry(
-                          entries.value.findIndex(
-                            (each) => each.key === row.key,
-                          ),
-                          -1,
-                        )
-                      }
-                    >
-                      {`Up`}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      label={`Move entry down`}
-                      disabled={
-                        entries.value.findIndex(
-                          (each) => each.key === row.key,
-                        ) ===
-                        entries.value.length - 1
-                      }
-                      onClick={() =>
-                        moveEntry(
-                          entries.value.findIndex(
-                            (each) => each.key === row.key,
-                          ),
-                          1,
-                        )
-                      }
-                    >
-                      {`Down`}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => removeEntry(row.key)}
-                    >{`Remove`}</Button>
-                  </div>
-                </div>
+                <p class="entry-name">{nameOf(row)}</p>
 
-                <Field
-                  label="Keywords"
-                  value={row.keywords}
-                  placeholder="king, court, throne"
-                  help="Comma-separated."
-                  error={rowErrors.value[row.key] ?? ""}
-                  onInput={(value) => patch(row.key, "keywords", value)}
-                />
-                <Field
-                  label="Secondary keywords"
-                  value={row.secondaryKeywords}
-                  placeholder="oath, crown"
-                  help="Comma-separated. Used when selective matching is on."
-                  onInput={(value) =>
-                    patch(row.key, "secondaryKeywords", value)
-                  }
-                />
-                <Field
-                  label="Content"
-                  multiline={true}
-                  rows={4}
-                  value={row.content}
-                  placeholder="What is injected into the session when an entry matches."
-                  onInput={(value) => patch(row.key, "content", value)}
-                />
-
-                <div class="entry-switches">
-                  <Toggle
-                    label="Enabled"
-                    pressed={row.enabled}
-                    onToggle={(next) => patch(row.key, "enabled", next)}
-                  />
-                  <Toggle
-                    label="Case sensitive"
-                    pressed={row.caseSensitive}
-                    onToggle={(next) => patch(row.key, "caseSensitive", next)}
-                  />
-                  <Toggle
-                    label="Selective"
-                    pressed={row.selective}
-                    onToggle={(next) => patch(row.key, "selective", next)}
-                  />
-                  <Toggle
-                    label="Constant"
-                    pressed={row.constant}
-                    onToggle={(next) => patch(row.key, "constant", next)}
-                  />
-                </div>
-
-                <div class="entry-grid">
-                  <Field
-                    label="Insertion order"
-                    type="text"
-                    value={String(row.insertionOrder)}
-                    onInput={(value) =>
-                      patch(row.key, "insertionOrder", Number(value) || 0)
-                    }
-                  />
-                  <Field
-                    label="Priority"
-                    type="text"
-                    value={String(row.priority)}
-                    onInput={(value) =>
-                      patch(row.key, "priority", Number(value) || 0)
-                    }
-                  />
-                  <Field
-                    label="Probability (%)"
-                    type="text"
-                    value={String(row.probability)}
-                    onInput={(value) =>
-                      patch(
-                        row.key,
-                        "probability",
-                        Math.max(0, Math.min(100, Number(value) || 0)),
+                <div class="entry-actions">
+                  <Button variant="secondary" onClick={() => openEntry(row.key)}>
+                    Edit
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={entries.value.findIndex((each) => each.key === row.key) === 0}
+                    onClick={() =>
+                      moveEntry(
+                        entries.value.findIndex((each) => each.key === row.key),
+                        -1,
                       )
                     }
-                  />
-                  <Select
-                    label="Selective logic"
-                    value={row.selectiveLogic}
-                    options={[
-                      { value: "AND", label: "AND" },
-                      { value: "NOT", label: "NOT" },
-                    ]}
-                    onChange={(next) =>
-                      patch(
-                        row.key,
-                        "selectiveLogic",
-                        next === "NOT" ? "NOT" : "AND",
+                  >
+                    Up
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={
+                      entries.value.findIndex((each) => each.key === row.key) ===
+                      entries.value.length - 1
+                    }
+                    onClick={() =>
+                      moveEntry(
+                        entries.value.findIndex((each) => each.key === row.key),
+                        1,
                       )
                     }
-                  />
+                  >
+                    Down
+                  </Button>
                 </div>
-                {/* The schema's sentence for this block. It is read here, in the template, so it
-                  updates the moment `rowErrors` does — a `Field.error` prop would be evaluated once
-                  and never refresh. */}
-                @if (rowErrors.value[row.key]) {
-                  <p class="row-error" role="alert">
-                    {rowErrors.value[row.key]}
-                  </p>
-                }
               </li>
             }
           </ul>
@@ -502,6 +474,115 @@ export function LorebookForm({
           </Button>
         </div>
       </section>
+
+      @if (editingKey.value !== "") {
+        <Sheet title="Entry" onClose={closeEntry} full={true}>
+          <Field
+            label="Name"
+            value={draftTitle}
+            placeholder="The line this entry is listed by"
+            onInput={(value) => {
+              draftTitle.value = value;
+              draftError.value = "";
+            }}
+          />
+
+          <Field
+            label="Keywords"
+            value={draftKeywords}
+            placeholder="king, court, throne"
+            help="Comma-separated."
+            error={draftError}
+            onInput={(value) => {
+              draftKeywords.value = value;
+              draftError.value = "";
+            }}
+          />
+
+          <Field
+            label="Secondary keywords"
+            value={draftSecondary}
+            placeholder="oath, crown"
+            help="Comma-separated. Used when selective matching is on."
+            onInput={(value) => {
+              draftSecondary.value = value;
+              draftError.value = "";
+            }}
+          />
+
+          <Field
+            label="Content"
+            multiline={true}
+            rows={6}
+            value={draftContent}
+            placeholder="What is injected into the session when an entry matches."
+            onInput={(value) => {
+              draftContent.value = value;
+              draftError.value = "";
+            }}
+          />
+
+          <div class="entry-switches">
+            <Toggle label="Enabled" pressed={draftEnabled} onToggle={(next) => (draftEnabled.value = next)} />
+            <Toggle
+              label="Case sensitive"
+              pressed={draftCaseSensitive}
+              onToggle={(next) => (draftCaseSensitive.value = next)}
+            />
+            <Toggle label="Selective" pressed={draftSelective} onToggle={(next) => (draftSelective.value = next)} />
+            <Toggle label="Constant" pressed={draftConstant} onToggle={(next) => (draftConstant.value = next)} />
+          </div>
+
+          <div class="entry-grid">
+            <Field
+              label="Insertion order"
+              type="text"
+              value={draftOrder}
+              onInput={(value) => (draftOrder.value = value)}
+            />
+            <Field
+              label="Priority"
+              type="text"
+              value={draftPriority}
+              onInput={(value) => (draftPriority.value = value)}
+            />
+            <Field
+              label="Probability (%)"
+              type="text"
+              value={draftProbability}
+              onInput={(value) => (draftProbability.value = value)}
+            />
+            <Select
+              label="Selective logic"
+              value={draftLogic}
+              options={[
+                { value: "AND", label: "AND" },
+                { value: "NOT", label: "NOT" },
+              ]}
+              onChange={(next) => (draftLogic.value = next === "NOT" ? "NOT" : "AND")}
+            />
+          </div>
+
+          @if (draftError.value !== "") {
+            <p class="row-error" role="alert">{draftError.value}</p>
+          }
+
+          <div class="entry-dialog-actions">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (editingKey.value === "") return;
+                removeEntry(editingKey.value);
+                closeEntry();
+              }}
+            >
+              Remove entry
+            </Button>
+            <Button variant="secondary" onClick={closeEntry}>Cancel</Button>
+            <Button variant="primary" onClick={saveEntry}>Save entry</Button>
+          </div>
+        </Sheet>
+      }
 
       <div class="foot">
         @if (formError.value) {
@@ -596,26 +677,37 @@ export function LorebookForm({
         border-bottom: 1px solid var(--color-border);
       }
 
-      .entry-head {
+      /* One entry, one line: the name across the row, then Edit · Up · Down spread evenly over the
+         full width. Everything else about the entry lives behind **Edit**. */
+      .entry {
         display: flex;
         flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
+        gap: 10px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--color-border);
       }
 
-      .entry-index {
+      .entry-name {
         margin: 0;
-        color: var(--color-text-muted);
-        font-size: 12px;
-        letter-spacing: 0.08em;
+        overflow: hidden;
+        color: var(--color-text);
+        font-size: 14px;
+        font-weight: 600;
         line-height: 1.4;
-        text-transform: uppercase;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
-      .entry-controls {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+      .entry-actions,
+      .entry-dialog-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+      }
+
+      .entry-dialog-actions {
+        padding-top: 4px;
       }
 
       .add-row {

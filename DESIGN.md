@@ -505,6 +505,28 @@ by the compiler. Use `:global(...)` only to react to something you do not own (a
 
 ---
 
+## Lorebook entries: a list of names, one dialog per entry (owner's call)
+
+The create/edit lorebook form used to open **every entry inline** — keywords, secondary keywords,
+content, four switches and four numbers per block. With a dozen entries that is a wall of fields, and
+finding one meant scrolling a form that never ended. Now:
+
+- **A name per entry.** `lorebookEntrySchema` carries `title` (optional on stored rows, so old seeds
+  parse; the editor always writes one). Empty falls back to the entry's first keyword, then to
+  *Untitled entry*.
+- **The list is names only** — one line each, the name at full width, ellipsised.
+- **Edit · Up · Down** under each name, a three-column grid across the full width: equal targets,
+  even edges. Up is disabled on the first row, Down on the last, and the order is the author's — the
+  adapter stores it and nothing sorts it.
+- **Edit opens the entry in a `Sheet`** (`full` on a phone, the centred dialog from `md`) with the
+  whole record: Name, Keywords, Secondary keywords, Content, the four switches, insertion order,
+  priority, probability, selective logic — plus **Remove entry**, Cancel and Save entry. The dialog
+  edits a **draft copy**: Cancel throws it away, which an inline block could never do.
+- **Add entry** appends and opens that empty entry straight away, so the author names it instead of
+  hunting for the row that just appeared at the bottom.
+- The reading page shows the same name above the entry's content, so the name an author typed is the
+  name a reader sees.
+
 ## The dropdown is the app's, not the OS's
 
 `Select` was a native `<select>` until now, and on Android that opens a full-screen wheel while on a

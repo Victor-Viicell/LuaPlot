@@ -1295,20 +1295,34 @@ results.push(
     if (second !== first) throw new Error(`the name field read "${first}" then "${second}"`);
 
     // The entry list is the only thing on this form the character form does not have, so the write
-    // is proven by adding one block — the one road into `repo.updateLorebook` that a name alone
-    // cannot walk.
-    const keywords = 'input[placeholder="king, court, throne"]';
-    const content = 'textarea[placeholder="What is injected into the session when an entry matches."]';
-    const blocks = await js(`return document.querySelectorAll(${JSON.stringify(keywords)}).length;`);
-    if (blocks !== 4) throw new Error(`The Salt Archive preloaded ${blocks} entry blocks, not 4`);
+    // is proven by adding one — the one road into `repo.updateLorebook` that a name alone cannot
+    // walk. Since T-89 the list is **names only** and the record opens in a dialog (`DESIGN.md` →
+    // *Lorebook entries*), so the walk counts rows, opens the new one, fills it and saves it.
+    const rows = await js(`return document.querySelectorAll(".entry-name").length;`);
+    if (rows !== 4) throw new Error(`The Salt Archive preloaded ${rows} entry rows, not 4`);
+    const names = await js(`return [...document.querySelectorAll(".entry-name")].map((el) => el.innerText.trim()).join(" · ");`);
+    if (!/strongroom/i.test(names)) throw new Error(`the entry rows read "${names}"`);
+
     await click("Add entry", { exact: true });
     await waitFor(
-      `document.querySelectorAll(${JSON.stringify(keywords)}).length === ${blocks + 1}`,
-      "the new entry block",
+      `document.querySelector(".sheet") !== null && document.querySelector(".sheet input") !== null`,
+      "the new entry's dialog",
       6000,
     );
-    await retype(keywords, "tide-mark", blocks);
-    await retype(content, ownEntry, blocks);
+    await retype(".sheet input", "The tide-mark", 0);
+    await retype(".sheet input", "tide-mark", 1);
+    await retype(".sheet textarea", ownEntry, 0);
+    await click("Save entry", { exact: true });
+    await waitFor(
+      `document.querySelectorAll(".entry-name").length === ${rows + 1}`,
+      "the list to grow by one row",
+      6000,
+    );
+    await waitFor(
+      `[...document.querySelectorAll(".entry-name")].some((el) => el.innerText.trim() === "The tide-mark")`,
+      "the new entry's name in the list",
+      4000,
+    );
 
     await click("Save changes", { exact: true });
     // **Base-agnostic**, like `go()`: the preview serves `/lorebook/…` and Pages serves
@@ -1317,7 +1331,7 @@ results.push(
     await waitFor(`/\\/lorebook\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the lorebook's own page after saving", 8000);
     await waitText(ownEntry, 8000);
     await waitText("tide-mark", 8000);
-    return `the list grew ${blocks} → ${blocks + 1} and the detail page prints the entry and its keyword`;
+    return `the list grew ${rows} → ${rows + 1} and the detail page prints the entry and its name`;
   }),
 );
 
@@ -1334,8 +1348,21 @@ results.push(
       6000,
     );
     // The preload nobody had read: the stored model, before anything is touched.
-    const before = await choose(".select-input", "deepseek-chat");
-    await choose(".select-input", "deepseek-reasoner");
+    const offered = await page(`(async () => {
+      const trigger = document.querySelector(".select-input");
+      trigger.click();
+      await new Promise((r) => setTimeout(r, 120));
+      const values = [...document.querySelectorAll(".select-option[data-value]")].map((el) => el.dataset.value);
+      const current = trigger.dataset.value;
+      document.querySelector(".select-scrim")?.click();
+      return { values, current };
+    })()`);
+    if (!offered.values || offered.values.length < 2) {
+      throw new Error(`the model dropdown offers ${JSON.stringify(offered && offered.values)}`);
+    }
+    const before = offered.current;
+    const target = offered.values.find((value) => value !== before);
+    await choose(".select-input", target);
 
     await click("Save changes", { exact: true });
     await waitFor(`/\\/preset\\/[0-9a-f-]{36}$/.test(location.pathname)`, "the preset's own page after saving", 8000);
@@ -1347,13 +1374,13 @@ results.push(
     await waitFor(
       `(() => {
          const s = document.querySelector('section[aria-label="Generation settings"]');
-         return s && /deepseek-reasoner/.test(s.innerText) ? s.innerText.replace(/\\s+/g, " ").trim() : "";
+         return s && s.innerText.includes(${JSON.stringify(target)}) ? s.innerText.replace(/\\s+/g, " ").trim() : "";
        })()`,
       "the detail page to print the model that was chosen",
       8000,
     );
     const model = await settingValue("Model");
-    if (model !== "deepseek-reasoner") throw new Error(`the settings row reads "${model}" after the save`);
+    if (model !== target) throw new Error(`the settings row reads "${model}" after the save, not ${target}`);
     const body = await text();
     if (!body.includes("Quiet Draft")) throw new Error("the detail page lost the preset's name");
     if (!/Tuned for scene-setting/.test(body)) throw new Error("a settings-only save dropped the description");
@@ -4968,8 +4995,10 @@ results.push(
     // 3. The author edits the **live item**: name and in-session name, through its own edit form.
     await go(`/character/${characterId}/edit`);
     await waitFor(`!!document.querySelector("form input")`, "the character edit form", 8000);
-    await retype("form input", SNAPSHOT_EDIT_NAME, 0);
-    await retype("form input", SNAPSHOT_EDIT_INSESSION, 1);
+    // Addressed by their own placeholders: the form grew fields, and an index now lands on the
+    // 4-character Initials box (which read back "Aure" — a truncation, not a lost edit).
+    await retype('input[placeholder="Sonic the Hedgehog"]', SNAPSHOT_EDIT_NAME, 0);
+    await retype('input[placeholder="Sonic"]', SNAPSHOT_EDIT_INSESSION, 0);
     await click("Save changes", { exact: true });
     try {
       await waitFor(
@@ -5095,8 +5124,8 @@ results.push(
     //    move when the item it was cut from does.
     await go(`/character/${characterId}/edit`);
     await waitFor(`!!document.querySelector("form input")`, "the character edit form (second pass)", 8000);
-    await retype("form input", SNAPSHOT_SECOND_NAME, 0);
-    await retype("form input", SNAPSHOT_SECOND_INSESSION, 1);
+    await retype('input[placeholder="Sonic the Hedgehog"]', SNAPSHOT_SECOND_NAME, 0);
+    await retype('input[placeholder="Sonic"]', SNAPSHOT_SECOND_INSESSION, 0);
     await click("Save changes", { exact: true });
     await waitFor(
       `(document.querySelector(".detail h1.title")?.textContent || "").trim() === ${JSON.stringify(SNAPSHOT_SECOND_NAME)}`,
