@@ -44,6 +44,12 @@ import {
 /** One block in the editor. `key` is the render key only — it never reaches the write. */
 type EntryBlock = {
   key: number;
+  /**
+   * Changes whenever the row is rebuilt (a move, or a fresh entry). The `@for` is keyed by
+   * `key:stamp`, so a reorder re-creates the row: **a child's props are evaluated once**, and Up/Down
+   * kept the `disabled` they were mounted with — the buttons did not follow their position.
+   */
+  stamp: number;
   /** The name the list shows; empty falls back to the first keyword. */
   title: string;
   keywords: string;
@@ -91,6 +97,7 @@ export function LorebookForm({
       nextKey += 1;
       return {
         key: nextKey,
+        stamp: nextKey,
         title: entry.title ?? "",
         keywords: entry.keywords.join(", "),
         secondaryKeywords: (entry.secondaryKeywords ?? []).join(", "),
@@ -209,12 +216,24 @@ export function LorebookForm({
     closeEntry();
   }
 
+  /**
+   * Rename in place: the list is the only place a name is read, so an author should not have to open
+   * the entry to correct one. Everything else about the entry stays behind Edit.
+   */
+  function renameEntry(key: number, title: string): void {
+    entries.value = entries.value.map((row) =>
+      row.key === key ? { ...row, title } : row,
+    );
+    formError.value = "";
+  }
+
   function addEntry(): void {
     nextKey += 1;
     entries.value = [
       ...entries.value,
       {
         key: nextKey,
+        stamp: nextKey,
         title: "",
         keywords: "",
         secondaryKeywords: "",
@@ -246,8 +265,10 @@ export function LorebookForm({
     if (to < 0 || to >= entries.value.length) return;
     const next = [...entries.value];
     const carried = next[index];
-    next[index] = next[to];
-    next[to] = carried;
+    const other = next[to];
+    const bump = (row: EntryBlock) => ({ ...row, stamp: row.stamp + 1 });
+    next[index] = bump(other);
+    next[to] = bump(carried);
     entries.value = next;
   }
 
@@ -427,9 +448,18 @@ export function LorebookForm({
           </p>
         } @else {
           <ul class="entry-list">
-            @for (const row of entries.value; key row.key) {
+            @for (const row of entries.value; key row.key + ":" + row.stamp) {
               <li class="entry">
-                <p class="entry-name">{nameOf(row)}</p>
+                <input
+                  class="entry-name"
+                  type="text"
+                  value={row.title}
+                  placeholder={nameOf(row)}
+                  aria-label="Entry name"
+                  onInput={(event) =>
+                    renameEntry(row.key, event.currentTarget.value)
+                  }
+                />
 
                 <div class="entry-actions">
                   <Button variant="secondary" onClick={() => openEntry(row.key)}>
@@ -687,15 +717,35 @@ export function LorebookForm({
         border-bottom: 1px solid var(--color-border);
       }
 
-      .entry-name {
-        margin: 0;
-        overflow: hidden;
+      /* The name is an **input**: renaming should not cost a dialog (owner's call). It reads as the
+         row's title until touched — no box, a hairline that only shows on hover or focus. */
+      input.entry-name {
+        width: 100%;
+        min-height: 32px;
+        padding: 4px 0;
+        border: 0;
+        border-bottom: 1px solid transparent;
+        background: transparent;
         color: var(--color-text);
+        font: inherit;
         font-size: 14px;
         font-weight: 600;
         line-height: 1.4;
         text-overflow: ellipsis;
-        white-space: nowrap;
+      }
+
+      input.entry-name::placeholder {
+        color: var(--color-text-subtle);
+        font-weight: 500;
+      }
+
+      input.entry-name:hover {
+        border-bottom-color: var(--color-border);
+      }
+
+      input.entry-name:focus {
+        outline: none;
+        border-bottom-color: var(--color-accent);
       }
 
       .entry-actions,

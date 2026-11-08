@@ -1300,7 +1300,7 @@ results.push(
     // *Lorebook entries*), so the walk counts rows, opens the new one, fills it and saves it.
     const rows = await js(`return document.querySelectorAll(".entry-name").length;`);
     if (rows !== 4) throw new Error(`The Salt Archive preloaded ${rows} entry rows, not 4`);
-    const names = await js(`return [...document.querySelectorAll(".entry-name")].map((el) => el.innerText.trim()).join(" · ");`);
+    const names = await js(`return [...document.querySelectorAll(".entry-name")].map((el) => (el.value || el.placeholder || "").trim()).join(" · ");`);
     if (!/strongroom/i.test(names)) throw new Error(`the entry rows read "${names}"`);
 
     await click("Add entry", { exact: true });
@@ -1319,10 +1319,33 @@ results.push(
       6000,
     );
     await waitFor(
-      `[...document.querySelectorAll(".entry-name")].some((el) => el.innerText.trim() === "The tide-mark")`,
+      `[...document.querySelectorAll(".entry-name")].some((el) => ((el.value || "") + "").trim() === "The tide-mark")`,
       "the new entry's name in the list",
       4000,
     );
+
+    // The buttons follow their position: a keyed row keeps the props it was mounted with, so a move
+    // that reused the row used to leave Up/Down disabled in the wrong places (found by the owner).
+    const moved = await page(`(async () => {
+      const rows = () => [...document.querySelectorAll(".entry")];
+      const flags = () => rows().map((row) => {
+        const buttons = row.querySelectorAll(".entry-actions .btn");
+        return (buttons[1].disabled ? "-" : "u") + (buttons[2].disabled ? "-" : "d");
+      });
+      const before = flags();
+      rows()[1].querySelectorAll(".entry-actions .btn")[1].click();
+      await new Promise((r) => setTimeout(r, 250));
+      const after = flags();
+      rows()[0].querySelectorAll(".entry-actions .btn")[2].click();
+      await new Promise((r) => setTimeout(r, 250));
+      return { before, after, back: flags() };
+    })()`);
+    if (moved.after[0] !== "-d" || moved.after[1][0] !== "u") {
+      throw new Error(`after moving the second entry up the buttons read ${JSON.stringify(moved.after)} (was ${JSON.stringify(moved.before)}) — they kept the position they were mounted with`);
+    }
+    if (moved.back[0] !== "-d") {
+      throw new Error(`moving it back left the buttons at ${JSON.stringify(moved.back)}`);
+    }
 
     await click("Save changes", { exact: true });
     // **Base-agnostic**, like `go()`: the preview serves `/lorebook/…` and Pages serves

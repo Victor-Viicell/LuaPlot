@@ -515,9 +515,16 @@ finding one meant scrolling a form that never ended. Now:
   parse; the editor always writes one). Empty falls back to the entry's first keyword, then to
   *Untitled entry*.
 - **The list is names only** — one line each, the name at full width, ellipsised.
+- **The name is an input.** Renaming costs nothing: the row's title is a borderless text field (it
+  shows its hairline on hover, the accent on focus, and the fallback name as its placeholder), so an
+  author corrects a name without opening the entry. Everything else about the entry stays behind Edit.
 - **Edit · Up · Down** under each name, a three-column grid across the full width: equal targets,
   even edges. Up is disabled on the first row, Down on the last, and the order is the author's — the
   adapter stores it and nothing sorts it.
+- **A reordered row is re-created, not reused.** Each row carries a `stamp` and the `@for` is keyed by
+  `key:stamp`, bumped on every move: a child's props are evaluated **once**, so a row reused by key kept
+  the `disabled` its buttons were mounted with and Up/Down stopped matching their position. The walk
+  asserts the flags after a move for exactly this reason.
 - **Edit opens the entry in a `Sheet`** (`full` on a phone, the centred dialog from `md`) with the
   whole record: Name, Keywords, Secondary keywords, Content, the four switches, insertion order,
   priority, probability, selective logic — plus **Remove entry**, Cancel and Save entry. The dialog
