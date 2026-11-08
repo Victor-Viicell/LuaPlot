@@ -1,7 +1,8 @@
 import { track } from "ripple";
 import { Button } from "./Button.tsrx";
 import { Field } from "./Field.tsrx";
-import { Select } from "./Select.tsrx";
+import { IconArrowDown, IconArrowUp, IconTrash } from "./Icons.tsrx";
+import { Sheet } from "./Sheet.tsrx";
 import { Skeleton } from "./Skeleton.tsrx";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Lorebook, Persona } from "../lib/data/types.ts";
@@ -53,12 +54,28 @@ export function PersonaForm({
   const formError = track("");
   const saving = track(false);
 
-  const chooseOptions = track(() => [
-    { value: "", label: "Choose a lorebook" },
-    ...picker.value
-      .filter((book) => !ids.value.includes(book.id))
-      .map((book) => ({ value: book.id, label: book.name })),
-  ]);
+  /** The pick dialog: its search text and whether it is open. */
+  const pickerOpen = track(false);
+  const pickQuery = track("");
+  const pickFiltered = track<Lorebook[]>(() => {
+    const needle = pickQuery.value.trim().toLowerCase();
+    return picker.value.filter(
+      (book) =>
+        needle === "" ||
+        book.name.toLowerCase().includes(needle) ||
+        (book.tagline ?? "").toLowerCase().includes(needle),
+    );
+  });
+
+  /** The attached row whose removal is waiting for confirmation; empty when no dialog is open. */
+  const confirmingRemove = track("");
+
+  /** Per-row stamp: a move bumps it so the row remounts with fresh Up/Down state. */
+  const stamps = track<Record<string, number>>({});
+
+  const rows = track(() =>
+    ids.value.map((id) => ({ id, stamp: stamps.value[id] ?? 0 })),
+  );
 
   function load(): void {
     repo.listAttachableLorebooks().then(
@@ -73,14 +90,48 @@ export function PersonaForm({
     );
   }
 
-  function attach(id: string): void {
-    if (id === "" || ids.value.includes(id)) return;
-    ids.value = [...ids.value, id];
+  function attachBook(book: Lorebook): void {
+    if (ids.value.includes(book.id)) return;
+    ids.value = [...ids.value, book.id];
     formError.value = "";
+    closePicker();
+  }
+
+  function openPicker(): void {
+    pickQuery.value = "";
+    pickerOpen.value = true;
+  }
+
+  function closePicker(): void {
+    pickerOpen.value = false;
+    pickQuery.value = "";
   }
 
   function detach(id: string): void {
     ids.value = ids.value.filter((row) => row !== id);
+    confirmingRemove.value = "";
+    formError.value = "";
+  }
+
+  /** Up is `-1`, down is `+1`. The list is the author's order and nothing else sorts it. */
+  function moveAttached(index: number, step: -1 | 1): void {
+    const to = index + step;
+    if (index < 0 || to < 0 || to >= ids.value.length) return;
+    const next = [...ids.value];
+    const carried = next[index];
+    next[index] = next[to];
+    next[to] = carried;
+    ids.value = next;
+    const bump = { ...stamps.value };
+    bump[carried] = (bump[carried] ?? 0) + 1;
+    bump[next[index]] = (bump[next[index]] ?? 0) + 1;
+    stamps.value = bump;
+    formError.value = "";
+  }
+
+  /** What the confirmation dialog calls the row about to be removed. */
+  function removeName(): string {
+    return lorebookName(confirmingRemove.value);
   }
 
   function lorebookName(id: string): string {
@@ -222,13 +273,10 @@ export function PersonaForm({
               <p class="alert" role="alert">
                 {loadFailure.value}
               </p>
-            } @else if (chooseOptions.value.length > 1) {
-              <Select
-                label="Pick lorebook"
-                value={""}
-                options={chooseOptions.value}
-                onChange={attach}
-              />
+            } @else if (picker.value.length > 0) {
+              <Button variant="secondary" block onClick={openPicker}>
+                Pick lorebook
+              </Button>
             }
             @if (ids.value.length === 0) {
               <p class="empty-note">
@@ -236,12 +284,41 @@ export function PersonaForm({
               </p>
             } @else {
               <ul class="attach-list">
-                @for (const id of ids.value; key id) {
+                @for (const row of rows.value; key row.id + ":" + row.stamp) {
                   <li class="attach-row">
-                    <span class="attach-name">{lorebookName(id)}</span>
-                    <Button variant="ghost" onClick={() => detach(id)}>
-                      {"Remove"}
-                    </Button>
+                    <span class="attach-name">{lorebookName(row.id)}</span>
+                    <div class="attach-actions">
+                      <Button
+                        variant="secondary"
+                        label="Remove {lorebookName(row.id)}"
+                        onClick={() => (confirmingRemove.value = row.id)}
+                      >
+                        <IconTrash />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        label="Move up"
+                        disabled={ids.value.findIndex((id) => id === row.id) === 0}
+                        onClick={() =>
+                          moveAttached(ids.value.findIndex((id) => id === row.id), -1)
+                        }
+                      >
+                        <IconArrowUp />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        label="Move down"
+                        disabled={
+                          ids.value.findIndex((id) => id === row.id) ===
+                          ids.value.length - 1
+                        }
+                        onClick={() =>
+                          moveAttached(ids.value.findIndex((id) => id === row.id), 1)
+                        }
+                      >
+                        <IconArrowDown />
+                      </Button>
+                    </div>
                   </li>
                 }
               </ul>
@@ -249,6 +326,78 @@ export function PersonaForm({
           </>
         }
       </section>
+
+      @if (pickerOpen.value) {
+        <Sheet title="Pick lorebook" onClose={closePicker}>
+          <Field
+            label="Search"
+            type="search"
+            value={pickQuery}
+            placeholder="Search lorebooks"
+            onInput={(value) => (pickQuery.value = value)}
+          />
+
+          @if (pickFiltered.value.length === 0) {
+            <p class="empty-note">
+              {picker.value.length === 0
+                ? "You have no lorebooks to attach yet."
+                : `No lorebook matches “${pickQuery.value.trim()}”.`}
+            </p>
+          } @else {
+            <ul class="pick-list" aria-label="Lorebooks">
+              @for (const book of pickFiltered.value; key book.id) {
+                <li>
+                  <button
+                    class={
+                      ids.value.includes(book.id) ? "pick-row is-attached" : "pick-row"
+                    }
+                    type="button"
+                    disabled={ids.value.includes(book.id)}
+                    onClick={() => attachBook(book)}
+                  >
+                    <span class="pick-name">{book.name}</span>
+                    @if (book.tagline) {
+                      <span class="pick-tagline">{book.tagline}</span>
+                    }
+                    @if (ids.value.includes(book.id)) {
+                      <span class="pick-flag">Attached</span>
+                    }
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </Sheet>
+      }
+
+      @if (confirmingRemove.value !== "") {
+        <Sheet
+          title="Remove lorebook"
+          onClose={() => (confirmingRemove.value = "")}
+        >
+          <p class="entry-delete-note">
+            Remove “{removeName()}” from this persona? The change is kept when you save.
+          </p>
+          <div class="confirm-actions">
+            <Button
+              variant="secondary"
+              onClick={() => (confirmingRemove.value = "")}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const id = confirmingRemove.value;
+                if (id === "") return;
+                detach(id);
+              }}
+            >
+              Remove lorebook
+            </Button>
+          </div>
+        </Sheet>
+      }
 
       <div class="foot">
         @if (formError.value) {
@@ -314,11 +463,9 @@ export function PersonaForm({
       .attach-list {
         display: flex;
         flex-direction: column;
-        gap: 1px;
         margin: 0;
         padding: 0;
-        border: 1px solid var(--color-border);
-        border-radius: 2px;
+        border-top: 1px solid var(--color-border);
         list-style: none;
       }
 
@@ -326,19 +473,95 @@ export function PersonaForm({
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 8px;
-        min-height: 44px;
-        padding: 6px 4px 6px 12px;
-        background-color: var(--color-bg-elevated);
+        gap: 10px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--color-border);
       }
 
       .attach-name {
         overflow: hidden;
         color: var(--color-text);
-        font-size: 13px;
+        font-size: 14px;
+        font-weight: 600;
         line-height: 1.4;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .attach-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+      }
+
+      .pick-list {
+        display: flex;
+        flex-direction: column;
+        margin: 12px 0 0;
+        padding: 0;
+        border-top: 1px solid var(--color-border);
+        list-style: none;
+      }
+
+      .pick-row {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 0;
+        border: 0;
+        border-bottom: 1px solid var(--color-border);
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .pick-row:hover:not(:disabled) {
+        background-color: var(--color-surface);
+      }
+
+      .pick-row:disabled {
+        cursor: default;
+        opacity: 0.6;
+      }
+
+      .pick-name {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      .pick-tagline {
+        color: var(--color-text-subtle);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .pick-flag {
+        color: var(--color-text-subtle);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        line-height: 1.4;
+        text-transform: uppercase;
+      }
+
+      .entry-delete-note {
+        margin: 0 0 12px;
+        color: var(--color-text-muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .confirm-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
       }
 
       .foot {

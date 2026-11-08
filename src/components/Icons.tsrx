@@ -70,6 +70,27 @@ export function IconArrowUp() {
   );
 }
 
+export function IconArrowDown() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5v13" />
+      <path d="M6 12l6 6 6-6" />
+    </svg>
+  );
+}
+
+export function IconTrash() {
+  return (
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 7h14" />
+      <path d="M9 7V5h6v2" />
+      <path d="M7 7l1 12h8l1-12" />
+      <path d="M10.5 10.5v5.5" />
+      <path d="M13.5 10.5v5.5" />
+    </svg>
+  );
+}
+
 export function IconMore() {
   return (
     <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">

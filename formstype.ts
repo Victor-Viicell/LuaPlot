@@ -304,6 +304,7 @@ interface PresetWrite {
   /** Shown on the detail page; never part of the prompt. */
   creatorNotes: string;
   nsfw: boolean;
+  tags: string[];
   avatar: Avatar;
   settings: PresetSettings;
 }

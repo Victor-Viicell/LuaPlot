@@ -1407,7 +1407,7 @@ export const memoryRepo: Repo = {
       settings: write.settings,
       isPublic: true,
       verified: false,
-      tags: [],
+      tags: write.tags,
       likes: 0,
       dislikes: 0,
       bookmarks: 0,
@@ -1437,6 +1437,7 @@ export const memoryRepo: Repo = {
       nsfw: write.nsfw,
       avatar: write.avatar,
       settings: write.settings,
+      tags: write.tags,
       verified: false,
       updatedAt: nowIso(),
     });

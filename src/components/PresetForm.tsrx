@@ -2,6 +2,7 @@ import { track } from "ripple";
 import { Button } from "./Button.tsrx";
 import { Field } from "./Field.tsrx";
 import { Select } from "./Select.tsrx";
+import { TagPicker } from "./TagPicker.tsrx";
 import { Toggle } from "./Toggle.tsrx";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Preset } from "../lib/data/types.ts";
@@ -52,6 +53,13 @@ export function PresetForm({
   const creatorNotes = track(preset?.creatorNotes ?? "");
   const initials = track(preset?.avatar.initials ?? "");
   const nsfw = track(preset?.nsfw ?? false);
+  const tags = track<string[]>(preset?.tags ?? []);
+  /** The tag vocabulary the picker offers; empty until the adapter answers, which just means none. */
+  const tagOptions = track<string[]>([]);
+  repo.listTags("preset").then(
+    (next) => (tagOptions.value = next),
+    () => (tagOptions.value = []),
+  );
 
   const settings = preset?.settings;
   const preHistoryInstructions = track(settings?.preHistoryInstructions ?? "");
@@ -84,6 +92,7 @@ export function PresetForm({
       tagline: tagline.value,
       creatorNotes: creatorNotes.value,
       nsfw: nsfw.value,
+      tags: tags.value,
       avatar: { initials: initials.value },
       settings: {
         preHistoryInstructions: preHistoryInstructions.value,
@@ -176,6 +185,17 @@ export function PresetForm({
           label="NSFW"
           pressed={nsfw}
           onToggle={(next) => (nsfw.value = next)}
+        />
+        <TagPicker
+          label="Tags"
+          options={tagOptions}
+          selected={tags}
+          creatable={true}
+          placeholder="long-form, low heat"
+          onChange={(next) => {
+            tags.value = next;
+            formError.value = "";
+          }}
         />
         <Field
           label="Initials"

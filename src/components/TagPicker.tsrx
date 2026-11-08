@@ -27,6 +27,7 @@ export function TagPicker({
   selected,
   onChange,
   placeholder = "Any tag",
+  creatable = false,
 }: {
   label: string;
   /** Every tag in use, from the adapter. May be live: it arrives after mount. */
@@ -35,6 +36,11 @@ export function TagPicker({
   selected: Derived<string[]> | string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
+  /**
+   * Whether the typed text may become a tag of its own. The catalog filters with an existing
+   * vocabulary, so it leaves this off; an authored form needs to mint the first tag.
+   */
+  creatable?: boolean;
 }) @{
   counter += 1;
   const id = `tagpicker-${counter}`;
@@ -48,14 +54,25 @@ export function TagPicker({
 
   const chosen = (): string[] => read(selected);
 
-  /** Options not already chosen, narrowed by what has been typed. */
+  /** Options not already chosen, narrowed by what has been typed; the typed tag comes first. */
   const available = (): string[] => {
     const needle = text.value.trim().toLowerCase();
-    return read(options).filter(
+    const typed = text.value.trim();
+    const all = read(options);
+    const list = all.filter(
       (tag) =>
         !chosen().includes(tag) &&
         (needle === "" || tag.toLowerCase().includes(needle)),
     );
+    if (
+      creatable &&
+      typed !== "" &&
+      !all.some((tag) => tag.toLowerCase() === typed.toLowerCase()) &&
+      !chosen().some((tag) => tag.toLowerCase() === typed.toLowerCase())
+    ) {
+      list.unshift(typed);
+    }
+    return list;
   };
 
   function add(tag: string | undefined): void {

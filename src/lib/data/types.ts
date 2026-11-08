@@ -124,7 +124,7 @@ export type PresetSettings = z.infer<typeof presetSettingsSchema>;
 export type Preset = z.infer<typeof presetSchema>;
 /**
  * One preset submission (`presetWriteSchema`): the fields the author writes. The adapter owns the
- * id, the author, the clock, the `tagline`/tags it never has and the empty engagement.
+ * id, the author, the clock and the empty engagement.
  */
 export type PresetWrite = z.infer<typeof presetWriteSchema>;
 export type Persona = z.infer<typeof personaSchema>;

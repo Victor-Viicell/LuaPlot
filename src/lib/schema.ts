@@ -508,9 +508,10 @@ export const presetSchema = authored("preset", {
  * parsed by `PresetForm` **and** again by `repo.addPreset` / `repo.updatePreset` — the pattern
  * `characterWriteSchema` and `lorebookWriteSchema` established.
  *
- * Deliberately no `tagline` (a preset has none, so the card's stays `""`) and no tags (the taxonomy
- * is undecided). `settings` is the whole generation block: `model` is the only named field, and the
- * provider behind it belongs to the app, so it is not a field a write can carry.
+ * Deliberately no `tagline` (a preset has none, so the card's stays `""`). `settings` is the whole
+ * generation block: `model` is the only named field, and the provider behind it belongs to the app,
+ * so it is not a field a write can carry. `tags` is the authored vocabulary the cards and the
+ * catalog filter read.
  */
 export const PRESET_NAME_REQUIRED = "A preset needs a name.";
 
@@ -523,6 +524,7 @@ export const presetWriteSchema = z
     tagline: z.string().transform((raw) => raw.trim()),
     creatorNotes: z.string().transform((raw) => raw.trim()),
     nsfw: z.boolean(),
+    tags: stringListInput(splitTags),
     avatar: z.strictObject({ initials: initialsInputSchema, url: z.url().optional() }),
     settings: presetSettingsWriteSchema,
   })

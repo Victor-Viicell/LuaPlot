@@ -1,8 +1,10 @@
 import { track } from "ripple";
 import { Button } from "./Button.tsrx";
 import { Field } from "./Field.tsrx";
+import { IconArrowDown, IconArrowUp, IconPen, IconTrash } from "./Icons.tsrx";
 import { Select } from "./Select.tsrx";
 import { Sheet } from "./Sheet.tsrx";
+import { TagPicker } from "./TagPicker.tsrx";
 import { Toggle } from "./Toggle.tsrx";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Lorebook } from "../lib/data/types.ts";
@@ -29,8 +31,8 @@ import {
  * - **Add entry appends below the list**, because the list reads in the author's order and a new
  *   block at the top would push the first entry down on every add.
  * - **A block never collapses in the form**: every field of every entry stays editable, but a block
- *   carries its own Up / Down / Remove on one 44px row, so reordering is two taps rather than a
- *   phone drag.
+ *   carries its own edit / delete / up / down icons on one 44px row, so reordering is two taps rather
+ *   than a phone drag. Deleting asks first, in a sheet.
  *
  * The entry block follows `formstype.ts` → `LorebookEntryWrite`: keywords, secondary keywords,
  * content, then the firing switches and counters (enabled, insertion order, case sensitivity,
@@ -89,7 +91,13 @@ export function LorebookForm({
   );
   const nsfw = track(lorebook?.nsfw ?? false);
   const anonymous = track(lorebook?.anonymous ?? false);
-  const tags = track((lorebook?.tags ?? []).join(", "));
+  const tags = track<string[]>(lorebook?.tags ?? []);
+  /** The tag vocabulary the picker offers; empty until the adapter answers, which just means none. */
+  const tagOptions = track<string[]>([]);
+  repo.listTags("lorebook").then(
+    (next) => (tagOptions.value = next),
+    () => (tagOptions.value = []),
+  );
 
   /** The preloaded blocks, built once: a `track(() => …)` initialiser would make the list read-only. */
   const initialEntries: EntryBlock[] = (lorebook?.entries ?? []).map(
@@ -119,6 +127,9 @@ export function LorebookForm({
   const rowErrors = track<Record<number, string>>({});
   const formError = track("");
   const saving = track(false);
+
+  /** The entry whose delete is waiting for confirmation; empty when no dialog is open. */
+  const confirmingDelete = track<number | "">("");
 
   const denySave = track(() => saving.value || name.value.trim().length === 0);
   const entryCount = track(() => entries.value.length);
@@ -249,14 +260,25 @@ export function LorebookForm({
       },
     ];
     formError.value = "";
-    // A new entry is empty: open it straight away so the author names it and writes it instead of
-    // hunting for the row that just appeared at the bottom of the list.
-    openEntry(nextKey);
   }
 
   function removeEntry(key: number): void {
     entries.value = entries.value.filter((row) => row.key !== key);
+    const next = { ...rowErrors.value };
+    delete next[key];
+    rowErrors.value = next;
+    confirmingDelete.value = "";
+    // An open editor or an open confirm belongs to the row that no longer exists.
+    if (editingKey.value === key) closeEntry();
     formError.value = "";
+  }
+
+  /** What the confirmation dialog calls the row about to be deleted. */
+  function confirmName(): string {
+    const key = confirmingDelete.value;
+    if (key === "") return "";
+    const row = entries.value.find((each) => each.key === key);
+    return row ? nameOf(row) : "";
   }
 
   /** Up is `-1`, down is `+1`. The list is the author's order and nothing else sorts it. */
@@ -422,13 +444,14 @@ export function LorebookForm({
             onToggle={(next) => (anonymous.value = next)}
           />
         </div>
-        <Field
+        <TagPicker
           label="Tags"
-          value={tags}
+          options={tagOptions}
+          selected={tags}
+          creatable={true}
           placeholder="harbor, debt"
-          help="Comma-separated."
-          onInput={(value) => {
-            tags.value = value;
+          onChange={(next) => {
+            tags.value = next;
             formError.value = "";
           }}
         />
@@ -462,11 +485,23 @@ export function LorebookForm({
                 />
 
                 <div class="entry-actions">
-                  <Button variant="secondary" onClick={() => openEntry(row.key)}>
-                    Edit
+                  <Button
+                    variant="secondary"
+                    label="Edit entry"
+                    onClick={() => openEntry(row.key)}
+                  >
+                    <IconPen />
                   </Button>
                   <Button
                     variant="secondary"
+                    label="Delete entry"
+                    onClick={() => (confirmingDelete.value = row.key)}
+                  >
+                    <IconTrash />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    label="Move entry up"
                     disabled={entries.value.findIndex((each) => each.key === row.key) === 0}
                     onClick={() =>
                       moveEntry(
@@ -475,10 +510,11 @@ export function LorebookForm({
                       )
                     }
                   >
-                    Up
+                    <IconArrowUp />
                   </Button>
                   <Button
                     variant="secondary"
+                    label="Move entry down"
                     disabled={
                       entries.value.findIndex((each) => each.key === row.key) ===
                       entries.value.length - 1
@@ -490,7 +526,7 @@ export function LorebookForm({
                       )
                     }
                   >
-                    Down
+                    <IconArrowDown />
                   </Button>
                 </div>
               </li>
@@ -504,6 +540,33 @@ export function LorebookForm({
           </Button>
         </div>
       </section>
+
+      @if (confirmingDelete.value !== "") {
+        <Sheet
+          title="Delete entry"
+          onClose={() => (confirmingDelete.value = "")}
+        >
+          <p class="entry-delete-note">
+            Delete “{confirmName()}”? The entry is removed from this lorebook. The change is
+            kept when you save.
+          </p>
+          <div class="confirm-actions">
+            <Button variant="secondary" onClick={() => (confirmingDelete.value = "")}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const key = confirmingDelete.value;
+                if (key === "") return;
+                removeEntry(key);
+              }}
+            >
+              Delete entry
+            </Button>
+          </div>
+        </Sheet>
+      }
 
       @if (editingKey.value !== "") {
         <Sheet title="Entry" onClose={closeEntry} full={true}>
@@ -602,8 +665,9 @@ export function LorebookForm({
               variant="secondary"
               onClick={() => {
                 if (editingKey.value === "") return;
-                removeEntry(editingKey.value);
+                const key = editingKey.value;
                 closeEntry();
+                confirmingDelete.value = key;
               }}
             >
               Remove entry
@@ -707,8 +771,8 @@ export function LorebookForm({
         border-bottom: 1px solid var(--color-border);
       }
 
-      /* One entry, one line: the name across the row, then Edit · Up · Down spread evenly over the
-         full width. Everything else about the entry lives behind **Edit**. */
+      /* One entry, one line: the name across the row, then edit · delete · up · down as icon buttons
+         spread evenly over the full width. Everything else about the entry lives behind **Edit**. */
       .entry {
         display: flex;
         flex-direction: column;
@@ -751,13 +815,31 @@ export function LorebookForm({
       .entry-actions,
       .entry-dialog-actions {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 8px;
         width: 100%;
       }
 
       .entry-dialog-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
         padding-top: 4px;
+      }
+
+      .confirm-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+      }
+
+      .entry-delete-note {
+        margin: 0 0 12px;
+        color: var(--color-text-muted);
+        font-size: 14px;
+        line-height: 1.6;
       }
 
       .add-row {

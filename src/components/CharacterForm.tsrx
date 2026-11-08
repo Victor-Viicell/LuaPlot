@@ -1,8 +1,11 @@
 import { track } from "ripple";
 import { Button } from "./Button.tsrx";
 import { Field } from "./Field.tsrx";
+import { IconArrowDown, IconArrowUp, IconTrash } from "./Icons.tsrx";
 import { Select } from "./Select.tsrx";
+import { Sheet } from "./Sheet.tsrx";
 import { Skeleton } from "./Skeleton.tsrx";
+import { TagPicker } from "./TagPicker.tsrx";
 import { Toggle } from "./Toggle.tsrx";
 import { resolveRepo } from "../lib/data/repo.ts";
 import type { Character, Lorebook } from "../lib/data/types.ts";
@@ -41,7 +44,13 @@ import {
  */
 
 /** One row in the attachment list: an id, its name when it still resolves, and that fact. */
-type AttachmentRow = { id: string; name: string; available: boolean };
+type AttachmentRow = {
+  id: string;
+  name: string;
+  available: boolean;
+  /** Remounts the row after a move so its disabled endpoints follow the new position. */
+  stamp: number;
+};
 
 export function CharacterForm({
   character,
@@ -60,7 +69,13 @@ export function CharacterForm({
   const tagline = track(character?.tagline ?? "");
   const inSessionName = track(character?.inSessionName ?? "");
   const creatorNotes = track(character?.creatorNotes ?? "");
-  const tags = track((character?.tags ?? []).join(", "));
+  const tags = track<string[]>(character?.tags ?? []);
+  /** The tag vocabulary the picker offers; empty until the adapter answers, which just means none. */
+  const tagOptions = track<string[]>([]);
+  repo.listTags("character").then(
+    (next) => (tagOptions.value = next),
+    () => (tagOptions.value = []),
+  );
   const visibility = track<Visibility>(
     character?.visibility ??
       (character?.isPublic === false ? "private" : "public"),
@@ -83,27 +98,42 @@ export function CharacterForm({
 
   /** Names of the attached lorebooks that still resolve — the map the list draws. */
   const names = track<Record<string, string>>({});
+  /** Per-row stamp: a move bumps it so the row remounts with fresh Up/Down state. */
+  const stamps = track<Record<string, number>>({});
   /** The picker's list: own lorebooks plus the ones booked from other authors. */
   const picker = track<Lorebook[]>([]);
   const loading = track(true);
   const loadFailure = track("");
 
+  /** The pick dialog: its search text and whether it is open. */
+  const pickerOpen = track(false);
+  const pickQuery = track("");
+  const pickFiltered = track<Lorebook[]>(() => {
+    const needle = pickQuery.value.trim().toLowerCase();
+    return picker.value.filter(
+      (book) =>
+        needle === "" ||
+        book.name.toLowerCase().includes(needle) ||
+        (book.tagline ?? "").toLowerCase().includes(needle),
+    );
+  });
+
   const rows = track<AttachmentRow[]>(() =>
     ids.value.map((id) => {
       const found = names.value[id];
-      return { id, name: found ?? "", available: found !== undefined };
+      return {
+        id,
+        name: found ?? "",
+        available: found !== undefined,
+        stamp: stamps.value[id] ?? 0,
+      };
     }),
   );
 
-  /** Already-attached books are not offered again; the by-ID control refuses them instead. */
-  const chooseOptions = track<{ value: string; label: string }[]>(() => [
-    { value: "", label: "Choose a lorebook" },
-    ...picker.value
-      .filter((book) => !ids.value.includes(book.id))
-      .map((book) => ({ value: book.id, label: book.name })),
-  ]);
-
   const denySave = track(() => saving.value || name.value.trim().length === 0);
+
+  /** The attached row whose removal is waiting for confirmation; empty when no dialog is open. */
+  const confirmingRemove = track("");
 
   function remember(book: Lorebook): void {
     names.value = { ...names.value, [book.id]: book.name };
@@ -162,17 +192,51 @@ export function CharacterForm({
     idInput.value = "";
   }
 
-  function pick(value: string): void {
-    if (value === "") return;
-    const book = picker.value.find((row) => row.id === value) ?? null;
-    if (!book || ids.value.includes(book.id)) return;
+  function openPicker(): void {
+    pickQuery.value = "";
+    pickerOpen.value = true;
+  }
+
+  function closePicker(): void {
+    pickerOpen.value = false;
+    pickQuery.value = "";
+  }
+
+  /** Attach a row from the pick dialog; already-attached books are shown but inert. */
+  function attachBook(book: Lorebook): void {
+    if (ids.value.includes(book.id)) return;
     ids.value = [...ids.value, book.id];
     remember(book);
     attachError.value = "";
+    closePicker();
   }
 
   function remove(id: string): void {
     ids.value = ids.value.filter((row) => row !== id);
+    confirmingRemove.value = "";
+    attachError.value = "";
+  }
+
+  /** What the confirmation dialog calls the row about to be removed. */
+  function removeName(): string {
+    const id = confirmingRemove.value;
+    const row = rows.value.find((each) => each.id === id);
+    return row ? (row.available ? row.name : row.id) : "";
+  }
+
+  /** Up is `-1`, down is `+1`. The list is the author's order and nothing else sorts it. */
+  function moveAttached(index: number, step: -1 | 1): void {
+    const to = index + step;
+    if (index < 0 || to < 0 || to >= ids.value.length) return;
+    const next = [...ids.value];
+    const carried = next[index];
+    next[index] = next[to];
+    next[to] = carried;
+    ids.value = next;
+    const bump = { ...stamps.value };
+    bump[carried] = (bump[carried] ?? 0) + 1;
+    bump[next[index]] = (bump[next[index]] ?? 0) + 1;
+    stamps.value = bump;
     attachError.value = "";
   }
 
@@ -291,13 +355,14 @@ export function CharacterForm({
             formError.value = "";
           }}
         />
-        <Field
+        <TagPicker
           label="Tags"
-          value={tags}
+          options={tagOptions}
+          selected={tags}
+          creatable={true}
           placeholder="sea, harbor, ritual"
-          help="Comma-separated."
-          onInput={(value) => {
-            tags.value = value;
+          onChange={(next) => {
+            tags.value = next;
             formError.value = "";
           }}
         />
@@ -420,13 +485,10 @@ export function CharacterForm({
               <p class="alert" role="alert">
                 {loadFailure.value}
               </p>
-            } @else if (chooseOptions.value.length > 1) {
-              <Select
-                label="Pick lorebook"
-                value={""}
-                options={chooseOptions.value}
-                onChange={pick}
-              />
+            } @else if (picker.value.length > 0) {
+              <Button variant="secondary" block onClick={openPicker}>
+                Pick lorebook
+              </Button>
             }
 
             @if (rows.value.length === 0) {
@@ -435,7 +497,7 @@ export function CharacterForm({
               </p>
             } @else {
               <ul class="attach-list">
-                @for (const row of rows.value; key row.id) {
+                @for (const row of rows.value; key row.id + ":" + row.stamp) {
                   <li class="attach-row">
                     <span class="attach-text">
                       <span class="attach-name">
@@ -447,11 +509,38 @@ export function CharacterForm({
                         </span>
                       }
                     </span>
-                    <Button
-                      variant="ghost"
-                      onClick={() => remove(row.id)}
-                      label="Remove"
-                    >{`Remove`}</Button>
+                    <div class="attach-actions">
+                      <Button
+                        variant="secondary"
+                        label="Remove {row.available ? row.name : row.id}"
+                        onClick={() => (confirmingRemove.value = row.id)}
+                      >
+                        <IconTrash />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        label="Move up"
+                        disabled={ids.value.findIndex((id) => id === row.id) === 0}
+                        onClick={() =>
+                          moveAttached(ids.value.findIndex((id) => id === row.id), -1)
+                        }
+                      >
+                        <IconArrowUp />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        label="Move down"
+                        disabled={
+                          ids.value.findIndex((id) => id === row.id) ===
+                          ids.value.length - 1
+                        }
+                        onClick={() =>
+                          moveAttached(ids.value.findIndex((id) => id === row.id), 1)
+                        }
+                      >
+                        <IconArrowDown />
+                      </Button>
+                    </div>
                   </li>
                 }
               </ul>
@@ -459,6 +548,78 @@ export function CharacterForm({
           </>
         }
       </section>
+
+      @if (pickerOpen.value) {
+        <Sheet title="Pick lorebook" onClose={closePicker}>
+          <Field
+            label="Search"
+            type="search"
+            value={pickQuery}
+            placeholder="Search lorebooks"
+            onInput={(value) => (pickQuery.value = value)}
+          />
+
+          @if (pickFiltered.value.length === 0) {
+            <p class="empty-note">
+              {picker.value.length === 0
+                ? "You have no lorebooks to attach yet."
+                : `No lorebook matches “${pickQuery.value.trim()}”.`}
+            </p>
+          } @else {
+            <ul class="pick-list" aria-label="Lorebooks">
+              @for (const book of pickFiltered.value; key book.id) {
+                <li>
+                  <button
+                    class={
+                      ids.value.includes(book.id) ? "pick-row is-attached" : "pick-row"
+                    }
+                    type="button"
+                    disabled={ids.value.includes(book.id)}
+                    onClick={() => attachBook(book)}
+                  >
+                    <span class="pick-name">{book.name}</span>
+                    @if (book.tagline) {
+                      <span class="pick-tagline">{book.tagline}</span>
+                    }
+                    @if (ids.value.includes(book.id)) {
+                      <span class="pick-flag">Attached</span>
+                    }
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </Sheet>
+      }
+
+      @if (confirmingRemove.value !== "") {
+        <Sheet
+          title="Remove lorebook"
+          onClose={() => (confirmingRemove.value = "")}
+        >
+          <p class="entry-delete-note">
+            Remove “{removeName()}” from this character? The change is kept when you save.
+          </p>
+          <div class="confirm-actions">
+            <Button
+              variant="secondary"
+              onClick={() => (confirmingRemove.value = "")}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const id = confirmingRemove.value;
+                if (id === "") return;
+                remove(id);
+              }}
+            >
+              Remove lorebook
+            </Button>
+          </div>
+        </Sheet>
+      }
 
       <div class="foot">
         @if (formError.value) {
@@ -528,22 +689,19 @@ export function CharacterForm({
       .attach-list {
         display: flex;
         flex-direction: column;
-        gap: 1px;
         margin: 0;
         padding: 0;
+        border-top: 1px solid var(--color-border);
         list-style: none;
-        border: 1px solid var(--color-border);
-        border-radius: 2px;
       }
 
       .attach-row {
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 8px;
-        min-height: 44px;
-        padding: 6px 4px 6px 12px;
-        background-color: var(--color-bg-elevated);
+        gap: 10px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--color-border);
       }
 
       .attach-text {
@@ -556,7 +714,8 @@ export function CharacterForm({
       .attach-name {
         overflow: hidden;
         color: var(--color-text);
-        font-size: 13px;
+        font-size: 14px;
+        font-weight: 600;
         line-height: 1.4;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -566,6 +725,82 @@ export function CharacterForm({
         color: var(--color-text-subtle);
         font-size: 11px;
         line-height: 1.4;
+      }
+
+      .attach-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+      }
+
+      .entry-delete-note {
+        margin: 0 0 12px;
+        color: var(--color-text-muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .confirm-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+      }
+
+      .pick-list {
+        display: flex;
+        flex-direction: column;
+        margin: 12px 0 0;
+        padding: 0;
+        border-top: 1px solid var(--color-border);
+        list-style: none;
+      }
+
+      .pick-row {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 0;
+        border: 0;
+        border-bottom: 1px solid var(--color-border);
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .pick-row:hover:not(:disabled) {
+        background-color: var(--color-surface);
+      }
+
+      .pick-row:disabled {
+        cursor: default;
+        opacity: 0.6;
+      }
+
+      .pick-name {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      .pick-tagline {
+        color: var(--color-text-subtle);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .pick-flag {
+        color: var(--color-text-subtle);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        line-height: 1.4;
+        text-transform: uppercase;
       }
 
       .empty-note {
